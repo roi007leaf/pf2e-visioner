@@ -1302,6 +1302,10 @@
         "name": "Hold for Cover Visualization",
         "hint": "Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks."
       },
+      "HOLD_PEEK": {
+        "name": "Hold Peek (Corner)",
+        "hint": "Hold to peek a directional cone around the nearest corner toward the cursor for the selected token."
+      },
       "SHOW_WALL_COVER_LABELS": {
         "name": "Show Wall Cover Labels",
         "hint": "Hold this key while the walls tool is active to show cover status labels on walls (AUTO, NONE, LESSER, STANDARD, GREATER)."

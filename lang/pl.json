@@ -1238,6 +1238,10 @@
       "hidden": "Ukryty"
     },
     "KEYBINDINGS": {
+      "HOLD_PEEK": {
+        "name": "Hold Peek (Corner)",
+        "hint": "Hold to peek a directional cone around the nearest corner toward the cursor for the selected token."
+      },
       "OPEN_TOKEN_MANAGER": {
         "name": "Otwórz Menedżera Widoczności",
         "hint": "Otwórz menedżera tokenów dla wybranych tokenów"

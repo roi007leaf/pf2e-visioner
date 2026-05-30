@@ -1181,6 +1181,12 @@ export const KEYBINDINGS = {
     editable: [{ key: 'KeyY', modifiers: [] }],
     restricted: false,
   },
+  holdPeek: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_PEEK.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_PEEK.hint',
+    editable: [],
+    restricted: false,
+  },
   showWallCoverLabels: {
     name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.name',
     hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.hint',

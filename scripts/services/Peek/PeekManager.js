@@ -1,3 +1,4 @@
+import { MODULE_ID } from '../../constants.js';
 import { clampCornerPeek, clampDoorPeek } from './peek-geometry.js';
 
 const PEEK_BAND = 50;
@@ -83,6 +84,19 @@ export class PeekManager {
     Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
     Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
+    if (typeof canvas !== 'undefined' && canvas?.stage?.on) {
+      canvas.stage.on('pointermove', () => {
+        const mod = game.modules.get(MODULE_ID);
+        const id = mod?._peekKeyHeld;
+        if (!id) return;
+        if (this._raf) return;
+        this._raf = requestAnimationFrame(() => {
+          this._raf = null;
+          const m = canvas.mousePosition;
+          if (m) this.updatePeek(id, { x: m.x, y: m.y });
+        });
+      });
+    }
   }
 
   _footprint(token) {
