@@ -1,5 +1,3 @@
-import { MODULE_ID } from '../../constants.js';
-
 export function registerDoorPeekInteraction(manager) {
   if (typeof Hooks === 'undefined') return;
   Hooks.on('renderDoorControl', (control, html) => {
