@@ -130,6 +130,47 @@ describe('PeekManager hook reactions', () => {
   });
 });
 
+describe('PeekManager heartbeat', () => {
+  function deps() {
+    return {
+      registry: new PeekRegistry(),
+      renderer: { apply: jest.fn(), clear: jest.fn() },
+      socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+      recompute: jest.fn(),
+      now: () => 1000,
+    };
+  }
+
+  test('heartbeat re-sends all active peeks owned by this manager', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    d.socket.sendUpdate.mockClear();
+    mgr.heartbeat();
+    expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+    expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.objectContaining({ origin: expect.anything() }));
+  });
+
+  test('heartbeat sends nothing when no active peek', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    mgr.heartbeat();
+    expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+  });
+
+  test('heartbeat stops re-sending a token after its peek ended', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    mgr.endPeek('p', 'keyup');
+    d.socket.sendUpdate.mockClear();
+    mgr.heartbeat();
+    expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('PeekManager door DC gate', () => {
   function mgrWith(extra = {}) {
     const d = {

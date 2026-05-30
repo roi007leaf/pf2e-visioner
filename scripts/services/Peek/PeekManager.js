@@ -33,12 +33,12 @@ export class PeekManager {
   startCornerPeek(token, mouse) {
     const footprint = this._footprint(token);
     const geo = clampCornerPeek({ footprint, mouse, band: PEEK_BAND, fov: PEEK_FOV });
-    this._begin(token, { ...geo, ignoredWallIds: [], kind: 'corner' });
+    this._begin(token, { ...geo, ignoredWallIds: [] });
   }
 
   startDoorPeek(token, doorDoc) {
     const geo = clampDoorPeek({ door: doorDoc, tokenCenter: token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV });
-    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id], kind: 'door' });
+    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id] });
   }
 
   updatePeek(tokenId, mouse) {
@@ -64,6 +64,13 @@ export class PeekManager {
 
   getActivePeek(tokenId) {
     return this._registry.get(tokenId);
+  }
+
+  heartbeat() {
+    for (const id of this._tokensById.keys()) {
+      const peek = this._registry.get(id);
+      if (peek) this._socket.sendUpdate(id, peek);
+    }
   }
 
   _begin(token, data) {
@@ -94,11 +101,16 @@ export class PeekManager {
   }
 
   init() {
+    if (this._initialized) return;
+    this._initialized = true;
     if (typeof Hooks === 'undefined') return;
     Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
     Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
     registerDoorPeekInteraction(this);
+    if (typeof setInterval !== 'undefined') {
+      this._heartbeatTimer = setInterval(() => this.heartbeat(), 500);
+    }
     if (typeof canvas !== 'undefined' && canvas?.stage?.on) {
       canvas.stage.on('pointermove', () => {
         const mod = game.modules.get(MODULE_ID);

@@ -1468,8 +1468,7 @@
     },
     "PEEK": {
       "CHECK_LABEL": "Peek Through Door",
-      "DC_FIELD_LABEL": "Peek DC",
-      "FAILED": "{name} fails to peek through the door."
+      "DC_FIELD_LABEL": "Peek DC"
     }
   }
 }
