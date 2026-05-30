@@ -1465,6 +1465,11 @@
     "SNEAK_ADEPT_FEAT": {
       "OUTCOME_UPGRADED": "Sneak Adept",
       "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
+    },
+    "PEEK": {
+      "CHECK_LABEL": "Peek Through Door",
+      "DC_FIELD_LABEL": "Peek DC",
+      "FAILED": "{name} fails to peek through the door."
     }
   }
 }

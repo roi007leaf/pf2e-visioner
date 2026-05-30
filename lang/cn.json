@@ -1490,6 +1490,11 @@
             "SOUND_LABEL": "层级地面与声音",
             "SIGHT_HINT": "选择该层级边界是采用原生V14视线碰撞，始终阻挡视线还是从不阻挡视线的模式。",
             "SOUND_HINT": "选择该层级边界是采用原生V14声音碰撞，始终阻挡声音还是从不阻挡声音的模式。"
+        },
+        "PEEK": {
+            "CHECK_LABEL": "Peek Through Door",
+            "DC_FIELD_LABEL": "Peek DC",
+            "FAILED": "{name} fails to peek through the door."
         }
     }
 }
