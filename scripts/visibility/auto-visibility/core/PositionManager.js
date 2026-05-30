@@ -1,3 +1,5 @@
+import { peekRegistry } from '../../../services/Peek/PeekRegistry.js';
+
 /**
  * Manages token position tracking, pinning, and coordinate calculations for the auto-visibility system.
  * Handles position updates, position pinning during animations, and coordinate transformations.
@@ -73,6 +75,14 @@ export class PositionManager {
    */
   getTokenPosition(token) {
     const tokenId = token.document.id;
+    const peek = peekRegistry.get(tokenId);
+    if (peek?.origin) {
+      return {
+        x: peek.origin.x,
+        y: peek.origin.y,
+        elevation: peek.origin.elevation ?? token.document.elevation ?? 0,
+      };
+    }
     const tokenName = token.document.name;
 
     // Priority 1: Updated document coordinates during an update cycle
