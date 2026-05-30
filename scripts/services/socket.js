@@ -470,7 +470,7 @@ export function peekUpdateHandler(payload) {
     fov: payload.fov,
     ignoredWallIds: payload.ignoredWallIds ?? [],
   }, now);
-  peekRegistry.pruneStale(1000, now);
+  peekRegistry.pruneStale(5000, now);
   recalcPeekToken(payload.tokenId);
 }
 
@@ -500,7 +500,7 @@ export function startPeekStalePruner() {
   _peekPruneTimer = setInterval(() => {
     if (!game.user?.isGM) return;
     const before = peekRegistry.ids();
-    peekRegistry.pruneStale(1000, Date.now());
+    peekRegistry.pruneStale(5000, Date.now());
     for (const id of before) {
       if (!peekRegistry.has(id)) recalcPeekToken(id);
     }

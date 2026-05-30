@@ -18,7 +18,7 @@ function toRadians(deg) {
   return (deg * Math.PI) / 180;
 }
 
-export function clampCornerPeek({ footprint, mouse, band, fov }) {
+export function clampCornerPeek({ footprint, mouse, band, fov, tokenCenter, maxSweep }) {
   const expanded = {
     minX: footprint.x - band,
     minY: footprint.y - band,
@@ -29,15 +29,20 @@ export function clampCornerPeek({ footprint, mouse, band, fov }) {
   const clampedY = clamp(mouse.y, expanded.minY, expanded.maxY);
   const origin = { x: clampedX, y: clampedY };
   if (footprint.elevation !== undefined) origin.elevation = footprint.elevation;
-  const direction = Math.atan2(mouse.y - origin.y, mouse.x - origin.x);
-  return { origin, direction: Number.isNaN(direction) ? 0 : direction, fov };
+  let direction = Math.atan2(mouse.y - origin.y, mouse.x - origin.x);
+  if (Number.isNaN(direction)) direction = 0;
+  if (tokenCenter && typeof maxSweep === 'number' && !(origin.x === tokenCenter.x && origin.y === tokenCenter.y)) {
+    const base = Math.atan2(origin.y - tokenCenter.y, origin.x - tokenCenter.x);
+    direction = clampDirectionToArc(base, direction, maxSweep);
+  }
+  return { origin, direction: direction, fov };
 }
 
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function clampDoorPeek({ door, tokenCenter, nudge, fov }) {
+export function clampDoorPeek({ door, tokenCenter, nudge, fov, aim, maxSweep }) {
   const [x1, y1, x2, y2] = door.c;
   const mid = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
   let nx = -(y2 - y1);
@@ -52,8 +57,21 @@ export function clampDoorPeek({ door, tokenCenter, nudge, fov }) {
     ny = -ny;
   }
   const origin = { x: mid.x + nx * nudge, y: mid.y + ny * nudge };
-  const direction = Math.atan2(ny, nx);
+  const base = Math.atan2(ny, nx);
+  let direction = base;
+  if (aim && typeof maxSweep === 'number') {
+    const raw = Math.atan2(aim.y - origin.y, aim.x - origin.x);
+    direction = clampDirectionToArc(base, raw, maxSweep);
+  }
   return { origin, direction, fov };
+}
+
+export function clampDirectionToArc(base, target, maxSweep) {
+  let delta = target - base;
+  delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+  if (delta > maxSweep) delta = maxSweep;
+  else if (delta < -maxSweep) delta = -maxSweep;
+  return base + delta;
 }
 
 export function distancePointToSegment(point, segment) {

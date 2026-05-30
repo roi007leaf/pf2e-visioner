@@ -2,6 +2,7 @@ import '../../../setup.js';
 import { isPointInCone } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { clampCornerPeek } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { distancePointToSegment, isWithinDoorPeekRange } from '../../../../scripts/services/Peek/peek-geometry.js';
+import { clampDirectionToArc } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 describe('isPointInCone', () => {
   const origin = { x: 0, y: 0 };
@@ -95,6 +96,42 @@ describe('clampDoorPeek', () => {
   test('fov passed through', () => {
     const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
     expect(out.fov).toBe(60);
+  });
+});
+
+describe('clampDirectionToArc', () => {
+  test('within the arc is unchanged', () => {
+    expect(clampDirectionToArc(0, 0.3, 0.7)).toBeCloseTo(0.3, 5);
+  });
+  test('clamps to +maxSweep when target is too far CCW', () => {
+    expect(clampDirectionToArc(0, 1.5, 0.7)).toBeCloseTo(0.7, 5);
+  });
+  test('clamps to -maxSweep when target is too far CW', () => {
+    expect(clampDirectionToArc(0, -1.5, 0.7)).toBeCloseTo(-0.7, 5);
+  });
+  test('handles the +/-PI wraparound (close across the seam stays small)', () => {
+    const out = clampDirectionToArc(3.0, -3.0, 0.7);
+    const delta = Math.atan2(Math.sin(out - 3.0), Math.cos(out - 3.0));
+    expect(Math.abs(delta)).toBeLessThanOrEqual(0.7 + 1e-9);
+  });
+});
+
+describe('clampDoorPeek aim', () => {
+  const door = { c: [0, 0, 0, 100] };
+  const tokenCenter = { x: -50, y: 50 };
+  const maxSweep = (40 * Math.PI) / 180;
+
+  test('aim slightly off the normal stays within sweep of base', () => {
+    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 22, aim: { x: 100, y: 60 }, maxSweep });
+    const base = 0;
+    const delta = Math.atan2(Math.sin(out.direction - base), Math.cos(out.direction - base));
+    expect(Math.abs(delta)).toBeLessThanOrEqual(maxSweep + 1e-9);
+    expect(Math.abs(delta)).toBeGreaterThan(0);
+  });
+
+  test('aim far to one side clamps to exactly base+maxSweep', () => {
+    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 22, aim: { x: 100, y: 1000 }, maxSweep });
+    expect(out.direction).toBeCloseTo(maxSweep, 5);
   });
 });
 

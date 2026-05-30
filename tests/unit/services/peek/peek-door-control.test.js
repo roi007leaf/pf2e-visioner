@@ -23,10 +23,10 @@ describe('handleDoorRightDown', () => {
   test('peeks the door for the single controlled token', async () => {
     const token = createMockToken({ id: 'p', x: -50, y: 50 });
     token.center = { x: -50, y: 50 };
-    global.canvas = { ...global.canvas, grid: { size: 100 }, tokens: { controlled: [token] } };
+    global.canvas = { ...global.canvas, grid: { size: 100 }, tokens: { controlled: [token] }, mousePosition: { x: 10, y: 20 } };
     const handled = await handleDoorRightDown(manager, control('door1'));
     expect(handled).toBe(true);
-    expect(manager.tryStartDoorPeek).toHaveBeenCalledWith(token, expect.objectContaining({ id: 'door1' }));
+    expect(manager.tryStartDoorPeek).toHaveBeenCalledWith(token, expect.objectContaining({ id: 'door1' }), expect.anything());
   });
 
   test('does nothing when no token controlled', async () => {

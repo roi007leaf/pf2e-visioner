@@ -4,9 +4,10 @@ import { readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 
 const PEEK_BAND = 50;
-const PEEK_FOV = 90;
-const DOOR_FOV = 60;
+const PEEK_FOV = 22;
+const DOOR_FOV = 22;
 const DOOR_NUDGE = 5;
+const MAX_SWEEP = (40 * Math.PI) / 180;
 
 export class PeekManager {
   constructor({ registry, renderer, socket, recompute, now, rollPeek, readDC }) {
@@ -15,48 +16,56 @@ export class PeekManager {
     this._socket = socket;
     this._recompute = recompute;
     this._now = now || (() => Date.now());
-    this._tokensById = new Map();
+    this._active = new Map();
     this._rollPeek = rollPeek;
     this._readDC = readDC || readPeekDC;
   }
 
-  async tryStartDoorPeek(token, doorDoc) {
+  async tryStartDoorPeek(token, doorDoc, mouse) {
+    const id = token.document.id;
+    const existing = this._active.get(id);
+    if (existing?.kind === 'door' && existing.doorDoc?.id === doorDoc.id) {
+      this.endPeek(id, 'toggle');
+      return false;
+    }
     const dc = this._readDC(doorDoc);
     if (dc != null && this._rollPeek) {
       const { success } = await this._rollPeek({ token, dc });
       if (!success) return false;
     }
-    this.startDoorPeek(token, doorDoc);
+    this.startDoorPeek(token, doorDoc, mouse);
     return true;
   }
 
   startCornerPeek(token, mouse) {
-    const footprint = this._footprint(token);
-    const geo = clampCornerPeek({ footprint, mouse, band: PEEK_BAND, fov: PEEK_FOV });
-    this._begin(token, { ...geo, ignoredWallIds: [] });
+    const geo = clampCornerPeek({ footprint: this._footprint(token), mouse, band: PEEK_BAND, fov: PEEK_FOV, tokenCenter: token.center, maxSweep: MAX_SWEEP });
+    this._begin(token, { ...geo, ignoredWallIds: [] }, { kind: 'corner' });
   }
 
-  startDoorPeek(token, doorDoc) {
-    const geo = clampDoorPeek({ door: doorDoc, tokenCenter: token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV });
-    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id] });
+  startDoorPeek(token, doorDoc, mouse) {
+    const geo = clampDoorPeek({ door: doorDoc, tokenCenter: token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV, aim: mouse, maxSweep: MAX_SWEEP });
+    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id] }, { kind: 'door', doorDoc });
   }
 
   updatePeek(tokenId, mouse) {
-    const token = this._tokensById.get(tokenId);
-    if (!token) return;
-    const footprint = this._footprint(token);
-    const geo = clampCornerPeek({ footprint, mouse, band: PEEK_BAND, fov: PEEK_FOV });
-    this._registry.set(tokenId, { ...geo, ignoredWallIds: [] }, this._now());
-    this._renderer.apply(token, this._registry.get(tokenId));
+    const entry = this._active.get(tokenId);
+    if (!entry) return;
+    const geo = entry.kind === 'door'
+      ? clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV, aim: mouse, maxSweep: MAX_SWEEP })
+      : clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: PEEK_FOV, tokenCenter: entry.token.center, maxSweep: MAX_SWEEP });
+    const ignoredWallIds = entry.kind === 'door' ? [entry.doorDoc.id] : [];
+    this._registry.set(tokenId, { ...geo, ignoredWallIds }, this._now());
+    this._renderer.apply(entry.token, this._registry.get(tokenId));
     this._socket.sendUpdate(tokenId, this._registry.get(tokenId));
     this._recompute(tokenId);
   }
 
   endPeek(tokenId, reason) {
     if (!this._registry.has(tokenId)) return;
-    const token = this._tokensById.get(tokenId);
+    const entry = this._active.get(tokenId);
+    const token = entry?.token;
     this._registry.clear(tokenId);
-    this._tokensById.delete(tokenId);
+    this._active.delete(tokenId);
     if (token) this._renderer.clear(token);
     this._socket.sendEnd(tokenId);
     this._recompute(tokenId);
@@ -67,16 +76,16 @@ export class PeekManager {
   }
 
   heartbeat() {
-    for (const id of this._tokensById.keys()) {
+    for (const id of this._active.keys()) {
       const peek = this._registry.get(id);
       if (peek) this._socket.sendUpdate(id, peek);
     }
   }
 
-  _begin(token, data) {
+  _begin(token, data, meta) {
     const id = token.document.id;
     if (this._registry.has(id)) this.endPeek(id, 'restart');
-    this._tokensById.set(id, token);
+    this._active.set(id, { token, kind: meta.kind, doorDoc: meta.doorDoc });
     this._registry.set(id, data, this._now());
     this._renderer.apply(token, this._registry.get(id));
     this._socket.sendUpdate(id, this._registry.get(id));
@@ -109,18 +118,26 @@ export class PeekManager {
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
     registerDoorPeekInteraction(this);
     if (typeof setInterval !== 'undefined') {
-      this._heartbeatTimer = setInterval(() => this.heartbeat(), 500);
+      this._heartbeatTimer = setInterval(() => this.heartbeat(), 2000);
     }
     if (typeof canvas !== 'undefined' && canvas?.stage?.on) {
       canvas.stage.on('pointermove', () => {
-        const mod = game.modules.get(MODULE_ID);
-        const id = mod?._peekKeyHeld;
-        if (!id) return;
         if (this._raf) return;
         this._raf = requestAnimationFrame(() => {
           this._raf = null;
           const m = canvas.mousePosition;
-          if (m) this.updatePeek(id, { x: m.x, y: m.y });
+          if (!m) return;
+          const mod = game.modules.get(MODULE_ID);
+          const heldId = mod?._peekKeyHeld;
+          if (heldId && this._active.has(heldId)) {
+            this.updatePeek(heldId, { x: m.x, y: m.y });
+            return;
+          }
+          for (const [id, entry] of this._active) {
+            if (entry.kind === 'door' && entry.token?.controlled) {
+              this.updatePeek(id, { x: m.x, y: m.y });
+            }
+          }
         });
       });
     }

@@ -24,7 +24,7 @@ export async function handleDoorRightDown(manager, control) {
     globalThis.ui?.notifications?.warn?.(game.i18n.localize('PF2E_VISIONER.PEEK.TOO_FAR'));
     return false;
   }
-  await manager.tryStartDoorPeek(token, wallDoc);
+  await manager.tryStartDoorPeek(token, wallDoc, canvas?.mousePosition);
   return true;
 }
 

@@ -26,6 +26,36 @@ describe('PeekManager door peek', () => {
   });
 });
 
+describe('PeekManager door re-aim and toggle', () => {
+  test('updatePeek on a door peek keeps origin fixed but re-sends', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
+    token.center = { x: -50, y: 50 };
+    const door = { id: 'door1', c: [0, 0, 0, 100] };
+    mgr.startDoorPeek(token, door, { x: 100, y: 50 });
+    const originBefore = { ...d.registry.get('peeker').origin };
+    d.socket.sendUpdate.mockClear();
+    mgr.updatePeek('peeker', { x: 100, y: 200 });
+    expect(d.registry.get('peeker').origin).toEqual(originBefore);
+    expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  test('tryStartDoorPeek twice on same token+door toggles the peek off', async () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
+    token.center = { x: -50, y: 50 };
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+    const first = await mgr.tryStartDoorPeek(token, door, { x: 100, y: 50 });
+    expect(first).toBe(true);
+    expect(d.registry.has('peeker')).toBe(true);
+    const second = await mgr.tryStartDoorPeek(token, door, { x: 100, y: 50 });
+    expect(second).toBe(false);
+    expect(d.registry.has('peeker')).toBe(false);
+  });
+});
+
 describe('PeekManager updatePeek', () => {
   test('updatePeek re-applies render, socket, and recompute', () => {
     const d = deps();
