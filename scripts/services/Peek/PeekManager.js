@@ -61,6 +61,30 @@ export class PeekManager {
     this._recompute(id);
   }
 
+  onTokenUpdate(doc, change) {
+    if (!('x' in change) && !('y' in change)) return;
+    if (this._registry.has(doc.id)) this.endPeek(doc.id, 'move');
+  }
+
+  onWallUpdate(doc, change) {
+    if (!('ds' in change) && !('door' in change)) return;
+    for (const id of this._registry.ids()) {
+      const peek = this._registry.get(id);
+      if (peek?.ignoredWallIds?.includes(doc.id)) this.endPeek(id, 'door');
+    }
+  }
+
+  endAll(reason) {
+    for (const id of this._registry.ids()) this.endPeek(id, reason);
+  }
+
+  init() {
+    if (typeof Hooks === 'undefined') return;
+    Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
+    Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
+    Hooks.on('canvasTearDown', () => this.endAll('teardown'));
+  }
+
   _footprint(token) {
     const gridSize = globalThis.canvas?.grid?.size ?? 100;
     return {

@@ -92,3 +92,40 @@ describe('PeekManager lifecycle', () => {
     expect(d.registry.ids().filter((id) => id === 'peeker')).toHaveLength(1);
   });
 });
+
+describe('PeekManager hook reactions', () => {
+  function mgrWith() {
+    const d = {
+      registry: new PeekRegistry(),
+      renderer: { apply: jest.fn(), clear: jest.fn() },
+      socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+      recompute: jest.fn(),
+      now: () => 1,
+    };
+    return { d, mgr: new PeekManager(d) };
+  }
+
+  test('onTokenUpdate ends peek when position changes', () => {
+    const { d, mgr } = mgrWith();
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    mgr.onTokenUpdate({ id: 'p' }, { x: 200 });
+    expect(d.registry.has('p')).toBe(false);
+  });
+
+  test('onTokenUpdate ignores non-position changes', () => {
+    const { d, mgr } = mgrWith();
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    mgr.onTokenUpdate({ id: 'p' }, { rotation: 90 });
+    expect(d.registry.has('p')).toBe(true);
+  });
+
+  test('onWallUpdate ends a door peek that ignored that wall', () => {
+    const { d, mgr } = mgrWith();
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    mgr.startDoorPeek(token, { id: 'door9', c: [0, 0, 0, 100] });
+    mgr.onWallUpdate({ id: 'door9' }, { ds: 1 });
+    expect(d.registry.has('p')).toBe(false);
+  });
+});
