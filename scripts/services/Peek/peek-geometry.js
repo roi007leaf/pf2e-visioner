@@ -18,7 +18,7 @@ function toRadians(deg) {
   return (deg * Math.PI) / 180;
 }
 
-export function clampCornerPeek({ footprint, gridSize, mouse, band, fov }) {
+export function clampCornerPeek({ footprint, mouse, band, fov }) {
   const expanded = {
     minX: footprint.x - band,
     minY: footprint.y - band,
