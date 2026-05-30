@@ -17,3 +17,22 @@ function normalizeAngle(a) {
 function toRadians(deg) {
   return (deg * Math.PI) / 180;
 }
+
+export function clampCornerPeek({ footprint, gridSize, mouse, band, fov }) {
+  const expanded = {
+    minX: footprint.x - band,
+    minY: footprint.y - band,
+    maxX: footprint.x + footprint.width + band,
+    maxY: footprint.y + footprint.height + band,
+  };
+  const clampedX = clamp(mouse.x, expanded.minX, expanded.maxX);
+  const clampedY = clamp(mouse.y, expanded.minY, expanded.maxY);
+  const origin = { x: clampedX, y: clampedY };
+  if (footprint.elevation !== undefined) origin.elevation = footprint.elevation;
+  const direction = Math.atan2(mouse.y - origin.y, mouse.x - origin.x);
+  return { origin, direction: Number.isNaN(direction) ? 0 : direction, fov };
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
