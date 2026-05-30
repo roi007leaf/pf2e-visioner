@@ -2303,6 +2303,18 @@ function onRenderWallConfig(app, html) {
       </div>
     `;
 
+    const isDoor = Number(app.document?.door) > 0;
+    if (isDoor) {
+      const current = app.document?.getFlag?.(MODULE_ID, 'peekDC');
+      const row = document.createElement('div');
+      row.className = 'form-group';
+      row.innerHTML = `
+        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.DC_FIELD_LABEL')}</label>
+        <input type="number" name="flags.${MODULE_ID}.peekDC" value="${current ?? ''}" step="1" min="0" />
+      `;
+      fs.appendChild(row);
+    }
+
     // Append near Door Configuration or at form end
     const doorHeader = Array.from(form.querySelectorAll('label, h3, header, legend')).find((el) =>
       (el.textContent || '').toLowerCase().includes('door configuration'),
