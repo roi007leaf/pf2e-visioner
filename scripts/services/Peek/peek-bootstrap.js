@@ -6,6 +6,7 @@ import { PeekSocketSender } from './peek-socket.js';
 import { emitPeekUpdate } from '../socket.js';
 import { MODULE_ID } from '../../constants.js';
 import { readPeekDC, rollPeekCheck, defaultPeekRoll } from './peek-door-dc.js';
+import { peekLocalVisibility } from './peek-local-visibility.js';
 
 export function createPeekManager() {
   const renderer = new PeekVisionSourceController({});
@@ -16,6 +17,40 @@ export function createPeekManager() {
       game.modules.get(MODULE_ID)?.api?.autoVisibility?.updateTokens?.([tokenId]);
     } catch (_) {}
   };
+  let _revealInFlight = false;
+  const refreshPerception = () => {
+    try {
+      globalThis.canvas?.perception?.update?.({ refreshVision: true });
+    } catch (_) {}
+  };
+  const localReveal = (tokenId) => {
+    if (_revealInFlight) return;
+    const observer = globalThis.canvas?.tokens?.get?.(tokenId);
+    if (!observer) return;
+    const api = game.modules.get(MODULE_ID)?.api?.autoVisibility;
+    if (!api?.calculateVisibility) return;
+    _revealInFlight = true;
+    const targets = (globalThis.canvas?.tokens?.placeables || []).filter(
+      (t) => t && t !== observer && t.actor,
+    );
+    Promise.all(
+      targets.map(async (t) => {
+        try {
+          const result = await api.calculateVisibility(observer, t);
+          const state =
+            typeof result === 'string' ? result : (result?.visibility ?? result?.state ?? null);
+          if (state) peekLocalVisibility.set(tokenId, t.document.id, state);
+        } catch (_) {}
+      }),
+    ).finally(() => {
+      _revealInFlight = false;
+      refreshPerception();
+    });
+  };
+  const clearLocalReveal = (tokenId) => {
+    peekLocalVisibility.clearObserver(tokenId);
+    refreshPerception();
+  };
   const manager = new PeekManager({
     registry: peekRegistry,
     renderer: { apply: (t, p) => renderer.apply(t, p), clear: (t) => renderer.clear(t) },
@@ -24,6 +59,8 @@ export function createPeekManager() {
     now: () => Date.now(),
     readDC: readPeekDC,
     rollPeek: ({ token, dc }) => rollPeekCheck({ token, dc, roll: defaultPeekRoll }),
+    localReveal,
+    clearLocalReveal,
   });
   manager._visionController = renderer;
   return manager;

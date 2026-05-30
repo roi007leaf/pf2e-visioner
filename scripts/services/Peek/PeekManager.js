@@ -10,7 +10,7 @@ const DOOR_NUDGE = 5;
 const MAX_SWEEP = (20 * Math.PI) / 180;
 
 export class PeekManager {
-  constructor({ registry, renderer, socket, recompute, now, rollPeek, readDC }) {
+  constructor({ registry, renderer, socket, recompute, now, rollPeek, readDC, localReveal, clearLocalReveal }) {
     this._registry = registry;
     this._renderer = renderer;
     this._socket = socket;
@@ -19,6 +19,8 @@ export class PeekManager {
     this._active = new Map();
     this._rollPeek = rollPeek;
     this._readDC = readDC || readPeekDC;
+    this._localReveal = localReveal || (() => {});
+    this._clearLocalReveal = clearLocalReveal || (() => {});
   }
 
   async tryStartDoorPeek(token, doorDoc, mouse) {
@@ -58,6 +60,7 @@ export class PeekManager {
     this._renderer.apply(entry.token, this._registry.get(tokenId));
     this._socket.sendUpdate(tokenId, this._registry.get(tokenId));
     this._recompute(tokenId);
+    this._localReveal(tokenId);
   }
 
   endPeek(tokenId, reason) {
@@ -69,6 +72,7 @@ export class PeekManager {
     if (token) this._renderer.clear(token);
     this._socket.sendEnd(tokenId);
     this._recompute(tokenId);
+    this._clearLocalReveal(tokenId);
   }
 
   getActivePeek(tokenId) {
@@ -90,6 +94,7 @@ export class PeekManager {
     this._renderer.apply(token, this._registry.get(id));
     this._socket.sendUpdate(id, this._registry.get(id));
     this._recompute(id);
+    this._localReveal(id);
   }
 
   onTokenUpdate(doc, change) {
