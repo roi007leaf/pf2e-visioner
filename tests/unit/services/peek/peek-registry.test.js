@@ -27,4 +27,26 @@ describe('PeekRegistry', () => {
     expect(reg.has('old')).toBe(false);
     expect(reg.has('fresh')).toBe(true);
   });
+
+  test('ids returns token IDs when entries exist and empty array when registry is empty', () => {
+    expect(reg.ids()).toEqual([]);
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    reg.set('t2', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    expect(reg.ids()).toEqual(['t1', 't2']);
+  });
+
+  test('clearAll wipes all entries', () => {
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    reg.set('t2', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    reg.clearAll();
+    expect(reg.has('t1')).toBe(false);
+    expect(reg.has('t2')).toBe(false);
+    expect(reg.ids()).toEqual([]);
+  });
+
+  test('pruneStale deletes entries at exactly TTL age', () => {
+    reg.set('exact', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    reg.pruneStale(1000, 2000);
+    expect(reg.has('exact')).toBe(false);
+  });
 });
