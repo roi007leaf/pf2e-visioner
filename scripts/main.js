@@ -123,7 +123,6 @@ Hooks.once('init', async () => {
 
     const mod = game.modules.get('pf2e-visioner');
     if (mod) {
-      mod.api = mod.api || {};
       mod.api.peekManager = createPeekManager();
       mod.api.peekManager.init();
     }

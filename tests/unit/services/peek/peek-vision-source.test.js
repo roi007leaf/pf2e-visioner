@@ -25,4 +25,19 @@ describe('PeekVisionSourceController contract', () => {
     ctrl.clear(token);
     expect(update).not.toHaveBeenCalled();
   });
+
+  test('apply then repeated clear re-inits exactly twice and never updates token document', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const update = jest.fn();
+    const token = {
+      document: { id: 't', update },
+      initializeVisionSource: jest.fn(),
+    };
+    ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 90, ignoredWallIds: [] });
+    ctrl.clear(token);
+    ctrl.clear(token);
+    expect(token.initializeVisionSource).toHaveBeenCalledTimes(2);
+    expect(update).not.toHaveBeenCalled();
+  });
 });

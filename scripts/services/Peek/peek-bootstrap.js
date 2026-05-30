@@ -1,12 +1,14 @@
 import { peekRegistry } from './PeekRegistry.js';
 import { PeekManager } from './PeekManager.js';
 import { PeekVisionSourceController } from './PeekVisionSourceController.js';
+import { registerPeekVisionWrapper } from './peek-vision-wrapper.js';
 import { PeekSocketSender } from './peek-socket.js';
 import { emitPeekUpdate } from '../socket.js';
 import { MODULE_ID } from '../../constants.js';
 
 export function createPeekManager() {
   const renderer = new PeekVisionSourceController({});
+  registerPeekVisionWrapper(renderer);
   const sender = new PeekSocketSender({ emit: (channel, data) => emitPeekUpdate(channel, data) });
   const recompute = (tokenId) => {
     try {
