@@ -2,8 +2,8 @@ import { MODULE_ID } from '../../constants.js';
 
 let _registered = false;
 
-function radiansToFoundryRotation(radians) {
-  const degrees = (radians * 180) / Math.PI + 90;
+export function radiansToFoundryRotation(radians) {
+  const degrees = (radians * 180) / Math.PI - 90;
   return ((degrees % 360) + 360) % 360;
 }
 

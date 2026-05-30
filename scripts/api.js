@@ -2993,9 +2993,12 @@ export const autoVisibility = {
   enable: () => autoVisibilitySystem.enable(),
   disable: () => autoVisibilitySystem.disable(),
   recalculateAll: (force = false) => autoVisibilitySystem.recalculateAllVisibility(force),
-  updateTokens: (tokens) =>
-    autoVisibilitySystem.updateVisibilityForTokens?.(tokens) ||
-    console.warn('updateTokens method not available in refactored system'),
+  updateTokens: (tokens) => {
+    const ids = (Array.isArray(tokens) ? tokens : [tokens])
+      .map((t) => (typeof t === 'string' ? t : (t?.id ?? t?.document?.id)))
+      .filter(Boolean);
+    return autoVisibilitySystem.recalculateForTokens?.(ids);
+  },
   calculateVisibility: (observer, target) =>
     autoVisibilitySystem.calculateVisibility(observer, target),
   getPerceptionProfile: (observerId, targetId) =>
