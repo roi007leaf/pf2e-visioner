@@ -69,3 +69,30 @@ describe('clampCornerPeek', () => {
     expect(out.origin.elevation).toBe(30);
   });
 });
+
+import { clampDoorPeek } from '../../../../scripts/services/Peek/peek-geometry.js';
+
+describe('clampDoorPeek', () => {
+  const door = { c: [0, 0, 0, 100] };
+
+  test('origin is near the door midpoint', () => {
+    const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
+    expect(out.origin.y).toBeCloseTo(50, 0);
+    expect(Math.abs(out.origin.x)).toBeLessThanOrEqual(6);
+  });
+
+  test('origin nudges to the far side from the token', () => {
+    const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
+    expect(out.origin.x).toBeGreaterThan(0);
+  });
+
+  test('direction points away from the token through the door', () => {
+    const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
+    expect(Math.cos(out.direction)).toBeGreaterThan(0);
+  });
+
+  test('fov passed through', () => {
+    const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
+    expect(out.fov).toBe(60);
+  });
+});

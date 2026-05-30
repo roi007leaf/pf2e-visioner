@@ -36,3 +36,22 @@ export function clampCornerPeek({ footprint, mouse, band, fov }) {
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
+
+export function clampDoorPeek({ door, tokenCenter, nudge, fov }) {
+  const [x1, y1, x2, y2] = door.c;
+  const mid = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+  let nx = -(y2 - y1);
+  let ny = x2 - x1;
+  const len = Math.hypot(nx, ny) || 1;
+  nx /= len;
+  ny /= len;
+  const toTokenX = tokenCenter.x - mid.x;
+  const toTokenY = tokenCenter.y - mid.y;
+  if (nx * toTokenX + ny * toTokenY > 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const origin = { x: mid.x + nx * nudge, y: mid.y + ny * nudge };
+  const direction = Math.atan2(ny, nx);
+  return { origin, direction, fov };
+}
