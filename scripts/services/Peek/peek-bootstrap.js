@@ -18,17 +18,19 @@ export function createPeekManager() {
     } catch (_) {}
   };
   let _revealInFlight = false;
+  let _revealPending = null;
   const refreshPerception = () => {
     try {
       globalThis.canvas?.perception?.update?.({ refreshVision: true });
     } catch (_) {}
   };
-  const localReveal = (tokenId) => {
-    if (_revealInFlight) return;
+  const runReveal = (tokenId) => {
     const observer = globalThis.canvas?.tokens?.get?.(tokenId);
-    if (!observer) return;
     const api = game.modules.get(MODULE_ID)?.api?.autoVisibility;
-    if (!api?.calculateVisibility) return;
+    if (!observer || !api?.calculateVisibility) {
+      _revealInFlight = false;
+      return;
+    }
     _revealInFlight = true;
     const targets = (globalThis.canvas?.tokens?.placeables || []).filter(
       (t) => t && t !== observer && t.actor,
@@ -43,9 +45,21 @@ export function createPeekManager() {
         } catch (_) {}
       }),
     ).finally(() => {
-      _revealInFlight = false;
       refreshPerception();
+      _revealInFlight = false;
+      if (_revealPending != null) {
+        const next = _revealPending;
+        _revealPending = null;
+        runReveal(next);
+      }
     });
+  };
+  const localReveal = (tokenId) => {
+    if (_revealInFlight) {
+      _revealPending = tokenId;
+      return;
+    }
+    runReveal(tokenId);
   };
   const clearLocalReveal = (tokenId) => {
     peekLocalVisibility.clearObserver(tokenId);
