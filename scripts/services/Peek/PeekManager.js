@@ -120,26 +120,36 @@ export class PeekManager {
     if (typeof setInterval !== 'undefined') {
       this._heartbeatTimer = setInterval(() => this.heartbeat(), 2000);
     }
-    if (typeof canvas !== 'undefined' && canvas?.stage?.on) {
-      canvas.stage.on('pointermove', () => {
-        if (this._raf) return;
-        this._raf = requestAnimationFrame(() => {
-          this._raf = null;
-          const m = canvas.mousePosition;
-          if (!m) return;
-          const mod = game.modules.get(MODULE_ID);
-          const heldId = mod?._peekKeyHeld;
-          if (heldId && this._active.has(heldId)) {
-            this.updatePeek(heldId, { x: m.x, y: m.y });
-            return;
-          }
-          for (const [id, entry] of this._active) {
-            if (entry.kind === 'door' && entry.token?.controlled) {
-              this.updatePeek(id, { x: m.x, y: m.y });
-            }
-          }
-        });
+    Hooks.on('canvasReady', () => this._attachPointerMove());
+    this._attachPointerMove();
+  }
+
+  _attachPointerMove() {
+    const stage = globalThis.canvas?.stage;
+    if (!stage?.on) return;
+    if (this._boundStage === stage) return;
+    this._boundStage = stage;
+    stage.on('pointermove', () => {
+      if (this._raf) return;
+      this._raf = requestAnimationFrame(() => {
+        this._raf = null;
+        this.reaimFromPointer(globalThis.canvas?.mousePosition);
       });
+    });
+  }
+
+  reaimFromPointer(mouse) {
+    if (!mouse) return;
+    const mod = game.modules.get(MODULE_ID);
+    const heldId = mod?._peekKeyHeld;
+    if (heldId && this._active.has(heldId)) {
+      this.updatePeek(heldId, { x: mouse.x, y: mouse.y });
+      return;
+    }
+    for (const [id, entry] of this._active) {
+      if (entry.kind === 'door' && entry.token?.controlled) {
+        this.updatePeek(id, { x: mouse.x, y: mouse.y });
+      }
     }
   }
 

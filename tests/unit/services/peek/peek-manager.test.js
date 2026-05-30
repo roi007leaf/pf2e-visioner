@@ -243,3 +243,57 @@ describe('PeekManager door DC gate', () => {
     expect(d.registry.has('p')).toBe(false);
   });
 });
+
+describe('PeekManager reaimFromPointer', () => {
+  function deps() {
+    return {
+      registry: new PeekRegistry(),
+      renderer: { apply: jest.fn(), clear: jest.fn() },
+      socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+      recompute: jest.fn(),
+      now: () => 1,
+    };
+  }
+
+  test('re-aims an active door peek for a controlled token', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    token.controlled = true;
+    mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
+    d.socket.sendUpdate.mockClear();
+    mgr.reaimFromPointer({ x: 10, y: 80 });
+    expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.objectContaining({ origin: expect.anything() }));
+  });
+
+  test('does not re-aim a door peek when token is not controlled', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    token.controlled = false;
+    mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
+    d.socket.sendUpdate.mockClear();
+    mgr.reaimFromPointer({ x: 10, y: 80 });
+    expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+  });
+
+  test('re-aims the held corner peek', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    const prevGet = global.game.modules.get;
+    global.game.modules.get = jest.fn(() => ({ _peekKeyHeld: 'p' }));
+    d.socket.sendUpdate.mockClear();
+    mgr.reaimFromPointer({ x: 0, y: 500 });
+    expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.anything());
+    global.game.modules.get = prevGet;
+  });
+
+  test('no-op when mouse is null', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    expect(() => mgr.reaimFromPointer(null)).not.toThrow();
+    expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+  });
+});
