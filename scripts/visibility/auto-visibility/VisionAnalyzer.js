@@ -27,6 +27,8 @@ import {
   doesWallBlockLineOfSight,
 } from '../../helpers/wall-height-utils.js';
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
+import { peekRegistry } from '../../services/Peek/PeekRegistry.js';
+import { isPointInCone } from '../../services/Peek/peek-geometry.js';
 import { getActiveSceneHearingRange } from '../../services/scene-hearing-range.js';
 import { getLogger } from '../../utils/logger.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
@@ -218,6 +220,14 @@ export class VisionAnalyzer {
       return undefined;
     }
 
+    const observerPeek = peekRegistry.get(observer?.document?.id);
+    if (observerPeek?.origin) {
+      const tgtCenter = { x: target.center.x, y: target.center.y };
+      if (!isPointInCone(observerPeek.origin, observerPeek.direction, observerPeek.fov, tgtCenter)) {
+        return false;
+      }
+    }
+
     let stage = 'init';
     try {
       // Check for 3D collision using Levels if available
@@ -339,7 +349,10 @@ export class VisionAnalyzer {
 
         // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
         // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
-        const cachedWalls = this.#getCachedWalls(null); // Get all walls for validation
+        const cachedWalls = this._applyPeekWallExclusion(
+          observer?.document?.id,
+          this.#getCachedWalls(null),
+        ); // Get all walls for validation
 
         // Run full geometric LOS check (same logic as the fallback below)
         const observerCenter = { x: observerPos.x, y: observerPos.y };
@@ -448,7 +461,10 @@ export class VisionAnalyzer {
 
             const observerCenter = { x: observerPos.x, y: observerPos.y };
             const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos);
-            const cachedWalls = this.#getCachedWalls(null);
+            const cachedWalls = this._applyPeekWallExclusion(
+              observer?.document?.id,
+              this.#getCachedWalls(null),
+            );
             const customWallPass = this.#findNonBlockingCustomSightWallPath(
               observerCenter,
               targetPoints,
@@ -485,7 +501,10 @@ export class VisionAnalyzer {
       } catch (error) {}
 
       stage = 'get-walls';
-      const cachedWalls = this.#getCachedWalls(elevationRange);
+      const cachedWalls = this._applyPeekWallExclusion(
+        observer?.document?.id,
+        this.#getCachedWalls(elevationRange),
+      );
 
       // Early exit: if no walls, always have LOS
       stage = 'wall-check';
@@ -578,6 +597,13 @@ export class VisionAnalyzer {
    * @param {Object} elevationRange
    * @returns {Array<Wall>}
    */
+  _applyPeekWallExclusion(observerId, walls) {
+    const peek = peekRegistry.get(observerId);
+    if (!peek?.ignoredWallIds?.length) return walls;
+    const ignore = new Set(peek.ignoredWallIds);
+    return walls.filter((w) => !ignore.has(w.document?.id));
+  }
+
   #getCachedWalls(elevationRange) {
     const cacheKey = `${elevationRange?.bottom ?? 'none'}_${elevationRange?.top ?? 'none'}`;
 
