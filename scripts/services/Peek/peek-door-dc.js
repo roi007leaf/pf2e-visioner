@@ -2,7 +2,7 @@ import { MODULE_ID } from '../../constants.js';
 
 export function readPeekDC(doorDoc) {
   const v = doorDoc?.getFlag?.(MODULE_ID, 'peekDC');
-  return typeof v === 'number' ? v : null;
+  return typeof v === 'number' && !Number.isNaN(v) ? v : null;
 }
 
 export async function rollPeekCheck({ token, dc, roll }) {

@@ -12,6 +12,16 @@ describe('peek door DC', () => {
     expect(readPeekDC(door)).toBeNull();
   });
 
+  test('readPeekDC returns null for a string value', () => {
+    const door = { getFlag: () => '18' };
+    expect(readPeekDC(door)).toBeNull();
+  });
+
+  test('readPeekDC returns null for NaN', () => {
+    const door = { getFlag: () => NaN };
+    expect(readPeekDC(door)).toBeNull();
+  });
+
   test('rollPeekCheck success when degree >= 2', async () => {
     const roll = jest.fn(async () => ({ degreeOfSuccess: 2 }));
     const out = await rollPeekCheck({ token: createMockToken({ id: 't' }), dc: 15, roll });
