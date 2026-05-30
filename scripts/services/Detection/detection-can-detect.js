@@ -25,13 +25,18 @@ import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visib
 import { peekRegistry } from '../Peek/PeekRegistry.js';
 import { peekLocalVisibility } from '../Peek/peek-local-visibility.js';
 
+const PEEK_VISIBILITY_RANK = { observed: 3, concealed: 2, hidden: 1, undetected: 0 };
+
 export function peekAdjustedVisibility(observerToken, target, baseVisibility) {
   const observerId = observerToken?.document?.id;
   const targetId = target?.document?.id;
   if (!observerId || !targetId) return baseVisibility;
   if (!peekRegistry.has(observerId)) return baseVisibility;
   const local = peekLocalVisibility.get(observerId, targetId);
-  return local ?? baseVisibility;
+  if (!local) return baseVisibility;
+  const localRank = PEEK_VISIBILITY_RANK[local] ?? -1;
+  const baseRank = PEEK_VISIBILITY_RANK[baseVisibility] ?? -1;
+  return localRank > baseRank ? local : baseVisibility;
 }
 
 export function createCanDetectVisibilityWrapper(threshold) {

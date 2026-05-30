@@ -23,10 +23,22 @@ describe('peekAdjustedVisibility', () => {
     expect(peekAdjustedVisibility(mkToken('obs1'), mkToken('tgt1'), 'undetected')).toBe('observed');
   });
 
-  test('peek active + cache has hidden returns hidden (respects Stealth, no leak)', () => {
+  test('raise-only: a less-visible local value never lowers the synced base', () => {
     peekRegistry.set('obs1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
     peekLocalVisibility.set('obs1', 'tgt1', 'hidden');
-    expect(peekAdjustedVisibility(mkToken('obs1'), mkToken('tgt1'), 'observed')).toBe('hidden');
+    expect(peekAdjustedVisibility(mkToken('obs1'), mkToken('tgt1'), 'observed')).toBe('observed');
+  });
+
+  test('raise-only: a wrong undetected local value cannot hide a GM-revealed token', () => {
+    peekRegistry.set('obs1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    peekLocalVisibility.set('obs1', 'tgt1', 'undetected');
+    expect(peekAdjustedVisibility(mkToken('obs1'), mkToken('tgt1'), 'observed')).toBe('observed');
+  });
+
+  test('raises base undetected up to the local hidden state (no over-reveal to observed)', () => {
+    peekRegistry.set('obs1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    peekLocalVisibility.set('obs1', 'tgt1', 'hidden');
+    expect(peekAdjustedVisibility(mkToken('obs1'), mkToken('tgt1'), 'undetected')).toBe('hidden');
   });
 
   test('peek active + cache empty for target returns base', () => {
