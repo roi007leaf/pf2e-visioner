@@ -485,12 +485,12 @@ function recalcPeekToken(tokenId) {
   try {
     game.modules.get(MODULE_ID)?.api?.autoVisibility?.updateTokens?.([tokenId]);
   } catch (e) {
-    if (game.settings.get(MODULE_ID, 'debug')) console.warn(`[${MODULE_ID}] peek recalc failed`, e);
+    console.warn(`[${MODULE_ID}] peek recalc failed`, e);
   }
 }
 
 export function emitPeekUpdate(channel, data) {
-  _socketService.executeAsGM(channel === 'PeekEnd' ? PEEK_END_CHANNEL : PEEK_UPDATE_CHANNEL, data);
+  _socketService.executeAsGM(channel === PEEK_END_CHANNEL ? PEEK_END_CHANNEL : PEEK_UPDATE_CHANNEL, data);
 }
 
 let _peekPruneTimer = null;

@@ -31,4 +31,17 @@ describe('GM peek socket handlers', () => {
     peekEndHandler({ tokenId: 't', sceneId });
     expect(peekRegistry.has('t')).toBe(false);
   });
+
+  test('peekEndHandler ignores non-GM', () => {
+    global.game.user.isGM = false;
+    peekRegistry.set('t', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1);
+    peekEndHandler({ tokenId: 't', sceneId });
+    expect(peekRegistry.has('t')).toBe(true);
+  });
+
+  test('peekEndHandler ignores other scenes', () => {
+    peekRegistry.set('t', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1);
+    peekEndHandler({ tokenId: 't', sceneId: 'OTHER' });
+    expect(peekRegistry.has('t')).toBe(true);
+  });
 });
