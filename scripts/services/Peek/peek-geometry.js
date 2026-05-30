@@ -55,3 +55,18 @@ export function clampDoorPeek({ door, tokenCenter, nudge, fov }) {
   const direction = Math.atan2(ny, nx);
   return { origin, direction, fov };
 }
+
+export function distancePointToSegment(point, segment) {
+  const [x1, y1, x2, y2] = segment;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(point.x - x1, point.y - y1);
+  let t = ((point.x - x1) * dx + (point.y - y1) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(point.x - (x1 + t * dx), point.y - (y1 + t * dy));
+}
+
+export function isWithinDoorPeekRange(tokenCenter, door, maxDistance) {
+  return distancePointToSegment(tokenCenter, door.c) <= maxDistance;
+}

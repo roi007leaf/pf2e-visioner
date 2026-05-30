@@ -1,6 +1,7 @@
 import '../../../setup.js';
 import { isPointInCone } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { clampCornerPeek } from '../../../../scripts/services/Peek/peek-geometry.js';
+import { distancePointToSegment, isWithinDoorPeekRange } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 describe('isPointInCone', () => {
   const origin = { x: 0, y: 0 };
@@ -94,5 +95,29 @@ describe('clampDoorPeek', () => {
   test('fov passed through', () => {
     const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
     expect(out.fov).toBe(60);
+  });
+});
+
+describe('door peek range', () => {
+  const door = { c: [0, 0, 0, 100] };
+
+  test('distancePointToSegment: perpendicular distance to the segment body', () => {
+    expect(distancePointToSegment({ x: 30, y: 50 }, door.c)).toBeCloseTo(30, 5);
+  });
+
+  test('distancePointToSegment: clamps to nearest endpoint when beyond the segment', () => {
+    expect(distancePointToSegment({ x: 0, y: 200 }, door.c)).toBeCloseTo(100, 5);
+  });
+
+  test('distancePointToSegment: zero-length segment falls back to point distance', () => {
+    expect(distancePointToSegment({ x: 3, y: 4 }, [0, 0, 0, 0])).toBeCloseTo(5, 5);
+  });
+
+  test('isWithinDoorPeekRange: true when within maxDistance', () => {
+    expect(isWithinDoorPeekRange({ x: 40, y: 50 }, door, 150)).toBe(true);
+  });
+
+  test('isWithinDoorPeekRange: false when beyond maxDistance', () => {
+    expect(isWithinDoorPeekRange({ x: 400, y: 50 }, door, 150)).toBe(false);
   });
 });

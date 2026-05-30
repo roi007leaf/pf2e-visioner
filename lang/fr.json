@@ -1134,7 +1134,8 @@
     },
     "PEEK": {
       "CHECK_LABEL": "Peek Through Door",
-      "DC_FIELD_LABEL": "Peek DC"
+      "DC_FIELD_LABEL": "Peek DC",
+      "TOO_FAR": "You are too far from the door to peek through it."
     }
   }
 }
