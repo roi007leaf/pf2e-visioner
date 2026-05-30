@@ -129,3 +129,46 @@ describe('PeekManager hook reactions', () => {
     expect(d.registry.has('p')).toBe(false);
   });
 });
+
+describe('PeekManager door DC gate', () => {
+  function mgrWith(extra = {}) {
+    const d = {
+      registry: new PeekRegistry(),
+      renderer: { apply: jest.fn(), clear: jest.fn() },
+      socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+      recompute: jest.fn(),
+      now: () => 1,
+      ...extra,
+    };
+    return { d, mgr: new PeekManager(d) };
+  }
+
+  test('no DC -> opens immediately without rolling', async () => {
+    const rollPeek = jest.fn();
+    const { d, mgr } = mgrWith({ rollPeek });
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'd', c: [0, 0, 0, 100], getFlag: () => undefined };
+    await mgr.tryStartDoorPeek(token, door);
+    expect(d.registry.has('p')).toBe(true);
+    expect(rollPeek).not.toHaveBeenCalled();
+  });
+
+  test('DC + success -> opens', async () => {
+    const rollPeek = jest.fn(async () => ({ success: true }));
+    const { d, mgr } = mgrWith({ rollPeek });
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'd', c: [0, 0, 0, 100], getFlag: (m, k) => (k === 'peekDC' ? 12 : undefined) };
+    await mgr.tryStartDoorPeek(token, door);
+    expect(rollPeek).toHaveBeenCalled();
+    expect(d.registry.has('p')).toBe(true);
+  });
+
+  test('DC + failure -> does not open', async () => {
+    const rollPeek = jest.fn(async () => ({ success: false }));
+    const { d, mgr } = mgrWith({ rollPeek });
+    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'd', c: [0, 0, 0, 100], getFlag: (m, k) => (k === 'peekDC' ? 12 : undefined) };
+    await mgr.tryStartDoorPeek(token, door);
+    expect(d.registry.has('p')).toBe(false);
+  });
+});

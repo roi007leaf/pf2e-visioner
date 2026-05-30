@@ -1,5 +1,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { clampCornerPeek, clampDoorPeek } from './peek-geometry.js';
+import { readPeekDC } from './peek-door-dc.js';
+import { registerDoorPeekInteraction } from './peek-door-control.js';
 
 const PEEK_BAND = 50;
 const PEEK_FOV = 90;
@@ -7,13 +9,25 @@ const DOOR_FOV = 60;
 const DOOR_NUDGE = 5;
 
 export class PeekManager {
-  constructor({ registry, renderer, socket, recompute, now }) {
+  constructor({ registry, renderer, socket, recompute, now, rollPeek, readDC }) {
     this._registry = registry;
     this._renderer = renderer;
     this._socket = socket;
     this._recompute = recompute;
     this._now = now || (() => Date.now());
     this._tokensById = new Map();
+    this._rollPeek = rollPeek;
+    this._readDC = readDC || readPeekDC;
+  }
+
+  async tryStartDoorPeek(token, doorDoc) {
+    const dc = this._readDC(doorDoc);
+    if (dc != null && this._rollPeek) {
+      const { success } = await this._rollPeek({ token, dc });
+      if (!success) return false;
+    }
+    this.startDoorPeek(token, doorDoc);
+    return true;
   }
 
   startCornerPeek(token, mouse) {
@@ -84,6 +98,7 @@ export class PeekManager {
     Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
     Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
+    registerDoorPeekInteraction(this);
     if (typeof canvas !== 'undefined' && canvas?.stage?.on) {
       canvas.stage.on('pointermove', () => {
         const mod = game.modules.get(MODULE_ID);

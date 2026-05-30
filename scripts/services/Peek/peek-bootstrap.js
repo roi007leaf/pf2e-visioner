@@ -5,6 +5,7 @@ import { registerPeekVisionWrapper } from './peek-vision-wrapper.js';
 import { PeekSocketSender } from './peek-socket.js';
 import { emitPeekUpdate } from '../socket.js';
 import { MODULE_ID } from '../../constants.js';
+import { readPeekDC, rollPeekCheck, defaultPeekRoll } from './peek-door-dc.js';
 
 export function createPeekManager() {
   const renderer = new PeekVisionSourceController({});
@@ -21,6 +22,8 @@ export function createPeekManager() {
     socket: { sendUpdate: (id, p) => sender.sendUpdate(id, p), sendEnd: (id) => sender.sendEnd(id) },
     recompute,
     now: () => Date.now(),
+    readDC: readPeekDC,
+    rollPeek: ({ token, dc }) => rollPeekCheck({ token, dc, roll: defaultPeekRoll }),
   });
   manager._visionController = renderer;
   return manager;
