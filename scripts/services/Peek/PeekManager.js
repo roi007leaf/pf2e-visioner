@@ -7,7 +7,7 @@ const PEEK_BAND = 50;
 const PEEK_FOV = 10;
 const DOOR_FOV = 10;
 const DOOR_NUDGE = 5;
-const MAX_SWEEP = (40 * Math.PI) / 180;
+const MAX_SWEEP = (20 * Math.PI) / 180;
 
 export class PeekManager {
   constructor({ registry, renderer, socket, recompute, now, rollPeek, readDC }) {
