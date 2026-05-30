@@ -16,7 +16,7 @@ describe('PeekSocketSender', () => {
   });
 
   test('throttles updates faster than minInterval', () => {
-    const { emit, sender } = make([0, 50, 200]);
+    const { emit, sender } = make([0, 50, 120]);
     const peek = { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] };
     sender.sendUpdate('t', { ...peek, origin: { x: 0, y: 0 } });
     sender.sendUpdate('t', { ...peek, origin: { x: 10, y: 0 } });
