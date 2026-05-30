@@ -120,22 +120,23 @@ export class PeekManager {
     if (typeof setInterval !== 'undefined') {
       this._heartbeatTimer = setInterval(() => this.heartbeat(), 2000);
     }
-    Hooks.on('canvasReady', () => this._attachPointerMove());
     this._attachPointerMove();
   }
 
   _attachPointerMove() {
-    const stage = globalThis.canvas?.stage;
-    if (!stage?.on) return;
-    if (this._boundStage === stage) return;
-    this._boundStage = stage;
-    stage.on('pointermove', () => {
-      if (this._raf) return;
-      this._raf = requestAnimationFrame(() => {
-        this._raf = null;
-        this.reaimFromPointer(globalThis.canvas?.mousePosition);
-      });
-    });
+    if (typeof document === 'undefined' || this._pointerBound) return;
+    this._pointerBound = true;
+    document.addEventListener(
+      'pointermove',
+      () => {
+        if (this._raf) return;
+        this._raf = requestAnimationFrame(() => {
+          this._raf = null;
+          this.reaimFromPointer(globalThis.canvas?.mousePosition);
+        });
+      },
+      true,
+    );
   }
 
   reaimFromPointer(mouse) {
