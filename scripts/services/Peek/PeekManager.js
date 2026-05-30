@@ -4,8 +4,8 @@ import { readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 
 const PEEK_BAND = 50;
-const PEEK_FOV = 22;
-const DOOR_FOV = 22;
+const PEEK_FOV = 10;
+const DOOR_FOV = 10;
 const DOOR_NUDGE = 5;
 const MAX_SWEEP = (40 * Math.PI) / 180;
 
