@@ -10,7 +10,7 @@ import { readPeekDC, rollPeekCheck, defaultPeekRoll } from './peek-door-dc.js';
 export function createPeekManager() {
   const renderer = new PeekVisionSourceController({});
   registerPeekVisionWrapper(renderer);
-  const sender = new PeekSocketSender({ emit: (channel, data) => emitPeekUpdate(channel, data) });
+  const sender = new PeekSocketSender({ emit: (channel, data) => emitPeekUpdate(channel, data), minIntervalMs: 50 });
   const recompute = (tokenId) => {
     try {
       game.modules.get(MODULE_ID)?.api?.autoVisibility?.updateTokens?.([tokenId]);
