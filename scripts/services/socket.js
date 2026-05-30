@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../constants.js';
 import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { showNotification } from '../utils.js';
+import { peekRegistry } from './Peek/PeekRegistry.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
 // No module-scoped socket reference required; use the service wrapper
@@ -21,6 +22,9 @@ class SocketService {
     this._socket.register(POINTOUT_REQUEST_CHANNEL, pointOutRequestHandler);
     this._socket.register(TAKE_COVER_REQUEST_CHANNEL, takeCoverRequestHandler);
     this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
+    this._socket.register(PEEK_UPDATE_CHANNEL, peekUpdateHandler);
+    this._socket.register(PEEK_END_CHANNEL, peekEndHandler);
+    startPeekStalePruner();
     return this._socket;
   }
   get socket() {
@@ -45,6 +49,8 @@ const SEEK_TEMPLATE_CHANNEL = 'SeekTemplate';
 const POINTOUT_REQUEST_CHANNEL = 'PointOutRequest';
 const TAKE_COVER_REQUEST_CHANNEL = 'TakeCoverRequest';
 const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
+const PEEK_UPDATE_CHANNEL = 'PeekUpdate';
+const PEEK_END_CHANNEL = 'PeekEnd';
 
 export function registerSocket() {
   _socketService.register();
@@ -452,4 +458,51 @@ async function seekTemplateHandler({
   } catch (e) {
     console.error(`[${MODULE_ID}] Failed to handle GM Seek template from player:`, e);
   }
+}
+
+export function peekUpdateHandler(payload) {
+  if (!game.user?.isGM) return;
+  if (!payload || payload.sceneId !== canvas?.scene?.id) return;
+  const now = Date.now();
+  peekRegistry.set(payload.tokenId, {
+    origin: payload.origin,
+    direction: payload.direction,
+    fov: payload.fov,
+    ignoredWallIds: payload.ignoredWallIds ?? [],
+  }, now);
+  peekRegistry.pruneStale(1000, now);
+  recalcPeekToken(payload.tokenId);
+}
+
+export function peekEndHandler(payload) {
+  if (!game.user?.isGM) return;
+  if (!payload || payload.sceneId !== canvas?.scene?.id) return;
+  peekRegistry.clear(payload.tokenId);
+  recalcPeekToken(payload.tokenId);
+}
+
+function recalcPeekToken(tokenId) {
+  try {
+    game.modules.get(MODULE_ID)?.api?.autoVisibility?.updateTokens?.([tokenId]);
+  } catch (e) {
+    if (game.settings.get(MODULE_ID, 'debug')) console.warn(`[${MODULE_ID}] peek recalc failed`, e);
+  }
+}
+
+export function emitPeekUpdate(channel, data) {
+  _socketService.executeAsGM(channel === 'PeekEnd' ? PEEK_END_CHANNEL : PEEK_UPDATE_CHANNEL, data);
+}
+
+let _peekPruneTimer = null;
+
+export function startPeekStalePruner() {
+  if (_peekPruneTimer || typeof setInterval === 'undefined') return;
+  _peekPruneTimer = setInterval(() => {
+    if (!game.user?.isGM) return;
+    const before = peekRegistry.ids();
+    peekRegistry.pruneStale(1000, Date.now());
+    for (const id of before) {
+      if (!peekRegistry.has(id)) recalcPeekToken(id);
+    }
+  }, 1000);
 }
