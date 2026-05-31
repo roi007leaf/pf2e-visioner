@@ -6,6 +6,7 @@ import { PeekSocketSender } from './peek-socket.js';
 import { emitPeekUpdate } from '../socket.js';
 import { MODULE_ID } from '../../constants.js';
 import { readPeekDC, rollPeekCheck, defaultPeekRoll } from './peek-door-dc.js';
+import { peekGmOverlay } from './peek-gm-overlay.js';
 
 export function createPeekManager() {
   const renderer = new PeekVisionSourceController({});
@@ -18,7 +19,10 @@ export function createPeekManager() {
   };
   const manager = new PeekManager({
     registry: peekRegistry,
-    renderer: { apply: (t, p) => renderer.apply(t, p), clear: (t) => renderer.clear(t) },
+    renderer: {
+      apply: (t, p) => { renderer.apply(t, p); peekGmOverlay.render(); },
+      clear: (t) => { renderer.clear(t); peekGmOverlay.render(); },
+    },
     socket: { sendUpdate: (id, p) => sender.sendUpdate(id, p), sendEnd: (id) => sender.sendEnd(id) },
     recompute,
     now: () => Date.now(),

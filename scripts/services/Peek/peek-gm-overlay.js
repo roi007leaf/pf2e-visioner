@@ -11,15 +11,17 @@ export class PeekGmOverlay {
 
   render() {
     try {
-      if (!globalThis.game?.user?.isGM) return;
       const layer = this._layer();
       if (!layer) return;
       const ownId = globalThis.game?.user?.id;
+      const isGM = !!globalThis.game?.user?.isGM;
       const live = new Set();
       for (const id of peekRegistry.ids()) {
         const peek = peekRegistry.get(id);
         if (!peek?.origin) continue;
-        if (peek.userId && ownId && peek.userId === ownId) continue;
+        const isOwn = !peek.userId || peek.userId === ownId;
+        if (isGM && isOwn) continue;
+        if (!isGM && !isOwn) continue;
         live.add(id);
         this._draw(layer, id, peek);
       }
