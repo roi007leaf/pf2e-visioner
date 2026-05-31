@@ -223,7 +223,10 @@ export class VisionAnalyzer {
     const observerPeek = peekRegistry.get(observer?.document?.id);
     if (observerPeek?.origin) {
       const tgtCenter = { x: target.center.x, y: target.center.y };
-      if (!isPointInCone(observerPeek.origin, observerPeek.direction, observerPeek.fov, tgtCenter)) {
+      if (
+        typeof observerPeek.fov === 'number' &&
+        !isPointInCone(observerPeek.origin, observerPeek.direction, observerPeek.fov, tgtCenter)
+      ) {
         return false;
       }
       if (observerPeek.range > 0) {

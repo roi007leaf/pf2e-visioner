@@ -141,6 +141,19 @@ describe('VisionAnalyzer peek constraints', () => {
     expect(va.hasLineOfSight(observer, target)).toBe(false);
   });
 
+  test('corner peek (fov null) skips the cone gate: full sight from the offset origin', () => {
+    const va = new VisionAnalyzer();
+    va.clearCache();
+    const { observer, target } = makeClearLosPair();
+    const origin = { x: observer.center.x, y: observer.center.y };
+    peekRegistry.set(
+      observer.document.id,
+      { origin, direction: directionToward(origin, target) + Math.PI, fov: null, range: 0, ignoredWallIds: [] },
+      1000,
+    );
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+  });
+
   test('returns false when target is outside the peek cone', () => {
     const va = new VisionAnalyzer();
     const { observer, target } = makePair();

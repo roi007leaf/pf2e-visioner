@@ -53,7 +53,7 @@ export class PeekManager {
   }
 
   startCornerPeek(token, mouse) {
-    const geo = clampCornerPeek({ footprint: this._footprint(token), mouse, band: PEEK_BAND, fov: this._slitAngle(), tokenCenter: token.center, maxSweep: this._maxSweep() });
+    const geo = clampCornerPeek({ footprint: this._footprint(token), mouse, band: PEEK_BAND, fov: null });
     geo.origin = this._clampOriginToWalls(token.center, geo.origin);
     this._begin(token, { ...geo, ignoredWallIds: [], range: 0 }, { kind: 'corner' });
   }
@@ -91,7 +91,7 @@ export class PeekManager {
     if (entry.kind === 'door') {
       geo = clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: this._slitAngle(), aim: mouse, maxSweep: this._maxSweep() });
     } else {
-      geo = clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: this._slitAngle(), tokenCenter: entry.token.center, maxSweep: this._maxSweep() });
+      geo = clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: null });
       geo.origin = this._clampOriginToWalls(entry.token.center, geo.origin);
     }
     const ignoredWallIds = entry.kind === 'door' ? [entry.doorDoc.id] : [];

@@ -309,12 +309,12 @@ describe('PeekManager settings-backed geometry', () => {
     global.canvas.dimensions = prevDimensions;
   });
 
-  test('startCornerPeek applies slit angle but ignores range (full sight)', () => {
+  test('startCornerPeek uses full sight (no fov cone) and ignores range', () => {
     const d = deps();
     const mgr = new PeekManager(d);
     const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
     mgr.startCornerPeek(token, { x: 500, y: 50 });
-    expect(d.registry.get('peeker').fov).toBeCloseTo(30, 5);
+    expect(d.registry.get('peeker').fov).toBeNull();
     expect(d.registry.get('peeker').range).toBe(0);
   });
 
