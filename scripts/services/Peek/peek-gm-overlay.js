@@ -46,9 +46,13 @@ export class PeekGmOverlay {
       g.drawPolygon(peek.points);
       g.endFill();
     }
-    g.beginFill(color, 0.9);
-    g.lineStyle(1, 0x000000, 0.8);
-    g.drawCircle(peek.origin.x, peek.origin.y, 6);
+    g.lineStyle(3, 0x000000, 0.9);
+    g.beginFill(color, 1);
+    g.drawCircle(peek.origin.x, peek.origin.y, 12);
+    g.endFill();
+    g.lineStyle(0);
+    g.beginFill(0xffffff, 1);
+    g.drawCircle(peek.origin.x, peek.origin.y, 4);
     g.endFill();
   }
 
