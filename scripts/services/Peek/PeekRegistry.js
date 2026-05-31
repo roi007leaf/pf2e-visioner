@@ -13,6 +13,7 @@ export class PeekRegistry {
       points: Array.isArray(data.points) ? data.points : null,
       userColor: data.userColor ?? null,
       userName: data.userName ?? null,
+      userId: data.userId ?? null,
       ts: now,
     });
   }

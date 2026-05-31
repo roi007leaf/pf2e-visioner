@@ -475,6 +475,7 @@ export function peekUpdateHandler(payload) {
     points: payload.points ?? null,
     userColor: payload.userColor ?? null,
     userName: payload.userName ?? payload.tokenId,
+    userId: payload.userId ?? null,
   }, now);
   peekRegistry.pruneStale(5000, now);
   recalcPeekToken(payload.tokenId);

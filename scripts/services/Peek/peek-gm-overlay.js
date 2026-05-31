@@ -14,10 +14,12 @@ export class PeekGmOverlay {
       if (!globalThis.game?.user?.isGM) return;
       const layer = this._layer();
       if (!layer) return;
+      const ownId = globalThis.game?.user?.id;
       const live = new Set();
       for (const id of peekRegistry.ids()) {
         const peek = peekRegistry.get(id);
-        if (!peek?.points || peek.points.length < 6) continue;
+        if (!peek?.origin) continue;
+        if (peek.userId && ownId && peek.userId === ownId) continue;
         live.add(id);
         this._draw(layer, id, peek);
       }
@@ -36,9 +38,15 @@ export class PeekGmOverlay {
     }
     g.clear();
     const color = this._color(peek.userColor);
-    g.beginFill(color, 0.15);
-    g.lineStyle(2, color, 0.6);
-    g.drawPolygon(peek.points);
+    if (Array.isArray(peek.points) && peek.points.length >= 6) {
+      g.beginFill(color, 0.15);
+      g.lineStyle(2, color, 0.6);
+      g.drawPolygon(peek.points);
+      g.endFill();
+    }
+    g.beginFill(color, 0.9);
+    g.lineStyle(1, 0x000000, 0.8);
+    g.drawCircle(peek.origin.x, peek.origin.y, 6);
     g.endFill();
   }
 
