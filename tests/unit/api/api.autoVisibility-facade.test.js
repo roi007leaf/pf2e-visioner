@@ -30,29 +30,25 @@ describe('API.autoVisibility facade', () => {
     disableSpy.mockRestore();
   });
 
-  test('recalculateAll delegates and updateTokens is safe when missing', async () => {
+  test('recalculateAll and updateTokens delegate to the visibility system', async () => {
     const modulePath = '../../../scripts/visibility/auto-visibility/index.js';
     const realMod = await import(modulePath);
     const recalcSpy = jest
       .spyOn(realMod.autoVisibilitySystem, 'recalculateAllVisibility')
       .mockImplementation(() => { });
-
-    // Ensure updateVisibilityForTokens is undefined to exercise warning path
-    const originalUpdate = realMod.autoVisibilitySystem.updateVisibilityForTokens;
-    delete realMod.autoVisibilitySystem.updateVisibilityForTokens;
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
+    const recalcForSpy = jest
+      .spyOn(realMod.autoVisibilitySystem, 'recalculateForTokens')
+      .mockImplementation(() => { });
 
     const api = await import('../../../scripts/api.js');
     api.autoVisibility.recalculateAll();
-    api.autoVisibility.updateTokens([{ id: 't1' }]);
+    api.autoVisibility.updateTokens([{ id: 't1' }, 't2']);
 
     expect(recalcSpy).toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith('updateTokens method not available in refactored system');
+    expect(recalcForSpy).toHaveBeenCalledWith(['t1', 't2']);
 
-    // Restore
     recalcSpy.mockRestore();
-    warnSpy.mockRestore();
-    if (originalUpdate) realMod.autoVisibilitySystem.updateVisibilityForTokens = originalUpdate;
+    recalcForSpy.mockRestore();
   });
 
   test('getMovementPerformanceSnapshot delegates to auto visibility system', async () => {
