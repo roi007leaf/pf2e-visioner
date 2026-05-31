@@ -86,11 +86,8 @@ export function boundConeToSweep(base, rawAim, fovDeg, maxSweep) {
   if (fovDeg >= STATIC_SLIT_THRESHOLD_DEG) {
     return { direction: base, fov: fovDeg };
   }
-  const fovRad = toRadians(fovDeg);
-  const cappedFovRad = Math.min(fovRad, 2 * maxSweep);
-  const effSweep = Math.max(0, maxSweep - cappedFovRad / 2);
-  const direction = clampDirectionToArc(base, rawAim, effSweep);
-  return { direction, fov: (cappedFovRad * 180) / Math.PI };
+  const direction = clampDirectionToArc(base, rawAim, maxSweep);
+  return { direction, fov: fovDeg };
 }
 
 export function distancePointToSegment(point, segment) {
