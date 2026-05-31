@@ -83,9 +83,9 @@ describe('clampDoorPeek', () => {
     expect(Math.abs(out.origin.x)).toBeLessThanOrEqual(6);
   });
 
-  test('origin nudges to the far side from the token', () => {
+  test("origin stays on the token's side of the wall (not past it)", () => {
     const out = clampDoorPeek({ door, tokenCenter: { x: -50, y: 50 }, nudge: 5, fov: 60 });
-    expect(out.origin.x).toBeGreaterThan(0);
+    expect(out.origin.x).toBeLessThan(0);
   });
 
   test('direction points away from the token through the door', () => {

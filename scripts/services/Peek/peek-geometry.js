@@ -56,7 +56,7 @@ export function clampDoorPeek({ door, tokenCenter, nudge, fov, aim, maxSweep }) 
     nx = -nx;
     ny = -ny;
   }
-  const origin = { x: mid.x + nx * nudge, y: mid.y + ny * nudge };
+  const origin = { x: mid.x - nx * nudge, y: mid.y - ny * nudge };
   const base = Math.atan2(ny, nx);
   let direction = base;
   if (aim && typeof maxSweep === 'number') {
