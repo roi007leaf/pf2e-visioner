@@ -1015,6 +1015,15 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  cornerPeekEnabled: {
+    name: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.name',
+    hint: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
   autoCoverIgnoreSmallerTokens: {
     name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_SMALLER_TOKENS.name',
     hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_SMALLER_TOKENS.hint',

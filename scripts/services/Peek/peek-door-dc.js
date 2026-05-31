@@ -5,6 +5,10 @@ export function readPeekDC(doorDoc) {
   return typeof v === 'number' && !Number.isNaN(v) ? v : null;
 }
 
+export function isDoorPeekAllowed(doorDoc) {
+  return doorDoc?.getFlag?.(MODULE_ID, 'peekAllowed') === true;
+}
+
 export async function rollPeekCheck({ token, dc, roll }) {
   const result = await roll({ token, dc });
   const degree = result?.degreeOfSuccess ?? 0;

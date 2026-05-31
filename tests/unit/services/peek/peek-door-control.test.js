@@ -1,8 +1,16 @@
 import '../../../setup.js';
 import { handleDoorRightDown } from '../../../../scripts/services/Peek/peek-door-control.js';
 
-function control(wallId = 'door1') {
-  return { wall: { document: { id: wallId, c: [0, 0, 0, 100] } } };
+function control(wallId = 'door1', peekAllowed = true) {
+  return {
+    wall: {
+      document: {
+        id: wallId,
+        c: [0, 0, 0, 100],
+        getFlag: (m, k) => (m === 'pf2e-visioner' && k === 'peekAllowed' ? peekAllowed : undefined),
+      },
+    },
+  };
 }
 
 describe('handleDoorRightDown', () => {
@@ -48,6 +56,16 @@ describe('handleDoorRightDown', () => {
     const handled = await handleDoorRightDown(manager, {});
     expect(handled).toBe(false);
     expect(manager.tryStartDoorPeek).not.toHaveBeenCalled();
+  });
+
+  test('rejects and warns when the door does not allow peeking', async () => {
+    const token = createMockToken({ id: 'p', x: -50, y: 50 });
+    token.center = { x: -50, y: 50 };
+    global.canvas = { ...global.canvas, grid: { size: 100 }, tokens: { controlled: [token] }, mousePosition: { x: 10, y: 20 } };
+    const handled = await handleDoorRightDown(manager, control('door1', false));
+    expect(handled).toBe(false);
+    expect(manager.tryStartDoorPeek).not.toHaveBeenCalled();
+    expect(global.ui.notifications.warn).toHaveBeenCalled();
   });
 
   test('rejects and warns when the controlled token is too far from the door', async () => {

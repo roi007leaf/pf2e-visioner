@@ -1,5 +1,5 @@
 import '../../../setup.js';
-import { readPeekDC, rollPeekCheck } from '../../../../scripts/services/Peek/peek-door-dc.js';
+import { isDoorPeekAllowed, readPeekDC, rollPeekCheck } from '../../../../scripts/services/Peek/peek-door-dc.js';
 
 describe('peek door DC', () => {
   test('readPeekDC returns numeric flag', () => {
@@ -20,6 +20,26 @@ describe('peek door DC', () => {
   test('readPeekDC returns null for NaN', () => {
     const door = { getFlag: () => NaN };
     expect(readPeekDC(door)).toBeNull();
+  });
+
+  test('isDoorPeekAllowed true when flag is true', () => {
+    const door = { getFlag: (m, k) => (m === 'pf2e-visioner' && k === 'peekAllowed' ? true : undefined) };
+    expect(isDoorPeekAllowed(door)).toBe(true);
+  });
+
+  test('isDoorPeekAllowed false when flag is false', () => {
+    const door = { getFlag: () => false };
+    expect(isDoorPeekAllowed(door)).toBe(false);
+  });
+
+  test('isDoorPeekAllowed false when flag is undefined', () => {
+    const door = { getFlag: () => undefined };
+    expect(isDoorPeekAllowed(door)).toBe(false);
+  });
+
+  test('isDoorPeekAllowed false for a non-boolean value', () => {
+    const door = { getFlag: () => 'true' };
+    expect(isDoorPeekAllowed(door)).toBe(false);
   });
 
   test('rollPeekCheck success when degree >= 2', async () => {

@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { isDoorPeekAllowed } from './peek-door-dc.js';
 import { isWithinDoorPeekRange } from './peek-geometry.js';
 
 let _registered = false;
@@ -18,6 +19,10 @@ export async function handleDoorRightDown(manager, control) {
   const token = controlled[0];
   const wallDoc = control?.wall?.document;
   if (!wallDoc) return false;
+  if (!isDoorPeekAllowed(wallDoc)) {
+    globalThis.ui?.notifications?.warn?.(game.i18n.localize('PF2E_VISIONER.PEEK.NOT_ALLOWED'));
+    return false;
+  }
   const gridSize = canvas?.grid?.size ?? 100;
   const maxDistance = gridSize * 1.5;
   if (!isWithinDoorPeekRange(token.center, { c: wallDoc.c }, maxDistance)) {

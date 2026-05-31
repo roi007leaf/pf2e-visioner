@@ -2305,6 +2305,14 @@ function onRenderWallConfig(app, html) {
 
     const isDoor = Number(app.document?.door) > 0;
     if (isDoor) {
+      const allowed = app.document?.getFlag?.(MODULE_ID, 'peekAllowed') === true;
+      const allowRow = document.createElement('div');
+      allowRow.className = 'form-group';
+      allowRow.innerHTML = `
+        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.ALLOW_FIELD_LABEL')}</label>
+        <input type="checkbox" name="flags.${MODULE_ID}.peekAllowed" ${allowed ? 'checked' : ''} data-dtype="Boolean" />
+      `;
+      fs.appendChild(allowRow);
       const current = app.document?.getFlag?.(MODULE_ID, 'peekDC');
       const row = document.createElement('div');
       row.className = 'form-group';

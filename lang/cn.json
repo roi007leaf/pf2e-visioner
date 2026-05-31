@@ -466,6 +466,10 @@
                 "name": "忽略死亡指示物",
                 "hint": "死亡指示物将不提供自动掩蔽"
             },
+            "CORNER_PEEK_ENABLED": {
+                "name": "Enable Corner Peeking",
+                "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
+            },
             "TOKEN_INTERSECTION_MODE": {
                 "hint": "如何基于指示物遮挡计算掩蔽",
                 "name": "指示物连线相交模式",
@@ -1494,6 +1498,8 @@
         "PEEK": {
             "CHECK_LABEL": "Peek Through Door",
             "DC_FIELD_LABEL": "Peek DC",
+            "ALLOW_FIELD_LABEL": "Allow Peeking",
+            "NOT_ALLOWED": "Peeking is not allowed through this door.",
             "TOO_FAR": "You are too far from the door to peek through it."
         }
     }

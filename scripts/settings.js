@@ -854,6 +854,7 @@ export function registerKeybindings() {
         break;
       case 'holdPeek':
         keybindingConfig.onDown = () => {
+          if (!game.settings.get(MODULE_ID, 'cornerPeekEnabled')) return;
           const token = canvas?.tokens?.controlled?.[0];
           if (!token || canvas.tokens.controlled.length !== 1) return;
           const mgr = game.modules.get(MODULE_ID)?.api?.peekManager;
