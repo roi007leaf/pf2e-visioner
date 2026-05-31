@@ -47,7 +47,9 @@ export class PeekManager {
 
   _clampOriginToWalls(from, origin) {
     try {
-      const hit = globalThis.canvas?.walls?.testCollision?.(from, origin, { type: 'sight', mode: 'closest' });
+      const backend =
+        globalThis.CONFIG?.Canvas?.polygonBackends?.sight ?? globalThis.canvas?.walls;
+      const hit = backend?.testCollision?.(from, origin, { type: 'sight', mode: 'closest' });
       if (hit) return pullBackOrigin(from, origin, hit, 2);
     } catch (_) {}
     return origin;
