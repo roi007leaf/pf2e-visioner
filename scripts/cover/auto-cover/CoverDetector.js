@@ -26,6 +26,7 @@ import { getVisibilityBetween } from '../../utils.js';
 import { normalizeSlug } from '../../utils/actor-features.js';
 import { getLogger } from '../../utils/logger.js';
 import { peekRegistry } from '../../services/Peek/PeekRegistry.js';
+import { tokenHasActiveTakeCoverState } from '../../chat/services/take-cover-expiration-service.js';
 
 export class CoverDetector {
   constructor() {
@@ -80,13 +81,18 @@ export class CoverDetector {
    */
   detectBetweenTokens(attacker, target, options = {}) {
     const cover = this._detectBetweenTokensCore(attacker, target, options);
-    return this._applyPeekCoverCap(attacker, cover);
+    return this._applyPeekCoverCap(target, cover);
   }
 
-  _applyPeekCoverCap(attacker, cover) {
+  _applyPeekCoverCap(defender, cover) {
     try {
-      const peek = peekRegistry.get(attacker?.document?.id);
-      if (peek && peek.fov == null && (cover === 'standard' || cover === 'greater')) {
+      const peek = peekRegistry.get(defender?.document?.id);
+      if (
+        peek &&
+        peek.fov == null &&
+        (cover === 'standard' || cover === 'greater') &&
+        !tokenHasActiveTakeCoverState(defender)
+      ) {
         return 'lesser';
       }
     } catch (_) {}
