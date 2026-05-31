@@ -55,7 +55,7 @@ export class PeekManager {
   startCornerPeek(token, mouse) {
     const geo = clampCornerPeek({ footprint: this._footprint(token), mouse, band: PEEK_BAND, fov: this._slitAngle(), tokenCenter: token.center, maxSweep: this._maxSweep() });
     geo.origin = this._clampOriginToWalls(token.center, geo.origin);
-    this._begin(token, { ...geo, ignoredWallIds: [], range: this._rangePx() }, { kind: 'corner' });
+    this._begin(token, { ...geo, ignoredWallIds: [], range: 0 }, { kind: 'corner' });
   }
 
   _clampOriginToWalls(from, origin) {
@@ -84,7 +84,8 @@ export class PeekManager {
       geo.origin = this._clampOriginToWalls(entry.token.center, geo.origin);
     }
     const ignoredWallIds = entry.kind === 'door' ? [entry.doorDoc.id] : [];
-    this._registry.set(tokenId, { ...geo, ignoredWallIds, range: this._rangePx() }, this._now());
+    const range = entry.kind === 'door' ? this._rangePx() : 0;
+    this._registry.set(tokenId, { ...geo, ignoredWallIds, range }, this._now());
     this._renderer.apply(entry.token, this._registry.get(tokenId));
     this._socket.sendUpdate(tokenId, this._registry.get(tokenId));
     this._recompute(tokenId);

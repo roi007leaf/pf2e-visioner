@@ -309,12 +309,20 @@ describe('PeekManager settings-backed geometry', () => {
     global.canvas.dimensions = prevDimensions;
   });
 
-  test('startCornerPeek applies slit angle and range from settings', () => {
+  test('startCornerPeek applies slit angle but ignores range (full sight)', () => {
     const d = deps();
     const mgr = new PeekManager(d);
     const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
     mgr.startCornerPeek(token, { x: 500, y: 50 });
     expect(d.registry.get('peeker').fov).toBe(30);
+    expect(d.registry.get('peeker').range).toBe(0);
+  });
+
+  test('startDoorPeek applies the configured range', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
     expect(d.registry.get('peeker').range).toBe(400);
   });
 });
