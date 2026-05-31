@@ -3,7 +3,7 @@ import { clampCornerPeek, clampDoorPeek, pullBackOrigin } from './peek-geometry.
 import { readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 
-const PEEK_BAND = 50;
+const PEEK_BAND = 25;
 const DOOR_NUDGE = 5;
 
 export class PeekManager {
