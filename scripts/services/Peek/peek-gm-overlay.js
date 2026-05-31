@@ -20,10 +20,9 @@ export class PeekGmOverlay {
         const peek = peekRegistry.get(id);
         if (!peek?.origin) continue;
         const isOwn = !peek.userId || peek.userId === ownId;
-        if (isGM && isOwn) continue;
         if (!isGM && !isOwn) continue;
         live.add(id);
-        this._draw(layer, id, peek);
+        this._draw(layer, id, peek, !isOwn);
       }
       for (const id of [...this._graphics.keys()]) {
         if (!live.has(id)) this._remove(id);
@@ -31,7 +30,7 @@ export class PeekGmOverlay {
     } catch (_) {}
   }
 
-  _draw(layer, id, peek) {
+  _draw(layer, id, peek, drawPolygon) {
     let g = this._graphics.get(id);
     if (!g) {
       g = new PIXI.Graphics();
@@ -40,7 +39,7 @@ export class PeekGmOverlay {
     }
     g.clear();
     const color = this._color(peek.userColor);
-    if (Array.isArray(peek.points) && peek.points.length >= 6) {
+    if (drawPolygon && Array.isArray(peek.points) && peek.points.length >= 6) {
       g.beginFill(color, 0.15);
       g.lineStyle(2, color, 0.6);
       g.drawPolygon(peek.points);
