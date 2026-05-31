@@ -31,11 +31,14 @@ export function clampCornerPeek({ footprint, mouse, band, fov, tokenCenter, maxS
   if (footprint.elevation !== undefined) origin.elevation = footprint.elevation;
   let direction = Math.atan2(mouse.y - origin.y, mouse.x - origin.x);
   if (Number.isNaN(direction)) direction = 0;
+  let outFov = fov;
   if (tokenCenter && typeof maxSweep === 'number' && !(origin.x === tokenCenter.x && origin.y === tokenCenter.y)) {
     const base = Math.atan2(origin.y - tokenCenter.y, origin.x - tokenCenter.x);
-    direction = clampDirectionToArc(base, direction, maxSweep);
+    const bounded = boundConeToSweep(base, direction, fov, maxSweep);
+    direction = bounded.direction;
+    outFov = bounded.fov;
   }
-  return { origin, direction: direction, fov };
+  return { origin, direction, fov: outFov };
 }
 
 function clamp(v, lo, hi) {
@@ -59,11 +62,14 @@ export function clampDoorPeek({ door, tokenCenter, nudge, fov, aim, maxSweep }) 
   const origin = { x: mid.x - nx * nudge, y: mid.y - ny * nudge };
   const base = Math.atan2(ny, nx);
   let direction = base;
-  if (aim && typeof maxSweep === 'number') {
-    const raw = Math.atan2(aim.y - origin.y, aim.x - origin.x);
-    direction = clampDirectionToArc(base, raw, maxSweep);
+  let outFov = fov;
+  if (typeof maxSweep === 'number') {
+    const raw = aim ? Math.atan2(aim.y - origin.y, aim.x - origin.x) : base;
+    const bounded = boundConeToSweep(base, raw, fov, maxSweep);
+    direction = bounded.direction;
+    outFov = bounded.fov;
   }
-  return { origin, direction, fov };
+  return { origin, direction, fov: outFov };
 }
 
 export function clampDirectionToArc(base, target, maxSweep) {
@@ -72,6 +78,14 @@ export function clampDirectionToArc(base, target, maxSweep) {
   if (delta > maxSweep) delta = maxSweep;
   else if (delta < -maxSweep) delta = -maxSweep;
   return base + delta;
+}
+
+export function boundConeToSweep(base, rawAim, fovDeg, maxSweep) {
+  const fovRad = toRadians(fovDeg);
+  const cappedFovRad = Math.min(fovRad, 2 * maxSweep);
+  const effSweep = Math.max(0, maxSweep - cappedFovRad / 2);
+  const direction = clampDirectionToArc(base, rawAim, effSweep);
+  return { direction, fov: (cappedFovRad * 180) / Math.PI };
 }
 
 export function distancePointToSegment(point, segment) {

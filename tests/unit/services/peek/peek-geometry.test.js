@@ -130,9 +130,17 @@ describe('clampDoorPeek aim', () => {
     expect(Math.abs(delta)).toBeGreaterThan(0);
   });
 
-  test('aim far to one side clamps to exactly base+maxSweep', () => {
+  test('aim far to one side clamps so the cone edge stays within the sweep arc', () => {
+    const fovRad = (22 * Math.PI) / 180;
+    const effSweep = maxSweep - fovRad / 2;
     const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 22, aim: { x: 100, y: 1000 }, maxSweep });
-    expect(out.direction).toBeCloseTo(maxSweep, 5);
+    expect(out.direction).toBeCloseTo(effSweep, 5);
+  });
+
+  test('slit wider than the sweep arc fills it: cone capped at 2*sweep and pinned to base', () => {
+    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 200, aim: { x: 100, y: 1000 }, maxSweep });
+    expect(out.fov).toBeCloseTo((2 * maxSweep * 180) / Math.PI, 5);
+    expect(out.direction).toBeCloseTo(0, 5);
   });
 });
 
