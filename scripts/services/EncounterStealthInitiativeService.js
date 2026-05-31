@@ -16,6 +16,7 @@ const OVERRIDE_SOURCE = 'encounter_stealth_initiative';
 const TRACKER_HIDDEN_CLASS = 'pf2e-visioner-stealth-tracker-hidden';
 const TRACKER_MASKED_CLASS = 'pf2e-visioner-stealth-tracker-masked';
 const TRACKER_STEALTH_MARKER_SELECTOR = '[data-pf2e-visioner-stealth-initiative-marker="true"]';
+const TRACKER_VISIBILITY_REFRESH_DELAYS_MS = [50, 150, 300];
 const PREVIOUS_OVERRIDE_PREFIX = 'encounter-stealth-previous-from-';
 const MASKED_COMBATANT_LABEL = 'Undetected Combatant';
 const STANDARD_OR_GREATER_COVER = new Set(['standard', 'greater']);
@@ -119,6 +120,7 @@ export class EncounterStealthInitiativeService {
   constructor() {
     this._initialHideRecordsByCombat = new Map();
     this._expiredInitialHideRecordsByCombat = new Map();
+    this._scheduledTrackerVisibilityRefreshes = new Map();
   }
 
   isEnabled() {
@@ -166,12 +168,15 @@ export class EncounterStealthInitiativeService {
       this._expiredInitialHideRecordsByCombat.set(combatId, new Set());
     }
     const records = this._initialHideRecordsByCombat.get(combatId);
+    const foundryHiddenStealthersToUnhide = new Map();
 
     for (const stealther of stealthers) {
       if (!hasNumericInitiative(stealther)) continue;
       const stealtherToken = getTokenFromCombatant(stealther);
       if (!stealtherToken?.document?.id) continue;
-      await this._unhideFoundryHiddenCombatantToken(stealtherToken);
+      if (stealtherToken.document.hidden === true) {
+        foundryHiddenStealthersToUnhide.set(stealtherToken.document.id, stealtherToken);
+      }
 
       for (const observer of combatants) {
         if (observer === stealther) continue;
@@ -228,6 +233,10 @@ export class EncounterStealthInitiativeService {
         }
       }
     }
+
+    for (const token of foundryHiddenStealthersToUnhide.values()) {
+      await this._unhideFoundryHiddenCombatantToken(token);
+    }
   }
 
   async _unhideFoundryHiddenCombatantToken(token) {
@@ -247,6 +256,7 @@ export class EncounterStealthInitiativeService {
 
   clearCombat(combat = game.combat) {
     const combatId = getCombatId(combat);
+    this._clearScheduledTrackerVisibilityRefresh(combat);
     this._initialHideRecordsByCombat.delete(combatId);
     this._expiredInitialHideRecordsByCombat.delete(combatId);
     this.applyTrackerVisibility(combat);
@@ -283,10 +293,38 @@ export class EncounterStealthInitiativeService {
   }
 
   scheduleTrackerVisibilityRefresh(combat = game.combat) {
-    this.applyTrackerVisibility(combat);
-    for (const delay of [50, 150, 300]) {
-      setTimeout(() => this.applyTrackerVisibility(combat), delay);
+    const combatId = getCombatId(combat);
+    const existing = this._scheduledTrackerVisibilityRefreshes.get(combatId);
+    if (existing) {
+      existing.combat = combat;
+      return;
     }
+
+    const entry = { combat, timeoutsByDelay: new Map() };
+    this._scheduledTrackerVisibilityRefreshes.set(combatId, entry);
+
+    this.applyTrackerVisibility(combat);
+    for (const delay of TRACKER_VISIBILITY_REFRESH_DELAYS_MS) {
+      const timeoutId = setTimeout(() => {
+        entry.timeoutsByDelay.delete(delay);
+        this.applyTrackerVisibility(entry.combat);
+        if (!entry.timeoutsByDelay.size) {
+          this._scheduledTrackerVisibilityRefreshes.delete(combatId);
+        }
+      }, delay);
+      entry.timeoutsByDelay.set(delay, timeoutId);
+    }
+  }
+
+  _clearScheduledTrackerVisibilityRefresh(combat = game.combat) {
+    const combatId = getCombatId(combat);
+    const entry = this._scheduledTrackerVisibilityRefreshes.get(combatId);
+    if (!entry) return;
+
+    for (const timeoutId of entry.timeoutsByDelay.values()) {
+      clearTimeout(timeoutId);
+    }
+    this._scheduledTrackerVisibilityRefreshes.delete(combatId);
   }
 
   shouldHideCombatantFromCurrentUser(combatant, combat = game.combat) {

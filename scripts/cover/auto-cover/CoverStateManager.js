@@ -10,6 +10,21 @@ import { systemIconPath } from '../../system-adapter.js';
 import { deleteExistingEmbeddedItems } from '../../visibility/utils.js';
 import { runWithCoverEffectLock } from '../utils.js';
 
+function tokenIdOf(token) {
+  return token?.id || token?.document?.id || null;
+}
+
+function coverEffectMatchesObserver(effect, observerToken) {
+  const flags = effect?.flags?.[MODULE_ID];
+  if (!flags?.isEphemeralCover) return false;
+
+  const observerTokenId = flags.observerTokenId || flags.observerToken;
+  if (observerTokenId) return observerTokenId === tokenIdOf(observerToken);
+
+  const observerSignature = observerToken?.actor?.signature;
+  return !!observerSignature && flags.observerActorSignature === observerSignature;
+}
+
 export class CoverStateManager {
   /**
    * Flag scope for auto-cover
@@ -159,16 +174,15 @@ export class CoverStateManager {
       if (!actor) return;
 
       await runWithCoverEffectLock(actor, async () => {
-        // Check if effect already exists for this attacker
-        const existingEffect = actor.itemTypes.effect.find(
-          (e) =>
-            e.flags?.[MODULE_ID]?.isEphemeralCover &&
-            e.flags?.[MODULE_ID]?.observerActorSignature === attacker.actor.signature,
+        const existingEffects = actor.itemTypes.effect.filter((effect) =>
+          coverEffectMatchesObserver(effect, attacker),
         );
 
-        // Remove existing effect if found
-        if (existingEffect) {
-          await deleteExistingEmbeddedItems(actor, [existingEffect.id]);
+        if (existingEffects.length > 0) {
+          await deleteExistingEmbeddedItems(
+            actor,
+            existingEffects.map((effect) => effect.id),
+          );
         }
 
         // If no cover or removing cover, just return after cleaning up

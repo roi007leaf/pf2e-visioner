@@ -293,6 +293,118 @@ describe('CoverStateManager', () => {
         'cover-effect',
       ]);
     });
+
+    test('removes all encounter-start cover effects for the moved pair', async () => {
+      const matchingEffectByToken = {
+        id: 'cover-effect-token',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'source-signature',
+            observerTokenId: 'source-123',
+          },
+        },
+      };
+      const matchingLegacyEffect = {
+        id: 'cover-effect-legacy',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'source-signature',
+          },
+        },
+      };
+      const siblingSameActorEffect = {
+        id: 'cover-effect-sibling',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'source-signature',
+            observerTokenId: 'source-sibling',
+          },
+        },
+      };
+      const unrelatedEffect = {
+        id: 'cover-effect-unrelated',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'other-signature',
+            observerTokenId: 'other-token',
+          },
+        },
+      };
+      const effects = [
+        matchingEffectByToken,
+        matchingLegacyEffect,
+        siblingSameActorEffect,
+        unrelatedEffect,
+      ];
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          uuid: 'Actor.target',
+          itemTypes: { effect: effects },
+          items: {
+            get: jest.fn((id) => effects.find((effect) => effect.id === id) ?? null),
+          },
+          createEmbeddedDocuments: jest.fn(),
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'none');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledTimes(1);
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+        'cover-effect-token',
+        'cover-effect-legacy',
+      ]);
+      expect(targetToken.actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    });
+
+    test('does not request stale cover effect delete when user lacks item permission', async () => {
+      const existingEffect = {
+        id: 'cover-effect',
+        canUserModify: jest.fn(() => false),
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'source-signature',
+          },
+        },
+      };
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          uuid: 'Actor.target',
+          itemTypes: { effect: [existingEffect] },
+          items: {
+            get: jest.fn((id) => (id === existingEffect.id ? existingEffect : null)),
+          },
+          createEmbeddedDocuments: jest.fn(),
+          deleteEmbeddedDocuments: jest.fn().mockRejectedValue(new Error('permission should gate')),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'none');
+
+      expect(existingEffect.canUserModify).toHaveBeenCalledWith(global.game.user, 'delete');
+      expect(targetToken.actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+      expect(targetToken.actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    });
   });
 
   describe('clearCover', () => {

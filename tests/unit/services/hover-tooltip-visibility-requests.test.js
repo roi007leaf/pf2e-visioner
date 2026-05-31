@@ -2,6 +2,8 @@ import {
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityIndicatorDecision,
   buildTooltipVisibilityRequests,
+  getTooltipCandidateTokens,
+  isTooltipTokenInEncounter,
   normalizeTooltipVisibilityState,
 } from '../../../scripts/services/HoverTooltip/hover-tooltip-visibility-requests.js';
 import {
@@ -206,6 +208,59 @@ describe('hover tooltip visibility request planning', () => {
         senseUsed: null,
       },
     ]);
+  });
+
+  test('limits active encounter hover planning to encounter tokens', () => {
+    const subject = makeToken('subject');
+    const combatObserver = makeToken('combat-observer');
+    const offEncounterTokens = Array.from({ length: 100 }, (_, index) =>
+      makeToken(`off-encounter-${index}`),
+    );
+    const combat = {
+      combatants: [
+        { tokenId: subject.id },
+        { tokenId: combatObserver.id },
+      ],
+    };
+    const getVisibilityState = jest.fn((observer) =>
+      observer.id === combatObserver.id ? 'hidden' : 'observed',
+    );
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: subject,
+      allTokens: [subject, combatObserver, ...offEncounterTokens],
+      mode: 'target',
+      isGM: true,
+      getVisibilityState,
+      combat,
+    });
+
+    expect(getVisibilityState).toHaveBeenCalledTimes(1);
+    expect(getVisibilityState).toHaveBeenCalledWith(combatObserver, subject);
+    expect(requests).toEqual([
+      {
+        renderToken: combatObserver,
+        observerToken: combatObserver,
+        visibilityState: 'hidden',
+        mode: 'target',
+        detectionTarget: subject,
+        senseUsed: null,
+      },
+    ]);
+  });
+
+  test('keeps non-encounter hover planning scene-wide during active combat', () => {
+    const subject = makeToken('subject');
+    const combatToken = makeToken('combat-token');
+    const outsider = makeToken('outsider');
+    const combat = {
+      combatants: [{ tokenId: combatToken.id }],
+    };
+
+    expect(isTooltipTokenInEncounter(subject, combat)).toBe(false);
+    expect(getTooltipCandidateTokens([subject, combatToken, outsider], subject, { combat })).toEqual(
+      [subject, combatToken, outsider],
+    );
   });
 
   test('returns no player requests for non-owned subject token', () => {

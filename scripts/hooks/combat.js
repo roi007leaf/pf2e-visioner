@@ -64,11 +64,46 @@ function onDeleteCombat(combat) {
 }
 
 function onRenderCombatTracker(tracker) {
-  encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(tracker?.viewed ?? game.combat);
+  encounterStealthInitiativeService.applyTrackerVisibility(tracker?.viewed ?? game.combat);
 }
 
-function onVisibilityMapUpdated() {
-  encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(game.combat);
+function onVisibilityMapUpdated(update = {}) {
+  const combat = game.combat;
+  if (!visibilityMapUpdateTouchesCombat(update, combat)) return;
+  encounterStealthInitiativeService.scheduleTrackerVisibilityRefresh(combat);
+}
+
+function combatantsToArray(combatants) {
+  if (!combatants) return [];
+  if (Array.isArray(combatants)) return combatants;
+  if (Array.isArray(combatants.contents)) return combatants.contents;
+  if (typeof combatants.values === 'function') return Array.from(combatants.values());
+  try {
+    return Array.from(combatants);
+  } catch {
+    return [];
+  }
+}
+
+function visibilityMapUpdateTouchesCombat(update = {}, combat = game.combat) {
+  if (!encounterStealthInitiativeService.isEnabled()) return false;
+
+  const combatants = combatantsToArray(combat?.combatants ?? combat?.turns);
+  if (!combatants) return false;
+
+  const tokenIds = new Set();
+  try {
+    for (const combatant of combatants) {
+      const tokenId = combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.object?.id;
+      if (tokenId) tokenIds.add(tokenId);
+    }
+  } catch {
+    return false;
+  }
+
+  if (tokenIds.size === 0) return false;
+  if (!update?.observerId && !update?.targetId) return true;
+  return tokenIds.has(update.observerId) || tokenIds.has(update.targetId);
 }
 
 async function handleCombatStart(combat) {

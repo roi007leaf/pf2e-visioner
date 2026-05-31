@@ -57,6 +57,7 @@ import {
   destroyCoverTooltipIndicator,
   destroyVisibilityBadge,
   destroyVisibilityTooltipIndicator,
+  removeTooltipDomElement,
 } from './HoverTooltip/hover-tooltip-cleanup.js';
 import {
   createTooltipPositionPoint,
@@ -109,9 +110,13 @@ class HoverTooltipsImpl {
     this.tooltipIconSize = 14;
     this.badgeTicker = null;
     this.visibilityBadges = new Map();
+    this.tooltipBadgePool = new Map();
     this._isTokenMoving = false;
     this._movementDebounceTimer = null;
     this._isDragging = false;
+    this._hookHandlers = [];
+    this._originalCanvasAnimatePan = null;
+    this._canvasAnimatePanWrapper = null;
   }
   init() {
     if (this._initialized) return this.refreshSizes();
@@ -333,10 +338,144 @@ function stopBadgeTickerIfNoBadgesRemain() {
   if (!hasPositionedTooltipBadges()) stopBadgeTicker();
 }
 
+function createTooltipWorldAnchor(targetToken) {
+  const tokenWidth = targetToken.document.width * canvas.grid.size;
+  return {
+    x: targetToken.x + tokenWidth / 2,
+    y: targetToken.y - 8,
+  };
+}
+
+function getTooltipTokenId(token) {
+  return token?.document?.id ?? token?.id ?? '';
+}
+
+function makeTooltipBadgePoolKey(...parts) {
+  return parts.map((part) => String(part ?? '')).join('|');
+}
+
+function showPooledTooltipElement(key, createElement, left, top) {
+  let element = HoverTooltips.tooltipBadgePool.get(key);
+  if (!element) {
+    element = createElement();
+    HoverTooltips.tooltipBadgePool.set(key, element);
+  }
+
+  if (!element.isConnected) document.body.appendChild(element);
+  element.style.display = '';
+  setTooltipBadgeTransform(element, left, top);
+  return element;
+}
+
+function hidePooledTooltipElement(element) {
+  if (!element?.style) return;
+  element.style.display = 'none';
+  element.onclick = null;
+}
+
+function hidePooledTooltipIndicator(indicator, fields) {
+  if (!indicator) return;
+  removeTooltipDomElement(indicator._suppressionBadgeEl);
+  delete indicator._suppressionBadgeEl;
+  for (const field of fields) {
+    hidePooledTooltipElement(indicator[field]);
+    delete indicator[field];
+  }
+}
+
+function clearTooltipBadgePool() {
+  for (const element of HoverTooltips.tooltipBadgePool.values()) {
+    removeTooltipDomElement(element);
+  }
+  HoverTooltips.tooltipBadgePool.clear();
+}
+
 function clearPendingHoverDebounce() {
   if (!HoverTooltips._hoverDebounceTimer) return;
   clearTimeout(HoverTooltips._hoverDebounceTimer);
   delete HoverTooltips._hoverDebounceTimer;
+}
+
+function clearHoverTooltipLifecycleTimers() {
+  const timerKeys = ['_panTimeout', '_zoomTimeout', '_visibilityUpdateDebounce'];
+  for (const key of timerKeys) {
+    if (!HoverTooltips[key]) continue;
+    clearTimeout(HoverTooltips[key]);
+    HoverTooltips[key] = null;
+  }
+}
+
+function registerHoverTooltipHook(hookName, handler) {
+  const hookId = Hooks.on(hookName, handler);
+  HoverTooltips._hookHandlers.push({ hookName, handler, hookId });
+  return hookId;
+}
+
+function unregisterHoverTooltipHooks() {
+  const registrations = HoverTooltips._hookHandlers || [];
+  for (const { hookName, handler, hookId } of registrations) {
+    try {
+      Hooks.off?.(hookName, handler);
+    } catch (_) {
+      try {
+        if (hookId !== undefined) Hooks.off?.(hookName, hookId);
+      } catch (_) { }
+    }
+  }
+  HoverTooltips._hookHandlers = [];
+}
+
+function installCanvasZoomGuard() {
+  const canvasRef = globalThis.canvas;
+  if (typeof canvasRef?.animatePan !== 'function') return false;
+  if (
+    HoverTooltips._canvasAnimatePanWrapper &&
+    canvasRef.animatePan === HoverTooltips._canvasAnimatePanWrapper
+  )
+    return true;
+
+  HoverTooltips._originalCanvasAnimatePan = canvasRef.animatePan;
+  HoverTooltips._canvasAnimatePanWrapper = function (...args) {
+    const options = args[0] || {};
+    if (options.scale !== undefined && options.scale !== canvasRef.stage.scale.x) {
+      if (!HoverTooltips._isZooming) {
+        HoverTooltips._isZooming = true;
+        if (!HoverTooltips._isPanning) {
+          saveViewportTooltipState();
+          suspendViewportTooltipRendering();
+        }
+      }
+
+      if (HoverTooltips._zoomTimeout) clearTimeout(HoverTooltips._zoomTimeout);
+
+      HoverTooltips._zoomTimeout = setTimeout(() => {
+        HoverTooltips._isZooming = false;
+        restoreSavedViewportTooltipState({ skipIfPanning: true });
+        HoverTooltips._zoomTimeout = null;
+      }, 150);
+    }
+    return HoverTooltips._originalCanvasAnimatePan.apply(this, args);
+  };
+
+  canvasRef.animatePan = HoverTooltips._canvasAnimatePanWrapper;
+  return true;
+}
+
+function removeCanvasZoomGuard() {
+  const canvasRef = globalThis.canvas;
+  if (HoverTooltips._zoomTimeout) {
+    clearTimeout(HoverTooltips._zoomTimeout);
+    HoverTooltips._zoomTimeout = null;
+  }
+  if (
+    canvasRef &&
+    HoverTooltips._canvasAnimatePanWrapper &&
+    canvasRef.animatePan === HoverTooltips._canvasAnimatePanWrapper
+  ) {
+    canvasRef.animatePan = HoverTooltips._originalCanvasAnimatePan;
+  }
+  HoverTooltips._originalCanvasAnimatePan = null;
+  HoverTooltips._canvasAnimatePanWrapper = null;
 }
 
 function hoverTooltipsSuppressedByPointerActivity() {
@@ -470,6 +609,35 @@ function scheduleTooltipOverlayRefresh({ clearExisting = true } = {}) {
   return false;
 }
 
+function tokenIdOfTooltipToken(token) {
+  return token?.document?.id ?? token?.id ?? null;
+}
+
+function tooltipVisibilityUpdateAffectsActiveOverlay(update = null) {
+  const hasActiveOverlay = HoverTooltips.isShowingKeyTooltips || !!HoverTooltips.currentHoveredToken;
+  if (!hasActiveOverlay) return false;
+  if (!update || typeof update !== 'object') return true;
+
+  const observerId = update.observerId ?? null;
+  const targetId = update.targetId ?? null;
+  if (!observerId && !targetId) return true;
+
+  if (HoverTooltips.isShowingKeyTooltips) {
+    const subjectIds = HoverTooltips.keyTooltipTokens;
+    if (!subjectIds?.size) return true;
+    return HoverTooltips.tooltipMode === 'observer'
+      ? subjectIds.has(observerId)
+      : subjectIds.has(targetId);
+  }
+
+  const hoveredId = tokenIdOfTooltipToken(HoverTooltips.currentHoveredToken);
+  if (!hoveredId) return true;
+
+  return HoverTooltips.tooltipMode === 'observer'
+    ? observerId === hoveredId
+    : targetId === hoveredId;
+}
+
 /**
  * Initialize hover tooltip system
  */
@@ -504,7 +672,7 @@ export function initializeHoverTooltips() {
 
   // Register hoverToken hook to handle token hover events
   // This is cleaner than PIXI events and automatically excludes UI hover
-  Hooks.on('hoverToken', (token, hovered) => {
+  registerHoverTooltipHook('hoverToken', (token, hovered) => {
     if (hovered) {
       onTokenHover(token);
     } else {
@@ -513,8 +681,7 @@ export function initializeHoverTooltips() {
   });
 
   // Handle canvas pan: hide tooltips during pan, show after
-  let panTimeout = null;
-  Hooks.on('canvasPan', () => {
+  registerHoverTooltipHook('canvasPan', () => {
     // Hide tooltips immediately when pan starts
     if (!HoverTooltips._isPanning) {
       setTooltipPanningState(true);
@@ -525,63 +692,39 @@ export function initializeHoverTooltips() {
     suspendViewportTooltipRendering();
 
     // Clear any existing timeout
-    if (panTimeout) clearTimeout(panTimeout);
+    if (HoverTooltips._panTimeout) clearTimeout(HoverTooltips._panTimeout);
 
     // Set timeout to restore tooltips after pan stops
-    panTimeout = setTimeout(() => {
+    HoverTooltips._panTimeout = setTimeout(() => {
       setTooltipPanningState(false);
       restoreSavedViewportTooltipState({ restartTicker: true });
-      panTimeout = null;
+      HoverTooltips._panTimeout = null;
     }, 150); // 150ms after pan stops
   });
 
   // Handle canvas zoom: hide tooltips during zoom, show after (similar to pan)
-  let zoomTimeout = null;
-  const originalAnimate = canvas.animatePan;
-  canvas.animatePan = function (...args) {
-    // Detect if this is a zoom operation
-    const options = args[0] || {};
-    if (options.scale !== undefined && options.scale !== canvas.stage.scale.x) {
-      // Hide tooltips immediately when zoom starts
-      if (!HoverTooltips._isZooming) {
-        HoverTooltips._isZooming = true;
-        if (!HoverTooltips._isPanning) {
-          saveViewportTooltipState();
-          suspendViewportTooltipRendering();
-        }
-      }
-
-      // Clear any existing timeout
-      if (zoomTimeout) clearTimeout(zoomTimeout);
-
-      // Set timeout to restore tooltips after zoom stops
-      zoomTimeout = setTimeout(() => {
-        HoverTooltips._isZooming = false;
-        restoreSavedViewportTooltipState({ skipIfPanning: true });
-        zoomTimeout = null;
-      }, 150);
-    }
-    return originalAnimate.apply(this, args);
-  };
+  installCanvasZoomGuard();
 
   // Refresh badges when visibility map changes (debounced to avoid performance issues during rapid updates)
   try {
-    let visibilityUpdateDebounce = null;
-    Hooks.on('pf2e-visioner.visibilityMapUpdated', () => {
+    registerHoverTooltipHook('pf2e-visioner.visibilityMapUpdated', (update) => {
       // Skip updates entirely during active token movement to prevent performance issues
       if (HoverTooltips._isTokenMoving) {
         return;
       }
+      if (!tooltipVisibilityUpdateAffectsActiveOverlay(update)) {
+        return;
+      }
 
       // Clear any pending update
-      if (visibilityUpdateDebounce) {
-        clearTimeout(visibilityUpdateDebounce);
+      if (HoverTooltips._visibilityUpdateDebounce) {
+        clearTimeout(HoverTooltips._visibilityUpdateDebounce);
       }
 
       // Debounce tooltip updates during rapid visibility changes (e.g., token movement)
       // This prevents constant re-rendering during AVS batch processing
-      visibilityUpdateDebounce = setTimeout(() => {
-        visibilityUpdateDebounce = null;
+      HoverTooltips._visibilityUpdateDebounce = setTimeout(() => {
+        HoverTooltips._visibilityUpdateDebounce = null;
         scheduleTooltipOverlayRefresh();
       }, 150); // 150ms debounce - batch multiple rapid updates
     });
@@ -589,7 +732,7 @@ export function initializeHoverTooltips() {
 
   // Detect token movement and pause tooltip updates during movement
   // This prevents tooltips from consuming CPU during drag operations
-  Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
+  registerHoverTooltipHook('preUpdateToken', (tokenDoc, changes, options, userId) => {
     // Check if this is a position or animation change
     if (changes.x !== undefined || changes.y !== undefined || changes.rotation !== undefined) {
       // Mark movement as active
@@ -616,7 +759,7 @@ export function initializeHoverTooltips() {
   });
 
   // Clean up tooltips when tearing down canvas (leaving a scene)
-  Hooks.on('canvasTearDown', () => {
+  registerHoverTooltipHook('canvasTearDown', () => {
     // Aggressively destroy all PIXI containers and DOM elements
 
     // Destroy all visibility indicators with full cleanup
@@ -638,6 +781,7 @@ export function initializeHoverTooltips() {
       }
     });
     HoverTooltips.coverIndicators.clear();
+    clearTooltipBadgePool();
 
     // Destroy all visibility badges (including factor badges)
     HoverTooltips.visibilityBadges.forEach((badge, key) => {
@@ -689,7 +833,7 @@ export function initializeHoverTooltips() {
   });
 
   // Clean up tooltips when changing scenes
-  Hooks.on('canvasReady', () => {
+  registerHoverTooltipHook('canvasReady', () => {
     // Clean up all tooltips and reset state
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
@@ -1047,7 +1191,7 @@ function showKeyboardVisibilityOverlay({ mode, tokens, markInitialized = false }
 function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, actualTarget = null) {
   if (!badgeElement) return;
 
-  badgeElement.addEventListener('click', async (event) => {
+  badgeElement.onclick = async (event) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -1077,7 +1221,7 @@ function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, ac
     } catch (error) {
       console.error('PF2E Visioner | Error opening token manager from tooltip:', error);
     }
-  });
+  };
 }
 
 /**
@@ -1113,12 +1257,7 @@ function addVisibilityIndicator(
     blockedVisibilityStates: SENSE_BADGE_BLOCKED_VISIBILITY_STATES,
   });
 
-  // Create an anchor container at the token center-top to compute transformed bounds
-  const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
-  indicator.x = targetToken.x + tokenWidth / 2;
-  indicator.y = targetToken.y - 8; // slight padding above the token
-  canvas.tokens.addChild(indicator);
+  const indicator = createTooltipWorldAnchor(targetToken);
 
   const canvasRect = canvas.app.view.getBoundingClientRect();
   const sizeConfig = readTooltipSizeConfig({
@@ -1142,35 +1281,70 @@ function addVisibilityIndicator(
     badgeHeight,
     hudActive,
   });
+  const observerId = getTooltipTokenId(observerToken);
+  const targetId = getTooltipTokenId(targetToken);
+  const detectionTargetId = getTooltipTokenId(detectionTarget);
 
   const placeBadge = (leftPx, topPx, stateClass, iconClass, kind, tooltipLabel = '') => {
-    const el = createVisibilityTooltipBadge({
-      left: leftPx,
-      top: topPx,
-      stateClass,
-      iconClass,
+    const key = makeTooltipBadgePoolKey(
+      'visibility',
       kind,
-      tooltipLabel,
+      mode,
+      observerId,
+      targetId,
+      detectionTargetId,
+      stateClass,
       badgeWidth,
       badgeHeight,
       borderRadius,
-    });
-    document.body.appendChild(el);
-    return el;
+    );
+    return showPooledTooltipElement(
+      key,
+      () =>
+        createVisibilityTooltipBadge({
+          left: leftPx,
+          top: topPx,
+          stateClass,
+          iconClass,
+          kind,
+          tooltipLabel,
+          badgeWidth,
+          badgeHeight,
+          borderRadius,
+        }),
+      leftPx,
+      topPx,
+    );
   };
 
   const placeSenseBadge = (leftPx, topPx, sense) => {
-    const el = createSenseTooltipBadge({
-      left: leftPx,
-      top: topPx,
+    const key = makeTooltipBadgePoolKey(
+      'sense',
+      mode,
+      observerId,
+      targetId,
+      detectionTargetId,
       sense,
       badgeWidth,
       badgeHeight,
       borderRadius,
-      iconPx: sizeConfig.iconPx,
-    });
-    document.body.appendChild(el);
-    return el;
+      sizeConfig.iconPx,
+    );
+    return showPooledTooltipElement(
+      key,
+      () =>
+        createSenseTooltipBadge({
+          left: leftPx,
+          top: topPx,
+          sense,
+          badgeWidth,
+          badgeHeight,
+          borderRadius,
+          iconPx: sizeConfig.iconPx,
+        }),
+      leftPx,
+      topPx,
+    );
   };
 
   const addSuppressionOverlay = (parentBadgeEl, suppressedSenses) => {
@@ -1251,8 +1425,6 @@ function addVisibilityIndicator(
   }
 
   HoverTooltips.visibilityIndicators.set(targetToken.id, indicator);
-
-  ensureBadgeTicker();
 }
 function ensureBadgeTicker() {
   if (HoverTooltips.badgeTicker) return;
@@ -1436,12 +1608,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   const config = COVER_STATES[coverState];
   if (!config) return;
 
-  // Use DOM badge with icon only (no large text), consistent with visibility badges
-  const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
-  indicator.x = targetToken.x + tokenWidth / 2;
-  indicator.y = targetToken.y - 8; // align above token
-  canvas.tokens.addChild(indicator);
+  const indicator = createTooltipWorldAnchor(targetToken);
 
   const canvasRect = canvas.app.view.getBoundingClientRect();
   const sizeConfig = readTooltipSizeConfig({
@@ -1474,23 +1641,36 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
     fallbackColor: config.color,
   });
 
-  const el = createCoverTooltipBadge({
+  const el = showPooledTooltipElement(
+    makeTooltipBadgePoolKey(
+      'cover',
+      getTooltipTokenId(observerToken),
+      getTooltipTokenId(targetToken),
+      coverState,
+      isManualCover ? 'manual' : 'auto',
+      badgeWidth,
+      badgeHeight,
+      borderRadius,
+    ),
+    () =>
+      createCoverTooltipBadge({
+        left,
+        top,
+        iconClass: config.icon,
+        color,
+        badgeWidth,
+        badgeHeight,
+        borderRadius,
+        isManualCover,
+      }),
     left,
     top,
-    iconClass: config.icon,
-    color,
-    badgeWidth,
-    badgeHeight,
-    borderRadius,
-    isManualCover,
-  });
-  document.body.appendChild(el);
+  );
   indicator._coverBadgeEl = el;
 
   addBadgeClickHandler(el, observerToken, targetToken, 'target');
 
   HoverTooltips.coverIndicators.set(targetToken.id + '|cover', indicator);
-  ensureBadgeTicker();
 }
 
 /**
@@ -1507,7 +1687,7 @@ function hideAllVisibilityIndicators() {
   // Clean up all indicators
   HoverTooltips.visibilityIndicators.forEach((indicator) => {
     try {
-      destroyVisibilityTooltipIndicator(indicator);
+      hidePooledTooltipIndicator(indicator, ['_senseBadgeEl', '_visBadgeEl', '_coverBadgeEl']);
     } catch (e) {
       console.warn('PF2E Visioner: Error cleaning up indicator', e);
     }
@@ -1548,7 +1728,7 @@ function hideAllCoverIndicators() {
   } catch (_) { }
   HoverTooltips.coverIndicators.forEach((indicator) => {
     try {
-      destroyCoverTooltipIndicator(indicator);
+      hidePooledTooltipIndicator(indicator, ['_coverBadgeEl']);
     } catch (_) { }
   });
   HoverTooltips.coverIndicators.clear();
@@ -1562,7 +1742,11 @@ export function cleanupHoverTooltips() {
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
   clearPendingHoverDebounce();
+  clearHoverTooltipLifecycleTimers();
+  unregisterHoverTooltipHooks();
+  removeCanvasZoomGuard();
   removeCanvasPointerGuard();
+  clearTooltipBadgePool();
   HoverTooltips.currentHoveredToken = null;
   HoverTooltips.isShowingKeyTooltips = false;
   HoverTooltips.keyTooltipTokens.clear();
@@ -1572,6 +1756,7 @@ export function cleanupHoverTooltips() {
   cleanupTokenEventListeners();
 
   _initialized = false;
+  HoverTooltips._initialized = false;
 }
 
 /**

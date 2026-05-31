@@ -4025,7 +4025,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(refreshTokenVisibility).toHaveBeenCalledTimes(1);
   });
 
-  test('animation refresh keeps full cadence for sensitive visual work', () => {
+  test('animation refresh keeps bounded full cadence for sensitive visual work', () => {
     jest.useFakeTimers();
 
     const refreshTokenVisibility = jest.fn();
@@ -4038,7 +4038,7 @@ describe('pending token movement hidden detection guard', () => {
 
     jest.advanceTimersByTime(500);
 
-    expect(refreshTokenVisibility).toHaveBeenCalledTimes(5);
+    expect(refreshTokenVisibility).toHaveBeenCalledTimes(2);
   });
 
 

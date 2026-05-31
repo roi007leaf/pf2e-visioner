@@ -558,10 +558,13 @@ export async function initializeSceneHiddenForPCs(options = {}) {
   let wallEntries = 0;
   let wallDefaults = 0;
   let foundryUnhidden = 0;
+  const foundryHiddenTokenTargetsToUnhide = new Map();
 
   for (const target of tokenTargets) {
     await setDefaultPlayerVisibility(target, 'hidden');
-    foundryUnhidden += await clearFoundryHiddenState(target);
+    if (target?.document?.hidden === true) {
+      foundryHiddenTokenTargetsToUnhide.set(getTokenId(target), target);
+    }
   }
 
   for (const wall of wallTargets) {
@@ -581,6 +584,10 @@ export async function initializeSceneHiddenForPCs(options = {}) {
     }
 
     wallEntries += await setHiddenWallVisibility(observer, wallTargets, allWalls);
+  }
+
+  for (const target of foundryHiddenTokenTargetsToUnhide.values()) {
+    foundryUnhidden += await clearFoundryHiddenState(target);
   }
 
   try {

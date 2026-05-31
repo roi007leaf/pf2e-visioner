@@ -5,6 +5,7 @@ const mockApplyCombatStartAutoCover = jest.fn();
 const mockApplyEncounterStartVisibility = jest.fn();
 const mockClearCombat = jest.fn();
 const mockScheduleTrackerVisibilityRefresh = jest.fn();
+const mockApplyTrackerVisibility = jest.fn();
 const mockHandleCombatantInitiativeUpdate = jest.fn();
 const mockIsEnabled = jest.fn();
 const mockIsInitiativeRelevantUpdate = jest.fn();
@@ -22,6 +23,7 @@ jest.mock('../../../scripts/services/EncounterStealthInitiativeService.js', () =
     applyEncounterStartVisibility: (...args) => mockApplyEncounterStartVisibility(...args),
     clearCombat: (...args) => mockClearCombat(...args),
     scheduleTrackerVisibilityRefresh: (...args) => mockScheduleTrackerVisibilityRefresh(...args),
+    applyTrackerVisibility: (...args) => mockApplyTrackerVisibility(...args),
     handleCombatantInitiativeUpdate: (...args) => mockHandleCombatantInitiativeUpdate(...args),
     isEnabled: (...args) => mockIsEnabled(...args),
     isInitiativeRelevantUpdate: (...args) => mockIsInitiativeRelevantUpdate(...args),
@@ -100,5 +102,61 @@ describe('combat start cover hook integration', () => {
 
     expect(mockScheduleTrackerVisibilityRefresh).not.toHaveBeenCalled();
     expect(mockHandleCombatantInitiativeUpdate).not.toHaveBeenCalled();
+  });
+
+  test('combat tracker render applies visibility once without delayed refresh burst', async () => {
+    const { registerCombatHooks } = await import('../../../scripts/hooks/combat.js');
+    const combat = { id: 'combat-1', started: true, combatants: [] };
+
+    registerCombatHooks();
+    const renderCombatTrackerCallback = global.Hooks.on.mock.calls.find(
+      ([event]) => event === 'renderCombatTracker',
+    )[1];
+
+    renderCombatTrackerCallback({ viewed: combat });
+
+    expect(mockApplyTrackerVisibility).toHaveBeenCalledWith(combat);
+    expect(mockScheduleTrackerVisibilityRefresh).not.toHaveBeenCalled();
+  });
+
+  test('visibility map updates ignore pairs outside active combat', async () => {
+    const { registerCombatHooks } = await import('../../../scripts/hooks/combat.js');
+    global.game.combat = {
+      id: 'combat-1',
+      started: true,
+      combatants: new Map([
+        ['combatant-1', { id: 'combatant-1', tokenId: 'combat-token' }],
+      ]),
+    };
+
+    registerCombatHooks();
+    const visibilityMapCallback = global.Hooks.on.mock.calls.find(
+      ([event]) => event === 'pf2e-visioner.visibilityMapUpdated',
+    )[1];
+
+    visibilityMapCallback({ observerId: 'observer-outside', targetId: 'target-outside' });
+
+    expect(mockScheduleTrackerVisibilityRefresh).not.toHaveBeenCalled();
+  });
+
+  test('visibility map updates refresh tracker when pair touches active combat', async () => {
+    const { registerCombatHooks } = await import('../../../scripts/hooks/combat.js');
+    const combat = {
+      id: 'combat-1',
+      started: true,
+      combatants: new Map([
+        ['combatant-1', { id: 'combatant-1', tokenId: 'combat-token' }],
+      ]),
+    };
+    global.game.combat = combat;
+
+    registerCombatHooks();
+    const visibilityMapCallback = global.Hooks.on.mock.calls.find(
+      ([event]) => event === 'pf2e-visioner.visibilityMapUpdated',
+    )[1];
+
+    visibilityMapCallback({ observerId: 'observer-outside', targetId: 'combat-token' });
+
+    expect(mockScheduleTrackerVisibilityRefresh).toHaveBeenCalledWith(combat);
   });
 });

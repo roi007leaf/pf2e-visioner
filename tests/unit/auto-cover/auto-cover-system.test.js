@@ -196,6 +196,17 @@ describe('AutoCoverSystem', () => {
         { skipEphemeralUpdate: false },
       );
     });
+
+    test('cleanupCover forgets active pairs for document-only token refs', async () => {
+      const sourceToken = { document: { id: 'source' } };
+      const targetToken = { document: { id: 'target' } };
+      autoCoverSystem.recordPair('source', 'target');
+
+      await autoCoverSystem.cleanupCover(sourceToken, targetToken);
+
+      expect(autoCoverSystem.getActivePairsInvolving('source')).toEqual([]);
+      expect(autoCoverSystem.getActivePairsInvolving('target')).toEqual([]);
+    });
   });
 
   describe('isEnabled method', () => {

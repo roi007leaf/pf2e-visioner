@@ -34,6 +34,58 @@ export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {
   );
 }
 
+function collectionToArray(collection) {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (Array.isArray(collection.contents)) return collection.contents;
+  if (typeof collection.values === 'function') return Array.from(collection.values());
+  try {
+    return Array.from(collection);
+  } catch {
+    return [];
+  }
+}
+
+function getTokenId(token) {
+  return token?.document?.id ?? token?.id ?? token?.tokenId ?? token?.object?.id ?? null;
+}
+
+function getCombatantTokenIds(combat = globalThis.game?.combat) {
+  return new Set(
+    collectionToArray(combat?.combatants ?? combat?.turns)
+      .map((combatant) => combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.object?.id)
+      .filter(Boolean),
+  );
+}
+
+function hasActiveTooltipEncounter(combat = globalThis.game?.combat) {
+  return getCombatantTokenIds(combat).size > 0;
+}
+
+export function isTooltipTokenInEncounter(token, combat = globalThis.game?.combat) {
+  const tokenId = getTokenId(token);
+  if (!tokenId) return false;
+
+  const combatantTokenIds = getCombatantTokenIds(combat);
+  if (combatantTokenIds.has(tokenId)) return true;
+
+  const encounterMasterTokenId = token?.document?.getFlag?.('pf2e-visioner', 'encounterMasterTokenId');
+  return !!(encounterMasterTokenId && combatantTokenIds.has(encounterMasterTokenId));
+}
+
+export function getTooltipCandidateTokens(
+  allTokens = [],
+  subjectToken = null,
+  { combat = globalThis.game?.combat } = {},
+) {
+  if (!subjectToken || !hasActiveTooltipEncounter(combat)) return allTokens;
+  if (!isTooltipTokenInEncounter(subjectToken, combat)) return allTokens;
+
+  return allTokens.filter(
+    (token) => token === subjectToken || isTooltipTokenInEncounter(token, combat),
+  );
+}
+
 export function getTooltipSenseUsed(
   observerToken,
   targetToken,
@@ -180,14 +232,16 @@ export function buildTooltipVisibilityRequests({
   getVisibilityMap = () => ({}),
   getVisibilityState = null,
   getDetectionBetween = () => null,
+  combat = globalThis.game?.combat,
 } = {}) {
   if (!subjectToken) return [];
   if (!isGM && !subjectToken.isOwner) return [];
 
+  const candidateTokens = getTooltipCandidateTokens(allTokens, subjectToken, { combat });
   const otherTokens =
     mode === 'observer'
-      ? allTokens.filter((token) => token && token !== subjectToken)
-      : getVisibleOtherTokens(allTokens, subjectToken);
+      ? candidateTokens.filter((token) => token && token !== subjectToken)
+      : getVisibleOtherTokens(candidateTokens, subjectToken);
   if (otherTokens.length === 0) return [];
 
   if (mode === 'observer') {

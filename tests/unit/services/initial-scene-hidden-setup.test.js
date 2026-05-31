@@ -184,6 +184,27 @@ describe('initial scene hidden setup', () => {
     expect(result).toMatchObject({ foundryUnhidden: 2 });
   });
 
+  test('keeps Foundry-hidden scene targets hidden until PC visibility maps are written', async () => {
+    const pc = makeToken('pc', 'character', { hasPlayerOwner: true });
+    const loot = makeToken('loot', 'loot', { hidden: true });
+    const hiddenAtPcVisibilityWrite = [];
+    const originalSetFlag = pc.document.setFlag.getMockImplementation();
+    pc.document.setFlag.mockImplementation(async (...args) => {
+      hiddenAtPcVisibilityWrite.push(loot.document.hidden);
+      return originalSetFlag(...args);
+    });
+
+    await initializeSceneHiddenForPCs({
+      tokens: [pc, loot],
+      walls: [],
+    });
+
+    expect(hiddenAtPcVisibilityWrite).toContain(true);
+    expect(loot.document.update).toHaveBeenCalledWith({ hidden: false });
+    expect(loot.document.hidden).toBe(false);
+    expect(getVisibilityBetween(pc, loot)).toBe('hidden');
+  });
+
   test('stores default hidden visibility for prep scenes without player character tokens', async () => {
     const loot = makeToken('loot', 'loot');
     const hazard = makeToken('hazard', 'hazard');

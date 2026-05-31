@@ -12,6 +12,10 @@ export function isMissingEmbeddedDocumentError(error) {
   return /\b(Item|Actor|Token|Effect) "[^"]+" does not exist!/.test(String(error?.message ?? error));
 }
 
+export function isEmbeddedDocumentPermissionError(error) {
+  return /\blacks permission to delete Item\b/.test(String(error?.message ?? error));
+}
+
 function actorDocumentKey(actor) {
   return actor?.uuid || actor?.document?.uuid || null;
 }
@@ -82,6 +86,28 @@ function rememberDeletedItems(state, ids, now = Date.now()) {
   }
 }
 
+function canDeleteEmbeddedItem(actor, id) {
+  const user = globalThis.game?.user;
+  if (!user?.isGM) return false;
+
+  const item = typeof actor?.items?.get === 'function' ? actor.items.get(id) : null;
+  try {
+    if (typeof item?.canUserModify === 'function' && item.canUserModify(user, 'delete') === false) {
+      return false;
+    }
+    if (
+      typeof actor?.canUserModify === 'function' &&
+      actor.canUserModify(user, 'update') === false
+    ) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  return true;
+}
+
 export async function deleteExistingEmbeddedItems(actor, ids = []) {
   if (!actor?.deleteEmbeddedDocuments) return [];
   if (!globalThis.game?.user?.isGM) return [];
@@ -95,10 +121,14 @@ export async function deleteExistingEmbeddedItems(actor, ids = []) {
           (id) =>
             !deleteState.pending.has(id) &&
             !deleteState.recentlyDeleted.has(id) &&
-            !!actor.items.get(id),
+            !!actor.items.get(id) &&
+            canDeleteEmbeddedItem(actor, id),
         )
       : uniqueIds.filter(
-          (id) => !deleteState.pending.has(id) && !deleteState.recentlyDeleted.has(id),
+          (id) =>
+            !deleteState.pending.has(id) &&
+            !deleteState.recentlyDeleted.has(id) &&
+            canDeleteEmbeddedItem(actor, id),
         );
   if (!existingIds.length) return [];
 
@@ -108,7 +138,9 @@ export async function deleteExistingEmbeddedItems(actor, ids = []) {
     await actor.deleteEmbeddedDocuments('Item', existingIds);
     didDelete = true;
   } catch (error) {
-    if (!isMissingEmbeddedDocumentError(error)) throw error;
+    if (!isMissingEmbeddedDocumentError(error) && !isEmbeddedDocumentPermissionError(error)) {
+      throw error;
+    }
     didDelete = true;
   } finally {
     for (const id of existingIds) deleteState.pending.delete(id);

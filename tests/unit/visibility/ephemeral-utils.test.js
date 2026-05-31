@@ -1,5 +1,6 @@
 import {
   deleteExistingEmbeddedItems,
+  isEmbeddedDocumentPermissionError,
   isMissingEmbeddedDocumentError,
   runWithEffectLock,
 } from '../../../scripts/visibility/utils.js';
@@ -19,6 +20,15 @@ describe('visibility effect utils', () => {
   test('recognizes missing embedded document errors', () => {
     expect(isMissingEmbeddedDocumentError(new Error('Item "abc" does not exist!'))).toBe(true);
     expect(isMissingEmbeddedDocumentError(new Error('Other failure'))).toBe(false);
+  });
+
+  test('recognizes embedded item permission errors', () => {
+    expect(
+      isEmbeddedDocumentPermissionError(
+        new Error('User Spencer lacks permission to delete Item [abc] in parent Actor [def]'),
+      ),
+    ).toBe(true);
+    expect(isEmbeddedDocumentPermissionError(new Error('Other failure'))).toBe(false);
   });
 
   test('deleteExistingEmbeddedItems ignores stale missing item errors', async () => {
@@ -119,6 +129,41 @@ describe('visibility effect utils', () => {
     await expect(deleteExistingEmbeddedItems(actor, ['effect-id'])).resolves.toEqual([]);
 
     expect(actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+  });
+
+  test('deleteExistingEmbeddedItems skips effects current GM user cannot delete', async () => {
+    const effect = {
+      id: 'effect-id',
+      canUserModify: jest.fn(() => false),
+    };
+    const actor = {
+      items: {
+        get: jest.fn((id) => (id === effect.id ? effect : null)),
+      },
+      deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+    };
+
+    await expect(deleteExistingEmbeddedItems(actor, ['effect-id'])).resolves.toEqual([]);
+
+    expect(effect.canUserModify).toHaveBeenCalledWith(global.game.user, 'delete');
+    expect(actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+  });
+
+  test('deleteExistingEmbeddedItems treats permission races as already handled cleanup', async () => {
+    const actor = {
+      items: {
+        get: jest.fn(() => ({ id: 'effect-id' })),
+      },
+      deleteEmbeddedDocuments: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('User Spencer lacks permission to delete Item [effect-id] in parent Actor [a]'),
+        ),
+    };
+
+    await expect(deleteExistingEmbeddedItems(actor, ['effect-id'])).resolves.toEqual([
+      'effect-id',
+    ]);
   });
 
   test('runWithEffectLock does not warn for stale missing item errors', async () => {

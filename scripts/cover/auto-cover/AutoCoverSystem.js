@@ -178,10 +178,12 @@ export class AutoCoverSystem {
   async cleanupCover(attacker, target) {
     if (!attacker || !target) return;
     await this.setCoverBetween(attacker, target, 'none', { skipEphemeralUpdate: false });
-    const targets = this._activePairsByAttacker.get(attacker.id);
-    targets?.delete(target.id);
+    const attackerId = getTokenId(attacker);
+    const targetId = getTokenId(target);
+    const targets = this._activePairsByAttacker.get(attackerId);
+    targets?.delete(targetId);
     if (targets?.size === 0) {
-      this._activePairsByAttacker.delete(attacker.id);
+      this._activePairsByAttacker.delete(attackerId);
     }
   }
 

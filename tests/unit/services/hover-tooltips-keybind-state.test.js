@@ -224,6 +224,62 @@ describe('HoverTooltips keybind state', () => {
     expect(HoverTooltips.keyTooltipTokens.has('observer')).toBe(true);
   });
 
+  test('cleanup unregisters hover lifecycle hooks before reinitializing', async () => {
+    jest.useFakeTimers();
+    const hookHandlers = new Map();
+    const originalAnimatePan = global.canvas.animatePan;
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockImplementation((token) =>
+      token?.id === 'target' ? { observer: 'hidden' } : {},
+    );
+
+    global.Hooks.on.mockImplementation((eventName, handler) => {
+      const handlers = hookHandlers.get(eventName) ?? [];
+      handlers.push(handler);
+      hookHandlers.set(eventName, handlers);
+      return handler;
+    });
+    global.Hooks.off.mockImplementation((eventName, handler) => {
+      const handlers = hookHandlers.get(eventName) ?? [];
+      hookHandlers.set(
+        eventName,
+        handlers.filter((registeredHandler) => registeredHandler !== handler),
+      );
+    });
+
+    const { HoverTooltips, cleanupHoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    initializeHoverTooltips();
+    const firstAnimatePanWrapper = global.canvas.animatePan;
+    expect(hookHandlers.get('hoverToken')).toHaveLength(1);
+    expect(hookHandlers.get('canvasPan')).toHaveLength(1);
+    expect(firstAnimatePanWrapper).not.toBe(originalAnimatePan);
+
+    cleanupHoverTooltips();
+
+    expect(hookHandlers.get('hoverToken')).toHaveLength(0);
+    expect(hookHandlers.get('canvasPan')).toHaveLength(0);
+    expect(global.canvas.animatePan).toBe(originalAnimatePan);
+
+    initializeHoverTooltips();
+
+    expect(hookHandlers.get('hoverToken')).toHaveLength(1);
+    expect(hookHandlers.get('canvasPan')).toHaveLength(1);
+    expect(global.canvas.animatePan).not.toBe(originalAnimatePan);
+    expect(global.canvas.animatePan).not.toBe(firstAnimatePanWrapper);
+
+    hookHandlers.get('hoverToken')[0](observer, true);
+    jest.advanceTimersByTime(60);
+
+    expect(HoverTooltips.currentHoveredToken).toBe(observer);
+    expect(HoverTooltips.visibilityIndicators.size).toBe(1);
+  });
+
   test('canvas pan clears active factor overlay instead of leaving hidden active state', async () => {
     jest.useFakeTimers();
     const badgeEl = document.createElement('button');
@@ -279,6 +335,113 @@ describe('HoverTooltips keybind state', () => {
     expect(HoverTooltips.isShowingKeyTooltips).toBe(true);
     expect(HoverTooltips.keyTooltipTokens.has('observer')).toBe(true);
     expect(HoverTooltips.tooltipMode).toBe('observer');
+  });
+
+  test('visibility map updates skip hover rebuilds for unrelated pairs', async () => {
+    jest.useFakeTimers();
+    const hovered = makeToken('hovered', 0);
+    const observer = makeToken('observer', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [hovered, observer];
+    mockGetVisibilityMap.mockReturnValue({ hovered: 'hidden' });
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    HoverTooltips.tooltipMode = 'target';
+    HoverTooltips.currentHoveredToken = hovered;
+    initializeHoverTooltips();
+
+    getHookHandler('pf2e-visioner.visibilityMapUpdated')({
+      observerId: 'observer',
+      targetId: 'unrelated',
+    });
+    jest.advanceTimersByTime(150);
+    jest.runOnlyPendingTimers();
+
+    expect(mockGetVisibilityMap).not.toHaveBeenCalled();
+    expect(HoverTooltips.visibilityIndicators.size).toBe(0);
+  });
+
+  test('visibility map updates rebuild hover overlay for hovered target pair', async () => {
+    jest.useFakeTimers();
+    const hovered = makeToken('hovered', 0);
+    const observer = makeToken('observer', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [hovered, observer];
+    mockGetVisibilityMap.mockReturnValue({ hovered: 'hidden' });
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    HoverTooltips.tooltipMode = 'target';
+    HoverTooltips.currentHoveredToken = hovered;
+    initializeHoverTooltips();
+
+    getHookHandler('pf2e-visioner.visibilityMapUpdated')({
+      observerId: 'observer',
+      targetId: 'hovered',
+    });
+    jest.advanceTimersByTime(150);
+    jest.runOnlyPendingTimers();
+
+    expect(mockGetVisibilityMap).toHaveBeenCalledTimes(1);
+    expect(HoverTooltips.visibilityIndicators.size).toBe(1);
+  });
+
+  test('hover badges use DOM-only anchors without adding PIXI display objects or ticker work', async () => {
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockReturnValue({ target: 'hidden' });
+
+    const { setTooltipMode, showVisibilityIndicators } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    setTooltipMode('observer');
+    showVisibilityIndicators(observer);
+
+    expect(document.querySelector('.pf2e-visioner-tooltip-badge.visibility-hidden')).toBeTruthy();
+    expect(global.canvas.tokens.addChild).not.toHaveBeenCalled();
+    expect(global.canvas.app.ticker.add).not.toHaveBeenCalled();
+  });
+
+  test('hover badges stay pooled in the DOM and are reused after hide', async () => {
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockReturnValue({ target: 'hidden' });
+
+    const { hideAllVisibilityIndicators, setTooltipMode, showVisibilityIndicators } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    setTooltipMode('observer');
+    showVisibilityIndicators(observer);
+    const firstBadge = document
+      .querySelector('.pf2e-visioner-tooltip-badge.visibility-hidden')
+      ?.closest('div');
+
+    hideAllVisibilityIndicators();
+
+    expect(firstBadge?.isConnected).toBe(true);
+    expect(firstBadge?.style.display).toBe('none');
+
+    showVisibilityIndicators(observer);
+    const secondBadge = document
+      .querySelector('.pf2e-visioner-tooltip-badge.visibility-hidden')
+      ?.closest('div');
+
+    expect(secondBadge).toBe(firstBadge);
+    expect(secondBadge?.style.display).toBe('');
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      1,
+    );
   });
 
   test('movement completion rebuilds key overlay after movement hide', async () => {

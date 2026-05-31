@@ -434,9 +434,13 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
-  test('combat start unhides GM-hidden stealth combatants before applying encounter stealth overrides', async () => {
+  test('combat start unhides GM-hidden stealth combatants after applying encounter stealth overrides', async () => {
     setSetting(true);
     stealther.document.hidden = true;
+    mockSetPairOverrides.mockImplementation(async () => {
+      expect(stealther.document.hidden).toBe(true);
+      return true;
+    });
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('low', observerLow, 10),
@@ -1033,6 +1037,37 @@ describe('EncounterStealthInitiativeService', () => {
       'pf2e-visioner.visibilityMapUpdated',
       expect.any(Function),
     );
+  });
+
+  test('coalesces tracker visibility refreshes while delayed refreshes are pending', async () => {
+    jest.useFakeTimers();
+    const { EncounterStealthInitiativeService } = await importService();
+    const service = new EncounterStealthInitiativeService();
+    const combat = makeCombat([], { id: 'coalesced-tracker-refresh' });
+    const applyTrackerVisibility = jest
+      .spyOn(service, 'applyTrackerVisibility')
+      .mockImplementation(() => {});
+
+    service.scheduleTrackerVisibilityRefresh(combat);
+    service.scheduleTrackerVisibilityRefresh(combat);
+    service.scheduleTrackerVisibilityRefresh(combat);
+
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(50);
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(2);
+
+    service.scheduleTrackerVisibilityRefresh(combat);
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(2);
+
+    jest.advanceTimersByTime(100);
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(3);
+
+    jest.advanceTimersByTime(150);
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(4);
+
+    service.scheduleTrackerVisibilityRefresh(combat);
+    expect(applyTrackerVisibility).toHaveBeenCalledTimes(5);
   });
 
   test('does not apply encounter stealth setup from initiative updates after combat has started', async () => {
