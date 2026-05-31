@@ -862,14 +862,7 @@ export function registerKeybindings() {
           const mouse = canvas.mousePosition
             ? { x: canvas.mousePosition.x, y: canvas.mousePosition.y }
             : { x: token.center.x, y: token.center.y };
-          mgr.startCornerPeek(token, mouse);
-          game.modules.get(MODULE_ID)._peekKeyHeld = token.document.id;
-        };
-        keybindingConfig.onUp = () => {
-          const mgr = game.modules.get(MODULE_ID)?.api?.peekManager;
-          const id = game.modules.get(MODULE_ID)?._peekKeyHeld;
-          if (id && mgr) mgr.endPeek(id, 'keyup');
-          if (game.modules.get(MODULE_ID)) game.modules.get(MODULE_ID)._peekKeyHeld = null;
+          mgr.toggleCornerPeek(token, mouse);
         };
         break;
       case 'openWallManager':

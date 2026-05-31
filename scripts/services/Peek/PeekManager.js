@@ -58,6 +58,17 @@ export class PeekManager {
     this._begin(token, { ...geo, ignoredWallIds: [], range: 0 }, { kind: 'corner' });
   }
 
+  toggleCornerPeek(token, mouse) {
+    const id = token.document.id;
+    const existing = this._active.get(id);
+    if (existing?.kind === 'corner') {
+      this.endPeek(id, 'toggle');
+      return false;
+    }
+    this.startCornerPeek(token, mouse);
+    return true;
+  }
+
   _clampOriginToWalls(from, origin) {
     try {
       const backend =
@@ -172,14 +183,8 @@ export class PeekManager {
 
   reaimFromPointer(mouse) {
     if (!mouse) return;
-    const mod = game.modules.get(MODULE_ID);
-    const heldId = mod?._peekKeyHeld;
-    if (heldId && this._active.has(heldId)) {
-      this.updatePeek(heldId, { x: mouse.x, y: mouse.y });
-      return;
-    }
     for (const [id, entry] of this._active) {
-      if (entry.kind === 'door' && entry.token?.controlled) {
+      if (entry.token?.controlled) {
         this.updatePeek(id, { x: mouse.x, y: mouse.y });
       }
     }

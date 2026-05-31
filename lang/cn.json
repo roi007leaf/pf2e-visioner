@@ -863,8 +863,8 @@
         },
         "KEYBINDINGS": {
             "HOLD_PEEK": {
-                "name": "Hold Peek (Corner)",
-                "hint": "Hold to peek a directional cone around the nearest corner toward the cursor for the selected token."
+                "name": "Toggle Peek (Corner)",
+                "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
             },
             "OPEN_TOKEN_MANAGER": {
                 "hint": "打开所选指示物的指示物管理器",

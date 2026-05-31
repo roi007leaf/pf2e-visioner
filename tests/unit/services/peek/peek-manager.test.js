@@ -360,17 +360,25 @@ describe('PeekManager reaimFromPointer', () => {
     expect(d.socket.sendUpdate).not.toHaveBeenCalled();
   });
 
-  test('re-aims the held corner peek', () => {
+  test('re-aims an active corner peek for a controlled token', () => {
     const d = deps();
     const mgr = new PeekManager(d);
     const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    token.controlled = true;
     mgr.startCornerPeek(token, { x: 500, y: 0 });
-    const prevGet = global.game.modules.get;
-    global.game.modules.get = jest.fn(() => ({ _peekKeyHeld: 'p' }));
     d.socket.sendUpdate.mockClear();
     mgr.reaimFromPointer({ x: 0, y: 500 });
     expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.anything());
-    global.game.modules.get = prevGet;
+  });
+
+  test('toggleCornerPeek starts then stops on a second toggle', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    mgr.toggleCornerPeek(token, { x: 500, y: 0 });
+    expect(d.registry.has('p')).toBe(true);
+    mgr.toggleCornerPeek(token, { x: 500, y: 0 });
+    expect(d.registry.has('p')).toBe(false);
   });
 
   test('no-op when mouse is null', () => {
