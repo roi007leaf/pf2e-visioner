@@ -22,22 +22,6 @@ import {
   VISIBILITY_DETECTION_THRESHOLDS,
 } from './detection-visibility-context.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
-import { peekRegistry } from '../Peek/PeekRegistry.js';
-import { peekLocalVisibility } from '../Peek/peek-local-visibility.js';
-
-const PEEK_VISIBILITY_RANK = { observed: 3, concealed: 2, hidden: 1, undetected: 0 };
-
-export function peekAdjustedVisibility(observerToken, target, baseVisibility) {
-  const observerId = observerToken?.document?.id;
-  const targetId = target?.document?.id;
-  if (!observerId || !targetId) return baseVisibility;
-  if (!peekRegistry.has(observerId)) return baseVisibility;
-  const local = peekLocalVisibility.get(observerId, targetId);
-  if (!local) return baseVisibility;
-  const localRank = PEEK_VISIBILITY_RANK[local] ?? -1;
-  const baseRank = PEEK_VISIBILITY_RANK[baseVisibility] ?? -1;
-  return localRank > baseRank ? local : baseVisibility;
-}
 
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
@@ -64,8 +48,7 @@ export function createCanDetectVisibilityWrapper(threshold) {
       return canDetect;
     }
 
-    let visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
-    visibility = peekAdjustedVisibility(observerToken, target, visibility);
+    const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
     const pendingMovementSightBlocked =
       !isPendingMovementHiddenStateVisibilityProbe() &&
       threshold === VISIBILITY_DETECTION_THRESHOLDS.hidden &&
