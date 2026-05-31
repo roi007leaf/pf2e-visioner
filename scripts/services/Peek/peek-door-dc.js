@@ -22,7 +22,6 @@ export async function defaultPeekRoll({ token, dc }) {
     label: game.i18n.localize('PF2E_VISIONER.PEEK.CHECK_LABEL'),
     secret: true,
     rollMode: 'blindgm',
-    skipDialog: true,
     traits: ['secret', 'concentrate'],
   });
   return { degreeOfSuccess: result?.degreeOfSuccess ?? 0 };
