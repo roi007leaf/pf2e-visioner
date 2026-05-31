@@ -25,6 +25,7 @@ import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 import { getVisibilityBetween } from '../../utils.js';
 import { normalizeSlug } from '../../utils/actor-features.js';
 import { getLogger } from '../../utils/logger.js';
+import { peekRegistry } from '../../services/Peek/PeekRegistry.js';
 
 export class CoverDetector {
   constructor() {
@@ -78,6 +79,21 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
+    const cover = this._detectBetweenTokensCore(attacker, target, options);
+    return this._applyPeekCoverCap(attacker, cover);
+  }
+
+  _applyPeekCoverCap(attacker, cover) {
+    try {
+      const peek = peekRegistry.get(attacker?.document?.id);
+      if (peek && peek.fov == null && (cover === 'standard' || cover === 'greater')) {
+        return 'lesser';
+      }
+    } catch (_) {}
+    return cover;
+  }
+
+  _detectBetweenTokensCore(attacker, target, options = {}) {
     try {
       if (!attacker || !target) return 'none';
 
