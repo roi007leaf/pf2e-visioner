@@ -7,7 +7,7 @@ export function radiansToFoundryRotation(radians) {
   return ((degrees % 360) + 360) % 360;
 }
 
-function applyPeekOverrideToData(data, override) {
+export function applyPeekOverrideToData(data, override) {
   if (!data || !override?.origin) return data;
   data.x = override.origin.x;
   data.y = override.origin.y;
@@ -19,6 +19,9 @@ function applyPeekOverrideToData(data, override) {
   }
   if (typeof override.direction === 'number') {
     data.rotation = radiansToFoundryRotation(override.direction);
+  }
+  if (typeof override.range === 'number' && override.range > 0) {
+    data.radius = override.range;
   }
   return data;
 }

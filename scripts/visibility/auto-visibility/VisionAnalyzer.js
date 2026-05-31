@@ -226,6 +226,13 @@ export class VisionAnalyzer {
       if (!isPointInCone(observerPeek.origin, observerPeek.direction, observerPeek.fov, tgtCenter)) {
         return false;
       }
+      if (observerPeek.range > 0) {
+        const dx = tgtCenter.x - observerPeek.origin.x;
+        const dy = tgtCenter.y - observerPeek.origin.y;
+        if (Math.hypot(dx, dy) > observerPeek.range) {
+          return false;
+        }
+      }
     }
 
     let stage = 'init';

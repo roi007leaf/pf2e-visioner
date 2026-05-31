@@ -97,6 +97,32 @@ describe('VisionAnalyzer peek constraints', () => {
     expect(va.hasLineOfSight(observer, target)).toBe(true);
   });
 
+  test('in-cone target beyond peek range flips clear LOS to false', () => {
+    const va = new VisionAnalyzer();
+    va.clearCache();
+    const { observer, target } = makeClearLosPair();
+    const origin = { x: observer.center.x, y: observer.center.y };
+    peekRegistry.set(
+      observer.document.id,
+      { origin, direction: directionToward(origin, target), fov: 120, range: 10, ignoredWallIds: [] },
+      1000,
+    );
+    expect(va.hasLineOfSight(observer, target)).toBe(false);
+  });
+
+  test('range 0 (unlimited) skips the range check for an in-cone target', () => {
+    const va = new VisionAnalyzer();
+    va.clearCache();
+    const { observer, target } = makeClearLosPair();
+    const origin = { x: observer.center.x, y: observer.center.y };
+    peekRegistry.set(
+      observer.document.id,
+      { origin, direction: directionToward(origin, target), fov: 120, range: 0, ignoredWallIds: [] },
+      1000,
+    );
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+  });
+
   test('out-of-cone peek flips an otherwise clear LOS to false', () => {
     const va = new VisionAnalyzer();
     va.clearCache();

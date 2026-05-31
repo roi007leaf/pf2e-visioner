@@ -1,5 +1,5 @@
 import '../../../setup.js';
-import { radiansToFoundryRotation } from '../../../../scripts/services/Peek/peek-vision-wrapper.js';
+import { applyPeekOverrideToData, radiansToFoundryRotation } from '../../../../scripts/services/Peek/peek-vision-wrapper.js';
 
 function coneCenterRadians(rotationDegrees) {
   return (((rotationDegrees + 90) % 360) + 360) % 360;
@@ -22,5 +22,22 @@ describe('radiansToFoundryRotation', () => {
     const r = radiansToFoundryRotation(-Math.PI);
     expect(r).toBeGreaterThanOrEqual(0);
     expect(r).toBeLessThan(360);
+  });
+});
+
+describe('applyPeekOverrideToData', () => {
+  test('positive range sets data.radius', () => {
+    const data = applyPeekOverrideToData({}, { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 400 });
+    expect(data.radius).toBe(400);
+  });
+
+  test('range 0 leaves data.radius undefined', () => {
+    const data = applyPeekOverrideToData({}, { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 0 });
+    expect(data.radius).toBeUndefined();
+  });
+
+  test('missing origin returns data unchanged', () => {
+    const data = applyPeekOverrideToData({}, { direction: 0, fov: 10, range: 400 });
+    expect(data).toEqual({});
   });
 });

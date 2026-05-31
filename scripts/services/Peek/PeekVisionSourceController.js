@@ -12,6 +12,7 @@ export class PeekVisionSourceController {
       origin: peek.origin,
       direction: peek.direction,
       fov: peek.fov,
+      range: peek.range,
       ignoredWallIds,
     });
     this._excludeEdges(ignoredWallIds);

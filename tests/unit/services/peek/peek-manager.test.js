@@ -290,6 +290,35 @@ describe('PeekManager corner peek wall clamp', () => {
   });
 });
 
+describe('PeekManager settings-backed geometry', () => {
+  let prevGet;
+  let prevDimensions;
+  beforeEach(() => {
+    prevGet = global.game.settings.get;
+    prevDimensions = global.canvas.dimensions;
+    global.game.settings.get = jest.fn((_m, key) => {
+      if (key === 'peekSlitAngle') return 30;
+      if (key === 'peekSweepAngle') return 45;
+      if (key === 'peekRange') return 20;
+      return prevGet(_m, key);
+    });
+    global.canvas.dimensions = { size: 100, distance: 5 };
+  });
+  afterEach(() => {
+    global.game.settings.get = prevGet;
+    global.canvas.dimensions = prevDimensions;
+  });
+
+  test('startCornerPeek applies slit angle and range from settings', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
+    mgr.startCornerPeek(token, { x: 500, y: 50 });
+    expect(d.registry.get('peeker').fov).toBe(30);
+    expect(d.registry.get('peeker').range).toBe(400);
+  });
+});
+
 describe('PeekManager reaimFromPointer', () => {
   function deps() {
     return {

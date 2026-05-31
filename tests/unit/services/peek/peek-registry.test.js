@@ -49,4 +49,14 @@ describe('PeekRegistry', () => {
     reg.pruneStale(1000, 2000);
     expect(reg.has('exact')).toBe(false);
   });
+
+  test('set stores provided range', () => {
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, range: 250, ignoredWallIds: [] }, 1000);
+    expect(reg.get('t1').range).toBe(250);
+  });
+
+  test('set defaults range to 0 when omitted', () => {
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    expect(reg.get('t1').range).toBe(0);
+  });
 });

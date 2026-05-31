@@ -466,6 +466,18 @@
                 "name": "忽略死亡指示物",
                 "hint": "死亡指示物将不提供自动掩蔽"
             },
+            "PEEK_SLIT_ANGLE": {
+                "name": "Peek Slit Angle (°)",
+                "hint": "Width of the peek vision cone in degrees."
+            },
+            "PEEK_SWEEP_ANGLE": {
+                "name": "Peek Sweep Angle (°)",
+                "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
+            },
+            "PEEK_RANGE": {
+                "name": "Peek Range (ft)",
+                "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
+            },
             "CORNER_PEEK_ENABLED": {
                 "name": "Enable Corner Peeking",
                 "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."

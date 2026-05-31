@@ -8,6 +8,7 @@ export class PeekRegistry {
       origin: data.origin,
       direction: data.direction,
       fov: data.fov,
+      range: typeof data.range === 'number' ? data.range : 0,
       ignoredWallIds: Array.isArray(data.ignoredWallIds) ? data.ignoredWallIds : [],
       ts: now,
     });
