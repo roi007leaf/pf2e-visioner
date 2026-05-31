@@ -137,9 +137,16 @@ describe('clampDoorPeek aim', () => {
     expect(out.direction).toBeCloseTo(effSweep, 5);
   });
 
-  test('slit wider than the sweep arc fills it: cone capped at 2*sweep and pinned to base', () => {
-    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 200, aim: { x: 100, y: 1000 }, maxSweep });
-    expect(out.fov).toBeCloseTo((2 * maxSweep * 180) / Math.PI, 5);
+  test('slit wider than the sweep arc (below static threshold) fills it: capped at 2*sweep, pinned to base', () => {
+    const sweep10 = (10 * Math.PI) / 180;
+    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 30, aim: { x: 100, y: 1000 }, maxSweep: sweep10 });
+    expect(out.fov).toBeCloseTo(20, 5);
+    expect(out.direction).toBeCloseTo(0, 5);
+  });
+
+  test('slit >= 40deg is a static peek: no sweep, full slit width, pinned to base', () => {
+    const out = clampDoorPeek({ door, tokenCenter, nudge: 5, fov: 50, aim: { x: 100, y: 1000 }, maxSweep });
+    expect(out.fov).toBe(50);
     expect(out.direction).toBeCloseTo(0, 5);
   });
 });

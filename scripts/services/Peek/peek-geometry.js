@@ -80,7 +80,12 @@ export function clampDirectionToArc(base, target, maxSweep) {
   return base + delta;
 }
 
+export const STATIC_SLIT_THRESHOLD_DEG = 40;
+
 export function boundConeToSweep(base, rawAim, fovDeg, maxSweep) {
+  if (fovDeg >= STATIC_SLIT_THRESHOLD_DEG) {
+    return { direction: base, fov: fovDeg };
+  }
   const fovRad = toRadians(fovDeg);
   const cappedFovRad = Math.min(fovRad, 2 * maxSweep);
   const effSweep = Math.max(0, maxSweep - cappedFovRad / 2);
