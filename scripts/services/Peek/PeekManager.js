@@ -107,9 +107,9 @@ export class PeekManager {
   }
 
   heartbeat() {
-    for (const id of this._active.keys()) {
+    for (const [id, entry] of this._active) {
       const peek = this._registry.get(id);
-      if (peek) this._socket.sendUpdate(id, peek);
+      if (peek) this._socket.sendUpdate(id, { ...peek, points: this._polygonPoints(entry.token) });
     }
   }
 
