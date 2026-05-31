@@ -17,6 +17,13 @@ export async function rollPeekCheck({ token, dc, roll }) {
 
 export async function defaultPeekRoll({ token, dc }) {
   const statistic = token?.actor?.getStatistic?.('perception') ?? token?.actor?.perception;
-  const result = await statistic?.roll?.({ dc: { value: dc }, label: game.i18n.localize('PF2E_VISIONER.PEEK.CHECK_LABEL') });
+  const result = await statistic?.roll?.({
+    dc: { value: dc },
+    label: game.i18n.localize('PF2E_VISIONER.PEEK.CHECK_LABEL'),
+    secret: true,
+    rollMode: 'blindgm',
+    skipDialog: true,
+    traits: ['secret', 'concentrate'],
+  });
   return { degreeOfSuccess: result?.degreeOfSuccess ?? 0 };
 }
