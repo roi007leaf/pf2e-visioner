@@ -30,12 +30,14 @@ export class PeekVisionSourceController {
     return this._overrides.get(tokenId) ?? null;
   }
 
+  _edgeFor(wallId) {
+    return globalThis.canvas?.walls?.get?.(wallId)?.edge ?? null;
+  }
+
   _excludeEdges(wallIds) {
-    const edges = globalThis.canvas?.edges;
-    if (!edges?.get) return;
     for (const wallId of wallIds) {
       if (this._edgeSightBackup.has(wallId)) continue;
-      const edge = edges.get(wallId);
+      const edge = this._edgeFor(wallId);
       if (!edge) continue;
       this._edgeSightBackup.set(wallId, edge.sight);
       try {
@@ -45,9 +47,8 @@ export class PeekVisionSourceController {
   }
 
   _restoreEdges() {
-    const edges = globalThis.canvas?.edges;
     for (const [wallId, sight] of this._edgeSightBackup) {
-      const edge = edges?.get?.(wallId);
+      const edge = this._edgeFor(wallId);
       if (edge) {
         try {
           edge.sight = sight;

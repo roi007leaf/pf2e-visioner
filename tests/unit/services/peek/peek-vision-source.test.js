@@ -42,30 +42,36 @@ describe('PeekVisionSourceController contract', () => {
   });
 
   test('door peek clears the ignored wall edge sight locally and restores it on end', () => {
-    const edge = { sight: 1 };
+    const edge = { sight: 20 };
     const originalCanvas = globalThis.canvas;
-    globalThis.canvas = { ...originalCanvas, edges: new Map([['door9', edge]]) };
+    globalThis.canvas = {
+      ...originalCanvas,
+      walls: { get: (id) => (id === 'door9' ? { edge } : null) },
+    };
     try {
       const ctrl = new PeekVisionSourceController({ refreshPerception: jest.fn() });
       const token = { document: { id: 't', update: jest.fn() }, initializeVisionSource: jest.fn() };
       ctrl.apply(token, { origin: { x: 0, y: 0 }, direction: 0, fov: 22, ignoredWallIds: ['door9'] });
       expect(edge.sight).toBe(0);
       ctrl.clear(token);
-      expect(edge.sight).toBe(1);
+      expect(edge.sight).toBe(20);
     } finally {
       globalThis.canvas = originalCanvas;
     }
   });
 
   test('corner peek (no ignored walls) leaves edges untouched', () => {
-    const edge = { sight: 1 };
+    const edge = { sight: 20 };
     const originalCanvas = globalThis.canvas;
-    globalThis.canvas = { ...originalCanvas, edges: new Map([['w1', edge]]) };
+    globalThis.canvas = {
+      ...originalCanvas,
+      walls: { get: () => ({ edge }) },
+    };
     try {
       const ctrl = new PeekVisionSourceController({ refreshPerception: jest.fn() });
       const token = { document: { id: 't', update: jest.fn() }, initializeVisionSource: jest.fn() };
       ctrl.apply(token, { origin: { x: 0, y: 0 }, direction: 0, fov: 10, ignoredWallIds: [] });
-      expect(edge.sight).toBe(1);
+      expect(edge.sight).toBe(20);
     } finally {
       globalThis.canvas = originalCanvas;
     }
