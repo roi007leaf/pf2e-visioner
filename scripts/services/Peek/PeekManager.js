@@ -87,7 +87,7 @@ export class PeekManager {
     const range = entry.kind === 'door' ? this._rangePx() : 0;
     this._registry.set(tokenId, { ...geo, ignoredWallIds, range }, this._now());
     this._renderer.apply(entry.token, this._registry.get(tokenId));
-    this._socket.sendUpdate(tokenId, this._registry.get(tokenId));
+    this._socket.sendUpdate(tokenId, { ...this._registry.get(tokenId), points: this._polygonPoints(entry.token) });
     this._recompute(tokenId);
   }
 
@@ -119,7 +119,7 @@ export class PeekManager {
     this._active.set(id, { token, kind: meta.kind, doorDoc: meta.doorDoc });
     this._registry.set(id, data, this._now());
     this._renderer.apply(token, this._registry.get(id));
-    this._socket.sendUpdate(id, this._registry.get(id));
+    this._socket.sendUpdate(id, { ...this._registry.get(id), points: this._polygonPoints(token) });
     this._recompute(id);
   }
 
@@ -183,6 +183,13 @@ export class PeekManager {
         this.updatePeek(id, { x: mouse.x, y: mouse.y });
       }
     }
+  }
+
+  _polygonPoints(token) {
+    try {
+      const pts = token?.vision?.los?.points;
+      return Array.isArray(pts) ? pts : null;
+    } catch (_) { return null; }
   }
 
   _footprint(token) {

@@ -1,3 +1,10 @@
+function roundPoints(points) {
+  if (!Array.isArray(points)) return null;
+  const out = new Array(points.length);
+  for (let i = 0; i < points.length; i++) out[i] = Math.round(points[i]);
+  return out;
+}
+
 export class PeekSocketSender {
   constructor({ emit, now, minIntervalMs = 100 }) {
     this._emit = emit;
@@ -19,6 +26,11 @@ export class PeekSocketSender {
       direction: peek.direction,
       fov: peek.fov,
       ignoredWallIds: peek.ignoredWallIds ?? [],
+      range: typeof peek.range === 'number' ? peek.range : 0,
+      points: roundPoints(peek.points),
+      userColor: globalThis.game?.user?.color?.toString?.() ?? globalThis.game?.user?.color ?? null,
+      userName: globalThis.game?.user?.name ?? null,
+      userId: globalThis.game?.user?.id ?? null,
       ts: t,
     });
   }

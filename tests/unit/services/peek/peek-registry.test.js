@@ -59,4 +59,20 @@ describe('PeekRegistry', () => {
     reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
     expect(reg.get('t1').range).toBe(0);
   });
+
+  test('set stores points/userColor/userName when provided', () => {
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [], points: [1, 2, 3, 4, 5, 6], userColor: '#ff0000', userName: 'Alice' }, 1000);
+    const e = reg.get('t1');
+    expect(e.points).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(e.userColor).toBe('#ff0000');
+    expect(e.userName).toBe('Alice');
+  });
+
+  test('set defaults points/userColor/userName to null when omitted', () => {
+    reg.set('t1', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [] }, 1000);
+    const e = reg.get('t1');
+    expect(e.points).toBeNull();
+    expect(e.userColor).toBeNull();
+    expect(e.userName).toBeNull();
+  });
 });

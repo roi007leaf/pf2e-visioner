@@ -10,6 +10,9 @@ export class PeekRegistry {
       fov: data.fov,
       range: typeof data.range === 'number' ? data.range : 0,
       ignoredWallIds: Array.isArray(data.ignoredWallIds) ? data.ignoredWallIds : [],
+      points: Array.isArray(data.points) ? data.points : null,
+      userColor: data.userColor ?? null,
+      userName: data.userName ?? null,
       ts: now,
     });
   }

@@ -24,6 +24,12 @@ describe('PeekSocketSender', () => {
     expect(emit).toHaveBeenCalledTimes(2);
   });
 
+  test('rounds points and forwards range in payload', () => {
+    const { emit, sender } = make([0]);
+    sender.sendUpdate('t', { origin: { x: 0, y: 0 }, direction: 0, fov: 90, ignoredWallIds: [], range: 400, points: [1.6, 2.4, 3.5, 4.5] });
+    expect(emit).toHaveBeenCalledWith('PeekUpdate', expect.objectContaining({ points: [2, 2, 4, 5], range: 400 }));
+  });
+
   test('sendEnd always emits immediately', () => {
     const { emit, sender } = make([0]);
     sender.sendEnd('t');

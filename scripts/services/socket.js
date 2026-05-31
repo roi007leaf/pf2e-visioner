@@ -2,6 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { showNotification } from '../utils.js';
 import { peekRegistry } from './Peek/PeekRegistry.js';
+import { peekGmOverlay } from './Peek/peek-gm-overlay.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
 // No module-scoped socket reference required; use the service wrapper
@@ -25,6 +26,7 @@ class SocketService {
     this._socket.register(PEEK_UPDATE_CHANNEL, peekUpdateHandler);
     this._socket.register(PEEK_END_CHANNEL, peekEndHandler);
     startPeekStalePruner();
+    if (typeof Hooks !== 'undefined') Hooks.on('canvasTearDown', () => peekGmOverlay.clearAll());
     return this._socket;
   }
   get socket() {
@@ -468,10 +470,15 @@ export function peekUpdateHandler(payload) {
     origin: payload.origin,
     direction: payload.direction,
     fov: payload.fov,
+    range: payload.range ?? 0,
     ignoredWallIds: payload.ignoredWallIds ?? [],
+    points: payload.points ?? null,
+    userColor: payload.userColor ?? null,
+    userName: payload.userName ?? payload.tokenId,
   }, now);
   peekRegistry.pruneStale(5000, now);
   recalcPeekToken(payload.tokenId);
+  peekGmOverlay.render();
 }
 
 export function peekEndHandler(payload) {
@@ -479,6 +486,7 @@ export function peekEndHandler(payload) {
   if (!payload || payload.sceneId !== canvas?.scene?.id) return;
   peekRegistry.clear(payload.tokenId);
   recalcPeekToken(payload.tokenId);
+  peekGmOverlay.render();
 }
 
 function recalcPeekToken(tokenId) {
@@ -504,5 +512,6 @@ export function startPeekStalePruner() {
     for (const id of before) {
       if (!peekRegistry.has(id)) recalcPeekToken(id);
     }
+    peekGmOverlay.render();
   }, 1000);
 }
