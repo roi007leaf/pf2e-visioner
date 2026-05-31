@@ -1,5 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
-import { clampCornerPeek, clampDoorPeek } from './peek-geometry.js';
+import { clampCornerPeek, clampDoorPeek, pullBackOrigin } from './peek-geometry.js';
 import { readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 
@@ -41,7 +41,16 @@ export class PeekManager {
 
   startCornerPeek(token, mouse) {
     const geo = clampCornerPeek({ footprint: this._footprint(token), mouse, band: PEEK_BAND, fov: PEEK_FOV, tokenCenter: token.center, maxSweep: MAX_SWEEP });
+    geo.origin = this._clampOriginToWalls(token.center, geo.origin);
     this._begin(token, { ...geo, ignoredWallIds: [] }, { kind: 'corner' });
+  }
+
+  _clampOriginToWalls(from, origin) {
+    try {
+      const hit = globalThis.canvas?.walls?.testCollision?.(from, origin, { type: 'sight', mode: 'closest' });
+      if (hit) return pullBackOrigin(from, origin, hit, 2);
+    } catch (_) {}
+    return origin;
   }
 
   startDoorPeek(token, doorDoc, mouse) {
@@ -52,9 +61,13 @@ export class PeekManager {
   updatePeek(tokenId, mouse) {
     const entry = this._active.get(tokenId);
     if (!entry) return;
-    const geo = entry.kind === 'door'
-      ? clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV, aim: mouse, maxSweep: MAX_SWEEP })
-      : clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: PEEK_FOV, tokenCenter: entry.token.center, maxSweep: MAX_SWEEP });
+    let geo;
+    if (entry.kind === 'door') {
+      geo = clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: DOOR_FOV, aim: mouse, maxSweep: MAX_SWEEP });
+    } else {
+      geo = clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: PEEK_FOV, tokenCenter: entry.token.center, maxSweep: MAX_SWEEP });
+      geo.origin = this._clampOriginToWalls(entry.token.center, geo.origin);
+    }
     const ignoredWallIds = entry.kind === 'door' ? [entry.doorDoc.id] : [];
     this._registry.set(tokenId, { ...geo, ignoredWallIds }, this._now());
     this._renderer.apply(entry.token, this._registry.get(tokenId));

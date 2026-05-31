@@ -1,6 +1,7 @@
 import '../../../setup.js';
 import { PeekManager } from '../../../../scripts/services/Peek/PeekManager.js';
 import { PeekRegistry } from '../../../../scripts/services/Peek/PeekRegistry.js';
+import { pullBackOrigin } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 function deps() {
   return {
@@ -241,6 +242,51 @@ describe('PeekManager door DC gate', () => {
     const door = { id: 'd', c: [0, 0, 0, 100], getFlag: (m, k) => (k === 'peekDC' ? 12 : undefined) };
     await mgr.tryStartDoorPeek(token, door);
     expect(d.registry.has('p')).toBe(false);
+  });
+});
+
+describe('PeekManager corner peek wall clamp', () => {
+  let prevCanvas;
+  beforeEach(() => {
+    prevCanvas = global.canvas;
+  });
+  afterEach(() => {
+    global.canvas = prevCanvas;
+  });
+
+  test('startCornerPeek pulls origin back to the token side of a hit wall', () => {
+    const hit = { x: 25, y: 0 };
+    global.canvas = {
+      ...global.canvas,
+      walls: { testCollision: jest.fn(() => hit) },
+      grid: { size: 100 },
+    };
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
+    token.center = { x: 0, y: 0 };
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    const stored = d.registry.get('peeker');
+    const expected = pullBackOrigin(token.center, { x: stored.origin.x, y: stored.origin.y }, hit, 2);
+    expect(stored.origin.x).toBeCloseTo(23, 5);
+    expect(stored.origin.y).toBeCloseTo(0, 5);
+    expect(global.canvas.walls.testCollision).toHaveBeenCalled();
+    expect(expected.x).toBeCloseTo(23, 5);
+  });
+
+  test('startCornerPeek leaves origin unchanged when no wall is hit', () => {
+    global.canvas = {
+      ...global.canvas,
+      walls: { testCollision: jest.fn(() => null) },
+      grid: { size: 100 },
+    };
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
+    token.center = { x: 0, y: 0 };
+    mgr.startCornerPeek(token, { x: 500, y: 0 });
+    const stored = d.registry.get('peeker');
+    expect(stored.origin.x).toBeGreaterThan(100);
   });
 });
 

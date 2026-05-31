@@ -2,6 +2,7 @@ import '../../../setup.js';
 import { isPointInCone } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { clampCornerPeek } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { distancePointToSegment, isWithinDoorPeekRange } from '../../../../scripts/services/Peek/peek-geometry.js';
+import { pullBackOrigin } from '../../../../scripts/services/Peek/peek-geometry.js';
 import { clampDirectionToArc } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 describe('isPointInCone', () => {
@@ -156,5 +157,29 @@ describe('door peek range', () => {
 
   test('isWithinDoorPeekRange: false when beyond maxDistance', () => {
     expect(isWithinDoorPeekRange({ x: 400, y: 50 }, door, 150)).toBe(false);
+  });
+});
+
+describe('pullBackOrigin', () => {
+  test('pulls the origin back by the margin along the from->hit ray', () => {
+    const out = pullBackOrigin({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 0 }, 2);
+    expect(out.x).toBeCloseTo(48, 5);
+    expect(out.y).toBeCloseTo(0, 5);
+  });
+
+  test('preserves to.elevation when present', () => {
+    const out = pullBackOrigin({ x: 0, y: 0 }, { x: 100, y: 0, elevation: 30 }, { x: 50, y: 0 }, 2);
+    expect(out.elevation).toBe(30);
+  });
+
+  test('from === hit (zero length) returns the from point without NaN', () => {
+    const out = pullBackOrigin({ x: 10, y: 20 }, { x: 100, y: 0 }, { x: 10, y: 20 }, 2);
+    expect(out).toEqual({ x: 10, y: 20 });
+  });
+
+  test('margin larger than distance clamps back to the from point', () => {
+    const out = pullBackOrigin({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 1, y: 0 }, 5);
+    expect(out.x).toBeCloseTo(0, 5);
+    expect(out.y).toBeCloseTo(0, 5);
   });
 });

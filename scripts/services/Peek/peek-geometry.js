@@ -88,3 +88,14 @@ export function distancePointToSegment(point, segment) {
 export function isWithinDoorPeekRange(tokenCenter, door, maxDistance) {
   return distancePointToSegment(tokenCenter, door.c) <= maxDistance;
 }
+
+export function pullBackOrigin(from, to, hit, margin) {
+  const dx = hit.x - from.x;
+  const dy = hit.y - from.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return { x: from.x, y: from.y };
+  const back = Math.max(0, len - margin);
+  const out = { x: from.x + (dx / len) * back, y: from.y + (dy / len) * back };
+  if (to?.elevation !== undefined) out.elevation = to.elevation;
+  return out;
+}
