@@ -68,6 +68,26 @@ describe('select-all token visibility bypass', () => {
     expect(isSelectAllTokenVisibilityBypassActive()).toBe(false);
   });
 
+  test('keeps bypass active while multiple tokens are controlled by box selection', async () => {
+    const { isSelectAllTokenVisibilityBypassActive } = await import(
+      '../../../scripts/services/Detection/select-all-token-visibility-bypass.js'
+    );
+    const observer = { document: { id: 'observer', hidden: false } };
+    const target = { document: { id: 'target', hidden: false } };
+    const other = { document: { id: 'other', hidden: false } };
+    global.canvas.tokens = {
+      placeables: [observer, target, other],
+      controlled: [observer, target],
+    };
+    global.canvas.activeLayer = global.canvas.tokens;
+
+    expect(isSelectAllTokenVisibilityBypassActive()).toBe(true);
+
+    global.canvas.tokens.controlled = [observer];
+
+    expect(isSelectAllTokenVisibilityBypassActive()).toBe(false);
+  });
+
   test('ignores Ctrl+A in editable elements', async () => {
     const {
       isSelectAllTokenVisibilityBypassActive,

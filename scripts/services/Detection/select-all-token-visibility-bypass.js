@@ -51,6 +51,13 @@ function currentSelectionCoversAllSelectableTokens() {
   return selectableTokenIds.every((id) => controlledTokenIds.has(id));
 }
 
+function currentSelectionHasMultipleControlledTokens() {
+  const controlledTokenIds = new Set(
+    (globalThis.canvas?.tokens?.controlled || []).map(tokenIdOf).filter(Boolean),
+  );
+  return controlledTokenIds.size > 1;
+}
+
 function selectAllSelectionBypassIsActive() {
   if (!selectAllTokenVisibilityBypassState.persistWhileAllSelected) return false;
 
@@ -70,6 +77,7 @@ function selectAllSelectionBypassIsActive() {
 
 export function isSelectAllTokenVisibilityBypassActive() {
   return (
+    currentSelectionHasMultipleControlledTokens() ||
     selectAllTokenVisibilityBypassState.active === true ||
     selectAllSelectionBypassIsActive()
   );

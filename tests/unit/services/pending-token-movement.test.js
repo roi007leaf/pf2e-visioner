@@ -322,6 +322,28 @@ describe('pending token movement hidden detection guard', () => {
     jest.advanceTimersByTime(100);
   });
 
+  test('does not render-hide from controlled observer during multi-token selection', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const selectedTarget = createMockToken({ id: 'selected-target', controlled: true });
+    const target = createMockToken({ id: 'target', visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) =>
+          id === 'observer' ? observer : id === 'selected-target' ? selectedTarget : target,
+        ),
+        controlled: [observer, selectedTarget],
+        placeables: [observer, selectedTarget, target],
+      },
+    };
+
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
   test('keeps render-hidden target locked until current core polygon reaches predicted observed target', () => {
     let currentCorePolygonContainsTarget = false;
     const observer = createMockToken({
