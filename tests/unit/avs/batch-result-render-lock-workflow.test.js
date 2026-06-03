@@ -55,6 +55,7 @@ describe('BatchResultRenderLockWorkflow', () => {
     expect(refreshPendingMovementTokenVisibility).toHaveBeenNthCalledWith(2, [], {
       coalesceFrame: true,
       ignoreObservedGrace: true,
+      skipPerceptionRefresh: true,
       source: 'batch-result-hidden-refresh',
       targetTokenIds: ['hidden-target'],
     });
@@ -80,6 +81,7 @@ describe('BatchResultRenderLockWorkflow', () => {
     expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith(['moving-target'], {
       coalesceFrame: true,
       ignoreObservedGrace: true,
+      skipPerceptionRefresh: true,
       source: 'batch-result-hidden-refresh',
       targetTokenIds: ['moving-target'],
     });
