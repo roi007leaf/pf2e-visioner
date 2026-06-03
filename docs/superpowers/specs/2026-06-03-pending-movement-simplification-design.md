@@ -64,6 +64,46 @@ Diagnosis was done live via Playwright against the running world (Silva,
 - Eliminate the teleport.
 - Preserve current FPS (no regression).
 
+## Target model (guiding principle for Phases 2–3)
+
+Maintainer's intent, verbatim: *"make the performance of visioner core like [Foundry
+core] … just use core LOS polygon; when core shows soundwaves we should set state to
+hidden; and unless something is undetected there's nothing we need to change; all we
+need to change is if something is undetected, hide it completely from the observer and
+not show the token at all."*
+
+Concretely, the steady-state behavior we converge on:
+
+- **Lean on core detection for performance.** Let Foundry core compute LOS / detection
+  modes (sight, hearing, tremorsense) at its own optimized cadence. Do not run a
+  parallel per-frame visioner computation.
+- **Derive PF2e state from core's result, don't fight it:**
+  - Core detects the target by sight → `observed` (or `concealed` per lighting) — leave it.
+  - Core detects the target only by a non-visual sense (the "soundwave" /
+    detection-filter case) → PF2e `hidden`.
+  - Core does not detect the target at all → nothing to show.
+- **The only hard override visioner must impose:** if a target is `undetected` for an
+  observer, hide it **completely** from that observer — token not shown at all — even if
+  core would reveal it. This is the `_canDetect` wrapper returning `false`.
+- **Move-end settle:** these state derivations and any soundwave visuals settle at
+  movement-end (not animated mid-move).
+
+This model is the destination for Phases 2–3. The exact core→PF2e state mapping is pinned
+during Phase 2 implementation; this section is the acceptance lens.
+
+## Special cases to preserve (do NOT regress)
+
+- **Invisible creatures:** an invisible target is `undetected` to an observer that cannot
+  perceive it (hidden completely), or `hidden` if the observer has a non-visual sense in
+  range (soundwave). Observers with see-invisibility / appropriate precise senses detect
+  normally. Visioner's override must keep an invisible-and-undetected creature fully
+  hidden even though core sight might otherwise reveal it.
+- **Darkness without darkvision:** target detected by hearing/tremor shows the soundwave
+  indicator, not a black circle, including on move.
+- **GM-set PF2e overrides (Hide / Sneak / Seek):** an explicitly set `hidden` /
+  `undetected` state must win over core's raw detection.
+- **GM vision bypass and peek/cover:** unchanged; not in scope to alter.
+
 ## Non-Goals
 
 - True mid-animation reveal/hide of tokens (the system does not actually do this
@@ -160,6 +200,12 @@ Acceptance:
     a black circle).
   - Soundwave (detection-filter mesh) visible without requiring hover.
   - Token reveal/soundwave settles correctly at move-end (not stuck).
+  - Undetected target (incl. invisible creature with no observer sense in range)
+    is hidden completely — token not rendered at all for that observer — during
+    and after a move.
+  - Invisible creature detected by a non-visual sense (hearing/tremor) shows as
+    `hidden` (soundwave), not fully visible.
+  - GM-set Hide/Sneak/Seek override states win over core's raw detection.
 
 ## Open implementation notes
 
