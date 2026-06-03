@@ -159,6 +159,7 @@ export class DependencyInjectionContainer {
     // Batch orchestrator factory
     this.#factories.set('batchOrchestrator', async (dependencies) => {
       const { BatchOrchestrator } = await import('./BatchOrchestrator.js');
+      const { hasActivePendingTokenMovement } = await import('../../../services/PendingMovement/pending-movement-render-lock.js');
       return new BatchOrchestrator({
         batchProcessor: dependencies.batchProcessor,
         telemetryReporter: dependencies.telemetryReporter,
@@ -168,6 +169,7 @@ export class DependencyInjectionContainer {
         visibilityMapService: dependencies.visibilityMapService,
         overrideValidationManager: dependencies.overrideValidationManager,
         moduleId: dependencies.moduleId,
+        hasActivePendingTokenMovement,
       });
     });
 

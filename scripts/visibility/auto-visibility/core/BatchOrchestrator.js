@@ -17,7 +17,7 @@ import {
   isPendingMovementDragPreviewOnlyActive,
   recentCompletedMovementFinalSightLineSeesTarget,
 } from '../../../services/PendingMovement/pending-movement-sight-line.js';
-import { hasActivePendingTokenMovement } from '../../../services/PendingMovement/pending-movement-render-lock.js';
+import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/PendingMovement/pending-token-movement.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -84,6 +84,7 @@ export class BatchOrchestrator {
     this.positionManager = dependencies.positionManager || null;
     this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
+    this._hasActivePendingTokenMovement = dependencies.hasActivePendingTokenMovement || defaultHasActivePendingTokenMovement;
     this.nowProvider = dependencies.nowProvider || (() => {
       try {
         return performance?.now?.() ?? Date.now();
@@ -239,7 +240,7 @@ export class BatchOrchestrator {
     return (
       this._isTokenMoving ||
       (includeMovementSession && !!this._movementSession) ||
-      (includePendingMovementService && hasActivePendingTokenMovement())
+      (includePendingMovementService && this._hasActivePendingTokenMovement())
     );
   }
 
