@@ -4,6 +4,8 @@ function getRenderableToken(token) {
 
 export function isTokenActivelyAnimating(token) {
   const renderableToken = getRenderableToken(token);
+  const movementPromise = renderableToken?.movementAnimationPromise;
+  if (movementPromise && typeof movementPromise.then === 'function') return true;
   const animation = renderableToken?._animation;
   if (!animation) return false;
   if (animation.state === 'completed') return false;
