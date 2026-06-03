@@ -1012,7 +1012,7 @@ function observerHasPendingRevealMovement(observer, target) {
   );
 }
 
-function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
+export function currentPendingMovementSightLineSeesTargetUncached(observer, target) {
   if (!observer || !target?.document?.id) return false;
   if (!observerHasUsableSight(observer)) return false;
 
