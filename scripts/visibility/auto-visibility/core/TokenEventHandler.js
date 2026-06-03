@@ -29,6 +29,8 @@ function getActiveMovementAnimation(token) {
   if (!token) return null;
   if (movementAnimationIsRunning(token._animation)) return token._animation;
   if (movementAnimationIsRunning(token.animation)) return token.animation;
+  const movementPromise = getMovementAnimationPromise(token);
+  if (movementPromise) return { promise: movementPromise, state: 'running' };
   return null;
 }
 

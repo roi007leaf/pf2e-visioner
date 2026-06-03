@@ -1130,6 +1130,30 @@ describe('TokenEventHandler - animation detection on position change', () => {
     jest.useRealTimers();
   });
 
+  test('position change with only v13 movementAnimationPromise is treated as animating', () => {
+    const animationPromise = new Promise(() => {});
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        animation: null,
+        _dragHandle: null,
+        movementAnimationPromise: animationPromise,
+        actor: { id: 'actor-1' },
+      },
+    });
+
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    handler.handleTokenUpdate(tokenDoc, { x: 100, y: 100 });
+
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+    expect(notifyTokenMovementStart).toHaveBeenCalled();
+    expect(storeUpdatedTokenDoc).toHaveBeenCalled();
+  });
+
   test('final move does not process early when updateToken already deferred to animation completion', async () => {
     let resolveAnimation;
     const animationPromise = new Promise((resolve) => {
