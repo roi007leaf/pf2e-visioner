@@ -1014,6 +1014,67 @@ describe('TokenEventHandler - animation detection on position change', () => {
     );
   });
 
+  test('final move defers while v13 movement tween is pending even though token doc is already at destination', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+
+    let resolveMovement;
+    const movementAnimationPromise = new Promise((resolve) => {
+      resolveMovement = resolve;
+    });
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        x: 100,
+        y: 100,
+        _animation: null,
+        _dragHandle: null,
+        movementAnimationPromise,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({ document: tokenDoc }));
+
+    const result = await handler._finalizeCompletedMovement(
+      tokenDoc,
+      { x: 100, y: 100 },
+      { options: {}, userId: 'user-1' },
+    );
+
+    expect(result).toBe(false);
+    await jest.advanceTimersByTimeAsync(300);
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    tokenDoc.object.movementAnimationPromise = null;
+    resolveMovement();
+    await movementAnimationPromise;
+    await jest.advanceTimersByTimeAsync(50);
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: {},
+      userId: 'user-1',
+    });
+
+    jest.useRealTimers();
+  });
+
   test('final move does not process early when updateToken already deferred to animation completion', async () => {
     let resolveAnimation;
     const animationPromise = new Promise((resolve) => {
