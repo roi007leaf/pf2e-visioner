@@ -53,6 +53,16 @@ The existing 4168 unit tests check single fixed positions; **none exercise a mul
 3. **Or (cleaner, bigger): skip the during-move decision entirely.**
    - During active pending movement, do not run the soundwave/sight-line decision recompute in the token-refresh path; let core drive the detection filter, keep `_canDetect` for undetected-hiding, and recompute visioner soundwave/visibility once at move-end. This removes essentially all 326ms. Higher regression risk (the soundwave/reveal special cases) — gate hard on the harness + the deafened/detection/pending-movement test suites + live special-case checks (darkness soundwave, invisible creature, GM Hide/Sneak).
 
+## Attempt 1 result (2026-06-03): position-quantized cache RULED OUT
+
+Implemented increment 2 (position-quantized cross-frame cache on `currentPendingMovementSightLineSeesTarget`) and reverted it (commits `2dcd0f6` then revert `26ec4c5`). It **broke 7 correctness tests** in `tests/unit/services/pending-token-movement.test.js` ("hidden detection guard"): those assert exact during-move visibility at specific *sub-cell* positions (e.g. expects `hidden`, got `concealed`; expects `true`, got `false`). Quantizing the observer position returns a stale within-cell value → wrong visibility.
+
+Conclusion: the position-DEPENDENT sight-line decision (the ~135ms: `lineIntersectsWallDocument` + `currentPendingMovementSightLineSeesTargetUncached`) **cannot be transparently cached/quantized** — sub-frame position genuinely changes the result, and the existing guard tests enforce it. There is no behavior-preserving way to cut that cost.
+
+Therefore, reducing the position-dependent cost REQUIRES a deliberate **behavior change**: the "rely on core LOS during move, settle at move-end" model (increment 3 / the spec's target). That model changes during-move visibility on purpose, so it necessarily **requires rewriting the "hidden detection guard" tests to the new contract** — which means first DEFINING that contract (what visibility/soundwave should a moving observer show mid-move under "rely on core"?). That's a design decision + a substantial refactor, not a transparent perf fix. Recommend a focused brainstorm to define the new during-move contract, then implement against the harness + rewritten guard tests.
+
+The position-INDEPENDENT caches (conditions ~70ms + scene hearing-range ~48ms, invariant during a move) remain the only behavior-preserving option (~36%), gated by the full suite. They won't fully fix the jank but carry low risk.
+
 ## What is already done (context)
 
 - Teleport fixed (sink-gate: `document-update-guard.js` v13 `movementAnimationPromise` awareness + cover-map await). Live-verified.
