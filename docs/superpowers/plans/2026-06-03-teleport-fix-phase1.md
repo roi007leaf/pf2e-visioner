@@ -1,3 +1,10 @@
+> **SUPERSEDED (2026-06-03):** The `movementAnimationPromise`-gating approach below
+> was implemented, reviewed, and live-tested — but proved insufficient (the mid-tween
+> AVS persist reaches the moving token via additional trigger paths + a timing race).
+> All patches were reverted (commit `5516da2`). The teleport is now folded into the
+> Phase 2 simplification, fixed at the persistence **sink** (skip flag writes to any
+> token with a pending `movementAnimationPromise`, re-flush on resolve). Kept for record.
+
 # Teleport Fix (Phase 1) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
