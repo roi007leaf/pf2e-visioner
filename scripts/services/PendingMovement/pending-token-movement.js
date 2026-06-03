@@ -129,13 +129,6 @@ const pendingTokenMovementCompletionTimeouts = new Map();
 const pendingTokenHiddenForceContexts = new Map();
 const pendingMovementCoreVisibleGraceContexts = new Map();
 const pendingMovementCurrentSightLineGraceContexts = new Map();
-const pendingMovementSightLineCrossFrameCache = new Map();
-function pendingMovementSightLineCacheCellPx() {
-  return Math.max(1, Math.floor((globalThis.canvas?.grid?.size ?? 100) / 2));
-}
-function clearPendingMovementSightLineCrossFrameCache() {
-  pendingMovementSightLineCrossFrameCache.clear();
-}
 let pendingMovementHiddenStateVisibilityProbeDepth = 0;
 let pendingMovementSerial = 0;
 const recentCompletedMovementRefreshTargetIds = new Map();
@@ -1072,42 +1065,13 @@ export function currentPendingMovementSightLineSeesTargetUncached(observer, targ
 }
 
 export function currentPendingMovementSightLineSeesTarget(observer, target) {
-  if (!hasActivePendingTokenMovement()) {
-    return withPendingMovementDecisionCache(() =>
-      cachePendingMovementEvaluation(
-        'currentSightLine',
-        observerTargetEvaluationKey(observer, target),
-        () => currentPendingMovementSightLineSeesTargetUncached(observer, target),
-      ),
-    );
-  }
-  const cell = pendingMovementSightLineCacheCellPx();
-  const oc = centerForToken(observer);
-  const tc = centerForToken(target);
-  const obsId = tokenIdOf(observer);
-  const tgtId = tokenIdOf(target);
-  if (!oc || !tc || !obsId || !tgtId) {
-    return withPendingMovementDecisionCache(() =>
-      cachePendingMovementEvaluation(
-        'currentSightLine',
-        observerTargetEvaluationKey(observer, target),
-        () => currentPendingMovementSightLineSeesTargetUncached(observer, target),
-      ),
-    );
-  }
-  const key = `${obsId}:${tgtId}:${Math.round(oc.x / cell)}:${Math.round(oc.y / cell)}:${Math.round(tc.x / cell)}:${Math.round(tc.y / cell)}`;
-  if (pendingMovementSightLineCrossFrameCache.has(key)) {
-    return pendingMovementSightLineCrossFrameCache.get(key);
-  }
-  const result = withPendingMovementDecisionCache(() =>
+  return withPendingMovementDecisionCache(() =>
     cachePendingMovementEvaluation(
       'currentSightLine',
       observerTargetEvaluationKey(observer, target),
       () => currentPendingMovementSightLineSeesTargetUncached(observer, target),
     ),
   );
-  pendingMovementSightLineCrossFrameCache.set(key, result);
-  return result;
 }
 
 function rememberCurrentSightLineGraceContext(observer, target) {
@@ -3422,7 +3386,6 @@ export function clearPendingTokenMovementPosition(
     preserveCurrentSightLineGrace,
     preserveRecentCompletedMovementContext,
   });
-  clearPendingMovementSightLineCrossFrameCache();
 }
 
 export function setPendingTokenMovementPosition(
