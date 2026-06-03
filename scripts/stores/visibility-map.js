@@ -17,7 +17,12 @@ import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import {
   currentPendingMovementSightLineSeesTarget,
   getPendingMovementObserverIds,
+  hasActivePendingTokenMovement,
   hasPendingMovementRenderWork,
+  isPendingMovementDragPreviewOnlyActive,
+  primePendingMovementDetectionFilterVisuals,
+  shouldPrimePendingMovementDetectionFilterVisuals,
+  shouldSuppressPendingMovementDetectionFilterVisuals,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
 } from '../services/PendingMovement/pending-movement-render-lock.js';
 import {
@@ -46,6 +51,13 @@ export {
 
 const log = getLogger('AVS/VisibilityMap');
 export const AVS_EXPLICIT_VISIBLE_DETECTION_SENSE = 'avs-visible';
+const DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS = Object.freeze([
+  0,
+  16,
+  ...Array.from({ length: 88 }, (_value, index) => 25 + index * 25),
+]);
+const DETECTION_FILTER_VISUAL_RETRY_DURATION_MS =
+  DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS[DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS.length - 1];
 const KNOWN_LEGACY_VISIBILITY_STATES = new Set([
   'observed',
   'concealed',
@@ -174,6 +186,13 @@ function shouldClearObservedDetectionFilterForChange(change) {
 
 function clearDetectionFilterVisuals(token) {
   if (!token) return;
+  if (
+    (isPendingMovementDragPreviewOnlyActive() ||
+      (canvas?.tokens?.placeables || []).some((placeable) => placeable?.isDragged)) &&
+    globalThis.__pf2eVisionerHasActivePendingTokenMovement !== true
+  ) {
+    return;
+  }
 
   try {
     token.detectionFilter = null;
@@ -236,12 +255,73 @@ function clearObservedDetectionFilterVisualsForChanges(changes = []) {
   }
 }
 
+function scheduleObservedDetectionFilterVisualClears(changes = []) {
+  if (isPendingMovementDragPreviewOnlyActive()) return;
+  const observedChanges = changes.filter(
+    (change) => change?.to === 'observed' || change?.to === 'concealed',
+  );
+  if (!observedChanges.length) return;
+
+  clearObservedDetectionFilterVisualsForChanges(observedChanges);
+  refreshDetectionFilterVisualsForCurrentRenderDecision();
+  scheduleDetectionFilterVisualFrameRetries(() => {
+    if (isPendingMovementDragPreviewOnlyActive()) return;
+    clearObservedDetectionFilterVisualsForChanges(observedChanges);
+    refreshDetectionFilterVisualsForCurrentRenderDecision();
+  });
+  for (const delayMs of DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS) {
+    setTimeout(() => {
+      if (isPendingMovementDragPreviewOnlyActive()) return;
+      clearObservedDetectionFilterVisualsForChanges(observedChanges);
+    }, delayMs);
+  }
+}
+
 function visibilityTestPointsForToken(token) {
   const documentPoints = token?.document?.getVisibilityTestPoints?.();
   if (Array.isArray(documentPoints) && documentPoints.length) return documentPoints;
 
   const centerPoint = token?.center || token?.getCenterPoint?.();
   return centerPoint ? [centerPoint] : [];
+}
+
+function centerForToken(token) {
+  const doc = getTokenDocument(token);
+  if (!doc) return null;
+  const gridSize = Number(canvas?.grid?.size ?? 0);
+  return {
+    x: Number(doc.x ?? token?.x ?? 0) + Number(doc.width ?? 1) * gridSize / 2,
+    y: Number(doc.y ?? token?.y ?? 0) + Number(doc.height ?? 1) * gridSize / 2,
+  };
+}
+
+function lineIntersectsSightOnlySoundOpenWall(origin, target) {
+  if (!origin || !target) return false;
+  const intersects = foundry?.utils?.lineSegmentIntersects;
+  if (typeof intersects !== 'function') return false;
+
+  return (canvas?.walls?.placeables || []).some((wall) => {
+    const doc = wall?.document ?? wall;
+    const c = doc?.c;
+    if (!Array.isArray(c) || c.length < 4) return false;
+    if (Number(doc?.sight ?? 0) <= 0 || Number(doc?.sound) !== 0) return false;
+    return !!intersects(origin, target, { x: c[0], y: c[1] }, { x: c[2], y: c[3] });
+  });
+}
+
+function hasActiveVisionSourceForObserver(observer) {
+  const observerId = getTokenId(observer);
+  if (!observerId) return false;
+  const sources = Array.from(canvas?.effects?.visionSources || [], (entry) =>
+    Array.isArray(entry) ? entry[1] : entry,
+  );
+  return sources.some((source) => source?.active !== false && getTokenId(source?.object) === observerId);
+}
+
+function shouldPrimeHiddenDetectionFilterForObserver(observer, target) {
+  if (!hasActiveVisionSourceForObserver(observer)) return true;
+  if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
+  return lineIntersectsSightOnlySoundOpenWall(centerForToken(observer), centerForToken(target));
 }
 
 function refreshCoreDetectionFilterForHiddenTarget(target) {
@@ -275,20 +355,136 @@ function primeHiddenDetectionFilterVisuals(target) {
   }
 }
 
+function shouldRefreshHiddenDetectionFilterTarget(change = {}) {
+  if (!hasActivePendingTokenMovement()) return true;
+  const pendingObserverIds = getPendingMovementObserverIds();
+  if (change?.targetId && pendingObserverIds.includes(change.targetId)) return false;
+  if (!change?.observerId) return false;
+  return !pendingObserverIds.includes(change.observerId);
+}
+
+function hiddenDetectionFilterChangeStillApplies(change, target) {
+  if (change?.to !== 'hidden' || !target) return false;
+  const observerId = change?.observerId;
+  if (!observerId) return true;
+
+  const observer = tokenObjectById(observerId);
+  if (!observer) return false;
+  if (getVisibilityBetween(observer, target) !== 'hidden') return false;
+  return shouldPrimeHiddenDetectionFilterForObserver(observer, target);
+}
+
 function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
   for (const change of changes) {
-    if (change?.to !== 'hidden') continue;
     const target = tokenObjectById(change.targetId);
+    if (!hiddenDetectionFilterChangeStillApplies(change, target)) continue;
     if (!target || tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
     refreshCoreDetectionFilterForHiddenTarget(target);
     if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
 
     try {
       primeHiddenDetectionFilterVisuals(target);
-      target.refresh?.();
+      if (shouldRefreshHiddenDetectionFilterTarget(change)) target.refresh?.();
+      primeHiddenDetectionFilterVisuals(target);
     } catch {
       /* best-effort immediate hidden visual refresh */
     }
+  }
+}
+
+function refreshHiddenDetectionFilterVisualsForCurrentObservers() {
+  const observers = getControlledObserverTokens();
+  if (!observers.length) return;
+
+  for (const observer of observers) {
+    const observerId = getTokenId(observer);
+    if (!observerId) continue;
+    for (const target of canvas?.tokens?.placeables || []) {
+      const targetId = getTokenId(target);
+      if (!targetId || targetId === observerId) continue;
+      if (getVisibilityBetween(observer, target) !== 'hidden') continue;
+      if (!shouldPrimeHiddenDetectionFilterForObserver(observer, target)) {
+        clearDetectionFilterVisuals(target);
+        continue;
+      }
+      refreshCoreDetectionFilterForHiddenTarget(target);
+      primeHiddenDetectionFilterVisuals(target);
+    }
+  }
+}
+
+function refreshDetectionFilterVisualsForCurrentRenderDecision() {
+  if (isPendingMovementDragPreviewOnlyActive()) return;
+  if (!canvas?.tokens?._draggedToken && !(canvas?.tokens?.controlled || []).length) return;
+  for (const token of canvas?.tokens?.placeables || []) {
+    if (shouldSuppressPendingMovementDetectionFilterVisuals(token)) {
+      clearDetectionFilterVisuals(token);
+      continue;
+    }
+    if (shouldPrimePendingMovementDetectionFilterVisuals(token)) {
+      primePendingMovementDetectionFilterVisuals(token);
+    }
+  }
+}
+
+function scheduleHiddenDetectionFilterVisualRefreshes(changes = []) {
+  if (isPendingMovementDragPreviewOnlyActive()) return;
+  const hiddenChanges = changes.filter((change) => change?.to === 'hidden');
+  if (!hiddenChanges.length) return;
+
+  refreshHiddenDetectionFilterVisualsForChanges(hiddenChanges);
+  refreshHiddenDetectionFilterVisualsForCurrentObservers();
+  refreshDetectionFilterVisualsForCurrentRenderDecision();
+  scheduleDetectionFilterVisualFrameRetries(() => {
+    if (isPendingMovementDragPreviewOnlyActive()) return;
+    refreshHiddenDetectionFilterVisualsForChanges(hiddenChanges);
+    refreshHiddenDetectionFilterVisualsForCurrentObservers();
+    refreshDetectionFilterVisualsForCurrentRenderDecision();
+  });
+  for (const delayMs of DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS) {
+    setTimeout(() => {
+      if (isPendingMovementDragPreviewOnlyActive()) return;
+      refreshHiddenDetectionFilterVisualsForChanges(hiddenChanges);
+      refreshHiddenDetectionFilterVisualsForCurrentObservers();
+    }, delayMs);
+  }
+}
+
+function scheduleDetectionFilterVisualFrameRetries(callback) {
+  if (typeof callback !== 'function') return;
+  const startedAt = Date.now();
+  const scheduleFrame =
+    typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (frameCallback) => setTimeout(frameCallback, 16);
+  const tick = () => {
+    callback();
+    if (Date.now() - startedAt >= DETECTION_FILTER_VISUAL_RETRY_DURATION_MS) return;
+    scheduleFrame(tick);
+  };
+  scheduleFrame(tick);
+}
+
+function refreshHiddenDetectionFilterVisualsForPair(observer, target, state) {
+  if (state !== 'hidden' || !target) return;
+  const refresh = () => {
+    if (observer && getVisibilityBetween(observer, target) !== 'hidden') return;
+    refreshHiddenDetectionFilterVisualsForChanges([
+      {
+        targetId: getTokenId(target),
+        targetName: target?.name ?? getTokenDocument(target)?.name ?? getTokenId(target),
+        observerId: getTokenId(observer),
+        to: 'hidden',
+      },
+    ]);
+  };
+
+  refresh();
+  for (const delayMs of DETECTION_FILTER_VISUAL_RETRY_DELAYS_MS) {
+    setTimeout(() => {
+      if (isPendingMovementDragPreviewOnlyActive()) return;
+      refresh();
+    }, delayMs);
   }
 }
 
@@ -385,8 +581,8 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
   }
 
   for (const entry of readbackEntries) {
-    clearObservedDetectionFilterVisualsForChanges(entry.changes);
-    refreshHiddenDetectionFilterVisualsForChanges(entry.changes);
+    scheduleObservedDetectionFilterVisualClears(entry.changes);
+    scheduleHiddenDetectionFilterVisualRefreshes(entry.changes);
   }
 
   const result = await applyTokenFlagUpdatePasses({
@@ -400,7 +596,8 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     ),
   });
   for (const entry of readbackEntries) {
-    refreshHiddenDetectionFilterVisualsForChanges(entry.changes);
+    scheduleObservedDetectionFilterVisualClears(entry.changes);
+    scheduleHiddenDetectionFilterVisualRefreshes(entry.changes);
   }
   const repaired = await repairStaleVisibilityBatchReadback(readbackEntries, options);
   return { ...result, repaired };
@@ -474,10 +671,10 @@ export async function setVisibilityMap(token, visibilityMap, options = {}) {
   const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
     preserveObserved: options?.preserveObserved === true,
   });
-  clearObservedDetectionFilterVisualsForChanges(observedClearChanges);
-  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  scheduleObservedDetectionFilterVisualClears(observedClearChanges);
+  scheduleHiddenDetectionFilterVisualRefreshes(observedClearChanges);
   const result = await setPerceptionProfileFlag(token, nextProfiles, options);
-  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  scheduleHiddenDetectionFilterVisualRefreshes(observedClearChanges);
   return result;
 }
 
@@ -645,6 +842,17 @@ export async function setPerceptionProfileBetween(
   const profileChanged =
     !areTokenFlagValuesEqual(normalizePerceptionProfile(currentProfile), nextProfile);
   const missingStoredProfile = !rawProfileMap[targetId] && !isDefaultProfile(nextProfile);
+  const hiddenVisualChange =
+    legacyState === 'hidden'
+      ? {
+          targetId,
+          targetName: target?.name ?? getTokenDocument(target)?.name ?? targetId,
+          from: currentLegacyState ?? 'observed',
+          to: legacyState,
+        }
+      : null;
+
+  if (hiddenVisualChange) refreshHiddenDetectionFilterVisualsForPair(observer, target, legacyState);
 
   if (profileChanged || missingStoredProfile) {
     if (isDefaultProfile(nextProfile)) {
@@ -676,6 +884,8 @@ export async function setPerceptionProfileBetween(
     }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }
+
+  if (hiddenVisualChange) refreshHiddenDetectionFilterVisualsForPair(observer, target, legacyState);
 
   await applyVisibilitySideEffects(observer, target, legacyState, options);
 }

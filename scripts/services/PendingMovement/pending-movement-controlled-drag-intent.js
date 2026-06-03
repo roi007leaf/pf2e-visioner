@@ -36,6 +36,10 @@ function scheduleControlledTokenDragIntentRefreshes(
   if (!tokenId) return;
 
   clearControlledTokenDragIntentRefreshes(tokenId);
+  if (typeof getRefreshTargetIds !== 'function' || typeof refreshTokenVisibility !== 'function') {
+    return;
+  }
+
   const timers = new Set();
   pendingControlledTokenDragIntentState.refreshTimers.set(tokenId, timers);
 

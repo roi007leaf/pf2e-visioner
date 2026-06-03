@@ -25,6 +25,8 @@ export function createPendingMovementCurrentViewSoundwaveController({
   hasPendingControlledTokenDragIntent,
   hasPendingMovementDetectionWork,
   hiddenSoundwaveShouldSurviveLimitedWall = () => false,
+  hiddenSoundwaveShouldSurviveSightBlockedSoundOpen = () => false,
+  isDragPreviewOnlyActive = () => false,
   pendingMovementEntryVisualReachedDestination,
   restorePendingMovementTokenRendering,
   shouldUseCoreDetectionDuringPendingMovement,
@@ -45,7 +47,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
       observers.push(token);
     };
 
-    add(getDraggedToken());
+    if (hasPendingMovementDetectionWork()) add(getDraggedToken());
     for (const token of getControlledTokens()) add(token);
     return observers;
   }
@@ -65,6 +67,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
   }
 
   function hasPendingControlledTokenDragIntentForCurrentView() {
+    if (!hasPendingMovementDetectionWork()) return false;
     return getCurrentViewObservers().some((observer) => hasPendingControlledTokenDragIntent(observer));
   }
 
@@ -149,7 +152,12 @@ export function createPendingMovementCurrentViewSoundwaveController({
       const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
       if (
         predictedFinalState &&
-        !detectionBlockingVisibilityStates.has(predictedFinalState)
+        !detectionBlockingVisibilityStates.has(predictedFinalState) &&
+        !hiddenSoundwaveShouldSurviveSightBlockedSoundOpen(
+          observer,
+          target,
+          predictedFinalState,
+        )
       ) {
         continue;
       }
@@ -160,20 +168,26 @@ export function createPendingMovementCurrentViewSoundwaveController({
           observer,
           target,
         );
+        const hiddenSoundwaveSurvivesSightBlockedSoundOpen =
+          hiddenSoundwaveShouldSurviveSightBlockedSoundOpen(
+            observer,
+            target,
+            predictedFinalState,
+          );
         if (!predictedFinalState) {
           if (
-            currentViewObserverHasPendingRevealMovement(observer) &&
             currentSightLineSeesTarget &&
-            !hiddenSoundwaveSurvivesLimitedWall
+            !hiddenSoundwaveSurvivesLimitedWall &&
+            !hiddenSoundwaveSurvivesSightBlockedSoundOpen
           ) {
             continue;
           }
           return true;
         }
-        if (predictedFinalState === 'hidden') return true;
         if (
           !currentSightLineSeesTarget ||
-          hiddenSoundwaveSurvivesLimitedWall
+          hiddenSoundwaveSurvivesLimitedWall ||
+          hiddenSoundwaveSurvivesSightBlockedSoundOpen
         ) {
           return true;
         }
@@ -193,9 +207,20 @@ export function createPendingMovementCurrentViewSoundwaveController({
     for (const observer of getCurrentViewObservers()) {
       const storedVisibilityState = getStoredVisibilityState(observer, target);
       if (!isStoredObservedState(storedVisibilityState)) continue;
-      if (getPendingMovementVisibilityState(observer, target) !== 'hidden') continue;
       if (!shouldUseCoreDetectionDuringPendingMovement(observer, target)) continue;
-      if (!currentPendingMovementSightLineSeesTarget(observer, target)) return true;
+      const sightBlockedSoundOpen = hiddenSoundwaveShouldSurviveSightBlockedSoundOpen(
+        observer,
+        target,
+      );
+      if (getPendingMovementVisibilityState(observer, target) !== 'hidden' && !sightBlockedSoundOpen) {
+        continue;
+      }
+      if (
+        !currentPendingMovementSightLineSeesTarget(observer, target) ||
+        sightBlockedSoundOpen
+      ) {
+        return true;
+      }
     }
 
     return false;
@@ -241,8 +266,9 @@ export function createPendingMovementCurrentViewSoundwaveController({
     if (predictedObservedMovementReachedDestination(observer, target)) return false;
 
     return (
-      (hasPendingMovementDetectionWork() || hasPendingControlledTokenDragIntent(observer)) &&
-      !currentPendingMovementSightLineSeesTarget(observer, target)
+      hasPendingMovementDetectionWork() &&
+      (!currentPendingMovementSightLineSeesTarget(observer, target) ||
+        hiddenSoundwaveShouldSurviveSightBlockedSoundOpen(observer, target))
     );
   }
 
@@ -311,6 +337,7 @@ export function createPendingMovementCurrentViewSoundwaveController({
 
   function clearPredictedObservedTransitionVisuals(token) {
     if (!token?.document?.id) return false;
+    if (isDragPreviewOnlyActive()) return false;
     if (observedSoundwaveShouldWaitForCore(token)) return false;
     if (hasActiveAvsOverrideHiddenForCurrentView(token)) return false;
 

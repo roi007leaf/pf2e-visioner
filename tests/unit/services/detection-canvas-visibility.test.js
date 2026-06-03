@@ -3,6 +3,7 @@ import '../../setup.js';
 import {
   clearPendingTokenMovementPosition,
   forceTokenInvisibleForObserverVisibility,
+  schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
   shouldHandlePendingMovementCanvasVisibilityForToken,
   shouldTemporarilyForceTokenInvisible,
@@ -198,6 +199,38 @@ describe('canvas visibility wrapper', () => {
 
     expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
     expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('core animation bypass keeps core can-detect result for hidden override targets', () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => true);
+    const wrapper = createCanDetectVisibilityWrapper(2);
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+    expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 
   test('GM Vision bypass keeps core detection-mode visibility result', () => {

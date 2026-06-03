@@ -280,4 +280,35 @@ describe('BatchDirectionalLosResolver', () => {
     expect(batchLosCache.get('A>>B')).toBe(true);
     expect(precomputedLOS.get('A-B')).toBe(true);
   });
+
+  test('movement resolver false overrides cached true LOS during movement', () => {
+    const observer = token('A');
+    const target = token('B');
+    const breakdown = makeBreakdown();
+    const batchLosCache = new Map([['A>>B', true]]);
+    const globalLosCache = {
+      getWithMeta: jest.fn(),
+      set: jest.fn(),
+    };
+    const visionAnalyzer = { hasLineOfSight: jest.fn() };
+    const movementSightLineResolver = jest.fn(() => false);
+    const precomputedLOS = new Map();
+
+    const resolver = new BatchDirectionalLosResolver({
+      visionAnalyzer,
+      globalLosCache,
+      batchLosCache,
+      precomputedLOS,
+      breakdown,
+      movementSightLineResolver,
+    });
+
+    expect(resolver.get(observer, target, 'A>>B')).toBe(false);
+    expect(movementSightLineResolver).toHaveBeenCalledWith(observer, target);
+    expect(globalLosCache.getWithMeta).not.toHaveBeenCalled();
+    expect(globalLosCache.set).not.toHaveBeenCalled();
+    expect(visionAnalyzer.hasLineOfSight).not.toHaveBeenCalled();
+    expect(batchLosCache.get('A>>B')).toBe(false);
+    expect(precomputedLOS.get('A-B')).toBe(false);
+  });
 });

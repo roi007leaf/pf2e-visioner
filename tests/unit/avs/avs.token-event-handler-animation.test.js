@@ -1,5 +1,9 @@
 import '../../setup.js';
 import { TokenEventHandler } from '../../../scripts/visibility/auto-visibility/core/TokenEventHandler.js';
+import {
+  clearPendingTokenMovementPosition,
+  setPendingTokenMovementPosition,
+} from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 
 describe('TokenEventHandler - animation detection on position change', () => {
   let handler;
@@ -80,6 +84,11 @@ describe('TokenEventHandler - animation detection on position change', () => {
       cacheManager,
       batchOrchestrator,
     );
+  });
+
+  afterEach(() => {
+    clearPendingTokenMovementPosition('token-1');
+    jest.useRealTimers();
   });
 
   function makeTokenDoc(overrides = {}) {
@@ -459,6 +468,399 @@ describe('TokenEventHandler - animation detection on position change', () => {
     });
   });
 
+  test('final animated move waits for animation to attach before processing', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    const movePromise = handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+    expect(notifyTokenMovementStart).toHaveBeenCalled();
+    expect(storeUpdatedTokenDoc).toHaveBeenCalledWith('token-1', {
+      id: 'token-1',
+      x: 100,
+      y: 100,
+      width: 1,
+      height: 1,
+      name: 'TestToken',
+      elevation: 0,
+    });
+
+    tokenDoc.object._animation = { state: 'running', promise: animationPromise };
+    await jest.advanceTimersByTimeAsync(0);
+    await Promise.resolve();
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    await movePromise;
+    jest.useRealTimers();
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+  });
+
+  test('final animated move still processes when no animation attaches', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    const movePromise = handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 100, y: 100 }, chain: [] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(150);
+    await movePromise;
+    jest.useRealTimers();
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+  });
+
+  test('final move does not finalize while token visual has not reached destination', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        x: 0,
+        y: 0,
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    const result = await handler._finalizeCompletedMovement(
+      tokenDoc,
+      { x: 100, y: 100 },
+      { options: {}, userId: 'user-1' },
+    );
+
+    expect(result).toBe(false);
+    await jest.advanceTimersByTimeAsync(300);
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
+  });
+
+  test('final move waits for visual destination after animation promise resolves early', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const tokenDoc = makeTokenDoc({
+      object: {
+        x: 0,
+        y: 0,
+        _animation: { state: 'running', promise: animationPromise },
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    const result = await handler._finalizeCompletedMovement(
+      tokenDoc,
+      { x: 100, y: 100 },
+      { options: {}, userId: 'user-1' },
+    );
+
+    expect(result).toBe(false);
+    resolveAnimation();
+    await animationPromise;
+    await jest.advanceTimersByTimeAsync(300);
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    tokenDoc.object.x = 100;
+    tokenDoc.object.y = 100;
+    tokenDoc.object._animation = { state: 'completed' };
+    await jest.advanceTimersByTimeAsync(50);
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: {},
+      userId: 'user-1',
+    });
+
+    jest.useRealTimers();
+  });
+
+  test('move hook without explicit destination does not finalize at current token position', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      x: 4200,
+      y: 2600,
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    await handler.handleMoveToken(
+      tokenDoc,
+      { chain: [] },
+      { method: 'dragging', _movement: { 'token-1': { passed: { waypoints: [] } } } },
+      'user-1',
+    );
+
+    expect(notifyTokenMovementStart).toHaveBeenCalledWith('token-1');
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+    expect(markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
+  });
+
+  test('move hook skips finalization while PendingMovement owns the token animation', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    tokenDoc.object.document = tokenDoc;
+
+    expect(
+      setPendingTokenMovementPosition(tokenDoc, { x: 700, y: 700 }, [tokenDoc.object], {
+        userId: global.game.user.id,
+      }),
+    ).toBe(true);
+
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 700, y: 700 }, chain: [] },
+      { method: 'dragging', _movement: { 'token-1': { passed: { waypoints: [] } } } },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+    expect(notifyTokenMovementStart).not.toHaveBeenCalled();
+  });
+
+  test('dragging update waits for late-attached animation instead of fallback finalizing mid-move', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    handler.handleTokenUpdate(
+      tokenDoc,
+      { x: 700, y: 700 },
+      { method: 'dragging' },
+      'user-1',
+    );
+
+    tokenDoc.object._animation = { state: 'running', promise: animationPromise };
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(2000);
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
+    jest.useRealTimers();
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 700, y: 700 },
+      options: { method: 'dragging' },
+      userId: 'user-1',
+    });
+  });
+
+  test('animated position update waits for late-attached animation without dragging method', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({
+      document: tokenDoc,
+    }));
+
+    handler.handleTokenUpdate(tokenDoc, { x: 900, y: 500 }, { animate: true }, 'user-1');
+
+    tokenDoc.object._animation = { state: 'running', promise: animationPromise };
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(2000);
+
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    resolveAnimation();
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
+    jest.useRealTimers();
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 900, y: 500 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+  });
+
   test('final move delegates completed movement invalidation without directly queuing override validation', async () => {
     const invalidationCoordinator = { invalidate: jest.fn(() => true) };
     handler = new TokenEventHandler(
@@ -483,7 +885,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
     await handler.handleMoveToken(
       tokenDoc,
       { destination: { x: 100, y: 100 }, chain: [] },
-      { animate: true },
+      { animate: false },
       'user-1',
     );
 
@@ -491,7 +893,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
       reason: 'token-movement-completed',
       document: tokenDoc,
       changeData: { x: 100, y: 100 },
-      options: { animate: true },
+      options: { animate: false },
       userId: 'user-1',
     });
     expect(queueOverrideValidation).not.toHaveBeenCalled();
@@ -554,7 +956,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
     await handler.handleMoveToken(
       tokenDoc,
       { destination: { x: 200, y: 100 }, chain: [] },
-      { animate: true },
+      { animate: false },
       'user-1',
     );
 
@@ -562,7 +964,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
       reason: 'token-movement-completed',
       document: tokenDoc,
       changeData: { x: 200, y: 100 },
-      options: { animate: true },
+      options: { animate: false },
       userId: 'user-1',
     });
   });
@@ -594,7 +996,7 @@ describe('TokenEventHandler - animation detection on position change', () => {
     await handler.handleMoveToken(
       tokenDoc,
       { destination: { x: 250, y: 300 }, chain: [] },
-      { animate: true },
+      { animate: false },
       'user-1',
     );
 

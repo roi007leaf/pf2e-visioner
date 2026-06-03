@@ -16,6 +16,7 @@ import { EventHandlerFactory } from './core/EventHandlerFactory.js';
 import { ExclusionManager } from './core/ExclusionManager.js';
 import { PositionManager } from './core/PositionManager.js';
 import { SystemStateProvider } from './core/SystemStateProvider.js';
+import { tokenMovementCompleted } from './core/TokenInvalidationIntents.js';
 import { VisibilityStateManager } from './core/VisibilityStateManager.js';
 
 // Exported helper for unit tests and potential external reuse
@@ -100,6 +101,30 @@ export class EventDrivenVisibilitySystem {
       return EventDrivenVisibilitySystem.#instance;
     }
     EventDrivenVisibilitySystem.#instance = this;
+  }
+
+  #getSetting(settingName, defaultValue = false) {
+    try {
+      return this.#systemStateProvider?.getSetting?.(settingName, defaultValue) ?? defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+
+  #shouldProcessEvents() {
+    try {
+      return !!this.#systemStateProvider?.shouldProcessEvents?.();
+    } catch {
+      return false;
+    }
+  }
+
+  #isEnabled() {
+    try {
+      return !!this.#systemStateProvider?.isEnabled?.();
+    } catch {
+      return false;
+    }
   }
 
   static getInstance() {
@@ -218,6 +243,10 @@ export class EventDrivenVisibilitySystem {
         }
       );
 
+      Hooks.on('pf2e-visioner.pendingTokenMovementComplete', (payload = {}) => {
+        this.#handlePendingTokenMovementComplete(payload);
+      });
+
       // Initialize the optimized visibility calculator with the core components
       coreServices.optimizedVisibilityCalculator.initialize(
         coreServices.lightingCalculator,
@@ -279,7 +308,7 @@ export class EventDrivenVisibilitySystem {
    * Force recalculation of all visibility (for manual triggers) - IMMEDIATE
    */
   recalculateAll() {
-    if (!this.#systemStateProvider.shouldProcessEvents()) return;
+    if (!this.#shouldProcessEvents()) return;
     const log = getLogger('AVS/API');
     const stack = new Error().stack;
     const caller = stack?.split('\n')?.[2]?.trim() || 'unknown';
@@ -296,7 +325,7 @@ export class EventDrivenVisibilitySystem {
    * @param {boolean} force - Force recalculation even if recently done
    */
   async recalculateAllVisibility(force = false) {
-    const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
+    const avsOnlyInCombat = this.#getSetting('avsOnlyInCombat', false);
     if (avsOnlyInCombat) {
       try {
         const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
@@ -310,7 +339,7 @@ export class EventDrivenVisibilitySystem {
     const disableAVS = canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS');
     if (disableAVS) return;
 
-    if (!this.#systemStateProvider.shouldProcessEvents() && !force) return;
+    if (!this.#shouldProcessEvents() && !force) return;
 
     // Delegate to VisibilityStateManager for proper abstraction
     this.#visibilityStateManager.markAllTokensChangedImmediate();
@@ -323,7 +352,7 @@ export class EventDrivenVisibilitySystem {
    * @param {string[]|Set<string>} tokenIds
    */
   async recalculateForTokens(tokenIds) {
-    const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
+    const avsOnlyInCombat = this.#getSetting('avsOnlyInCombat', false);
     if (avsOnlyInCombat) {
       try {
         const inCombat = !!(game.combat?.started && game.combat?.combatants?.size > 0);
@@ -337,7 +366,7 @@ export class EventDrivenVisibilitySystem {
     const disableAVS = canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS');
     if (disableAVS) return;
 
-    if (!this.#systemStateProvider.shouldProcessEvents()) return;
+    if (!this.#shouldProcessEvents()) return;
     const ids = Array.from(new Set((tokenIds || []).filter(Boolean)));
     if (ids.length === 0) return;
     const log = getLogger('AVS/API');
@@ -369,6 +398,14 @@ export class EventDrivenVisibilitySystem {
       ...movementSnapshot,
       pendingMovement: getPendingMovementPerformanceSnapshot(),
     };
+  }
+
+  #handlePendingTokenMovementComplete({ tokenDoc, movementChanges, options, userId } = {}) {
+    if (!this.#shouldProcessEvents()) return false;
+    if (!tokenDoc?.id) return false;
+    return this.#invalidationCoordinator?.invalidate?.(
+      tokenMovementCompleted(tokenDoc, movementChanges, { options, userId }),
+    ) ?? false;
   }
 
   /**
@@ -462,7 +499,7 @@ export class EventDrivenVisibilitySystem {
    */
   async recalculateSneakingTokens() {
     const changedTokens = new Set();
-    if (!this.#systemStateProvider.isEnabled()) return;
+    if (!this.#isEnabled()) return;
 
     const sneakingTokens =
       canvas.tokens?.placeables?.filter(

@@ -7,7 +7,9 @@ import { LightingCalculator } from '../../../scripts/visibility/auto-visibility/
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import {
   clearPendingTokenMovementPosition,
+  clearControlledObserverDragPreviewAddedSoundwaves,
   completePendingTokenMovement,
+  getControlledObserverDragPreviewSoundwaveTargetIds,
   getControlledObserverDetectionVisualTargetIds,
   getPendingMovementBlockContext,
   getPendingMovementPerformanceSnapshot,
@@ -27,7 +29,10 @@ import {
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockHiddenDetection,
 } from '../../../scripts/services/PendingMovement/pending-movement-detection-gate.js';
-import { currentPendingMovementSightLineSeesTarget } from '../../../scripts/services/PendingMovement/pending-movement-sight-line.js';
+import {
+  currentPendingMovementSightLineSeesTarget,
+  getRecentCompletedMovementVisibilityStateForObserver,
+} from '../../../scripts/services/PendingMovement/pending-movement-sight-line.js';
 import { withPendingMovementEvaluationCache } from '../../../scripts/services/PendingMovement/pending-movement-evaluation-cache.js';
 import { lineIntersectsLimitedWall } from '../../../scripts/services/PendingMovement/pending-movement-wall-blocking.js';
 import {
@@ -46,6 +51,7 @@ import {
   refreshPendingMovementTokenVisibility,
   restorePendingMovementDetectionFilterState,
   restorePendingMovementTokenRendering,
+  shouldPrimePendingMovementDetectionFilterVisuals,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   shouldTemporarilyForceTokenInvisible,
   suppressPendingMovementDetectionFilterVisualsForObservedTransition,
@@ -77,10 +83,12 @@ const WALL_SENSE_TYPES = {
 describe('pending token movement hidden detection guard', () => {
   let originalCanvas;
   let originalConst;
+  let originalFoundryCanvas;
 
   beforeEach(() => {
     originalCanvas = global.canvas;
     originalConst = global.CONST;
+    originalFoundryCanvas = global.foundry.canvas;
     global.game.settings.set('pf2e', 'gmVision', false);
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
     global.canvas = {
@@ -114,6 +122,8 @@ describe('pending token movement hidden detection guard', () => {
     global.canvas = originalCanvas;
     if (originalConst === undefined) delete global.CONST;
     else global.CONST = originalConst;
+    if (originalFoundryCanvas === undefined) delete global.foundry.canvas;
+    else global.foundry.canvas = originalFoundryCanvas;
   });
 
   test('does not guard hidden detection without a pending controlled-token movement', () => {
@@ -1138,13 +1148,7 @@ describe('pending token movement hidden detection guard', () => {
   });
 
   test('reuses current sight-line evaluation inside one pending movement cache scope', () => {
-    global.canvas.walls.placeables = [
-      createMockWall({
-        id: 'sight-wall',
-        c: [100, -50, 100, 100],
-        sight: WALL_SENSE_TYPES.NORMAL,
-      }),
-    ];
+    global.canvas.walls.placeables = [];
     const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
     const target = createMockToken({ id: 'target', x: 3, y: 0 });
     const los = { contains: jest.fn(() => true) };
@@ -1685,7 +1689,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldTemporarilyBlockHiddenDetection(preview, target, 'hidden')).toBe(false);
   });
 
-  test('refreshes target visibility during committed movement animation', () => {
+  test('does not full-refresh unrelated target visibility during committed movement animation', () => {
     jest.useFakeTimers();
 
     global.canvas.walls.placeables = [];
@@ -1718,7 +1722,7 @@ describe('pending token movement hidden detection guard', () => {
     schedulePendingTokenMovementCompletion(original.document);
     jest.advanceTimersByTime(250);
 
-    expect(target.refresh).toHaveBeenCalled();
+    expect(target.refresh).not.toHaveBeenCalled();
   });
 
   test('publishes prioritized final visibility predictions before the full scene finishes', async () => {
@@ -1774,7 +1778,6 @@ describe('pending token movement hidden detection guard', () => {
 
     expect(calculateFinalVisibility.mock.calls[0][1].document.id).toBe('target');
     expect(target.refresh).not.toHaveBeenCalled();
-    expect(target.visible).toBe(false);
 
     releaseOther();
     await slowOtherPrediction;
@@ -2224,6 +2227,40 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.levelIndicator.visible).toBe(false);
   });
 
+  test('notifies AVS when PendingMovement completes owned movement', () => {
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0 });
+    observer.document.object = observer;
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        placeables: [observer],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+    const hookSpy = jest.spyOn(global.Hooks, 'callAll');
+
+    try {
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 50 }, [observer], {
+        userId: global.game.user.id,
+      });
+
+      expect(completePendingTokenMovement('observer')).toBe(true);
+      expect(hookSpy).toHaveBeenCalledWith(
+        'pf2e-visioner.pendingTokenMovementComplete',
+        expect.objectContaining({
+          tokenId: 'observer',
+          tokenDoc: observer.document,
+          movementChanges: { x: 100, y: 50 },
+        }),
+      );
+    } finally {
+      hookSpy.mockRestore();
+    }
+  });
+
   test('keeps rendering core-owned until movement animation completes', async () => {
     jest.useFakeTimers();
 
@@ -2274,6 +2311,52 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.mesh.renderable).toBe(true);
     expect(target.mesh.alpha).toBe(1);
     expect(target.nameplate.visible).toBe(true);
+  });
+
+  test('keeps pending movement active when animation promise resolves before visual reaches destination', async () => {
+    jest.useFakeTimers();
+
+    let resolveAnimation;
+    const animationPromise = new Promise((resolve) => {
+      resolveAnimation = resolve;
+    });
+    const observer = createMockToken({ id: 'observer', x: 0, y: 0, controlled: true });
+    observer.document.object = observer;
+    observer._animation = { state: 'running', promise: animationPromise };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        controlled: [observer],
+        placeables: [observer],
+      },
+      effects: {
+        visionSources: [{ active: true, object: observer }],
+        lightSources: [],
+      },
+      visibility: {
+        testVisibility: jest.fn(() => false),
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+    resolveAnimation();
+    await animationPromise;
+    await jest.advanceTimersByTimeAsync(500);
+
+    expect(getPendingTokenMovementPosition('observer')).toEqual({ x: 100, y: 0 });
+
+    observer.x = 100;
+    observer.document.x = 100;
+    observer._animation = { state: 'completed' };
+    await jest.advanceTimersByTimeAsync(50);
+
+    expect(getPendingTokenMovementPosition('observer')).toBeNull();
   });
 
   test('waits briefly for Foundry animation without render-locking token visuals', async () => {
@@ -3737,6 +3820,61 @@ describe('pending token movement hidden detection guard', () => {
     global.cancelAnimationFrame = originalCancelAnimationFrame;
   });
 
+  test('coalesced targeted refresh does not become full-scene when merged with untargeted work', () => {
+    jest.useFakeTimers();
+    setMovementPerformanceDiagnosticsEnabled(true);
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalCancelAnimationFrame = global.cancelAnimationFrame;
+    global.requestAnimationFrame = jest.fn((callback) => setTimeout(callback, 16));
+    global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+    resetPendingMovementPerformanceCounters();
+    global.canvas.walls.placeables = [];
+    const target = createMockToken({ id: 'target', visible: true });
+    const unrelated = createMockToken({ id: 'unrelated', visible: true });
+    for (const token of [target, unrelated]) {
+      token.refresh = jest.fn();
+      token.renderable = true;
+      token.mesh = { visible: true, renderable: true, alpha: 1 };
+      token.nameplate = { visible: true };
+    }
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        placeables: [target, unrelated],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+    };
+
+    refreshPendingMovementTokenVisibility([], {
+      coalesceFrame: true,
+      source: 'unit-targeted',
+      targetTokenIds: ['target'],
+    });
+    refreshPendingMovementTokenVisibility([], {
+      coalesceFrame: true,
+      source: 'unit-untargeted',
+    });
+
+    jest.advanceTimersByTime(16);
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(unrelated.refresh).not.toHaveBeenCalled();
+    expect(getPendingMovementPerformanceSnapshot()).toEqual(
+      expect.objectContaining({
+        refreshCalls: 1,
+        targetedRefreshCalls: 1,
+        fullSceneRefreshCalls: 0,
+        tokensScanned: 1,
+        tokensRefreshed: 1,
+      }),
+    );
+
+    global.requestAnimationFrame = originalRequestAnimationFrame;
+    global.cancelAnimationFrame = originalCancelAnimationFrame;
+  });
+
   test('skips token refresh when pending movement visual state is unchanged', () => {
     setMovementPerformanceDiagnosticsEnabled(true);
     resetPendingMovementPerformanceCounters();
@@ -3997,6 +4135,22 @@ describe('pending token movement hidden detection guard', () => {
       source: 'post-completion-refresh',
       targetTokenIds: ['target'],
     });
+  });
+
+  test('post-completion refresh does not fall back to a full-scene refresh with no targets', () => {
+    jest.useFakeTimers();
+
+    const refreshTokenVisibility = jest.fn();
+    schedulePostCompletionRenderRefreshes('observer', 1, {
+      hasActivePendingMovementForObserver: () => false,
+      hasRenderWork: () => true,
+      getTargetTokenIds: () => [],
+      refreshTokenVisibility,
+    });
+
+    jest.advanceTimersByTime(100);
+
+    expect(refreshTokenVisibility).not.toHaveBeenCalled();
   });
 
   test('post-completion refresh uses light cadence unless full cadence is requested', () => {
@@ -4265,7 +4419,55 @@ describe('pending token movement hidden detection guard', () => {
     });
   });
 
-  test('refreshes movement vision mask without full visibility restriction during core animation', () => {
+  test('throttles repeated committed movement full vision perception rebuilds', () => {
+    jest.useFakeTimers();
+    const perceptionUpdate = jest.fn();
+    const observer = createMockToken({ id: 'observer', controlled: true });
+    observer.document.object = observer;
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : null)),
+        controlled: [observer],
+        placeables: [observer],
+      },
+      perception: {
+        update: perceptionUpdate,
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+    const fullVisionFlags = {
+      initializeVisionModes: false,
+      refreshLighting: true,
+      refreshVision: true,
+    };
+    global.canvas.perception.update(fullVisionFlags);
+    global.canvas.perception.update(fullVisionFlags);
+    global.canvas.perception.update({
+      initializeVisionModes: true,
+      refreshLighting: true,
+      refreshVision: true,
+    });
+
+    expect(perceptionUpdate).toHaveBeenCalledTimes(1);
+    expect(perceptionUpdate).toHaveBeenCalledWith(fullVisionFlags);
+
+    jest.advanceTimersByTime(99);
+    expect(perceptionUpdate).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(1);
+    expect(perceptionUpdate).toHaveBeenCalledTimes(2);
+    expect(perceptionUpdate).toHaveBeenLastCalledWith({
+      initializeVisionModes: true,
+      refreshLighting: true,
+      refreshVision: true,
+    });
+  });
+
+  test('delegates movement vision-bearing render flags back to Foundry during core animation', () => {
     jest.useFakeTimers();
     const renderFlags = new Set();
     renderFlags.set = function setRenderFlags(flags) {
@@ -4339,16 +4541,16 @@ describe('pending token movement hidden detection guard', () => {
     });
     global.canvas.perception.applyRenderFlags();
 
-    expect(applyRenderFlags).not.toHaveBeenCalled();
-    expect(global.canvas.effects.refreshLightSources).toHaveBeenCalledTimes(1);
-    expect(global.canvas.effects.refreshLighting).toHaveBeenCalledTimes(1);
-    expect(global.canvas.effects.refreshVisionSources).toHaveBeenCalledTimes(1);
-    expect(global.canvas.visibility.refreshVisibility).toHaveBeenCalledTimes(1);
+    expect(applyRenderFlags).toHaveBeenCalledTimes(1);
+    expect(global.canvas.effects.refreshLightSources).not.toHaveBeenCalled();
+    expect(global.canvas.effects.refreshLighting).not.toHaveBeenCalled();
+    expect(global.canvas.effects.refreshVisionSources).not.toHaveBeenCalled();
+    expect(global.canvas.visibility.refreshVisibility).not.toHaveBeenCalled();
     expect(global.canvas.visibility.restrictVisibility).not.toHaveBeenCalled();
-    expect(global.canvas.visibility.visible).toBe(true);
+    expect(global.canvas.visibility.visible).toBe(false);
   });
 
-  test('keeps committed movement vision mask updating on animation frames', () => {
+  test('does not rebuild committed movement vision mask on animation soundwave frames', () => {
     jest.useFakeTimers();
     const originalRequestAnimationFrame = global.requestAnimationFrame;
     const originalCancelAnimationFrame = global.cancelAnimationFrame;
@@ -4407,11 +4609,298 @@ describe('pending token movement hidden detection guard', () => {
       jest.advanceTimersByTime(80);
 
       expect(global.canvas.effects.refreshVisionSources).not.toHaveBeenCalled();
-      expect(global.canvas.visibility.refreshVisibility).toHaveBeenCalledTimes(4);
+      expect(global.canvas.visibility.refreshVisibility).not.toHaveBeenCalled();
       expect(global.canvas.visibility.restrictVisibility).not.toHaveBeenCalled();
       expect(global.canvas.effects.refreshLightSources).not.toHaveBeenCalled();
       expect(global.canvas.effects.refreshLighting).not.toHaveBeenCalled();
     } finally {
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+      global.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  test('throttles core animation LOS target discovery between refresh intervals', () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalCancelAnimationFrame = global.cancelAnimationFrame;
+
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 2, y: 0, visible: true });
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 125, y: 25 }]);
+    target.refresh = jest.fn();
+    const losContains = jest.fn(() => false);
+    const shapeContains = jest.fn(() => false);
+
+    global.requestAnimationFrame = jest.fn((callback) =>
+      setTimeout(() => {
+        observer.x = Math.min(100, observer.x + 10);
+        observer.center = { x: observer.x + 25, y: 25 };
+        observer.getCenterPoint.mockReturnValue(observer.center);
+        callback(Date.now());
+      }, 16),
+    );
+    global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        lightSources: new Map(),
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: losContains },
+              shape: { contains: shapeContains },
+            },
+          ],
+        ]),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    try {
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'hidden' },
+      });
+      expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+      jest.advanceTimersByTime(80);
+
+      expect(global.requestAnimationFrame.mock.calls.length).toBeGreaterThan(5);
+      expect(losContains.mock.calls.length).toBeLessThan(global.requestAnimationFrame.mock.calls.length);
+      expect(losContains.mock.calls.length).toBeLessThanOrEqual(4);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      jest.clearAllTimers();
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+      global.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  test('refreshes observed target mid-animation when moving LOS leaves it behind sight-only wall', () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalCancelAnimationFrame = global.cancelAnimationFrame;
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = {
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      filters: [null],
+    };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.requestAnimationFrame = jest.fn((callback) =>
+      setTimeout(() => {
+        observer.x = Math.min(100, observer.x + 25);
+        observer.center = { x: observer.x + 25, y: 25 };
+        callback(Date.now());
+      }, 16),
+    );
+    global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+    global.canvas = {
+      ...global.canvas,
+      walls: {
+        placeables: [
+          createMockWall({ id: 'sight-only-wall', c: [100, -100, 100, 100], sight: 1, sound: 0 }),
+        ],
+      },
+      effects: {
+        lightSources: new Map(),
+        refreshVisionSources: jest.fn(),
+        visionSources: [{ active: true, object: observer }],
+      },
+      masks: {
+        occlusion: {
+          _updateOcclusionMask: jest.fn(),
+        },
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      visibility: {
+        initialized: true,
+        refresh: jest.fn(),
+        refreshVisibility: jest.fn(),
+        restrictVisibility: jest.fn(),
+        tokenVision: true,
+        visible: false,
+      },
+    };
+
+    try {
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'hidden' },
+      });
+      expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+      jest.advanceTimersByTime(160);
+
+      expect(target.refresh).not.toHaveBeenCalled();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+      expect(global.canvas.visibility.refreshVisibility).not.toHaveBeenCalled();
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      jest.clearAllTimers();
+      global.requestAnimationFrame = originalRequestAnimationFrame;
+      global.cancelAnimationFrame = originalCancelAnimationFrame;
+    }
+  });
+
+  test('defers movement completion until async final visibility prediction publishes target state', async () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      x: 0,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 300, y: 0, visible: true });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    try {
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        predictFinalVisibility: async () => ({
+          finalVisibilityStatesByTargetId: { target: 'hidden' },
+        }),
+      });
+
+      expect(completePendingTokenMovement('observer')).toBe(false);
+      expect(getRecentCompletedMovementVisibilityStateForObserver(observer, target)).toBeNull();
+
+      await jest.advanceTimersByTimeAsync(300);
+
+      expect(getRecentCompletedMovementVisibilityStateForObserver(observer, target)).toBe('hidden');
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      jest.clearAllTimers();
+    }
+  });
+
+  test('continues refreshing observed transition target until mid-animation LOS drops', () => {
+    jest.useFakeTimers();
+    const originalRequestAnimationFrame = global.requestAnimationFrame;
+    const originalCancelAnimationFrame = global.cancelAnimationFrame;
+    const hearingFilter = { id: 'hearing-outline-filter' };
+    global.foundry.canvas = {
+      ...(global.foundry.canvas || {}),
+      rendering: {
+        filters: {
+          OutlineOverlayFilter: {
+            create: jest.fn(() => hearingFilter),
+          },
+        },
+      },
+    };
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      x: 100,
+      y: 0,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = {
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      filters: [null],
+    };
+    let refreshCount = 0;
+    target.refresh = jest.fn(() => {
+      refreshCount += 1;
+      if (refreshCount < 3) return;
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.requestAnimationFrame = jest.fn((callback) => setTimeout(() => callback(Date.now()), 16));
+    global.cancelAnimationFrame = jest.fn((id) => clearTimeout(id));
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        lightSources: new Map(),
+        refreshVisionSources: jest.fn(),
+        visionSources: [{ active: true, object: observer }],
+      },
+      masks: {
+        occlusion: {
+          _updateOcclusionMask: jest.fn(),
+        },
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      visibility: {
+        initialized: true,
+        refresh: jest.fn(),
+        refreshVisibility: jest.fn(),
+        restrictVisibility: jest.fn(),
+        tokenVision: true,
+        visible: false,
+      },
+    };
+
+    try {
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'hidden' },
+      });
+      expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+      jest.advanceTimersByTime(160);
+
+      expect(target.refresh).toHaveBeenCalledTimes(2);
+      expect(target.detectionFilter).toBeTruthy();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      jest.clearAllTimers();
       global.requestAnimationFrame = originalRequestAnimationFrame;
       global.cancelAnimationFrame = originalCancelAnimationFrame;
     }
@@ -5175,6 +5664,130 @@ describe('pending token movement hidden detection guard', () => {
     });
   });
 
+  test('preserves hidden soundwave when sight wall blocks but sound is open', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 1, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+
+    refreshPendingMovementTokenVisibility(['observer'], {
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('preserves hidden soundwave through stale visible final prediction when sight wall blocks but sound is open', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 1, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+
+    refreshPendingMovementTokenVisibility(['observer'], {
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('primes stored-hidden soundwave mesh when core refresh leaves no filter', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+
+    refreshPendingMovementTokenVisibility(['observer'], {
+      forceTokenRefresh: true,
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
   test('keeps completed movement sight-line grace until AVS reveal catches up', () => {
     jest.useFakeTimers();
     global.canvas.walls.placeables = [];
@@ -5259,7 +5872,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(geometryReads).toBe(0);
   });
 
-  test('keeps hidden soundwave during drag before pending movement entry exists', () => {
+  test('preserves hidden soundwave during uncommitted drag before pending movement entry exists even when current sight is clear', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({
       id: 'observer',
@@ -6044,6 +6657,138 @@ describe('pending token movement hidden detection guard', () => {
     });
   });
 
+  test('refreshes observed target after moving behind sight-only wall so core can add soundwave', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.canvas = {
+      ...global.canvas,
+      walls: {
+        placeables: [
+          {
+            document: {
+              id: 'sight-only-wall',
+              c: [100, -100, 100, 100],
+              sight: 1,
+              sound: 0,
+              door: 0,
+              ds: 0,
+            },
+          },
+        ],
+      },
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: null,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 150, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    completePendingTokenMovement('observer');
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('primes animation soundwave without full target refresh during movement', () => {
+    const hearingFilter = { id: 'hearing-outline-filter' };
+    global.foundry.canvas = {
+      ...(global.foundry.canvas || {}),
+      rendering: {
+        filters: {
+          OutlineOverlayFilter: {
+            create: jest.fn(() => hearingFilter),
+          },
+        },
+      },
+    };
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => false) },
+              shape: { contains: jest.fn(() => false) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+
+    refreshPendingMovementTokenVisibility([observer.id], {
+      ignoreObservedGrace: true,
+      skipPerceptionRefresh: true,
+      source: 'core-animation-vision-refresh',
+      targetTokenIds: [target.id],
+    });
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(global.foundry.canvas.rendering.filters.OutlineOverlayFilter.create).toHaveBeenCalled();
+    expect(target.detectionFilter).toBe(hearingFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
   test('lets core render soundwave when observed target leaves current sight line before state update', () => {
     const observer = createMockToken({
       id: 'observer',
@@ -6067,7 +6812,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
   });
 
-  test('refreshes targets during controlled drag intent so core LOS can add soundwaves before movement end', () => {
+  test('does not refresh targets during controlled drag intent before actual movement', () => {
     jest.useFakeTimers();
     const observer = createMockToken({
       id: 'observer',
@@ -6094,16 +6839,16 @@ describe('pending token movement hidden detection guard', () => {
     primePendingControlledTokenDragIntent(observer);
     jest.advanceTimersByTime(100);
 
-    expect(target.refresh).toHaveBeenCalled();
-    expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeNull();
     expect(target.detectionFilterMesh).toMatchObject({
-      visible: true,
-      renderable: true,
-      alpha: 1,
+      visible: false,
+      renderable: false,
+      alpha: 0,
     });
   });
 
-  test('refreshes observed targets immediately when current LOS still contains them but darkness blocks sight', () => {
+  test('does not refresh observed targets during drag when darkness blocks sight', () => {
     jest.useFakeTimers();
     const observer = createMockToken({
       id: 'observer',
@@ -6162,8 +6907,8 @@ describe('pending token movement hidden detection guard', () => {
       primePendingControlledTokenDragIntent(observer);
       jest.advanceTimersByTime(100);
 
-      expect(target.refresh).toHaveBeenCalled();
-      expect(target.detectionFilter).toEqual({ id: 'darkness-soundwave-filter' });
+      expect(target.refresh).not.toHaveBeenCalled();
+      expect(target.detectionFilter).toBeNull();
     } finally {
       lightingSpy.mockRestore();
       visionSpy.mockRestore();
@@ -6223,6 +6968,603 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
   });
 
+  test('refreshes observed target behind sight-only sound-open wall when current LOS is wall-blocked', () => {
+    jest.useFakeTimers();
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const hearingFilter = { id: 'hearing-outline-filter' };
+    global.foundry.canvas = {
+      ...(global.foundry.canvas || {}),
+      rendering: {
+        filters: {
+          OutlineOverlayFilter: {
+            create: jest.fn(() => hearingFilter),
+          },
+        },
+      },
+    };
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'sight-only-soundwave-filter' };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    observer.x = 100;
+    observer.center = { x: 125, y: 25 };
+    observer.getCenterPoint.mockReturnValue(observer.center);
+    observer.document.x = 100;
+
+    expect(getPendingMovementBlockContext(observer, target)).toMatchObject({ active: true });
+    expect(shouldUseCoreDetectionDuringPendingMovement(observer, target)).toBe(true);
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+
+    primePendingControlledTokenDragIntent(observer);
+    jest.advanceTimersByTime(100);
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeTruthy();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('uses Foundry planned drag destination for sight-only sound-open wall checks', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    observer._plannedMovement = {
+      [global.game.user.id]: {
+        foundPath: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+        ],
+      },
+    };
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(getPendingMovementBlockContext(observer, target)).toMatchObject({
+      active: true,
+      wallBlocked: true,
+      soundBlocked: false,
+      pendingPosition: { x: 100, y: 0 },
+    });
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('prefers current drag context destination over stale planned movement path', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    observer._plannedMovement = {
+      [global.game.user.id]: {
+        foundPath: [
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+        ],
+      },
+    };
+    observer.mouseInteractionManager = {
+      interactionData: {
+        contexts: {
+          observer: {
+            destination: { x: 100, y: 0 },
+            clonedToken: {
+              document: { x: 100, y: 0 },
+            },
+          },
+        },
+      },
+    };
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(getPendingMovementBlockContext(observer, target)).toMatchObject({
+      active: true,
+      wallBlocked: true,
+      soundBlocked: false,
+      pendingPosition: { x: 100, y: 0 },
+    });
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('does not force stored hidden soundwave preservation when current sight is clear and no sight-only wall blocks it', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stored-hidden-soundwave-filter' };
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    global.canvas = {
+      ...global.canvas,
+      walls: { placeables: [] },
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(true);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    expect(shouldPrimePendingMovementDetectionFilterVisuals(target)).toBe(true);
+  });
+
+  test('keeps stored hidden soundwave when current LOS is blocked by sight-only sound-open wall', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stored-hidden-soundwave-filter' };
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldSuppressPendingMovementDetectionFilterVisuals(target)).toBe(false);
+    expect(shouldPrimePendingMovementDetectionFilterVisuals(target)).toBe(true);
+  });
+
+  test('does not prime transient hidden soundwave when final movement state is observed', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    observer.x = 100;
+    observer.center = { x: 125, y: 25 };
+    observer.getCenterPoint.mockReturnValue(observer.center);
+    observer.document.x = 100;
+
+    expect(getPendingMovementBlockContext(observer, target)).toMatchObject({
+      active: true,
+      wallBlocked: true,
+      soundBlocked: false,
+    });
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldPrimePendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('does not prime observed soundwave after movement work has cleared', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    observer.x = 100;
+    observer.center = { x: 125, y: 25 };
+    observer.getCenterPoint.mockReturnValue(observer.center);
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: null,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldPrimePendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('does not prime observed soundwave after movement reaches destination without hidden final state', () => {
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'sight-only-wall', c: [75, -100, 75, 100], sight: 20, sound: 0 }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({ id: 'target', x: 0, y: 0, visible: true });
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+    observer.x = 100;
+    observer.center = { x: 125, y: 25 };
+    observer.getCenterPoint.mockReturnValue(observer.center);
+    observer.document.x = 100;
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(shouldPrimePendingMovementDetectionFilterVisuals(target)).toBe(false);
+  });
+
+  test('does not prime observed target soundwave during held drag before movement commit', () => {
+    jest.useFakeTimers();
+    global.CONST = {
+      ...global.CONST,
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    const hearingFilter = { id: 'hearing-outline-filter' };
+    global.foundry.canvas = {
+      ...(global.foundry.canvas || {}),
+      rendering: {
+        filters: {
+          OutlineOverlayFilter: {
+            create: jest.fn(() => hearingFilter),
+          },
+        },
+      },
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'sight-only-wall',
+        c: [75, -100, 75, 100],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.mesh = { filters: [null] };
+    const detachedPrimarySprite = { filters: [null], children: [] };
+    target.detectionFilterMesh = {
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      filters: [null],
+    };
+    target.refresh = jest.fn();
+    target._renderDetectionFilter = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => true) },
+              shape: { contains: jest.fn(() => true) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      stage: {
+        filters: [],
+        children: [{
+          filters: [],
+          children: [detachedPrimarySprite],
+        }],
+      },
+    };
+
+    primePendingControlledTokenDragIntent(observer);
+    jest.advanceTimersByTime(16);
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+    expect(global.foundry.canvas.rendering.filters.OutlineOverlayFilter.create).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeUndefined();
+    expect(target._renderDetectionFilter).not.toHaveBeenCalled();
+    expect(target.mesh.filters).toContain(null);
+    expect(target.detectionFilterMesh.filters).toContain(null);
+    expect(detachedPrimarySprite.filters).toContain(null);
+  });
+
+  test('clears core-added observed drag-preview soundwave but keeps stored-hidden soundwave', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ observed: 'observed', hidden: 'hidden' }),
+    });
+    const observed = createMockToken({ id: 'observed', x: 3, y: 0, visible: true });
+    observed.detectionFilter = { id: 'observed-preview-soundwave' };
+    observed.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    const hidden = createMockToken({ id: 'hidden', x: 4, y: 0, visible: true });
+    const hiddenFilter = { id: 'hidden-soundwave' };
+    hidden.detectionFilter = hiddenFilter;
+    hidden.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) =>
+          id === 'observer' ? observer : id === 'observed' ? observed : id === 'hidden' ? hidden : null,
+        ),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, observed, hidden],
+      },
+    };
+
+    expect(clearControlledObserverDragPreviewAddedSoundwaves(observer)).toBe(1);
+    expect(observed.detectionFilter).toBeNull();
+    expect(observed.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+    expect(hidden.detectionFilter).toBe(hiddenFilter);
+    expect(hidden.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('does not clear observed soundwave that existed before controlled drag started', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    const existingFilter = { id: 'existing-soundwave' };
+    target.detectionFilter = existingFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(primePendingControlledTokenDragIntent(observer, {
+      getRefreshTargetIds: null,
+      refreshTokenVisibility: null,
+    })).toBe(true);
+    expect(clearControlledObserverDragPreviewAddedSoundwaves(observer)).toBe(0);
+    expect(target.detectionFilter).toBe(existingFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
   test('starts observed-to-hidden refresh cadence from pending movement preupdate', () => {
     jest.useFakeTimers();
     const observer = createMockToken({
@@ -6270,7 +7612,7 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
   });
 
-  test('hides undetected targets during pre-drag controlled intent without refreshing them', () => {
+  test('does not hide undetected targets during pre-drag controlled intent', () => {
     jest.useFakeTimers();
     const observer = createMockToken({
       id: 'observer',
@@ -6295,16 +7637,16 @@ describe('pending token movement hidden detection guard', () => {
     jest.advanceTimersByTime(500);
 
     expect(target.refresh).not.toHaveBeenCalled();
-    expect(target.visible).toBe(false);
-    expect(target.renderable).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
     expect(target.mesh).toMatchObject({
-      visible: false,
-      renderable: false,
-      alpha: 0,
+      visible: true,
+      renderable: true,
+      alpha: 1,
     });
   });
 
-  test('keeps wall-blocked undetected target hidden during held controlled drag refreshes', () => {
+  test('does not hide wall-blocked undetected target during held controlled drag refreshes', () => {
     jest.useFakeTimers();
     const observer = createMockToken({
       id: 'observer',
@@ -6349,12 +7691,12 @@ describe('pending token movement hidden detection guard', () => {
     jest.advanceTimersByTime(50);
 
     expect(target.refresh).not.toHaveBeenCalled();
-    expect(target.visible).toBe(false);
-    expect(target.renderable).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
     expect(target.mesh).toMatchObject({
-      visible: false,
-      renderable: false,
-      alpha: 0,
+      visible: true,
+      renderable: true,
+      alpha: 1,
     });
   });
 
@@ -6477,12 +7819,12 @@ describe('pending token movement hidden detection guard', () => {
     expect(
       refreshPendingControlledTokenDragIntent(observer, { includeRenderHiddenTargets: true }),
     ).toBe(true);
-    expect(target.visible).toBe(true);
-    expect(target.renderable).toBe(true);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
     expect(target.mesh).toMatchObject({
-      visible: true,
-      renderable: true,
-      alpha: 1,
+      visible: false,
+      renderable: false,
+      alpha: 0,
     });
   });
 
@@ -6528,7 +7870,189 @@ describe('pending token movement hidden detection guard', () => {
     expect(target.refresh).not.toHaveBeenCalled();
   });
 
-  test('clears observed soundwave target once current LOS contains it', () => {
+  test('primes observed target soundwave during held drag once current LOS becomes blocked', () => {
+    global.CONST = {
+      ...global.CONST,
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'sight-only-wall',
+        c: [75, -100, 75, 100],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    observer.isDragged = true;
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'soundwave-filter', animated: true };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => false) },
+              shape: { contains: jest.fn(() => false) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+
+    refreshPendingMovementTokenVisibility([], {
+      skipPerceptionRefresh: true,
+      targetTokenIds: ['target'],
+    });
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilter).toMatchObject({ id: 'soundwave-filter' });
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('controlled drag intent timer does not refresh observed target before movement commit', () => {
+    jest.useFakeTimers();
+    global.CONST = {
+      ...global.CONST,
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'sight-only-wall',
+        c: [75, -100, 75, 100],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'soundwave-filter', animated: true };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => false) },
+              shape: { contains: jest.fn(() => false) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: null,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(primePendingControlledTokenDragIntent(observer)).toBe(true);
+    jest.advanceTimersByTime(50);
+    expect(target.refresh).not.toHaveBeenCalled();
+
+    global.canvas.tokens._draggedToken = observer;
+    jest.advanceTimersByTime(34);
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeUndefined();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+  });
+
+  test('does not keep refreshing blocked observed drag soundwave once visual exists', () => {
+    global.CONST = {
+      ...global.CONST,
+      WALL_SENSE_TYPES,
+      EDGE_SENSE_TYPES: WALL_SENSE_TYPES,
+    };
+    global.canvas.walls.placeables = [
+      createMockWall({
+        id: 'sight-only-wall',
+        c: [75, -100, 75, 100],
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+      }),
+    ];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'soundwave-filter', animated: true };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([
+          [
+            'observer',
+            {
+              active: true,
+              object: observer,
+              los: { contains: jest.fn(() => false) },
+              shape: { contains: jest.fn(() => false) },
+            },
+          ],
+        ]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+    expect(getControlledObserverDragPreviewSoundwaveTargetIds(observer)).toEqual([]);
+  });
+
+  test('does not clear existing soundwave during uncommitted controlled drag when LOS contains it', () => {
     jest.useFakeTimers();
     global.canvas.walls.placeables = [];
     let currentLosContainsTarget = false;
@@ -6577,7 +8101,7 @@ describe('pending token movement hidden detection guard', () => {
 
     currentLosContainsTarget = true;
     jest.advanceTimersByTime(34);
-    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilter).toEqual({ id: 'soundwave-filter' });
   });
 
   test('keeps hidden soundwave while controlled pending observer sight line remains wall-blocked', () => {
@@ -6779,6 +8303,168 @@ describe('pending token movement hidden detection guard', () => {
       visible: true,
       renderable: true,
       alpha: 1,
+    });
+  });
+
+  test('recreates observed-transition soundwave after previous clear-sight square suppressed it', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stale-soundwave-filter', animated: true };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = { id: 'current-hidden-soundwave-filter', animated: true };
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    refreshPendingMovementTokenVisibility(['observer'], { skipPerceptionRefresh: true });
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeNull();
+
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [100, 0, 100, 200], sight: 1, sound: 0 }),
+    ];
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    refreshPendingMovementTokenVisibility(['observer'], { skipPerceptionRefresh: true });
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilter).toMatchObject({
+      id: 'current-hidden-soundwave-filter',
+      animated: true,
+    });
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('does not let completed clear-sight grace suppress next wall-blocked square', () => {
+    jest.useFakeTimers();
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'stale-soundwave-filter', animated: true };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    let refreshCreatesSoundwave = false;
+    target.refresh = jest.fn(() => {
+      if (refreshCreatesSoundwave) {
+        target.detectionFilter = { id: 'next-square-soundwave-filter', animated: true };
+        target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+      } else {
+        target.detectionFilter = null;
+        target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      }
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    expect(completePendingTokenMovement('observer')).toBe(true);
+    expect(target.detectionFilter).toBeNull();
+
+    global.canvas.walls.placeables = [
+      createMockWall({ id: 'wall', c: [100, 0, 100, 200], sight: 1, sound: 0 }),
+    ];
+    target.refresh.mockClear();
+    refreshCreatesSoundwave = true;
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    refreshPendingMovementTokenVisibility(['observer'], { skipPerceptionRefresh: true });
+
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilter).toMatchObject({
+      id: 'next-square-soundwave-filter',
+      animated: true,
+    });
+  });
+
+  test('clears completed blocked-square soundwave grace on next clear-sight square', () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+    target.detectionFilter = { id: 'blocked-square-soundwave-filter', animated: true };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    let refreshClearsSoundwave = false;
+    target.refresh = jest.fn(() => {
+      if (refreshClearsSoundwave) {
+        target.detectionFilter = null;
+        target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      }
+    });
+    global.canvas = {
+      ...global.canvas,
+      walls: {
+        placeables: [createMockWall({ id: 'wall', c: [100, 0, 100, 200], sight: 1, sound: 0 })],
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    expect(completePendingTokenMovement('observer')).toBe(true);
+    expect(target.detectionFilter).toEqual({
+      id: 'blocked-square-soundwave-filter',
+      animated: true,
+    });
+
+    global.canvas.walls.placeables = [];
+    target.refresh.mockClear();
+    refreshClearsSoundwave = true;
+    setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'observed' },
+    });
+    refreshPendingMovementTokenVisibility(['observer'], { skipPerceptionRefresh: true });
+
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
     });
   });
 

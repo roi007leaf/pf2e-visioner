@@ -97,6 +97,37 @@ const SETTINGS_GROUPS = {
   Advanced: [{ title: 'Advanced', keys: ['keybindingOpensTMInTargetMode'] }],
 };
 
+export const AUTO_COVER_DEPENDENT_SETTINGS = [
+  'autoCoverVisualizationOnlyInEncounter',
+  'autoCoverVisualizationRespectFogForGM',
+  'computeCoverAtCombatStart',
+  'autoCoverTokenIntersectionMode',
+  'autoCoverIgnoreUndetected',
+  'autoCoverIgnoreDead',
+  'autoCoverAllowProneBlockers',
+  'autoCoverIgnoreAllies',
+  'autoCoverIgnoreSmallerTokens',
+  'autoCoverIgnoreSameSizeTokens',
+  'autoCoverIgnoreLargerTokens',
+  'wallCoverStandardThreshold',
+  'wallCoverAllowGreater',
+  'wallCoverGreaterThreshold',
+];
+
+export const AUTO_COVER_DEPENDENT_BOOLEAN_SETTINGS = [
+  'autoCoverVisualizationOnlyInEncounter',
+  'autoCoverVisualizationRespectFogForGM',
+  'computeCoverAtCombatStart',
+  'autoCoverIgnoreUndetected',
+  'autoCoverIgnoreDead',
+  'autoCoverAllowProneBlockers',
+  'autoCoverIgnoreAllies',
+  'autoCoverIgnoreSmallerTokens',
+  'autoCoverIgnoreSameSizeTokens',
+  'autoCoverIgnoreLargerTokens',
+  'wallCoverAllowGreater',
+];
+
 function allGroupedKeys() {
   return Object.values(SETTINGS_GROUPS)
     .flat()
@@ -187,22 +218,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       ],
       [
         'autoCover',
-        [
-          'autoCoverVisualizationOnlyInEncounter',
-          'autoCoverVisualizationRespectFogForGM',
-          'computeCoverAtCombatStart',
-          'autoCoverTokenIntersectionMode',
-          'autoCoverIgnoreUndetected',
-          'autoCoverIgnoreDead',
-          'autoCoverAllowProneBlockers',
-          'autoCoverIgnoreAllies',
-          'autoCoverIgnoreSmallerTokens',
-          'autoCoverIgnoreSameSizeTokens',
-          'autoCoverIgnoreLargerTokens',
-          'wallCoverStandardThreshold',
-          'wallCoverAllowGreater',
-          'wallCoverGreaterThreshold',
-        ],
+        AUTO_COVER_DEPENDENT_SETTINGS,
       ],
     ];
     dependencyPairs.forEach(([p, children]) => flatDependencyMap.set(p, children));
@@ -318,27 +334,13 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
             group.dataset.pvDisplay = group.style.display || computed || '';
           }
           group.style.display = visible ? group.dataset.pvDisplay : 'none';
+          input.disabled = !visible;
         } catch { }
       };
 
       // Generic dependency system per redesign
       const dependencyMap = {
-        autoCover: [
-          'autoCoverVisualizationOnlyInEncounter',
-          'autoCoverVisualizationRespectFogForGM',
-          'computeCoverAtCombatStart',
-          'autoCoverTokenIntersectionMode',
-          'autoCoverIgnoreUndetected',
-          'autoCoverIgnoreDead',
-          'autoCoverAllowProneBlockers',
-          'autoCoverIgnoreAllies',
-          'autoCoverIgnoreSmallerTokens',
-          'autoCoverIgnoreSameSizeTokens',
-          'autoCoverIgnoreLargerTokens',
-          'wallCoverStandardThreshold',
-          'wallCoverAllowGreater',
-          'wallCoverGreaterThreshold',
-        ],
+        autoCover: AUTO_COVER_DEPENDENT_SETTINGS,
         includeLootActors: ['lootStealthDC'],
         hiddenWallsEnabled: ['wallStealthDC'],
         limitSeekRangeInCombat: ['customSeekDistance'],
@@ -423,6 +425,11 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
       if (app?._pendingChanges) {
         for (const [name, value] of Object.entries(app._pendingChanges)) {
           if (!(name in rawMap)) rawMap[name] = value;
+        }
+      }
+      if (rawMap['settings.autoCover'] === false || rawMap['settings.autoCover'] === 'false') {
+        for (const key of AUTO_COVER_DEPENDENT_BOOLEAN_SETTINGS) {
+          rawMap[`settings.${key}`] = false;
         }
       }
       const allKeys = allGroupedKeys();
@@ -557,7 +564,14 @@ export function registerSettings() {
         key === 'autoCoverAllowProneBlockers'
       ) {
         // No reload needed: auto-cover is read at runtime
-        settingConfig.onChange = () => { };
+        settingConfig.onChange = async (value) => {
+          if (key !== 'autoCover' || value !== false) return;
+          await Promise.all(
+            AUTO_COVER_DEPENDENT_BOOLEAN_SETTINGS.map((settingKey) =>
+              game.settings.set(MODULE_ID, settingKey, false),
+            ),
+          );
+        };
       } else if (key === 'blockPlayerTargetTooltips') {
         // No reload: will take effect on next hover; ensure initialized when allowed
         settingConfig.onChange = async () => {

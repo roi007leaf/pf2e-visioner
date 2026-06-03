@@ -48,6 +48,7 @@ export function scheduleAnimationRenderRefreshes(
   serial,
   {
     getEntry,
+    getAnimationTargetTokenIds,
     getTargetTokenIds,
     shouldUseFullAnimationRefreshCadence = () => false,
     refreshTokenVisibility,
@@ -63,7 +64,8 @@ export function scheduleAnimationRenderRefreshes(
       const currentEntry = getEntry?.(tokenId);
       if (!currentEntry || currentEntry.serial !== serial) return;
 
-      const targetTokenIds = getTargetTokenIds?.(tokenId) ?? [];
+      const targetTokenIds =
+        getAnimationTargetTokenIds?.(tokenId) ?? getTargetTokenIds?.(tokenId) ?? [];
       if (!targetTokenIds.length) return;
 
       refreshTokenVisibility?.([tokenId], {
@@ -124,11 +126,12 @@ export function schedulePostCompletionRenderRefreshes(
       if (!hasRenderWork?.()) return;
 
       const targetTokenIds = getTargetTokenIds?.(tokenId) ?? [];
+      if (!targetTokenIds.length) return;
       refreshTokenVisibility?.([], {
         ignoreObservedGrace: true,
         skipPerceptionRefresh: true,
         source: 'post-completion-refresh',
-        ...(targetTokenIds.length ? { targetTokenIds } : {}),
+        targetTokenIds,
       });
     }, delayMs);
     addRefreshTimeout(pendingMovementPostCompletionRefreshTimeouts, tokenId, timeoutId);

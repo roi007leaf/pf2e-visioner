@@ -28,8 +28,10 @@ export function restorePendingMovementDetectionFilterVisualState(token, state) {
 
   try {
     if (state.hadDetectionFilter) {
-      token.detectionFilter = state.detectionFilter;
-    } else {
+      if (token.detectionFilter !== state.detectionFilter) {
+        token.detectionFilter = state.detectionFilter;
+      }
+    } else if (Object.prototype.hasOwnProperty.call(token, 'detectionFilter')) {
       delete token.detectionFilter;
     }
 
@@ -84,6 +86,55 @@ export function tokenHasDetectionFilterVisual(token) {
   );
 }
 
+export function sanitizeDetectionFilterList(token) {
+  let changed = false;
+  for (const mesh of [
+    token?.mesh,
+    token?.detectionFilterMesh,
+    token?._pvHiddenEcho,
+    token?.primary,
+    token?.primarySprite,
+  ]) {
+    if (!Array.isArray(mesh?.filters)) continue;
+    const filtered = mesh.filters.filter(Boolean);
+    if (filtered.length === mesh.filters.length) continue;
+    try {
+      mesh.filters = filtered;
+      changed = true;
+    } catch {
+      /* best effort */
+    }
+  }
+  return changed;
+}
+
+export function sanitizeCanvasDetectionFilterLists(root = null) {
+  let changed = false;
+  const seen = new WeakSet();
+  const scan = (object) => {
+    if (!object || typeof object !== 'object' || seen.has(object)) return;
+    seen.add(object);
+    if (Array.isArray(object.filters)) {
+      const filtered = object.filters.filter(Boolean);
+      if (filtered.length !== object.filters.length) {
+        try {
+          object.filters = filtered;
+          changed = true;
+        } catch {
+          /* best effort */
+        }
+      }
+    }
+    for (const child of object.children || []) scan(child);
+  };
+  if (root) scan(root);
+  else {
+    scan(globalThis.canvas?.primary);
+    scan(globalThis.canvas?.stage);
+  }
+  return changed;
+}
+
 export function restorePendingMovementDetectionFilterState(token, state) {
   if (!token || !state) return false;
 
@@ -118,12 +169,13 @@ export function restorePendingMovementDetectionFilterState(token, state) {
 export function clearDetectionFilterVisuals(token) {
   if (!token) return;
   if (tokenHasAnyHiddenAvsOverride(token)) return;
-
   try {
     token.detectionFilter = null;
   } catch {
     /* best-effort filter clear */
   }
+  sanitizeDetectionFilterList(token);
+  sanitizeCanvasDetectionFilterLists();
 
   const detectionFilterMesh = token.detectionFilterMesh;
   if (detectionFilterMesh) {

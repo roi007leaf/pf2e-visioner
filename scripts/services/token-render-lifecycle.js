@@ -1,5 +1,6 @@
 import {
   hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
+  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
   getPendingMovementRefreshTargetIds as defaultGetPendingMovementRefreshTargetIds,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
   hasPendingRenderState as defaultHasPendingRenderState,
@@ -87,6 +88,7 @@ export async function handleTokenUpdated(
   {
     schedulePendingTokenMovementCompletion = defaultSchedulePendingTokenMovementCompletion,
     refreshSystemHiddenHighlightsForMovedToken = defaultRefreshSystemHiddenHighlightsForMovedToken,
+    hasActivePendingTokenMovement = defaultHasActivePendingTokenMovement,
     warn = console.warn,
   } = {},
 ) {
@@ -101,7 +103,9 @@ export async function handleTokenUpdated(
       /* best effort */
     }
 
-    await refreshSystemHiddenHighlightsForMovedToken(tokenDoc, changes);
+    if (!hasActivePendingTokenMovement()) {
+      await refreshSystemHiddenHighlightsForMovedToken(tokenDoc, changes);
+    }
     return { handled: true };
   } catch (error) {
     warn('PF2E Visioner | updateToken hook failed:', error);
@@ -175,11 +179,13 @@ export async function handleAvsBatchCompleteRefresh({
     }
 
     const targetTokenIds = getPendingMovementRefreshTargetIds();
-    refreshPendingMovementTokenVisibility([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-      ...(targetTokenIds.length ? { targetTokenIds } : {}),
-    });
+    if (targetTokenIds.length) {
+      refreshPendingMovementTokenVisibility([], {
+        ignoreObservedGrace: true,
+        source: 'avs-batch-complete',
+        targetTokenIds,
+      });
+    }
     await refreshSystemHiddenHighlightsForControlledTokens();
     return { handled: true };
   } catch {

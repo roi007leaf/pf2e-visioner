@@ -27,6 +27,7 @@ describe('pending movement final visibility prediction', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     global.canvas = originalCanvas;
   });
 
@@ -144,6 +145,7 @@ describe('pending movement final visibility prediction', () => {
     const refreshTokenVisibility = jest.fn();
     const controller = createPendingMovementFinalVisibilityController({
       getEntry: (tokenId) => (tokenId === 'observer' ? entry : null),
+      getRefreshTargetIds: () => ['target'],
       predictionDelayMs: 0,
       refreshTokenVisibility,
     });
@@ -169,7 +171,58 @@ describe('pending movement final visibility prediction', () => {
     expect(refreshTokenVisibility).toHaveBeenCalledWith(['observer'], {
       ignoreObservedGrace: true,
       source: 'final-visibility-prediction',
-      targetTokenIds: ['target', 'observer'],
+      targetTokenIds: ['target'],
+    });
+  });
+
+  test('defers final prediction while movement visual is unsettled', async () => {
+    jest.useFakeTimers();
+    const entry = {
+      serial: 7,
+      finalVisibilityStatesByTargetId: new Map(),
+      finalVisibilityStatesByObserverId: new Map(),
+    };
+    let deferPrediction = true;
+    const predictFinalVisibility = jest.fn(() =>
+      Promise.resolve({
+        finalVisibilityStatesByTargetId: new Map([['target', 'hidden']]),
+      }),
+    );
+    const refreshTokenVisibility = jest.fn();
+    const controller = createPendingMovementFinalVisibilityController({
+      getEntry: (tokenId) => (tokenId === 'observer' ? entry : null),
+      getRefreshTargetIds: () => ['target'],
+      predictionDelayMs: 10,
+      finalPredictionRetryDelayMs: 25,
+      shouldDeferFinalVisibilityPrediction: () => deferPrediction,
+      refreshTokenVisibility,
+    });
+
+    controller.scheduleFinalVisibilityPrediction(
+      'observer',
+      7,
+      { id: 'observer' },
+      { x: 100, y: 0 },
+      { predictFinalVisibility },
+    );
+
+    jest.advanceTimersByTime(10);
+    await Promise.resolve();
+    expect(predictFinalVisibility).not.toHaveBeenCalled();
+    expect(entry.finalVisibilityPredictionPending).toBe(true);
+
+    deferPrediction = false;
+    jest.advanceTimersByTime(25);
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(predictFinalVisibility).toHaveBeenCalledTimes(1);
+    expect(entry.finalVisibilityPredictionPending).toBe(false);
+    expect(refreshTokenVisibility).toHaveBeenCalledWith(['observer'], {
+      ignoreObservedGrace: true,
+      source: 'final-visibility-prediction',
+      targetTokenIds: ['target'],
     });
   });
 
@@ -196,6 +249,7 @@ describe('pending movement final visibility prediction', () => {
         target?.id === 'first-target' || target?.id === 'second-target'
           ? 'undetected'
           : 'observed',
+      getRefreshTargetIds: () => ['first-target', 'second-target'],
       predictionDelayMs: 0,
       incrementalRefreshDelayMs: 25,
       refreshTokenVisibility,

@@ -7,7 +7,9 @@ import { MODULE_ID } from '../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
 import {
+  clearControlledObserverDragPreviewAddedSoundwaves,
   clearNoObserverDetectionFilterVisuals,
+  getControlledObserverDragPreviewSoundwaveTargetIds,
   getControlledObserverDetectionVisualTargetIds,
   getPendingMovementRefreshTargetIds,
   hasPendingMovementRenderWork,
@@ -49,12 +51,6 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
 const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
 const CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([75, 250]);
 const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
-const CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS = 50;
-const controlledDragPointerMoveRefreshState = (globalThis.__pf2eVisionerDragPointerMoveRefresh ??= {
-  lastRefreshAt: 0,
-  refreshFrameId: null,
-  timeoutId: null,
-});
 const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
   styleInstalled: false,
   documentListenersBound: false,
@@ -79,6 +75,16 @@ function bindWindowListenerOnce(key, eventName, callback, options = undefined) {
     return;
   }
   window.addEventListener(eventName, callback, options);
+  lifecycleBindingState.windowKeys.add(key);
+}
+
+function bindCanvasViewListenerOnce(key, eventName, callback, options = undefined) {
+  if (lifecycleBindingState.windowKeys.has(key)) {
+    return;
+  }
+  const view = canvas?.app?.view;
+  if (!view?.addEventListener) return;
+  view.addEventListener(eventName, callback, options);
   lifecycleBindingState.windowKeys.add(key);
 }
 
@@ -232,69 +238,68 @@ async function refreshSystemHiddenHighlightsForControlToken(token) {
   }
 }
 
-function eventTargetsCanvasView(event) {
-  const canvasView = canvas?.app?.view || canvas?.app?.renderer?.view || null;
-  return !!canvasView && event?.target === canvasView;
+function controlledCanvasTokens() {
+  const controlled = canvas?.tokens?.controlled || [];
+  if (controlled.length) return controlled;
+  return (canvas?.tokens?.placeables || []).filter((token) => token?.controlled);
 }
+
+let lastControlledTokenDragIntentRefreshAt = 0;
+const CONTROLLED_TOKEN_DRAG_INTENT_REFRESH_THROTTLE_MS = 120;
+let controlledTokenDragIntentRefreshInterval = null;
 
 function primeControlledTokenDragIntentFromCanvasPointer(event) {
   if (event?.button !== 0) return;
-  if (!eventTargetsCanvasView(event)) return;
 
-  for (const token of canvas?.tokens?.controlled || []) {
+  const controlledTokens = controlledCanvasTokens();
+  if (!controlledTokens.length) return;
+  for (const token of controlledTokens) {
     primePendingControlledTokenDragIntent(token);
   }
 }
 
-function releaseControlledTokenDragIntentFromCanvasPointer() {
-  releasePendingControlledTokenDragIntent();
-  controlledDragPointerMoveRefreshState.lastRefreshAt = 0;
-  if (controlledDragPointerMoveRefreshState.timeoutId) {
-    clearTimeout(controlledDragPointerMoveRefreshState.timeoutId);
-    controlledDragPointerMoveRefreshState.timeoutId = null;
-  }
-  controlledDragPointerMoveRefreshState.refreshFrameId = null;
-}
-
 function refreshControlledTokenDragIntentFromCanvasPointer() {
-  const controlledTokens = canvas?.tokens?.controlled || [];
-  if (!controlledTokens.length) return;
+  if (!canvas?.tokens?._draggedToken) return;
 
-  const refreshNow = () => {
-    controlledDragPointerMoveRefreshState.timeoutId = null;
-    controlledDragPointerMoveRefreshState.lastRefreshAt = Date.now();
-    if (controlledDragPointerMoveRefreshState.refreshFrameId) return;
-    const scheduleFrame =
-      typeof requestAnimationFrame === 'function'
-        ? requestAnimationFrame
-        : (callback) => setTimeout(callback, 0);
-    controlledDragPointerMoveRefreshState.refreshFrameId = scheduleFrame(() => {
-      controlledDragPointerMoveRefreshState.refreshFrameId = null;
-      const currentControlledTokens = canvas?.tokens?.controlled || controlledTokens;
-      if (!currentControlledTokens.length) return;
-      for (const token of currentControlledTokens) {
-        refreshPendingControlledTokenDragIntent(token, {
-          coalesceFrame: true,
-          includeRenderHiddenTargets: true,
-        });
-      }
-    });
-  };
-
-  const elapsedMs = Date.now() - controlledDragPointerMoveRefreshState.lastRefreshAt;
-  if (elapsedMs >= CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS) {
-    refreshNow();
+  const now = Date.now();
+  if (now - lastControlledTokenDragIntentRefreshAt < CONTROLLED_TOKEN_DRAG_INTENT_REFRESH_THROTTLE_MS) {
     return;
   }
+  lastControlledTokenDragIntentRefreshAt = now;
 
-  if (controlledDragPointerMoveRefreshState.timeoutId) return;
-  controlledDragPointerMoveRefreshState.timeoutId = setTimeout(
-    refreshNow,
-    CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS - elapsedMs,
-  );
+  const controlledTokens = controlledCanvasTokens();
+  if (!controlledTokens.length) return;
+  for (const token of controlledTokens) {
+    refreshPendingControlledTokenDragIntent(token);
+    clearControlledObserverDragPreviewAddedSoundwaves(token);
+    const targetTokenIds = getControlledObserverDragPreviewSoundwaveTargetIds(token);
+    if (targetTokenIds.length) {
+      refreshPendingMovementTokenVisibility([token.document?.id || token.id], {
+        ignoreObservedGrace: true,
+        skipPerceptionRefresh: true,
+        source: 'controlled-drag-intent-live',
+        targetTokenIds,
+      });
+    }
+  }
+}
+
+function releaseControlledTokenDragIntentFromCanvasPointer() {
+  lastControlledTokenDragIntentRefreshAt = 0;
+  releasePendingControlledTokenDragIntent();
+}
+
+function registerControlledTokenDragIntentRefreshInterval() {
+  if (controlledTokenDragIntentRefreshInterval) return;
+  controlledTokenDragIntentRefreshInterval = setInterval(() => {
+    if (!canvas?.tokens?._draggedToken) return;
+    refreshControlledTokenDragIntentFromCanvasPointer();
+  }, CONTROLLED_TOKEN_DRAG_INTENT_REFRESH_THROTTLE_MS);
 }
 
 function registerPendingMovementPointerIntentListeners() {
+  registerControlledTokenDragIntentRefreshInterval();
+
   bindWindowListenerOnce(
     'pendingMovementControlledDragIntentPointerDown',
     'pointerdown',
@@ -310,6 +315,36 @@ function registerPendingMovementPointerIntentListeners() {
   bindWindowListenerOnce(
     'pendingMovementControlledDragIntentPointerMove',
     'pointermove',
+    refreshControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindCanvasViewListenerOnce(
+    'pendingMovementControlledDragIntentCanvasPointerMove',
+    'pointermove',
+    refreshControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentMouseDown',
+    'mousedown',
+    primeControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentMouseUp',
+    'mouseup',
+    releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentMouseMove',
+    'mousemove',
+    refreshControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindCanvasViewListenerOnce(
+    'pendingMovementControlledDragIntentCanvasMouseMove',
+    'mousemove',
     refreshControlledTokenDragIntentFromCanvasPointer,
     { capture: true },
   );

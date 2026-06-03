@@ -50,7 +50,8 @@ export class AutoCoverSystem {
    * @returns {boolean}
    */
   isEnabled() {
-    return game.settings.get(MODULE_ID, 'autoCover');
+    if (!game.settings.get(MODULE_ID, 'autoCover')) return false;
+    return !canvas?.scene?.getFlag?.(MODULE_ID, 'disableAutoCover');
   }
 
   /**

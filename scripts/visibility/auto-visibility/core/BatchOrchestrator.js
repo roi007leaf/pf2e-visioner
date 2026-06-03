@@ -14,8 +14,10 @@ import {
   getRecentCompletedMovementVisibilityStateForObserver,
   hasRecentCompletedMovementRefreshTargetForObserver,
   hasPendingMovementEntryForPair,
+  isPendingMovementDragPreviewOnlyActive,
   recentCompletedMovementFinalSightLineSeesTarget,
 } from '../../../services/PendingMovement/pending-movement-sight-line.js';
+import { hasActivePendingTokenMovement } from '../../../services/PendingMovement/pending-movement-render-lock.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -75,6 +77,10 @@ export class BatchOrchestrator {
     this.exclusionManager = dependencies.exclusionManager;
     this.viewportFilterService = dependencies.viewportFilterService || null;
     this.visibilityMapService = dependencies.visibilityMapService;
+    this.optimizedVisibilityCalculator =
+      dependencies.optimizedVisibilityCalculator ||
+      dependencies.batchProcessor?.optimizedVisibilityCalculator ||
+      null;
     this.positionManager = dependencies.positionManager || null;
     this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
@@ -99,7 +105,8 @@ export class BatchOrchestrator {
           this._applyBatchResults(result, resultOptions),
         syncEphemeralEffectsForUpdates: (updates) =>
           this._syncEphemeralEffectsForUpdates(updates),
-        refreshPerceptionAfterBatch: () => this._refreshPerceptionAfterBatch(),
+        refreshPerceptionAfterBatch: (refreshOptions) =>
+          this._refreshPerceptionAfterBatch(refreshOptions),
         setSuppressLightingRefreshAfterBatch,
         clearSuppressLightingRefreshAfterBatch,
         schedulePostResultTask: scheduleTask,
@@ -125,6 +132,7 @@ export class BatchOrchestrator {
     this.processingBatch = false;
     this._wasMinimized = false;
     this._pendingPerceptionRefresh = false;
+    this._pendingPostMovementPerceptionRefresh = false;
 
     // Listen for visibility changes to handle window being restored from minimized state
     if (typeof document !== 'undefined') {
@@ -187,7 +195,7 @@ export class BatchOrchestrator {
    * Notify orchestrator that a token has started moving.
    * This will delay batch processing until movement stops.
    */
-  notifyTokenMovementStart() {
+  notifyTokenMovementStart(tokenId = null) {
     this._movementRevision++;
     // Start a new movement session if one is missing. The moving flag can outlive a
     // previous session after async batch cleanup, so session existence is the invariant.
@@ -206,6 +214,7 @@ export class BatchOrchestrator {
     this._isTokenMoving = true;
     if (this._movementSession) {
       this._movementSession.positionUpdates++;
+      if (tokenId) this._movementSession.tokensAccumulated.add(tokenId);
     }
 
     // Clear existing stop timer and restart it
@@ -223,8 +232,15 @@ export class BatchOrchestrator {
     this._flushMovementStop();
   }
 
-  isTokenMovementActive() {
-    return this._isTokenMoving || !!this._movementSession;
+  isTokenMovementActive({
+    includeMovementSession = true,
+    includePendingMovementService = true,
+  } = {}) {
+    return (
+      this._isTokenMoving ||
+      (includeMovementSession && !!this._movementSession) ||
+      (includePendingMovementService && hasActivePendingTokenMovement())
+    );
   }
 
   recordMovementLightingRefreshSuppressed() {
@@ -266,6 +282,20 @@ export class BatchOrchestrator {
       this._movementSession = this._createMovementSession(this._pendingTokens);
     }
 
+    const unsettledMovementTokenIds = this._getAnimatingChangedTokenIds(
+      new Set([
+        ...this._pendingTokens,
+        ...(this._movementSession?.tokensAccumulated || []),
+      ]),
+    );
+    if (unsettledMovementTokenIds.length > 0) {
+      this._isTokenMoving = true;
+      this._movementStopTimer = setTimeout(() => {
+        this._flushMovementStop();
+      }, this._movementStopDelayMs);
+      return;
+    }
+
     const sessionData = {
       sessionId: this._movementSession.sessionId,
       positionUpdates: this._movementSession.positionUpdates,
@@ -295,6 +325,7 @@ export class BatchOrchestrator {
       Hooks.callAll('pf2e-visioner.tokenMovementComplete', toProcess);
     } else {
       this._movementSession = null;
+      this._flushDeferredPostMovementPerceptionRefresh();
     }
   }
 
@@ -329,7 +360,7 @@ export class BatchOrchestrator {
         count: changedTokens?.size,
         tokens: Array.from(changedTokens || []),
         ...this._getDebugStackDetails(),
-        isMoving: this._isTokenMoving,
+        isMoving: this.isTokenMovementActive(),
         pendingCount: this._pendingTokens.size,
       }));
       for (const id of changedTokens) {
@@ -345,7 +376,7 @@ export class BatchOrchestrator {
 
       // If tokens are moving, just accumulate - don't start batch processing yet
       // The movement stop timer will trigger the batch when movement completes
-      if (this._isTokenMoving) return;
+      if (this.isTokenMovementActive()) return;
 
       // Cancel any existing coalesce timer to restart it with fresh changes
       if (this._coalesceTimer) {
@@ -358,7 +389,7 @@ export class BatchOrchestrator {
 
         const drainPlan = buildCoalesceDrainPlan({
           pendingTokens: this._pendingTokens,
-          isTokenMoving: this._isTokenMoving,
+          isTokenMoving: this.isTokenMovementActive(),
           processingBatch: this.processingBatch,
         });
         if (!drainPlan.shouldDrain) {
@@ -409,6 +440,7 @@ export class BatchOrchestrator {
       resultApplication: 0,
     };
     const movementSession = options.movementSession || null;
+    const isFinalMovementBatch = !!movementSession;
     const movementRevisionAtStart = this._movementRevision;
 
     // Check if AVS is disabled for the current scene
@@ -428,7 +460,9 @@ export class BatchOrchestrator {
 
     // CRITICAL: Don't process batch if tokens are still moving/animating
     // Wait for movement to complete to ensure accurate LOS calculations with final positions
-    const movementPreflightPlan = buildBatchPreflightPlan({ isTokenMoving: this._isTokenMoving });
+    const movementPreflightPlan = buildBatchPreflightPlan({
+      isTokenMoving: !isFinalMovementBatch && this.isTokenMovementActive(),
+    });
     if (!movementPreflightPlan.shouldProcess) {
       if (movementPreflightPlan.shouldQueueChangedTokens) {
         for (const id of changedTokens) {
@@ -463,7 +497,9 @@ export class BatchOrchestrator {
       }));
 
       if (animationPreflightPlan.shouldNotifyMovementStart) {
-        this.notifyTokenMovementStart();
+        for (const tokenId of animationPreflightPlan.animatingTokenIds) {
+          this.notifyTokenMovementStart(tokenId);
+        }
       }
       return;
     }
@@ -561,7 +597,7 @@ export class BatchOrchestrator {
         hasDarknessSources: this._detectDarknessSources(),
         precomputedLights,
         precomputeStats,
-        isTokenMoving: this._isTokenMoving,
+        isTokenMoving: !isFinalMovementBatch && this.isTokenMovementActive(),
         movementSession: options.movementSession,
         isMovementBatch,
         postBatchPerceptionSuppression,
@@ -630,6 +666,7 @@ export class BatchOrchestrator {
       // Clear movement session after successful batch
       if (movementSession) {
         this._movementSession = null;
+        this._flushDeferredPostMovementPerceptionRefresh();
       }
 
       // Fire custom hook to notify other systems that AVS batch is complete
@@ -660,7 +697,11 @@ export class BatchOrchestrator {
         },
         changedTokens,
         pendingTokens: this._pendingTokens,
-        isTokenMoving: this._isTokenMoving,
+        isTokenMoving:
+          !isFinalMovementBatch &&
+          this.isTokenMovementActive({
+            includeMovementSession: !this._pendingMovementSessionData,
+          }),
         pendingMovementSessionData: this._pendingMovementSessionData,
       });
     }
@@ -791,7 +832,24 @@ export class BatchOrchestrator {
    * This prevents the need for users to reselect tokens to see visibility changes.
    * @private
    */
-  async _refreshPerceptionAfterBatch() {
+  async _refreshPerceptionAfterBatch({ isMovementBatch = false, force = false } = {}) {
+    if (
+      !force &&
+      !isMovementBatch &&
+      this.isTokenMovementActive({
+        includeMovementSession: false,
+        includePendingMovementService: true,
+      })
+    ) {
+      this._pendingPostMovementPerceptionRefresh = true;
+      return;
+    }
+
+    this._pendingPostMovementPerceptionRefresh = false;
+    return this._performPostBatchPerceptionRefresh();
+  }
+
+  async _performPostBatchPerceptionRefresh() {
     try {
       // Set flag to suppress lighting refresh events during perception update
       // This prevents feedback loops where perception.update triggers lightingRefresh
@@ -826,6 +884,22 @@ export class BatchOrchestrator {
         /* noop */
       }
     }
+  }
+
+  _flushDeferredPostMovementPerceptionRefresh() {
+    if (!this._pendingPostMovementPerceptionRefresh) return false;
+    if (
+      this.isTokenMovementActive({
+        includeMovementSession: false,
+        includePendingMovementService: true,
+      })
+    ) {
+      return false;
+    }
+
+    this._pendingPostMovementPerceptionRefresh = false;
+    this._performPostBatchPerceptionRefresh();
+    return true;
   }
 
   /**
@@ -924,6 +998,10 @@ export class BatchOrchestrator {
   }
 
   _recordExplicitVisiblePair(update) {
+    if (this._movementBatchUpdateIsStale(update)) {
+      return clearExplicitVisiblePair(update.observer, update.target);
+    }
+
     if (update?.explicitVisiblePair === true) {
       return markExplicitVisiblePair(update.observer, update.target);
     }
@@ -942,6 +1020,7 @@ export class BatchOrchestrator {
   _resolvePendingMovementVisibilityUpdate(update, currentVisibility) {
     const nextVisibility = update?.visibility;
     if (!update?.observer || !update?.target) return nextVisibility;
+    if (this._movementBatchUpdateIsStale(update)) return currentVisibility;
 
     const hasPendingMovementPair = hasPendingMovementEntryForPair(update.observer, update.target);
     const hasRecentCompletedMovementPair = hasRecentCompletedMovementRefreshTargetForObserver(
@@ -994,6 +1073,28 @@ export class BatchOrchestrator {
       : currentVisibility;
   }
 
+  _movementBatchUpdateIsStale(update) {
+    if (update?.isMovementBatch !== true) return false;
+    return (
+      this._tokenPositionChangedSinceBatch(update.observer, update.observerPosition) ||
+      this._tokenPositionChangedSinceBatch(update.target, update.targetPosition)
+    );
+  }
+
+  _tokenPositionChangedSinceBatch(token, batchPosition) {
+    if (!token?.document?.id || !batchPosition) return false;
+    const currentPosition = this.positionManager?.getTokenPosition?.(token) || {
+      x: token.document.x + ((token.document.width || 1) * (canvas.grid?.size || 1)) / 2,
+      y: token.document.y + ((token.document.height || 1) * (canvas.grid?.size || 1)) / 2,
+      elevation: token.document.elevation || 0,
+    };
+    if (!currentPosition) return false;
+    const dx = Math.abs(Number(currentPosition.x || 0) - Number(batchPosition.x || 0));
+    const dy = Math.abs(Number(currentPosition.y || 0) - Number(batchPosition.y || 0));
+    const dz = Math.abs(Number(currentPosition.elevation || 0) - Number(batchPosition.elevation || 0));
+    return dx > 1 || dy > 1 || dz > 0.01;
+  }
+
   /**
    * Apply batch results with deduplication.
    * @param {Object} batchResult - Result from BatchProcessor
@@ -1005,6 +1106,14 @@ export class BatchOrchestrator {
     if (!game.user.isGM || !batchResult.updates || batchResult.updates.length === 0) {
       return 0;
     }
+    batchResult.updates = this._filterDragPreviewOnlyUpdates(batchResult.updates);
+    if (batchResult.updates.length === 0) {
+      batchResult.appliedUpdates = [];
+      return 0;
+    }
+    batchResult.updates = await this._validateVisibleUpdatesAgainstCurrentVisibility(
+      batchResult.updates,
+    );
 
     const applicationPlan = buildBatchResultApplicationPlan({
       updates: batchResult.updates,
@@ -1050,6 +1159,79 @@ export class BatchOrchestrator {
     }
 
     return applicationPlan.uniqueUpdateCount;
+  }
+
+  _filterDragPreviewOnlyUpdates(updates = []) {
+    if (!isPendingMovementDragPreviewOnlyActive()) return updates;
+
+    const dragTokenIds = new Set(
+      [
+        canvas?.tokens?._draggedToken,
+        ...(canvas?.tokens?.placeables || []).filter((token) => token?.isDragged),
+      ]
+        .map((token) => token?.document?.id || token?.id)
+        .filter(Boolean),
+    );
+    if (dragTokenIds.size === 0) return updates;
+
+    const tokenIdOf = (token) => token?.document?.id || token?.id || null;
+    return updates.filter((update) => {
+      const observerId = tokenIdOf(update?.observer);
+      const targetId = tokenIdOf(update?.target);
+      return !dragTokenIds.has(observerId) && !dragTokenIds.has(targetId);
+    });
+  }
+
+  async _validateVisibleUpdatesAgainstCurrentVisibility(updates = []) {
+    const calculator = this.optimizedVisibilityCalculator;
+    if (!calculator?.calculateVisibility) return updates;
+
+    const validatedUpdates = [];
+    for (const update of updates) {
+      const nextVisibility = update?.visibility;
+      if (nextVisibility !== 'observed' && nextVisibility !== 'concealed') {
+        validatedUpdates.push(update);
+        continue;
+      }
+      if (!update?.observer || !update?.target) {
+        validatedUpdates.push(update);
+        continue;
+      }
+
+      const currentVisibility = this.visibilityMapService.getVisibilityBetween
+        ? this.visibilityMapService.getVisibilityBetween(update.observer, update.target)
+        : this.visibilityMapService.getVisibilityMap(update.observer)?.[update.target.document?.id] ||
+          'observed';
+      if (currentVisibility !== 'hidden' && currentVisibility !== 'undetected') {
+        validatedUpdates.push(update);
+        continue;
+      }
+
+      try {
+        const calculatedVisibility = await calculator.calculateVisibility(
+          update.observer,
+          update.target,
+          {
+            isMovementBatch: update?.isMovementBatch === true,
+            skipCache: true,
+            skipPrecomputedLOS: true,
+          },
+        );
+        if (calculatedVisibility === 'hidden' || calculatedVisibility === 'undetected') {
+          validatedUpdates.push({
+            ...update,
+            visibility: currentVisibility,
+            explicitVisiblePair: false,
+          });
+          continue;
+        }
+      } catch {
+        /* keep original update if validation cannot run */
+      }
+
+      validatedUpdates.push(update);
+    }
+    return validatedUpdates;
   }
 
   /**

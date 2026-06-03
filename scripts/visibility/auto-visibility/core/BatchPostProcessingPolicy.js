@@ -9,6 +9,7 @@ function getDoorRevealEffectUpdates(updates = []) {
 }
 
 export function buildBatchPostProcessingPlan({
+  isMovementBatch = false,
   updates = [],
   uniqueUpdateCount = 0,
   postBatchPerceptionSuppression = null,
@@ -28,7 +29,8 @@ export function buildBatchPostProcessingPlan({
 
   const effectUpdates = isDoorTriggeredBatch ? getDoorRevealEffectUpdates(updates) : updates;
   const shouldRefreshPerception =
-    !isDoorTriggeredBatch || postBatchPerceptionSuppression?.perceptionRefreshed !== true;
+    !isMovementBatch &&
+    (!isDoorTriggeredBatch || postBatchPerceptionSuppression?.perceptionRefreshed !== true);
 
   return {
     hasVisibilityUpdates: true,

@@ -40,11 +40,25 @@ export class DependencyInjectionContainer {
     this.#factories.set('movementSightLineResolver', async () => {
       const {
         currentPendingMovementSightLineSeesTarget,
+        hasPendingMovementEntryForPair,
+        hasRecentCompletedMovementRefreshTargetForObserver,
         recentCompletedMovementFinalSightLineSeesTarget,
       } = await import('../../../services/PendingMovement/pending-movement-sight-line.js');
-      return (observer, target) =>
-        currentPendingMovementSightLineSeesTarget(observer, target) === true ||
-        recentCompletedMovementFinalSightLineSeesTarget(observer, target) === true;
+      return (observer, target) => {
+        const hasRecentCompletedMovement = hasRecentCompletedMovementRefreshTargetForObserver(
+          observer,
+          target,
+        );
+        const recentCompletedSightLine = recentCompletedMovementFinalSightLineSeesTarget(
+          observer,
+          target,
+        );
+        if (hasRecentCompletedMovement || recentCompletedSightLine !== null) {
+          return recentCompletedSightLine === true;
+        }
+        if (!hasPendingMovementEntryForPair(observer, target)) return null;
+        return currentPendingMovementSightLineSeesTarget(observer, target) === true;
+      };
     });
 
     // Lighting raster service (fast-path darkness sampling)

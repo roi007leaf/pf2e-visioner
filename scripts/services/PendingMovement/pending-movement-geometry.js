@@ -141,6 +141,24 @@ export function positionsEqual(a, b) {
 
 export function tokenVisualMovementPosition(tokenOrDoc) {
   const token = tokenOrDoc?.object || (tokenOrDoc?.document ? tokenOrDoc : null);
+  const dragContext = token?.mouseInteractionManager?.interactionData?.contexts?.[token?.document?.id];
+  const contextPosition = cloneMovementPosition(dragContext?.destination);
+  if (contextPosition) return contextPosition;
+
+  const preview = dragContext?.clonedToken;
+  const previewPosition = cloneMovementPosition({
+    x: preview?.document?.x,
+    y: preview?.document?.y,
+  });
+  if (previewPosition) return previewPosition;
+
+  const plannedMovement = token?._plannedMovement?.[game?.user?.id];
+  const plannedDestination = Array.isArray(plannedMovement?.foundPath)
+    ? plannedMovement.foundPath.at(-1)
+    : null;
+  const plannedPosition = cloneMovementPosition(plannedDestination);
+  if (plannedPosition) return plannedPosition;
+
   return cloneMovementPosition({ x: token?.x, y: token?.y });
 }
 

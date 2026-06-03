@@ -1667,6 +1667,7 @@ function injectPF2eVisionerBox(app, root) {
           Number(scene?.getFlag?.(MODULE_ID, 'hiddenIndicatorHalf')) || defaultWidth;
         const currentDim = Number(scene?.getFlag?.(MODULE_ID, 'dimThreshold')) || defaultDim;
         const disableAVS = !!scene?.getFlag?.(MODULE_ID, 'disableAVS');
+        const disableAutoCover = !!scene?.getFlag?.(MODULE_ID, 'disableAutoCover');
 
         fs.innerHTML = `
           <legend>PF2E Visioner</legend>
@@ -1674,6 +1675,10 @@ function injectPF2eVisionerBox(app, root) {
             <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AVS_PER_SCENE.hint')}">
               <input type="checkbox" name="flags.${MODULE_ID}.disableAVS" ${disableAVS ? 'checked' : ''}>
               ${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AVS_PER_SCENE.name')}
+            </label>
+            <label data-tooltip="${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AUTO_COVER_PER_SCENE.hint')}">
+              <input type="checkbox" name="flags.${MODULE_ID}.disableAutoCover" ${disableAutoCover ? 'checked' : ''}>
+              ${game.i18n.localize('PF2E_VISIONER.SETTINGS.DISABLE_AUTO_COVER_PER_SCENE.name')}
             </label>
             <label>Hidden Wall Indicator Width (half, px)</label>
             <div style="display:flex; align-items:center; gap:8px; width:100%;">

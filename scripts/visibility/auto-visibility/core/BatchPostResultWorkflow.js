@@ -38,6 +38,7 @@ export class BatchPostResultWorkflow {
 
   async run({
     batchResult = {},
+    isMovementBatch = false,
     postBatchPerceptionSuppression = null,
     flushDetectionBatch = this.#flushDetectionBatch,
   } = {}) {
@@ -49,9 +50,9 @@ export class BatchPostResultWorkflow {
     }
 
     const uniqueUpdateCount = await this.#applyBatchResults(batchResult, {
-      suppressVisibilityMapRender: shouldSuppressVisibilityMapRender(
-        postBatchPerceptionSuppression,
-      ),
+      suppressVisibilityMapRender:
+        isMovementBatch ||
+        shouldSuppressVisibilityMapRender(postBatchPerceptionSuppression),
     });
     const appliedUpdates = batchResult.appliedUpdates ?? batchResult.updates;
 
@@ -65,6 +66,7 @@ export class BatchPostResultWorkflow {
     }
 
     const postProcessingPlan = buildBatchPostProcessingPlan({
+      isMovementBatch,
       updates: appliedUpdates,
       uniqueUpdateCount,
       postBatchPerceptionSuppression,
@@ -79,7 +81,7 @@ export class BatchPostResultWorkflow {
         if (postProcessingPlan.shouldMarkPerceptionRefreshed) {
           postBatchPerceptionSuppression.perceptionRefreshed = true;
         }
-        await this.#refreshPerceptionAfterBatch();
+        await this.#refreshPerceptionAfterBatch({ isMovementBatch });
       }
     } else {
       this.#debug('BatchOrchestrator: skipping perception refresh (no updates)');

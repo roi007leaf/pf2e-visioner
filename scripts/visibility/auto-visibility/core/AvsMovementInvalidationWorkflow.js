@@ -5,8 +5,12 @@ import {
 } from '../../../services/runtime-state.js';
 import {
   hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
+  isPendingMovementDragPreviewOnlyActive as defaultIsPendingMovementDragPreviewOnlyActive,
 } from '../../../services/PendingMovement/pending-movement-render-lock.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
+
+const DETECTION_BLOCKING_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
+const VISIBLE_VISIBILITY_STATES = new Set(['observed', 'concealed']);
 
 function hasTakeCoverTrackingFlag(flagData) {
   return (
@@ -52,7 +56,14 @@ export class AvsMovementInvalidationWorkflow {
     setMovedTokenId = setLastMovedTokenId,
     lightingPrecomputer = LightingPrecomputer,
     hasActivePendingTokenMovement = defaultHasActivePendingTokenMovement,
+    isPendingMovementDragPreviewOnlyActive = defaultIsPendingMovementDragPreviewOnlyActive,
     overrideValidationProcessDelayMs = 150,
+    visibilityCalculator = null,
+    getVisibilityBetween = null,
+    setVisibilityBetween = null,
+    getPlaceableTokens = () => globalThis.canvas?.tokens?.placeables || [],
+    finalVisibilityReconcileDelayMs = 300,
+    finalVisibilityReconcileRetryDelaysMs = null,
   } = {}) {
     this.shouldProcessEvents = shouldProcessEvents;
     this.visibilityState = visibilityState;
@@ -64,8 +75,20 @@ export class AvsMovementInvalidationWorkflow {
     this.setMovedTokenId = setMovedTokenId;
     this.lightingPrecomputer = lightingPrecomputer;
     this.hasActivePendingTokenMovement = hasActivePendingTokenMovement;
+    this.isPendingMovementDragPreviewOnlyActive = isPendingMovementDragPreviewOnlyActive;
     this.overrideValidationProcessDelayMs = overrideValidationProcessDelayMs;
     this.overrideValidationProcessTimer = null;
+    this.visibilityCalculator = visibilityCalculator;
+    this.getVisibilityBetween = getVisibilityBetween;
+    this.setVisibilityBetween = setVisibilityBetween;
+    this.getPlaceableTokens = getPlaceableTokens;
+    this.finalVisibilityReconcileDelayMs = finalVisibilityReconcileDelayMs;
+    this.finalVisibilityReconcileRetryDelaysMs =
+      finalVisibilityReconcileRetryDelaysMs || [
+        finalVisibilityReconcileDelayMs,
+        1000,
+        2000,
+      ];
   }
 
   handleTokenMovementCompleted(tokenDoc, movementChanges) {
@@ -77,6 +100,7 @@ export class AvsMovementInvalidationWorkflow {
     this.visionAnalyzer?.clearCache?.(tokenDoc);
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
     this.batchOrchestrator?.notifyTokenMovementComplete?.();
+    this.#scheduleFinalVisibilityReconciliation(tokenDoc);
     this.#queueMovementOverrideValidation(tokenDoc, { processQueuedValidations: true });
     return true;
   }
@@ -129,6 +153,84 @@ export class AvsMovementInvalidationWorkflow {
     } catch {
       /* best-effort */
     }
+  }
+
+  #scheduleFinalVisibilityReconciliation(tokenDoc) {
+    const tokenId = tokenDoc?.id ?? tokenDoc?.document?.id;
+    if (!tokenId) return;
+    for (const delayMs of this.finalVisibilityReconcileRetryDelaysMs) {
+      setTimeout(() => {
+        this.#reconcileMovedTokenFinalVisibility(tokenDoc).catch((error) => {
+          console.warn('PF2E Visioner | Failed to reconcile final movement visibility:', error);
+        });
+      }, delayMs);
+    }
+  }
+
+  async #loadFinalVisibilityDependencies() {
+    if (this.visibilityCalculator && this.getVisibilityBetween && this.setVisibilityBetween) {
+      return {
+        visibilityCalculator: this.visibilityCalculator,
+        getVisibilityBetween: this.getVisibilityBetween,
+        setVisibilityBetween: this.setVisibilityBetween,
+      };
+    }
+
+    const [{ optimizedVisibilityCalculator }, visibilityMap] = await Promise.all([
+      import('../VisibilityCalculator.js'),
+      import('../../../stores/visibility-map.js'),
+    ]);
+
+    return {
+      visibilityCalculator: this.visibilityCalculator || optimizedVisibilityCalculator,
+      getVisibilityBetween: this.getVisibilityBetween || visibilityMap.getVisibilityBetween,
+      setVisibilityBetween: this.setVisibilityBetween || visibilityMap.setVisibilityBetween,
+    };
+  }
+
+  async #reconcileMovedTokenFinalVisibility(tokenDoc) {
+    if (!globalThis.game?.user?.isGM) return;
+    if (this.isPendingMovementDragPreviewOnlyActive?.()) return;
+    const tokenId = tokenDoc?.id ?? tokenDoc?.document?.id;
+    const movedToken = tokenDoc?.object || globalThis.canvas?.tokens?.get?.(tokenId);
+    if (!movedToken) return;
+
+    const { visibilityCalculator, getVisibilityBetween, setVisibilityBetween } =
+      await this.#loadFinalVisibilityDependencies();
+    if (!visibilityCalculator?.calculateVisibility || !getVisibilityBetween || !setVisibilityBetween) {
+      return;
+    }
+
+    for (const token of this.getPlaceableTokens() || []) {
+      if (!token?.document?.id || token.document.id === tokenId) continue;
+      await this.#reconcileDirection(movedToken, token, {
+        visibilityCalculator,
+        getVisibilityBetween,
+        setVisibilityBetween,
+      });
+      await this.#reconcileDirection(token, movedToken, {
+        visibilityCalculator,
+        getVisibilityBetween,
+        setVisibilityBetween,
+      });
+    }
+  }
+
+  async #reconcileDirection(observer, target, deps) {
+    const currentVisibility = deps.getVisibilityBetween(observer, target);
+    if (!VISIBLE_VISIBILITY_STATES.has(currentVisibility)) return;
+
+    const calculatedVisibility = await deps.visibilityCalculator.calculateVisibility(observer, target, {
+      isMovementBatch: true,
+      skipCache: true,
+      skipPrecomputedLOS: true,
+    });
+    if (!DETECTION_BLOCKING_VISIBILITY_STATES.has(calculatedVisibility)) return;
+
+    await deps.setVisibilityBetween(observer, target, calculatedVisibility, {
+      isAutomatic: true,
+      source: 'movement-final-reconciliation',
+    });
   }
 
   #queueMovementOverrideValidation(

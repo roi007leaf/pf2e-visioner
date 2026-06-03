@@ -920,6 +920,10 @@
         "name": "Disable AVS for this Scene",
         "hint": "When enabled, the Auto-Visibility System will be disabled for this scene. Visibility states will not be automatically calculated or updated."
       },
+      "DISABLE_AUTO_COVER_PER_SCENE": {
+        "name": "Disable Auto Cover for this Scene",
+        "hint": "When enabled, automatic cover detection will be disabled for this scene."
+      },
       "AVS_CHANGES_INDICATOR_SIZE": {
         "name": "AVS Changes Indicator Size",
         "hint": "Controls the size of the floating AVS changes indicator button and its tooltip.",

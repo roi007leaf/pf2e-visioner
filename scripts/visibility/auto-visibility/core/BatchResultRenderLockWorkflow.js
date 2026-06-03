@@ -50,6 +50,7 @@ export class BatchResultRenderLockWorkflow {
       this.#refreshPendingMovementTokenVisibility(activeMovementTokenIds, {
         coalesceFrame: true,
         ignoreObservedGrace: true,
+        skipPerceptionRefresh: true,
         source: 'batch-result-hidden-refresh',
         targetTokenIds: plan.hiddenTargetTokenIds,
       });

@@ -1,5 +1,5 @@
 import { cachePendingMovementEvaluation } from './pending-movement-evaluation-cache.js';
-import { centerForToken } from './pending-movement-geometry.js';
+import { centerForToken, tokenVisualMovementPosition } from './pending-movement-geometry.js';
 import {
   createPositionedTokenProxy,
   observerCanHearTarget,
@@ -170,19 +170,26 @@ export function createPendingMovementDecisionContextController({
       };
     }
 
-    const currentOriginPoint = centerForToken(observer);
-    const pendingOriginPoint = centerForToken(observer, pendingPosition || null);
+    const dragVisualPosition = isControlledDrag ? tokenVisualMovementPosition(observer) : null;
+    const effectivePendingPosition = dragVisualPosition || pendingPosition;
+    const currentOriginPoint = centerForToken(observer, dragVisualPosition);
+    const pendingOriginPoint = centerForToken(observer, effectivePendingPosition || null);
     const useCurrentOriginForCoreMovement = hasCoreOwnedPendingMovement(observer, target);
     const originPoint =
       useCurrentOriginForCoreMovement
         ? currentOriginPoint || pendingOriginPoint
         : pendingOriginPoint;
-    const originPoints =
+    const dragOriginPoint = dragVisualPosition ? centerForToken(observer, dragVisualPosition) : null;
+    const baseOriginPoints =
       pendingMovementEntry?.budgetedRoutePoints?.length
         ? pendingMovementEntry.budgetedRoutePoints
         : pendingMovementEntry?.routePoints?.length
           ? pendingMovementEntry.routePoints
           : [originPoint].filter(Boolean);
+    const originPoints =
+      dragOriginPoint && !baseOriginPoints.includes(dragOriginPoint)
+        ? [...baseOriginPoints, dragOriginPoint]
+        : baseOriginPoints;
     const targetPoint = centerForToken(target);
     const routeWallBlocked = routeWallBlockedForPendingMovement({
       entry: pendingMovementEntry,
@@ -209,9 +216,9 @@ export function createPendingMovementDecisionContextController({
           })
         : routeWallBlocked;
     const hearingObserver =
-      useCurrentOriginForCoreMovement || !pendingPosition
+      useCurrentOriginForCoreMovement || !effectivePendingPosition
         ? observer
-        : createPositionedTokenProxy(observer, pendingPosition, {
+        : createPositionedTokenProxy(observer, effectivePendingPosition, {
             getTokenObjectForDocument: tokenObjectForId,
           });
     const hearingCanReachTarget =
@@ -250,10 +257,10 @@ export function createPendingMovementDecisionContextController({
       observerName: observer?.name ?? observer?.document?.name,
       targetId,
       targetName: target?.name ?? target?.document?.name,
-      hasPendingPosition: !!pendingPosition,
+      hasPendingPosition: !!effectivePendingPosition,
       isMovementPreview,
       isControlledDrag,
-      pendingPosition,
+      pendingPosition: effectivePendingPosition,
       originPoint,
       originPointCount: originPoints.length,
       targetPoint,

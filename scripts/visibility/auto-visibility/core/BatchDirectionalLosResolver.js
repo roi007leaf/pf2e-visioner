@@ -43,9 +43,10 @@ export class BatchDirectionalLosResolver {
   }
 
   #applyLosOverrides(directionalLos, observerToken, targetToken) {
+    const movementSightLine = this.#movementSightLineResolver?.(observerToken, targetToken);
+    if (movementSightLine === true || movementSightLine === false) return movementSightLine;
     if (directionalLos === true) return true;
     if (this.#sourcePolygonLosResolver?.(observerToken, targetToken)) return true;
-    if (this.#movementSightLineResolver?.(observerToken, targetToken)) return true;
     return directionalLos;
   }
 

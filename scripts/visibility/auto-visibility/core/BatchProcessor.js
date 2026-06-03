@@ -736,6 +736,9 @@ export class BatchProcessor {
               observer: changedToken,
               target: otherToken,
               visibility: effectiveVisibility1,
+              isMovementBatch,
+              observerPosition: posA,
+              targetPosition: posB,
             });
           }
           if (
@@ -747,6 +750,9 @@ export class BatchProcessor {
               observer: otherToken,
               target: changedToken,
               visibility: effectiveVisibility2,
+              isMovementBatch,
+              observerPosition: posB,
+              targetPosition: posA,
             });
           }
           continue;
@@ -763,6 +769,9 @@ export class BatchProcessor {
             observer: changedToken,
             target: otherToken,
             visibility: effectiveVisibility1,
+            isMovementBatch,
+            observerPosition: posA,
+            targetPosition: posB,
           });
         }
 
@@ -932,6 +941,9 @@ export class BatchProcessor {
             target: otherToken,
             visibility: effectiveVisibility1,
             explicitVisiblePair: explicitVisiblePair1,
+            isMovementBatch,
+            observerPosition: posA,
+            targetPosition: posB,
           });
         }
         if (needsVisibilityUpdate2) {
@@ -940,6 +952,9 @@ export class BatchProcessor {
             target: changedToken,
             visibility: effectiveVisibility2,
             explicitVisiblePair: explicitVisiblePair2,
+            isMovementBatch,
+            observerPosition: posB,
+            targetPosition: posA,
           });
         }
         if (needsDoorDetectionSync1 || needsMovementDetectionSync1) {
@@ -949,6 +964,9 @@ export class BatchProcessor {
             visibility: effectiveVisibility1,
             forceDetectionSyncOnly: true,
             explicitVisiblePair: los1 === false ? false : explicitVisiblePair1,
+            isMovementBatch,
+            observerPosition: posA,
+            targetPosition: posB,
           });
         }
         if (needsDoorDetectionSync2 || needsMovementDetectionSync2) {
@@ -958,6 +976,9 @@ export class BatchProcessor {
             visibility: effectiveVisibility2,
             forceDetectionSyncOnly: true,
             explicitVisiblePair: los2 === false ? false : explicitVisiblePair2,
+            isMovementBatch,
+            observerPosition: posB,
+            targetPosition: posA,
           });
         }
 
@@ -971,6 +992,9 @@ export class BatchProcessor {
               target: otherToken,
               visibility: effectiveVisibility1,
               forceEphemeralOnly: true,
+              isMovementBatch,
+              observerPosition: posA,
+              targetPosition: posB,
             });
           }
           if (!needsVisibilityUpdate2 && effectiveVisibility2) {
@@ -979,6 +1003,9 @@ export class BatchProcessor {
               target: changedToken,
               visibility: effectiveVisibility2,
               forceEphemeralOnly: true,
+              isMovementBatch,
+              observerPosition: posB,
+              targetPosition: posA,
             });
           }
         }

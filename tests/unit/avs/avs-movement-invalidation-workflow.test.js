@@ -86,6 +86,71 @@ describe('AvsMovementInvalidationWorkflow', () => {
     expect(isTokenMovementLightingRefreshSuppressed()).toBe(true);
   });
 
+  test('completed movement reconciles stale visible map to hidden final visibility', async () => {
+    jest.useFakeTimers();
+    global.game.user.isGM = true;
+    const movedToken = { document: { id: 'moved' } };
+    const target = { document: { id: 'target' } };
+    const visibilityCalculator = {
+      calculateVisibility: jest.fn(async () => 'hidden'),
+    };
+    const getVisibilityBetween = jest.fn(() => 'observed');
+    const setVisibilityBetween = jest.fn(async () => {});
+    const workflow = makeWorkflow({
+      visibilityCalculator,
+      getVisibilityBetween,
+      setVisibilityBetween,
+      getPlaceableTokens: () => [movedToken, target],
+      finalVisibilityReconcileDelayMs: 25,
+      overrideValidationManager: null,
+    });
+
+    expect(workflow.handleTokenMovementCompleted({ id: 'moved', object: movedToken }, {})).toBe(
+      true,
+    );
+
+    await jest.advanceTimersByTimeAsync(25);
+
+    expect(visibilityCalculator.calculateVisibility).toHaveBeenCalledWith(movedToken, target, {
+      isMovementBatch: true,
+      skipCache: true,
+      skipPrecomputedLOS: true,
+    });
+    expect(setVisibilityBetween).toHaveBeenCalledWith(movedToken, target, 'hidden', {
+      isAutomatic: true,
+      source: 'movement-final-reconciliation',
+    });
+  });
+
+  test('completed movement reconciliation skips while drag preview is uncommitted', async () => {
+    jest.useFakeTimers();
+    global.game.user.isGM = true;
+    const movedToken = { document: { id: 'moved' } };
+    const target = { document: { id: 'target' } };
+    const visibilityCalculator = {
+      calculateVisibility: jest.fn(async () => 'hidden'),
+    };
+    const setVisibilityBetween = jest.fn(async () => {});
+    const workflow = makeWorkflow({
+      visibilityCalculator,
+      getVisibilityBetween: jest.fn(() => 'observed'),
+      setVisibilityBetween,
+      getPlaceableTokens: () => [movedToken, target],
+      finalVisibilityReconcileDelayMs: 25,
+      isPendingMovementDragPreviewOnlyActive: () => true,
+      overrideValidationManager: null,
+    });
+
+    expect(workflow.handleTokenMovementCompleted({ id: 'moved', object: movedToken }, {})).toBe(
+      true,
+    );
+
+    await jest.advanceTimersByTimeAsync(25);
+
+    expect(visibilityCalculator.calculateVisibility).not.toHaveBeenCalled();
+    expect(setVisibilityBetween).not.toHaveBeenCalled();
+  });
+
   test('completed movement expires Take Cover before queueing and scheduling override validation', async () => {
     jest.useFakeTimers();
     let finishExpiration;

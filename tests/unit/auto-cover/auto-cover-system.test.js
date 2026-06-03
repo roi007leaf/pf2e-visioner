@@ -227,6 +227,24 @@ describe('AutoCoverSystem', () => {
 
       expect(autoCoverSystem.isEnabled()).toBe(false);
     });
+
+    test('should return false when auto-cover is disabled for the active scene', () => {
+      global.game.settings.get.mockImplementation((module, setting) => {
+        if (setting === 'autoCover') return true;
+        return false;
+      });
+      const previousScene = global.canvas.scene;
+      global.canvas.scene = {
+        ...previousScene,
+        getFlag: jest.fn((moduleId, flagKey) =>
+          moduleId === 'pf2e-visioner' && flagKey === 'disableAutoCover' ? true : undefined,
+        ),
+      };
+
+      expect(autoCoverSystem.isEnabled()).toBe(false);
+
+      global.canvas.scene = previousScene;
+    });
   });
 
   describe('error handling', () => {

@@ -99,6 +99,24 @@ describe('token movement pre-update service', () => {
     });
   });
 
+  test('does not refresh every non-moving token when recorded movement has no targets', () => {
+    const setPendingTokenMovementPosition = jest.fn(() => true);
+    const getPendingMovementRefreshTargetIds = jest.fn(() => []);
+    const refreshPendingMovementTokenVisibility = jest.fn();
+
+    handlePreUpdateTokenMovement(makeTokenDoc({ id: 'mover' }), { x: 100 }, {}, 'u1', {
+      isAvsEnabled: () => false,
+      isUserGm: () => false,
+      getControlledTokens: () => [{ document: { id: 'mover' } }],
+      setPendingTokenMovementPosition,
+      getPendingMovementRefreshTargetIds,
+      refreshPendingMovementTokenVisibility,
+    });
+
+    expect(getPendingMovementRefreshTargetIds).toHaveBeenCalledWith('mover');
+    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+  });
+
   test('does not refresh render locks when pending movement is not recorded', () => {
     const getPendingMovementRefreshTargetIds = jest.fn(() => ['target']);
     const refreshPendingMovementTokenVisibility = jest.fn();

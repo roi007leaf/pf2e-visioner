@@ -93,7 +93,25 @@ describe('BatchPostResultWorkflow', () => {
     );
     expect(syncEphemeralEffectsForUpdates).toHaveBeenCalledWith([updates[1], updates[2]]);
     expect(refreshPerceptionAfterBatch).toHaveBeenCalledTimes(1);
+    expect(refreshPerceptionAfterBatch).toHaveBeenCalledWith({ isMovementBatch: false });
     expect(suppression.perceptionRefreshed).toBe(true);
+  });
+
+  test('movement batches suppress visibility map render during result persistence', async () => {
+    const applyBatchResults = jest.fn(async () => 1);
+    const { workflow } = createWorkflow({ applyBatchResults });
+    const updates = [update('hidden')];
+
+    await workflow.run({
+      batchResult: { updates },
+      isMovementBatch: true,
+      postBatchPerceptionSuppression: null,
+    });
+
+    expect(applyBatchResults).toHaveBeenCalledWith(
+      { updates },
+      { suppressVisibilityMapRender: true },
+    );
   });
 
   test('uses resolved applied updates for post-apply render locks and effect sync', async () => {

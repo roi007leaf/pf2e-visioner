@@ -131,6 +131,7 @@ describe('BatchOrchestrator', () => {
   afterEach(() => {
     jest.useRealTimers();
     clearPendingTokenMovementPosition('A');
+    global.canvas.tokens._draggedToken = null;
     global.canvas.walls.placeables = [];
   });
 
@@ -140,6 +141,27 @@ describe('BatchOrchestrator', () => {
     expect(telemetryReporter.start).toHaveBeenCalled();
     expect(telemetryReporter.stop).toHaveBeenCalled();
     expect(applied).toEqual([['A', 'B', 'hidden']]);
+  });
+
+  test('defers batch processing while pending movement service is active', async () => {
+    const [observer] = global.canvas.tokens.placeables;
+    const movementRecorded = setPendingTokenMovementPosition(
+      observer.document,
+      { x: 100, y: 0 },
+      [observer],
+      { userId: global.game.user.id },
+    );
+    expect(movementRecorded).toBe(true);
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+
+    completePendingTokenMovement(observer.document.id);
+    orchestrator.notifyTokenMovementComplete();
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
   });
 
   test('applies hidden to observed update after movement has settled even when current sight helper is blocked', () => {
@@ -295,6 +317,41 @@ describe('BatchOrchestrator', () => {
       global.canvas.tokens.placeables[0],
       { B: 'observed' },
     );
+  });
+
+  test('fresh current calculation vetoes stale hidden to observed batch update', async () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    batchProcessor.process.mockResolvedValueOnce({
+      updates: [
+        {
+          observer,
+          target,
+          visibility: 'observed',
+          explicitVisiblePair: true,
+          isMovementBatch: true,
+        },
+      ],
+      breakdown: { visGlobalHits: 0, visGlobalMisses: 1, losGlobalHits: 0, losGlobalMisses: 1 },
+      processedTokens: 1,
+      precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
+    });
+    const calculateVisibility = jest.fn(async () => 'hidden');
+    orchestrator.optimizedVisibilityCalculator = { calculateVisibility };
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'hidden' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    await orchestrator.processBatch(new Set(['A']), { movementSession: { sessionId: 'move-1' } });
+
+    expect(calculateVisibility).toHaveBeenCalledWith(
+      observer,
+      target,
+      expect.objectContaining({
+        isMovementBatch: true,
+        skipCache: true,
+        skipPrecomputedLOS: true,
+      }),
+    );
+    expect(visibilityMapService.setVisibilityMap).not.toHaveBeenCalled();
   });
 
   test('isProcessing flag prevents reentrancy and resets after', async () => {
@@ -494,6 +551,39 @@ describe('BatchOrchestrator', () => {
     );
   });
 
+  test('movement stop waits while remembered moving token render position is unsettled', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+
+    const mover = global.canvas.tokens.placeables[0];
+    mover.x = 0;
+    mover.y = 0;
+    mover.document.x = 100;
+    mover.document.y = 0;
+
+    orchestrator.notifyTokenMovementStart('A');
+    orchestrator.enqueueTokens(new Set(['A']));
+
+    await jest.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+    expect(orchestrator._isTokenMoving).toBe(true);
+
+    mover.x = 100;
+    mover.y = 0;
+
+    await jest.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+  });
+
   test('movement stop drains pending tokens without warning when session disappeared', async () => {
     jest.useFakeTimers();
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => { });
@@ -668,6 +758,22 @@ describe('BatchOrchestrator', () => {
     expect(target.visible).toBe(true);
   });
 
+  test('_applyBatchResults skips dragged preview token updates before movement commit', async () => {
+    const observer = global.canvas.tokens.placeables[0];
+    const target = global.canvas.tokens.placeables[1];
+    global.canvas.tokens._draggedToken = observer;
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+
+    const batchResult = {
+      updates: [{ observer, target, visibility: 'hidden' }],
+    };
+    const count = await orchestrator._applyBatchResults(batchResult);
+
+    expect(count).toBe(0);
+    expect(batchResult.appliedUpdates).toEqual([]);
+    expect(visibilityMapService.setVisibilityMap).not.toHaveBeenCalled();
+  });
+
   test('_applyBatchResults records door detection sync without map write', async () => {
     global.game.pf2eVisioner = {};
     visibilityMapService.setVisibilityMap = jest.fn(async () => { });
@@ -736,6 +842,37 @@ describe('BatchOrchestrator', () => {
 
     expect(count).toBe(1);
     expect(visibilityMapService.setVisibilityMap).toHaveBeenCalledWith(observer, { B: 'observed' });
+  });
+
+  test('_applyBatchResults skips stale movement observed update from prior square', async () => {
+    global.game.pf2eVisioner = {};
+    const observer = createMockToken({ id: 'A', x: 200, y: 0 });
+    const target = createMockToken({ id: 'B', x: 600, y: 0 });
+    global.canvas.tokens.placeables = [observer, target];
+    visibilityMapService.getVisibilityMap = jest.fn(() => ({ B: 'hidden' }));
+    visibilityMapService.setVisibilityMap = jest.fn(async () => { });
+    positionManager.getTokenPosition = jest.fn((token) => ({
+      x: token.document.x + 100,
+      y: token.document.y + 100,
+      elevation: token.document.elevation || 0,
+    }));
+
+    const count = await orchestrator._applyBatchResults({
+      updates: [
+        {
+          observer,
+          target,
+          visibility: 'observed',
+          explicitVisiblePair: true,
+          isMovementBatch: true,
+          observerPosition: { x: 100, y: 100, elevation: 0 },
+          targetPosition: { x: 700, y: 100, elevation: 0 },
+        },
+      ],
+    });
+
+    expect(count).toBe(0);
+    expect(visibilityMapService.setVisibilityMap).not.toHaveBeenCalled();
   });
 
   test('_applyBatchResults applies observed during pending movement when current sight sees target', async () => {
@@ -822,6 +959,29 @@ describe('BatchOrchestrator', () => {
     await orchestrator.processBatch(new Set(['A']));
 
     expect(order).toEqual(['effects', 'post-perception']);
+  });
+
+  test('defers non-movement post-batch perception refresh while pending movement is active', async () => {
+    const [observer] = global.canvas.tokens.placeables;
+    orchestrator._performPostBatchPerceptionRefresh = jest.fn(async () => {});
+
+    expect(
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        userId: global.game.user.id,
+      }),
+    ).toBe(true);
+
+    await orchestrator._refreshPerceptionAfterBatch({ isMovementBatch: false });
+
+    expect(orchestrator._performPostBatchPerceptionRefresh).not.toHaveBeenCalled();
+    expect(orchestrator._pendingPostMovementPerceptionRefresh).toBe(true);
+
+    completePendingTokenMovement(observer.document.id);
+    const flushed = orchestrator._flushDeferredPostMovementPerceptionRefresh();
+
+    expect(flushed).toBe(true);
+    expect(orchestrator._performPostBatchPerceptionRefresh).toHaveBeenCalledTimes(1);
+    expect(orchestrator._pendingPostMovementPerceptionRefresh).toBe(false);
   });
 
   test('processBatch does not refresh perception when no visibility updates are applied', async () => {
@@ -935,7 +1095,6 @@ describe('BatchOrchestrator', () => {
     await jest.advanceTimersByTimeAsync(250);
 
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
-    expect(global.canvas.perception.update).toHaveBeenCalled();
   });
 
   test('processBatch defers while changed token render position is still desynced from document position', async () => {
@@ -961,7 +1120,6 @@ describe('BatchOrchestrator', () => {
     await jest.advanceTimersByTimeAsync(250);
 
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
-    expect(global.canvas.perception.update).toHaveBeenCalled();
   });
 
   test('processBatch defers while changed token has a pending destination differing from current position', async () => {
@@ -1007,7 +1165,6 @@ describe('BatchOrchestrator', () => {
     await jest.advanceTimersByTimeAsync(250);
 
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
-    expect(global.canvas.perception.update).toHaveBeenCalled();
   });
 
   test('processBatch defers with a real PositionManager storing a pending destination', async () => {
@@ -1046,6 +1203,5 @@ describe('BatchOrchestrator', () => {
     await jest.advanceTimersByTimeAsync(250);
 
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
-    expect(global.canvas.perception.update).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../../constants.js';
 import { setLastMovedTokenId } from '../../../services/runtime-state.js';
+import { hasPendingTokenMovementPosition } from '../../../services/PendingMovement/pending-movement-render-lock.js';
 import { updateWallVisualsForEveryone } from '../../../services/socket.js';
 import { updateWallVisuals } from '../../../services/visual-effects.js';
 import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
@@ -29,6 +30,64 @@ function getActiveMovementAnimation(token) {
   if (movementAnimationIsRunning(token._animation)) return token._animation;
   if (movementAnimationIsRunning(token.animation)) return token.animation;
   return null;
+}
+
+const PENDING_MOVE_ANIMATION_ATTACH_DELAYS_MS = [0, 16, 33, 50];
+const MOVEMENT_VISUAL_SETTLE_POLL_MS = 50;
+const MOVEMENT_VISUAL_SETTLE_MAX_MS = 4000;
+const MOVEMENT_VISUAL_POSITION_TOLERANCE_PX = 1;
+
+function waitForMovementAnimationAttachDelay(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function moveTokenUpdateMayStartAnimation(updateData = {}, options = {}) {
+  if (options?.animate === false || updateData?.animate === false) return false;
+  if (options?.animation === false || updateData?.animation === false) return false;
+  return (
+    options?.animate === true ||
+    !!updateData?.destination ||
+    !!options?._movement ||
+    options?.method === 'dragging'
+  );
+}
+
+function numberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function explicitMoveDestination(updateData = {}) {
+  const destination = updateData?.destination || updateData?.position || null;
+  const x = numberOrNull(destination?.x ?? updateData?.x);
+  const y = numberOrNull(destination?.y ?? updateData?.y);
+  if (x === null && y === null) return null;
+  return { x, y };
+}
+
+function finiteNumberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function visualPositionReached(token, movementChanges = {}) {
+  const tokenX = finiteNumberOrNull(token?.x);
+  const tokenY = finiteNumberOrNull(token?.y);
+  const destinationX = finiteNumberOrNull(movementChanges?.x);
+  const destinationY = finiteNumberOrNull(movementChanges?.y);
+  if (
+    tokenX === null ||
+    tokenY === null ||
+    destinationX === null ||
+    destinationY === null
+  ) {
+    return true;
+  }
+
+  return (
+    Math.abs(tokenX - destinationX) <= MOVEMENT_VISUAL_POSITION_TOLERANCE_PX &&
+    Math.abs(tokenY - destinationY) <= MOVEMENT_VISUAL_POSITION_TOLERANCE_PX
+  );
 }
 
 /**
@@ -103,18 +162,31 @@ export class TokenEventHandler {
       return;
     }
 
-    // This is the final destination, process visibility
-    // Use destination from updateData - this is the final position after animation
-    const finalX = updateData.destination?.x ?? tokenDoc.x;
-    const finalY = updateData.destination?.y ?? tokenDoc.y;
     const tokenId = tokenDoc.id;
     const token = tokenDoc.object;
-    const activeAnimation = getActiveMovementAnimation(token);
+    const explicitDestination = explicitMoveDestination(updateData);
+    if (!explicitDestination) {
+      if (moveTokenUpdateMayStartAnimation(updateData, options)) {
+        this.batchOrchestrator?.notifyTokenMovementStart?.(tokenId);
+      }
+      return;
+    }
+
+    // This is the final destination, process visibility
+    // Use an explicit destination from updateData; falling back to tokenDoc.x/y
+    // can finalize movement at the starting square for Foundry movement-start hooks.
+    const finalX = explicitDestination.x ?? tokenDoc.x;
+    const finalY = explicitDestination.y ?? tokenDoc.y;
+    let activeAnimation = getActiveMovementAnimation(token);
 
     const movementChanges = {
       x: finalX,
       y: finalY,
     };
+
+    if (hasPendingTokenMovementPosition(tokenId)) {
+      return;
+    }
 
     if (this._wasAnimatedMoveHandledRecently(tokenId, movementChanges)) {
       return;
@@ -124,7 +196,29 @@ export class TokenEventHandler {
       return;
     }
 
+    let markedDeferred = false;
+    let deferredFinalizationStarted = false;
+
     try {
+      if (!activeAnimation && moveTokenUpdateMayStartAnimation(updateData, options)) {
+        if (this.batchOrchestrator?.notifyTokenMovementStart) {
+          this.batchOrchestrator.notifyTokenMovementStart(tokenId);
+        }
+
+        this._storeMovementDestination(tokenDoc, movementChanges);
+        this._markAnimatedMoveDeferred(tokenId, movementChanges);
+        markedDeferred = true;
+
+        activeAnimation = await this._waitForMovementAnimationToAttach(token);
+
+        if (
+          this._wasAnimatedMoveHandledRecently(tokenId, movementChanges) ||
+          !this._isAnimatedMoveDeferred(tokenId, movementChanges)
+        ) {
+          return;
+        }
+      }
+
       if (activeAnimation?.promise && activeAnimation.state !== 'completed') {
         try {
           await activeAnimation.promise;
@@ -134,21 +228,37 @@ export class TokenEventHandler {
 
         if (
           this._wasAnimatedMoveHandledRecently(tokenId, movementChanges) ||
-          this._isAnimatedMoveDeferred(tokenId, movementChanges)
+          (!markedDeferred && this._isAnimatedMoveDeferred(tokenId, movementChanges))
         ) {
           return;
         }
       }
 
-      await this._finalizeCompletedMovement(
+      const finalized = await this._finalizeCompletedMovement(
         tokenDoc,
         movementChanges,
         { options, userId },
       );
-      this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+      if (finalized === false) deferredFinalizationStarted = true;
+      if (finalized !== false) {
+        this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+      }
     } catch (e) {
       console.warn('PF2E Visioner | Error processing move token:', e);
+    } finally {
+      if (markedDeferred && !deferredFinalizationStarted) {
+        this._clearAnimatedMoveDeferred(tokenId, movementChanges);
+      }
     }
+  }
+
+  async _waitForMovementAnimationToAttach(token) {
+    for (const delayMs of PENDING_MOVE_ANIMATION_ATTACH_DELAYS_MS) {
+      await waitForMovementAnimationAttachDelay(delayMs);
+      const activeAnimation = getActiveMovementAnimation(token);
+      if (activeAnimation) return activeAnimation;
+    }
+    return null;
   }
 
   _sameMovementDestination(left, right) {
@@ -228,8 +338,99 @@ export class TokenEventHandler {
     this._draggingUpdateFallbackTimers.set(tokenId, timeoutId);
   }
 
+  _deferPositionUpdateUntilAnimationSettles(
+    tokenDoc,
+    movementChanges,
+    context = {},
+    { allowExistingDeferred = false } = {},
+  ) {
+    const tokenId = tokenDoc?.id;
+    if (!tokenId) return;
+    const alreadyDeferred = this._isAnimatedMoveDeferred(tokenId, movementChanges);
+    if (alreadyDeferred && !allowExistingDeferred) return;
+
+    if (!alreadyDeferred) {
+      this._markAnimatedMoveDeferred(tokenId, movementChanges);
+    }
+
+    (async () => {
+      try {
+        await this._waitForMovementVisualToSettle(tokenDoc, movementChanges);
+
+        if (this._wasAnimatedMoveHandledRecently(tokenId, movementChanges)) return;
+        if (!this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
+
+        const currentTokenDoc = canvas.tokens?.get(tokenId)?.document ?? tokenDoc;
+        const finalized = await this._finalizeCompletedMovement(currentTokenDoc, movementChanges, {
+          ...context,
+          allowUnsettledFinalize: true,
+        });
+        if (finalized !== false) {
+          this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+        }
+      } catch (error) {
+        console.warn('PF2E Visioner | Error processing animated movement:', error);
+      } finally {
+        this._clearAnimatedMoveDeferred(tokenId, movementChanges);
+      }
+    })();
+  }
+
+  async _waitForMovementVisualToSettle(tokenDoc, movementChanges) {
+    const startedAt = Date.now();
+    const watchedAnimationPromises = new Set();
+    let activeAnimation = getActiveMovementAnimation(tokenDoc?.object);
+    if (!activeAnimation) {
+      activeAnimation = await this._waitForMovementAnimationToAttach(tokenDoc?.object);
+    }
+
+    while (Date.now() - startedAt < MOVEMENT_VISUAL_SETTLE_MAX_MS) {
+      const token = tokenDoc?.object || canvas.tokens?.get(tokenDoc?.id)?.document?.object;
+      activeAnimation = getActiveMovementAnimation(token);
+      if (
+        activeAnimation?.promise &&
+        activeAnimation.state !== 'completed' &&
+        !watchedAnimationPromises.has(activeAnimation.promise)
+      ) {
+        watchedAnimationPromises.add(activeAnimation.promise);
+        try {
+          await activeAnimation.promise;
+        } catch {
+          /* ignore animation errors */
+        }
+        continue;
+      }
+
+      if (visualPositionReached(token, movementChanges)) return true;
+
+      if (!movementAnimationIsRunning(activeAnimation)) {
+        await waitForMovementAnimationAttachDelay(MOVEMENT_VISUAL_SETTLE_POLL_MS);
+        continue;
+      }
+
+      await waitForMovementAnimationAttachDelay(MOVEMENT_VISUAL_SETTLE_POLL_MS);
+    }
+
+    return false;
+  }
+
+  _shouldDeferFinalizeUntilVisualSettled(tokenDoc, movementChanges, context = {}) {
+    if (context?.allowUnsettledFinalize) return false;
+    if (context?.options?.animate === false || context?.options?.animation === false) return false;
+    const token = tokenDoc?.object;
+    if (!token) return false;
+    return !visualPositionReached(token, movementChanges);
+  }
+
   async _finalizeCompletedMovement(tokenDoc, movementChanges, context = {}) {
     if (!tokenDoc) return;
+
+    if (this._shouldDeferFinalizeUntilVisualSettled(tokenDoc, movementChanges, context)) {
+      this._deferPositionUpdateUntilAnimationSettles(tokenDoc, movementChanges, context, {
+        allowExistingDeferred: true,
+      });
+      return false;
+    }
 
     try {
       this._storeMovementDestination(tokenDoc, movementChanges);
@@ -240,6 +441,7 @@ export class TokenEventHandler {
     await this._reapplyRuleElementsAfterMovement(tokenDoc);
 
     this.invalidation.invalidate(tokenMovementCompleted(tokenDoc, movementChanges, context));
+    return true;
   }
 
   async _reapplyRuleElementsAfterMovement(tokenDoc) {
@@ -329,6 +531,10 @@ export class TokenEventHandler {
         setLastMovedTokenId(tokenDoc.id);
       } catch { }
 
+      if (hasPendingTokenMovementPosition(tokenDoc.id)) {
+        return;
+      }
+
       const token = tokenDoc.object;
 
       // Check if token is currently animating or being dragged
@@ -347,7 +553,7 @@ export class TokenEventHandler {
         // CRITICAL: Notify batch orchestrator that token is moving BEFORE we skip
         // This ensures the orchestrator knows to defer batch processing until movement completes
         if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
-          this.batchOrchestrator.notifyTokenMovementStart();
+          this.batchOrchestrator.notifyTokenMovementStart(tokenDoc.id);
         }
 
         // CRITICAL: Store the updated document position BEFORE returning early
@@ -373,11 +579,13 @@ export class TokenEventHandler {
               try {
                 if (!this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
                 const tokenDocObj = canvas.tokens?.get(tokenId)?.document;
-                await this._finalizeCompletedMovement(tokenDocObj ?? tokenDoc, movementChanges, {
+                const finalized = await this._finalizeCompletedMovement(tokenDocObj ?? tokenDoc, movementChanges, {
                   options,
                   userId,
                 });
-                this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+                if (finalized !== false) {
+                  this._markAnimatedMoveHandledRecently(tokenId, movementChanges);
+                }
               } catch (e) {
                 console.warn('PF2E Visioner | Error processing validation after animation:', e);
               } finally {
@@ -401,6 +609,19 @@ export class TokenEventHandler {
       const oldY = tokenDoc.y;
       const newX = changes.x ?? oldX;
       const newY = changes.y ?? oldY;
+      const movementChanges = { x: newX, y: newY };
+
+      if (moveTokenUpdateMayStartAnimation(changes, options)) {
+        if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
+          this.batchOrchestrator.notifyTokenMovementStart(tokenDoc.id);
+        }
+        this._storeMovementDestination(tokenDoc, movementChanges);
+        this._deferPositionUpdateUntilAnimationSettles(tokenDoc, movementChanges, {
+          options,
+          userId,
+        });
+        return;
+      }
 
       if (oldX === newX && oldY === newY) {
         // Token dragged but released at same position - clear cached data
@@ -411,11 +632,13 @@ export class TokenEventHandler {
 
       if (options?.method === 'dragging') {
         if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
-          this.batchOrchestrator.notifyTokenMovementStart();
+          this.batchOrchestrator.notifyTokenMovementStart(tokenDoc.id);
         }
-        const movementChanges = { x: newX, y: newY };
         this._storeMovementDestination(tokenDoc, movementChanges);
-        this._scheduleDraggingUpdateFallback(tokenDoc, movementChanges, { options, userId });
+        this._deferPositionUpdateUntilAnimationSettles(tokenDoc, movementChanges, {
+          options,
+          userId,
+        });
         return;
       }
     }

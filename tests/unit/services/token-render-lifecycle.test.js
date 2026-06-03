@@ -103,7 +103,7 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledTimes(1);
   });
 
-  test('keeps moved-token highlight refresh active while pending movement render work exists', async () => {
+  test('skips moved-token highlight refresh while pending movement is still active', async () => {
     const refreshSystemHiddenHighlightsForMovedToken = jest.fn().mockResolvedValue(undefined);
 
     const result = await handleTokenUpdated(
@@ -111,16 +111,13 @@ describe('token render lifecycle service', () => {
       { x: 100 },
       {
         schedulePendingTokenMovementCompletion: jest.fn(),
-        hasPendingMovementRenderWork: () => true,
+        hasActivePendingTokenMovement: () => true,
         refreshSystemHiddenHighlightsForMovedToken,
       },
     );
 
     expect(result).toEqual({ handled: true });
-    expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledWith(
-      { id: 'token-1' },
-      { x: 100 },
-    );
+    expect(refreshSystemHiddenHighlightsForMovedToken).not.toHaveBeenCalled();
   });
 
   test('warns when moved-token highlight refresh fails', async () => {
@@ -275,14 +272,12 @@ describe('token render lifecycle service', () => {
     await expect(
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => true,
+        getPendingMovementRefreshTargetIds: () => [],
         refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens,
       }),
     ).resolves.toEqual({ handled: true });
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-    });
+    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
     expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
   });
 

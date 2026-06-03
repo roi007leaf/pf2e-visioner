@@ -166,6 +166,13 @@ function withHiddenPrimaryMesh(token, callback) {
   }
 }
 
+function defaultIsDragPreviewOnlyActive() {
+  return (
+    globalThis.__pf2eVisionerHasActivePendingTokenMovement !== true &&
+    !!canvas?.tokens?._draggedToken
+  );
+}
+
 export function createPendingMovementDetectionFilterRenderingController({
   capturePendingMovementDetectionFilterVisualState,
   clearDetectionFilterVisuals,
@@ -176,6 +183,9 @@ export function createPendingMovementDetectionFilterRenderingController({
   getObservedDetectionFilterSuppressionContext,
   getVisibleCoreGraceContextForTarget,
   hasObservedTransitionDetectionFilterSuppression,
+  hiddenSoundwaveShouldPrimeSightBlockedSoundOpen = null,
+  hiddenSoundwaveShouldSurviveSightBlockedSoundOpen = () => false,
+  isDragPreviewOnlyActive = defaultIsDragPreviewOnlyActive,
   observedSoundwaveShouldWaitForCore,
   restorePendingMovementDetectionFilterVisualState,
   shouldAllowCoreHiddenSoundwaveForCurrentView,
@@ -214,6 +224,13 @@ export function createPendingMovementDetectionFilterRenderingController({
     if (getCurrentSightLineGraceContextForTarget?.(token)) return true;
     if (shouldPreserveHiddenSoundwaveForCurrentView?.(token)) return false;
     if (shouldAllowCoreHiddenSoundwaveForCurrentView?.(token)) return false;
+    if (
+      getCurrentViewObservers?.().some((observer) =>
+        hiddenSoundwaveShouldSurviveSightBlockedSoundOpen(observer, token),
+      )
+    ) {
+      return false;
+    }
     if (observedSoundwaveShouldWaitForCore?.(token)) return false;
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return true;
     if (getVisibleCoreGraceContextForTarget?.(token)) return true;
@@ -242,8 +259,17 @@ export function createPendingMovementDetectionFilterRenderingController({
   ) {
     if (!token?.document?.id) return false;
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return false;
+    if (shouldSuppressPendingMovementDetectionFilterVisuals(token, { hasDetectionWork })) return false;
     if (tokenHasDetectionFilterMeshVisual?.(token) || !!token?._pvHiddenEcho) return false;
     if (!token?.detectionFilterMesh) return false;
+    if (
+      getCurrentViewObservers?.().some((observer) =>
+        (hiddenSoundwaveShouldPrimeSightBlockedSoundOpen ||
+          hiddenSoundwaveShouldSurviveSightBlockedSoundOpen)(observer, token),
+      )
+    ) {
+      return true;
+    }
     return !!getHiddenDetectionFilterPreservationContext?.(token, { hasDetectionWork });
   }
 
@@ -301,6 +327,15 @@ export function createPendingMovementDetectionFilterRenderingController({
   function withSuppressedPendingMovementDetectionFilterVisuals(token, callback) {
     if (!shouldSuppressPendingMovementDetectionFilterVisuals(token)) return callback?.();
 
+    if (isDragPreviewOnlyActive()) {
+      const visualState = capturePendingMovementDetectionFilterVisualState?.(token);
+      try {
+        return callback?.();
+      } finally {
+        restorePendingMovementDetectionFilterVisualState?.(token, visualState);
+      }
+    }
+
     const restoreDetectionFilterProperty = suppressDetectionFilterProperty(token);
     try {
       clearDetectionFilterVisuals?.(token);
@@ -323,6 +358,15 @@ export function createPendingMovementDetectionFilterRenderingController({
 
   function withSuppressedPendingMovementDetectionFilterRender(token, callback) {
     if (!shouldSuppressPendingMovementDetectionFilterRender(token)) return callback?.();
+
+    if (isDragPreviewOnlyActive()) {
+      const visualState = capturePendingMovementDetectionFilterVisualState?.(token);
+      try {
+        return callback?.();
+      } finally {
+        restorePendingMovementDetectionFilterVisualState?.(token, visualState);
+      }
+    }
 
     const restoreDetectionFilterProperty = suppressDetectionFilterProperty(token, {
       value: SUPPRESSED_DETECTION_FILTER_RENDER_FILTER,

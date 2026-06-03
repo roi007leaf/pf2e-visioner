@@ -113,11 +113,13 @@ export function handlePreUpdateTokenMovement(
   if (movementRecorded) {
     const movingTokenId = tokenDoc?.id;
     const targetTokenIds = getRefreshTargetIds?.(movingTokenId) ?? [];
-    refreshPendingMovement?.(movingTokenId ? [movingTokenId] : [], {
-      skipPerceptionRefresh: true,
-      source: 'pre-update-token-movement',
-      ...(targetTokenIds.length ? { targetTokenIds } : {}),
-    });
+    if (targetTokenIds.length) {
+      refreshPendingMovement?.(movingTokenId ? [movingTokenId] : [], {
+        skipPerceptionRefresh: true,
+        source: 'pre-update-token-movement',
+        targetTokenIds,
+      });
+    }
   }
 
   if (isCurrentUserGm()) {
