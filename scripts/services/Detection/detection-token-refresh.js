@@ -160,12 +160,23 @@ function withPreservedDragPreviewDetectionVisuals(token, callback) {
   return result;
 }
 
+function anotherActiveSourceSeesTarget(token) {
+  const testPoints = token?.document?.getVisibilityTestPoints?.();
+  const testVisibility = canvas?.visibility?.testVisibility;
+  if (!testPoints?.length || !testVisibility) return false;
+  try {
+    return !!testVisibility.call(canvas.visibility, testPoints, { tolerance: 0, object: token });
+  } catch {
+    return false;
+  }
+}
+
 function refreshThenRestorePendingInvisible(token, refreshWrapped) {
   const result = refreshWrapped();
   try {
     if (shouldTemporarilyForceTokenInvisible(token)) {
       forcePendingMovementTokenInvisible(token);
-    } else if (shouldSuppressPendingMovementDetectionFilterVisuals(token)) {
+    } else if (shouldSuppressPendingMovementDetectionFilterVisuals(token) && (token.detectionFilter == null || !anotherActiveSourceSeesTarget(token))) {
       clearDetectionFilterVisuals(token);
     }
   } catch {
@@ -289,7 +300,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   }
 
   const handlesPendingMovementVisibility = shouldHandlePendingMovementCanvasVisibilityForToken(this);
-  const suppressDetectionFilterVisuals = shouldSuppressPendingMovementDetectionFilterVisuals(this);
+  const suppressDetectionFilterVisuals = shouldSuppressPendingMovementDetectionFilterVisuals(this) && (!this.detectionFilter || !anotherActiveSourceSeesTarget(this));
   const preserveDetectionFilterVisuals =
     !suppressDetectionFilterVisuals &&
     shouldPreservePendingMovementDetectionFilterVisuals(this);
