@@ -32,6 +32,11 @@ function getActiveMovementAnimation(token) {
   return null;
 }
 
+function getMovementAnimationPromise(token) {
+  const promise = token?.movementAnimationPromise;
+  return promise && typeof promise.then === 'function' ? promise : null;
+}
+
 const PENDING_MOVE_ANIMATION_ATTACH_DELAYS_MS = [0, 16, 33, 50];
 const MOVEMENT_VISUAL_SETTLE_POLL_MS = 50;
 const MOVEMENT_VISUAL_SETTLE_MAX_MS = 4000;
@@ -386,6 +391,16 @@ export class TokenEventHandler {
 
     while (Date.now() - startedAt < MOVEMENT_VISUAL_SETTLE_MAX_MS) {
       const token = tokenDoc?.object || canvas.tokens?.get(tokenDoc?.id)?.document?.object;
+      const movementAnimationPromise = getMovementAnimationPromise(token);
+      if (movementAnimationPromise && !watchedAnimationPromises.has(movementAnimationPromise)) {
+        watchedAnimationPromises.add(movementAnimationPromise);
+        try {
+          await movementAnimationPromise;
+        } catch {
+          /* ignore animation errors */
+        }
+        continue;
+      }
       activeAnimation = getActiveMovementAnimation(token);
       if (
         activeAnimation?.promise &&
@@ -419,6 +434,7 @@ export class TokenEventHandler {
     if (context?.options?.animate === false || context?.options?.animation === false) return false;
     const token = tokenDoc?.object;
     if (!token) return false;
+    if (getMovementAnimationPromise(token)) return true;
     return !visualPositionReached(token, movementChanges);
   }
 
