@@ -29,14 +29,7 @@ function getActiveMovementAnimation(token) {
   if (!token) return null;
   if (movementAnimationIsRunning(token._animation)) return token._animation;
   if (movementAnimationIsRunning(token.animation)) return token.animation;
-  const movementPromise = getMovementAnimationPromise(token);
-  if (movementPromise) return { promise: movementPromise, state: 'running' };
   return null;
-}
-
-function getMovementAnimationPromise(token) {
-  const promise = token?.movementAnimationPromise;
-  return promise && typeof promise.then === 'function' ? promise : null;
 }
 
 const PENDING_MOVE_ANIMATION_ATTACH_DELAYS_MS = [0, 16, 33, 50];
@@ -393,20 +386,6 @@ export class TokenEventHandler {
 
     while (Date.now() - startedAt < MOVEMENT_VISUAL_SETTLE_MAX_MS) {
       const token = tokenDoc?.object || canvas.tokens?.get(tokenDoc?.id)?.document?.object;
-      const movementAnimationPromise = getMovementAnimationPromise(token);
-      if (movementAnimationPromise && !watchedAnimationPromises.has(movementAnimationPromise)) {
-        watchedAnimationPromises.add(movementAnimationPromise);
-        const remainingMs = MOVEMENT_VISUAL_SETTLE_MAX_MS - (Date.now() - startedAt);
-        try {
-          await Promise.race([
-            movementAnimationPromise,
-            new Promise((resolve) => setTimeout(resolve, Math.max(0, remainingMs))),
-          ]);
-        } catch {
-          /* ignore animation errors */
-        }
-        continue;
-      }
       activeAnimation = getActiveMovementAnimation(token);
       if (
         activeAnimation?.promise &&
@@ -440,7 +419,6 @@ export class TokenEventHandler {
     if (context?.options?.animate === false || context?.options?.animation === false) return false;
     const token = tokenDoc?.object;
     if (!token) return false;
-    if (getMovementAnimationPromise(token)) return true;
     return !visualPositionReached(token, movementChanges);
   }
 
