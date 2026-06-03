@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 
 function getTokenId(token) {
   return token?.document?.id || token?.id || null;
@@ -27,6 +28,7 @@ export async function setCoverMap(token, coverMap) {
   if (!token?.document) return;
   // Only GMs can update token documents
   if (!game.user.isGM) return;
+  await waitForTokenDocumentUpdateSafe(token);
 
   const normalizedCoverMap = coverMap && typeof coverMap === 'object' ? coverMap : {};
   const hasCoverEntries = Object.keys(normalizedCoverMap).length > 0;
