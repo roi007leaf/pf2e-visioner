@@ -12,6 +12,7 @@ describe('pending movement current-view soundwave controller', () => {
     const controller = createPendingMovementCurrentViewSoundwaveController({
       getDraggedToken,
       getControlledTokens,
+      hasPendingMovementDetectionWork: () => true,
       tokenIdOf: (token) => token?.id ?? null,
     });
 
