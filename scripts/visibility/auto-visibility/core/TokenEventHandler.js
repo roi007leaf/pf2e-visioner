@@ -394,8 +394,12 @@ export class TokenEventHandler {
       const movementAnimationPromise = getMovementAnimationPromise(token);
       if (movementAnimationPromise && !watchedAnimationPromises.has(movementAnimationPromise)) {
         watchedAnimationPromises.add(movementAnimationPromise);
+        const remainingMs = MOVEMENT_VISUAL_SETTLE_MAX_MS - (Date.now() - startedAt);
         try {
-          await movementAnimationPromise;
+          await Promise.race([
+            movementAnimationPromise,
+            new Promise((resolve) => setTimeout(resolve, Math.max(0, remainingMs))),
+          ]);
         } catch {
           /* ignore animation errors */
         }

@@ -1075,6 +1075,61 @@ describe('TokenEventHandler - animation detection on position change', () => {
     jest.useRealTimers();
   });
 
+  test('final move stops waiting for a stalled v13 movement tween after the settle timeout', async () => {
+    jest.useFakeTimers();
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+
+    const movementAnimationPromise = new Promise(() => {});
+
+    const tokenDoc = makeTokenDoc({
+      object: {
+        x: 100,
+        y: 100,
+        _animation: null,
+        _dragHandle: null,
+        movementAnimationPromise,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+    global.canvas.tokens.get = jest.fn(() => ({ document: tokenDoc }));
+
+    const result = await handler._finalizeCompletedMovement(
+      tokenDoc,
+      { x: 100, y: 100 },
+      { options: {}, userId: 'user-1' },
+    );
+    expect(result).toBe(false);
+
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(invalidationCoordinator.invalidate).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(4100);
+    for (let i = 0; i < 12; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 100, y: 100 },
+      options: {},
+      userId: 'user-1',
+    });
+
+    jest.useRealTimers();
+  });
+
   test('final move does not process early when updateToken already deferred to animation completion', async () => {
     let resolveAnimation;
     const animationPromise = new Promise((resolve) => {
