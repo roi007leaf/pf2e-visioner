@@ -36,6 +36,13 @@ function sceneIdOf(scene) {
   return scene?.id ?? scene?._id ?? scene?.value?.id ?? scene?.value?._id ?? null;
 }
 
+let sceneHearingRangeGeneration = 0;
+const sceneHearingRangeCache = new WeakMap();
+
+export function invalidateSceneHearingRangeCache() {
+  sceneHearingRangeGeneration++;
+}
+
 function sceneCollectionValues(scenes) {
   if (!scenes) return [];
   if (Array.isArray(scenes)) return scenes;
@@ -57,6 +64,22 @@ export function getActiveSceneHearingRange({
   gameRef = globalThis.game,
   sceneId = canvasRef?.scene?.id ?? canvasRef?.scene?._id ?? null,
 } = {}) {
+  const activeScene = canvasRef?.scene;
+
+  if (activeScene && typeof activeScene === 'object') {
+    const direct = readSceneRangeCandidate(activeScene);
+    if (direct !== null) return direct;
+  }
+
+  const useCache =
+    activeScene && typeof activeScene === 'object' && sceneId && sceneIdOf(activeScene) === sceneId;
+  if (useCache) {
+    const cached = sceneHearingRangeCache.get(activeScene);
+    if (cached && cached.generation === sceneHearingRangeGeneration) {
+      return cached.range;
+    }
+  }
+
   const candidates = [];
   const seen = new Set();
   const addCandidate = (scene) => {
@@ -83,12 +106,23 @@ export function getActiveSceneHearingRange({
     addCandidate(scene);
   }
 
+  let resolved = null;
   for (const scene of candidates) {
     const range = readSceneRangeCandidate(scene);
-    if (range !== null) return range;
+    if (range !== null) {
+      resolved = range;
+      break;
+    }
   }
 
-  return null;
+  if (useCache) {
+    sceneHearingRangeCache.set(activeScene, {
+      generation: sceneHearingRangeGeneration,
+      range: resolved,
+    });
+  }
+
+  return resolved;
 }
 
 export function applyActiveSceneHearingRangeLimit(range, options = {}) {

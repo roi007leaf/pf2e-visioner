@@ -17,6 +17,8 @@ import { handleVisionerRuleElementItemUpdate } from '../rule-elements/item-updat
 import { cleanupDeletedEffectItem } from '../services/deleted-effect-cleanup.js';
 import { createVisionMasterTokenRefresh } from '../services/vision-master-token-refresh.js';
 import { handleSceneDisableAvsRefresh } from '../services/scene-disable-avs-refresh.js';
+import { invalidateSceneHearingRangeCache } from '../services/scene-hearing-range.js';
+import { invalidateActorConditionCache } from '../services/sense-distance.js';
 import { handlePreCreateChatMessage } from '../chat/services/pre-create-message.js';
 import {
   initializeDeferredSeekManager,
@@ -80,7 +82,13 @@ export async function registerHooks() {
 
   // Register item update hooks for rule element updates
   Hooks.on('updateItem', async (item, changes, options, userId) => {
+    invalidateActorConditionCache();
     handleVisionerRuleElementItemUpdate(item, changes, options, userId);
+  });
+
+  // Invalidate the move-invariant condition cache when condition items appear
+  Hooks.on('createItem', () => {
+    invalidateActorConditionCache();
   });
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
@@ -150,11 +158,13 @@ export async function registerHooks() {
 
   // If effects are manually removed, clear corresponding token flags
   Hooks.on('deleteItem', async (item) => {
+    invalidateActorConditionCache();
     await cleanupDeletedEffectItem(item);
   });
 
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
   Hooks.on('updateScene', async (scene, changes) => {
+    invalidateSceneHearingRangeCache();
     await handleSceneDisableAvsRefresh(scene, changes);
   });
 }

@@ -17,10 +17,36 @@ function collectionValues(collection) {
   return [];
 }
 
+let actorConditionGeneration = 0;
+const actorConditionCache = new WeakMap();
+
+export function invalidateActorConditionCache() {
+  actorConditionGeneration++;
+}
+
 export function actorHasConditionSlug(actor, slug) {
   if (!actor || !slug) return false;
   const normalizedSlug = String(slug).toLowerCase();
 
+  let actorEntry = actorConditionCache.get(actor);
+  if (actorEntry && actorEntry.generation !== actorConditionGeneration) {
+    actorEntry = undefined;
+  }
+  if (actorEntry?.slugs.has(normalizedSlug)) {
+    return actorEntry.slugs.get(normalizedSlug);
+  }
+
+  const result = computeActorHasConditionSlug(actor, normalizedSlug);
+
+  if (!actorEntry) {
+    actorEntry = { generation: actorConditionGeneration, slugs: new Map() };
+    actorConditionCache.set(actor, actorEntry);
+  }
+  actorEntry.slugs.set(normalizedSlug, result);
+  return result;
+}
+
+function computeActorHasConditionSlug(actor, normalizedSlug) {
   try {
     if (actor.hasCondition?.(normalizedSlug)) return true;
   } catch {}
