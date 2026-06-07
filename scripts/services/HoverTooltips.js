@@ -67,6 +67,7 @@ import {
 import {
   SENSE_BADGE_BLOCKED_VISIBILITY_STATES,
   buildHoverTooltipVisibilityRequests,
+  buildTooltipVisibilityIndicatorDecision,
   buildTooltipVisibilityRequests,
   canRenderTooltipToken,
 } from './HoverTooltip/hover-tooltip-visibility-requests.js';
@@ -1056,7 +1057,7 @@ function showVisibilityIndicators(hoveredToken) {
  * @param {Token} observerToken - The token to show visibility indicators for
  * @param {string} forceMode - Optional mode to force ('observer' or 'target'), defaults to current tooltipMode
  */
-function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
+export function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
   // Use forced mode if provided, otherwise use current tooltipMode
   const effectiveMode = forceMode || HoverTooltips.tooltipMode;
 
@@ -1078,6 +1079,31 @@ function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
   });
 
   requests.forEach(renderVisibilityIndicatorRequest);
+}
+
+export function showVisibilityIndicatorsForTokenPair(observerToken, targetToken, forceMode = 'target') {
+  const effectiveMode = forceMode || HoverTooltips.tooltipMode;
+  const isKeyboardTooltip = !!forceMode;
+  if (!observerToken || !targetToken) return;
+  if (!canShowTooltips(effectiveMode, null, isKeyboardTooltip)) return;
+
+  const visibilityState = getVisibilityBetween(observerToken, targetToken);
+  const decision = buildTooltipVisibilityIndicatorDecision({
+    observerToken,
+    targetToken,
+    visibilityState,
+    getDetectionBetween,
+  });
+  if (!decision.shouldShowIndicator) return;
+
+  renderVisibilityIndicatorRequest({
+    renderToken: effectiveMode === 'observer' ? targetToken : observerToken,
+    observerToken,
+    visibilityState: decision.visibilityState,
+    mode: effectiveMode,
+    detectionTarget: effectiveMode === 'target' ? targetToken : null,
+    senseUsed: decision.senseUsed,
+  });
 }
 
 /**

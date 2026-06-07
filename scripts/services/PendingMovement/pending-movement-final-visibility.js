@@ -4,6 +4,7 @@ import {
   actorHasConditionSlug,
   createPositionedTokenProxy,
   observerCanHearTarget,
+  observerHasWallBypassImpreciseSenseInRange,
   observerHasUsableSight,
 } from './pending-movement-observer-senses.js';
 import {
@@ -77,6 +78,9 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
   const getPlaceableTokens = adapter.getPlaceableTokens ?? (() => canvas?.tokens?.placeables || []);
   const getStoredVisibilityState = adapter.getStoredVisibilityState ?? (() => 'observed');
   const hasLineOfSightToSampledToken = adapter.hasLineOfSightToSampledToken ?? (() => false);
+  const observerHasWallBypassImpreciseSense =
+    adapter.observerHasWallBypassImpreciseSenseInRange ??
+    observerHasWallBypassImpreciseSenseInRange;
   const getEntry = adapter.getEntry ?? (() => null);
   const getRefreshTargetIds = adapter.getRefreshTargetIds ?? (() => []);
   const refreshTokenVisibility = adapter.refreshTokenVisibility ?? (() => undefined);
@@ -124,6 +128,8 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
       return renderHiddenFromObserverStates.has(normalizedStoredState) ? 'observed' : null;
     }
 
+    const canDetectByWallBypassImpreciseSense =
+      observerHasWallBypassImpreciseSense(observer, target);
     const canHearAtFinalPosition =
       observerCanHearTarget(observer, target) &&
       (!soundCanBeBlocked ||
@@ -132,7 +138,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
           targetToken: target,
         }));
 
-    if (canHearAtFinalPosition) {
+    if (canDetectByWallBypassImpreciseSense || canHearAtFinalPosition) {
       if (
         renderHiddenFromObserverStates.has(normalizedStoredState) ||
         DEFAULT_CORE_LOS_FINAL_PREDICTION_STATES.has(normalizedStoredState)

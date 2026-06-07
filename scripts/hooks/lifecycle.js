@@ -193,6 +193,23 @@ function scheduleNoObserverVisibilityRefresh() {
   }
 }
 
+function tokenIdForControlRefresh(token) {
+  return token?.document?.id ?? token?.id ?? null;
+}
+
+function getSceneTokenRefreshTargetIdsForControlToken() {
+  return (canvas?.tokens?.placeables || [])
+    .map((token) => tokenIdForControlRefresh(token))
+    .filter(Boolean);
+}
+
+function getRenderLockedSceneTokenIds() {
+  return (canvas?.tokens?.placeables || [])
+    .filter((token) => getPendingRenderState(token))
+    .map((token) => tokenIdForControlRefresh(token))
+    .filter(Boolean);
+}
+
 function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
   try {
     if (isSelectAllTokenVisibilityBypassActive()) {
@@ -204,6 +221,8 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
     const targetTokenIds = [
       ...new Set([
         ...(hasRenderWork ? getPendingMovementRefreshTargetIds() : []),
+        ...(!hasRenderWork ? getSceneTokenRefreshTargetIdsForControlToken() : []),
+        ...getRenderLockedSceneTokenIds(),
         ...getControlledObserverDetectionVisualTargetIds(token),
       ]),
     ];
@@ -214,7 +233,7 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
           ignoreObservedGrace: true,
           source: 'control-token-session',
           targetTokenIds,
-          ...(!hasRenderWork ? { skipPerceptionRefresh: true } : {}),
+          ...(!hasRenderWork ? { forceTokenRefresh: true } : {}),
         }
         : {
           ignoreObservedGrace: true,

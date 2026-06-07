@@ -9,6 +9,20 @@ export {
   observerCanHearTarget,
 };
 
+const WALL_BYPASS_IMPRECISE_SENSE_DEFAULT_RANGES = {
+  bloodsense: 30,
+  lifesense: 10,
+  magicsense: 30,
+  'motion-sense': 30,
+  scent: 30,
+  spiritsense: 30,
+  thoughtsense: 30,
+  wavesense: 30,
+};
+const WALL_BYPASS_IMPRECISE_SENSE_TYPES = new Set(
+  Object.keys(WALL_BYPASS_IMPRECISE_SENSE_DEFAULT_RANGES),
+);
+
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
 }
@@ -44,9 +58,20 @@ function normalizeSenseCollection(senses) {
   return [];
 }
 
+function normalizeSenseType(sense) {
+  return String(sense?.type ?? sense?.slug ?? sense?.id ?? sense ?? '').toLowerCase();
+}
+
+function senseRangeInFeet(sense, senseType) {
+  const explicitRange = Number(sense?.range ?? sense?.value?.range ?? sense?.distance);
+  if (Number.isFinite(explicitRange)) return explicitRange;
+  if (explicitRange === Infinity) return Infinity;
+  return WALL_BYPASS_IMPRECISE_SENSE_DEFAULT_RANGES[senseType] ?? 0;
+}
+
 function hasExplicitVisualSense(senses) {
   return normalizeSenseCollection(senses).some((sense) => {
-    const type = String(sense?.type ?? sense?.slug ?? sense?.id ?? sense ?? '').toLowerCase();
+    const type = normalizeSenseType(sense);
     return (
       type === 'vision' ||
       type === 'sight' ||
@@ -173,6 +198,37 @@ export function observerHasUsableSight(observer) {
     if (source?.active && source?.object && source.object === token) return true;
   }
   return false;
+}
+
+export function observerHasWallBypassImpreciseSenseInRange(observer, target, { gridSize } = {}) {
+  if (!observer || !target) return false;
+
+  let impreciseSenses = [];
+  try {
+    const capabilities = VisionAnalyzer.getInstance()?.getVisionCapabilities?.(observer);
+    impreciseSenses = normalizeSenseCollection(capabilities?.sensingSummary?.imprecise);
+  } catch {
+    impreciseSenses = [];
+  }
+
+  if (!impreciseSenses.length) {
+    const senses = actorOf(observer)?.system?.perception?.senses;
+    impreciseSenses = normalizeSenseCollection(senses).filter((sense) => {
+      const acuity = String(sense?.acuity ?? sense?.category ?? '').toLowerCase();
+      const type = normalizeSenseType(sense);
+      return acuity === 'imprecise' || WALL_BYPASS_IMPRECISE_SENSE_TYPES.has(type);
+    });
+  }
+
+  if (!impreciseSenses.length) return false;
+
+  const distance = calculateProxyDistanceInFeet(observer, target, observer?.distanceTo);
+  return impreciseSenses.some((sense) => {
+    const senseType = normalizeSenseType(sense);
+    if (!WALL_BYPASS_IMPRECISE_SENSE_TYPES.has(senseType)) return false;
+    const range = senseRangeInFeet(sense, senseType);
+    return range > 0 && (!Number.isFinite(range) || range >= distance);
+  });
 }
 
 export function createPositionedTokenProxy(tokenOrDoc, position, { getTokenObjectForDocument } = {}) {

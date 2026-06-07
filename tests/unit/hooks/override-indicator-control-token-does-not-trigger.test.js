@@ -400,7 +400,7 @@ describe('Override indicator should not trigger on controlToken', () => {
             ignoreObservedGrace: true,
             source: 'control-token-session',
             targetTokenIds: ['late-hidden'],
-            skipPerceptionRefresh: true,
+            forceTokenRefresh: true,
         });
     });
 
@@ -530,6 +530,44 @@ describe('Override indicator should not trigger on controlToken', () => {
         });
     });
 
+    test('controlToken refreshes scene tokens when switching observers without pending render work', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            getControlledObserverDragPreviewSoundwaveTargetIds: jest.fn(() => []),
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => false),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const restoreIndicatorsCb = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .find((cb) => String(cb).includes('allowControlledFallback'));
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const observer = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        const staleObservedTarget = { document: { id: 'stale-observed' } };
+        global.canvas.tokens.controlled = [observer];
+        global.canvas.tokens.placeables = [observer, staleObservedTarget];
+
+        await restoreIndicatorsCb(observer, true);
+
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+            source: 'control-token-session',
+            targetTokenIds: ['observer', 'stale-observed'],
+            forceTokenRefresh: true,
+        });
+    });
+
     test('controlToken immediately refreshes hidden targets for selected observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
@@ -562,7 +600,47 @@ describe('Override indicator should not trigger on controlToken', () => {
             ignoreObservedGrace: true,
             source: 'control-token-session',
             targetTokenIds: ['alon', 'centipede'],
-            skipPerceptionRefresh: true,
+            forceTokenRefresh: true,
+        });
+    });
+
+    test('controlToken refresh includes render-locked scene tokens as refresh targets', async () => {
+        const refreshPendingMovementTokenVisibility = jest.fn();
+        jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
+            getControlledObserverDragPreviewSoundwaveTargetIds: jest.fn(() => []),
+            getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
+            getPendingMovementRefreshTargetIds: jest.fn(() => []),
+            hasPendingMovementRenderWork: jest.fn(() => true),
+            primePendingControlledTokenDragIntent: jest.fn(),
+            refreshPendingMovementTokenVisibility,
+            releasePendingControlledTokenDragIntent: jest.fn(),
+            restorePendingMovementTokenRendering: jest.fn(),
+        }));
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const restoreIndicatorsCb = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .find((cb) => String(cb).includes('allowControlledFallback'));
+
+        expect(restoreIndicatorsCb).toBeTruthy();
+
+        const observer = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
+        const lockedToken = {
+            document: { id: 'locked-target' },
+            _pf2eVisionerPendingRenderState: { lastHiddenContext: { renderHiddenByVisioner: true } },
+        };
+        global.canvas.tokens.controlled = [observer];
+        global.canvas.tokens.placeables = [observer, lockedToken];
+
+        await restoreIndicatorsCb(observer, true);
+
+        expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+            ignoreObservedGrace: true,
+            source: 'control-token-session',
+            targetTokenIds: ['locked-target'],
         });
     });
 

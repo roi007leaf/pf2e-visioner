@@ -10,6 +10,11 @@ import {
 } from '../runtime-state.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from '../Detection/select-all-token-visibility-bypass.js';
+import {
+  resolveDuringMoveDecision,
+  stateBlocksDetection as duringMoveStateBlocksDetection,
+  stateHidesTargetRendering as duringMoveStateHidesTargetRendering,
+} from '../Detection/during-move-engine.js';
 import { drawHiddenTokenEcho, removeHiddenTokenEcho } from '../hidden-token-echoes.js';
 import {
   createPendingMovementFinalVisibilityController,
@@ -70,6 +75,7 @@ import {
   getPendingRenderState,
   hasPendingMovementRenderLocks,
   hasPendingRenderState,
+  hideTokenInterfaceChromeForHiddenSoundwave,
   hideTokenLevelIndicatorSurface,
   isPendingMovementRenderLocked,
   prunePendingMovementRenderLocks,
@@ -105,7 +111,6 @@ const PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS = PENDING_MOVEMENT_TTL_MS;
 const PENDING_MOVEMENT_REFRESH_VISIBILITY_PERCEPTION_COALESCE_MS = 3000;
 export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
-const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
 const CORE_LOS_TRANSITION_REFRESH_STATES = new Set(['observed', 'concealed']);
 const controlledDragSoundwaveBaselineByObserverId = new Map();
 const PENDING_MOVEMENT_SUPPRESSION_KEY = 'pf2eVisionerPendingMovement';
@@ -1520,81 +1525,177 @@ function activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVi
   return currentPendingMovementSightLineSeesTarget(observer, target);
 }
 
-function getPendingMovementVisibilityState(observer, target) {
-  const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
-  const coreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
-  if (coreOwnedMovement) {
-    const storedVisibilityState = getStoredVisibilityState(observer, target);
-    if (
-      hasActiveAvsOverride(observer, target) &&
-      DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState)
-    ) {
-      return storedVisibilityState;
-    }
-    if (activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState)) {
-      rememberCurrentSightLineGraceContext(observer, target);
-      return 'observed';
-    }
-    if (predictedFinalState) {
-      const startingVisibilityState =
-        getInitialPendingMovementVisibilityState(observer, target) || storedVisibilityState;
-      const storedRenderHidden = visionerStateHidesTargetRendering(storedVisibilityState, target);
-      const finalRenderHidden = visionerStateHidesTargetRendering(predictedFinalState, target);
-      if (
-        startingVisibilityState &&
-        !invisibleUndetectedRenderLockMustStayLocked(target, startingVisibilityState) &&
-        visionerStateHidesTargetRendering(startingVisibilityState, target) !==
-        finalRenderHidden
-      ) {
-        return renderVisibilityStateForCurrentPolygonTransition(
-          observer,
-          target,
-          startingVisibilityState,
-          predictedFinalState,
-        );
-      }
-      if (
-        storedRenderHidden &&
-        finalRenderHidden &&
-        currentSightLineGraceCanYieldToCore(observer, target, storedVisibilityState)
-      ) {
-        return 'observed';
-      }
-      if (
-        visibleDetectionStateShouldWaitForCurrentPolygon(
-          observer,
-          target,
-          storedVisibilityState,
-          predictedFinalState,
-        )
-      ) {
-        return storedVisibilityState;
-      }
-      return predictedFinalState;
-    }
-    if (visionerStateHidesTargetRendering(storedVisibilityState, target)) {
-      return storedVisibilityState;
-    }
-    if (
-      hasActiveControlledMovementPreview(observer, target) &&
-      !hasPendingMovementEntryForPair(observer, target)
-    ) {
-      return 'observed';
-    }
+function currentLosSeesTargetForDuringMove(observer, target, { useLivePolygon = false } = {}) {
+  if (useLivePolygon) {
+    const currentPolygonSeesTarget = currentCoreDetectionPolygonSeesTarget(observer, target, {
+      requirePolygon: true,
+    });
+    if (currentPolygonSeesTarget !== null) return currentPolygonSeesTarget;
   }
-
-  return getStoredVisibilityState(observer, target);
+  return currentPendingMovementSightLineSeesTarget(observer, target);
 }
 
-function hiddenStateShouldRenderHideTarget(target) {
-  if (!target) return false;
-  const actorType = String(actorOf(target)?.type ?? '').toLowerCase();
-  return HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES.has(actorType);
+function movementPreviewOnlyForPair(observer, target) {
+  if (hasPendingMovementEntryForPair(observer, target)) return false;
+  return (
+    hasActiveControlledMovementPreview(observer, target) ||
+    hasPendingControlledTokenDragIntent(observer) ||
+    hasPendingControlledTokenDragIntent(target)
+  );
+}
+
+function resolvePendingMovementDecisionForObserverTarget(
+  observer,
+  target,
+  {
+    includeInitialVisibility = true,
+    includeRecentCompletedVisibility = false,
+    allowActivePreviewReveal = true,
+    useLivePolygonLos = false,
+  } = {},
+) {
+  const storedVisibilityState = getStoredVisibilityState(observer, target);
+  const initialVisibilityState = includeInitialVisibility
+    ? getInitialPendingMovementVisibilityState(observer, target)
+    : null;
+  const recentCompletedVisibilityState = includeRecentCompletedVisibility
+    ? getRecentCompletedMovementVisibilityStateForObserver(observer, target)
+    : null;
+  const hasCoreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
+  const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
+  const activePreviewCanReveal = hasCoreOwnedMovement && allowActivePreviewReveal
+    ? activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState)
+    : false;
+  const finalStateBlocksDetection = DETECTION_BLOCKING_VISIBILITY_STATES.has(predictedFinalState);
+  const hiddenToHardHideFinal =
+    storedVisibilityState === 'hidden' && RENDER_HIDDEN_FROM_OBSERVER_STATES.has(predictedFinalState);
+  const shouldReadCurrentLos =
+    hasCoreOwnedMovement && (predictedFinalState || activePreviewCanReveal);
+  const currentLosForDecision = shouldReadCurrentLos
+    ? currentLosSeesTargetForDuringMove(observer, target, {
+      useLivePolygon: useLivePolygonLos || hiddenToHardHideFinal,
+    })
+    : null;
+  const sightLineGraceCanYield =
+    hasCoreOwnedMovement && (!finalStateBlocksDetection || currentLosForDecision === true)
+    ? currentSightLineGraceCanYieldToCore(observer, target, storedVisibilityState)
+    : false;
+
+  if (activePreviewCanReveal || sightLineGraceCanYield) {
+    rememberCurrentSightLineGraceContext(observer, target);
+  }
+
+  return resolveDuringMoveDecision({
+    storedState: storedVisibilityState,
+    initialState: initialVisibilityState,
+    recentCompletedState: recentCompletedVisibilityState,
+    finalState: predictedFinalState,
+    movementActive: hasCoreOwnedMovement,
+    movementCommitted: !movementPreviewOnlyForPair(observer, target),
+    selectionBypass: isSelectAllTokenVisibilityBypassActive(),
+    activeAvsOverride: hasActiveAvsOverride(observer, target),
+    activePreviewCanReveal,
+    currentSightLineGraceCanYield: sightLineGraceCanYield,
+    currentLosSeesTarget:
+      hasCoreOwnedMovement && (predictedFinalState || activePreviewCanReveal || sightLineGraceCanYield)
+        ? currentLosForDecision
+        : null,
+    invisible: actorHasConditionSlug(actorOf(target), 'invisible'),
+    targetType: actorOf(target)?.type,
+  });
+}
+
+function getPendingMovementVisibilityState(observer, target) {
+  return resolvePendingMovementDecisionForObserverTarget(observer, target).visibilityState;
 }
 
 function visionerStateHidesTargetRendering(visibilityState, target = null) {
-  if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(visibilityState)) return true;
-  return visibilityState === 'hidden' && hiddenStateShouldRenderHideTarget(target);
+  return duringMoveStateHidesTargetRendering(visibilityState, actorOf(target)?.type ?? target);
+}
+
+function hiddenSoundwaveContextCanRenderTarget(context, target) {
+  if (context?.visibilityState !== 'hidden') return false;
+  return !visionerStateHidesTargetRendering('hidden', target);
+}
+
+function selectedHiddenSoundwaveContextForTarget(target) {
+  const context = getActiveControlledHiddenDetectionFilterContext(target);
+  return hiddenSoundwaveContextCanRenderTarget(context, target) ? context : null;
+}
+
+export function shouldForceHiddenSoundwaveCanvasVisibility(target) {
+  if (!target?.document?.id) return false;
+  if (target.controlled) return false;
+
+  const targetId = tokenIdOf(target);
+  if (!targetId) return false;
+  for (const observer of canvas?.tokens?.controlled || []) {
+    if (tokenIdOf(observer) === targetId) continue;
+    const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
+    if (predictedFinalState) {
+      if (hiddenSoundwaveContextCanRenderTarget({ visibilityState: predictedFinalState }, target)) {
+        return true;
+      }
+      continue;
+    }
+    const recentCompletedState = getRecentCompletedMovementVisibilityStateForObserver(
+      observer,
+      target,
+    );
+    if (recentCompletedState) {
+      if (hiddenSoundwaveContextCanRenderTarget({ visibilityState: recentCompletedState }, target)) {
+        return true;
+      }
+      continue;
+    }
+    const visibilityState = getStoredVisibilityState(observer, target);
+    if (hiddenSoundwaveContextCanRenderTarget({ visibilityState }, target)) return true;
+  }
+  return false;
+}
+
+export function showHiddenSoundwaveCanvasVisibilityTarget(target) {
+  if (!shouldForceHiddenSoundwaveCanvasVisibility(target)) return false;
+  return showTokenForHiddenSoundwave(target);
+}
+
+function meshAlphaForHiddenSoundwave(token) {
+  const invisible = actorHasConditionSlug(actorOf(token), 'invisible');
+  const stateAlpha = Number(getPendingRenderState(token)?.meshAlpha);
+  if (Number.isFinite(stateAlpha) && stateAlpha > 0 && (!invisible || stateAlpha < 1)) {
+    return stateAlpha;
+  }
+
+  const currentAlpha = Number(token?.mesh?.alpha);
+  if (Number.isFinite(currentAlpha) && currentAlpha > 0 && (!invisible || currentAlpha < 1)) {
+    return currentAlpha;
+  }
+
+  return invisible ? 0.5 : 1;
+}
+
+function showTokenForHiddenSoundwave(token) {
+  if (!token) return false;
+  try {
+    token.visible = true;
+    token.renderable = true;
+    if (token.mesh) {
+      if ('visible' in token.mesh) token.mesh.visible = true;
+      if ('renderable' in token.mesh) token.mesh.renderable = true;
+      const currentAlpha = Number(token.mesh.alpha ?? 0);
+      const shouldCorrectAlpha =
+        currentAlpha <= 0 || (actorHasConditionSlug(actorOf(token), 'invisible') && currentAlpha >= 1);
+      if ('alpha' in token.mesh && shouldCorrectAlpha) {
+        token.mesh.alpha = meshAlphaForHiddenSoundwave(token);
+      }
+    }
+    ensurePendingMovementHearingDetectionVisual(token, { lightweight: true });
+    forceDetectionFilterMeshVisible(token);
+    hideTokenInterfaceChromeForHiddenSoundwave(token);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function invisibleUndetectedRenderLockMustStayLocked(target, visibilityState) {
@@ -1663,116 +1764,13 @@ function currentCoreDetectionPolygonSeesTarget(observer, target, { requirePolygo
   );
 }
 
-function renderVisibilityStateForCurrentPolygonTransition(observer, target, fromState, toState) {
-  const fromRenderHidden = visionerStateHidesTargetRendering(fromState, target);
-  const toRenderHidden = visionerStateHidesTargetRendering(toState, target);
-  if (fromRenderHidden === toRenderHidden) return toState;
-
-  const currentPolygonSeesTarget = currentCoreDetectionPolygonSeesTarget(observer, target, {
-    requirePolygon: true,
-  });
-  if (currentPolygonSeesTarget === null) return fromState;
-  if (fromRenderHidden && !toRenderHidden) {
-    if (currentPolygonSeesTarget) {
-      rememberCurrentSightLineGraceContext(observer, target);
-      return toState;
-    }
-    return fromState;
-  }
-  if (!fromRenderHidden && toRenderHidden) {
-    if (currentPolygonSeesTarget) {
-      rememberCurrentSightLineGraceContext(observer, target);
-      return fromState;
-    }
-    return toState;
-  }
-
-  return toState;
-}
-
-function visibleDetectionStateShouldWaitForCurrentPolygon(observer, target, fromState, toState) {
-  if (!CORE_LOS_TRANSITION_REFRESH_STATES.has(fromState)) return false;
-  if (toState !== 'hidden') return false;
-  if (!shouldUseCoreDetectionDuringPendingMovement(observer, target)) return false;
-  if (!currentPendingMovementSightLineSeesTarget(observer, target)) return false;
-
-  rememberCurrentSightLineGraceContext(observer, target);
-  return true;
-}
-
 function getCurrentViewRenderHiddenVisibilityState(observer, target) {
-  const storedVisibilityState =
-    getInitialPendingMovementVisibilityState(observer, target) ||
-    getStoredVisibilityState(observer, target);
-  const recentCompletedVisibilityState = getRecentCompletedMovementVisibilityStateForObserver(
-    observer,
-    target,
-  );
-  const hasCoreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
-
-  if (
-    hasActiveAvsOverride(observer, target) &&
-    DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState)
-  ) {
-    return storedVisibilityState;
-  }
-
-  if (!hasCoreOwnedMovement) {
-    if (recentCompletedVisibilityState) {
-      return renderVisibilityStateForCurrentPolygonTransition(
-        observer,
-        target,
-        storedVisibilityState,
-        recentCompletedVisibilityState,
-      );
-    }
-    return storedVisibilityState;
-  }
-
-  if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) {
-    return storedVisibilityState;
-  }
-  if (currentSightLineGraceCanYieldToCore(observer, target, storedVisibilityState)) {
-    return 'observed';
-  }
-
-  const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
-  if (!predictedFinalState) {
-    if (
-      visionerStateHidesTargetRendering(storedVisibilityState, target) &&
-      hasActiveControlledMovementPreview(observer, target) &&
-      !hasPendingMovementEntryForPair(observer, target)
-    ) {
-      const currentPolygonSeesTarget = currentCoreDetectionPolygonSeesTarget(observer, target, {
-        requirePolygon: true,
-      });
-      if (currentPolygonSeesTarget === true) {
-        rememberCurrentSightLineGraceContext(observer, target);
-        return 'observed';
-      }
-      return storedVisibilityState;
-    }
-    if (recentCompletedVisibilityState) {
-      return renderVisibilityStateForCurrentPolygonTransition(
-        observer,
-        target,
-        storedVisibilityState,
-        recentCompletedVisibilityState,
-      );
-    }
-    return storedVisibilityState;
-  }
-
-  const storedRenderHidden = visionerStateHidesTargetRendering(storedVisibilityState, target);
-  const finalRenderHidden = visionerStateHidesTargetRendering(predictedFinalState, target);
-  if (storedRenderHidden === finalRenderHidden) return predictedFinalState;
-
-  return renderVisibilityStateForCurrentPolygonTransition(
-    observer,
-    target,
-    storedVisibilityState,
-    predictedFinalState,
-  );
+  return resolvePendingMovementDecisionForObserverTarget(observer, target, {
+    includeInitialVisibility: true,
+    includeRecentCompletedVisibility: true,
+    allowActivePreviewReveal: false,
+    useLivePolygonLos: true,
+  }).visibilityState;
 }
 
 function shouldKeepVisionerRenderLockDuringPendingMovement(observer, target) {
@@ -1780,7 +1778,7 @@ function shouldKeepVisionerRenderLockDuringPendingMovement(observer, target) {
 }
 
 function visionerStateBlocksPendingDetection(visibilityState) {
-  return DETECTION_BLOCKING_VISIBILITY_STATES.has(visibilityState);
+  return duringMoveStateBlocksDetection(visibilityState);
 }
 
 function tokenObjectForId(tokenId) {
@@ -2269,7 +2267,10 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
   if (shouldBypassAvsForGmVision()) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
-  if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
+  if (shouldForceHiddenSoundwaveCanvasVisibility(target)) return false;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) {
+    return !selectedHiddenSoundwaveContextForTarget(target);
+  }
 
   const candidates = [];
   const add = (token) => {
@@ -2296,7 +2297,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
       RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState) &&
       !invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState) &&
       coreOwnedPendingMovement &&
-      currentPendingMovementSightLineSeesTarget(observer, target)
+      currentLosSeesTargetForDuringMove(observer, target, { useLivePolygon: true })
     ) {
       rememberCurrentSightLineGraceContext(observer, target);
     }
@@ -2309,7 +2310,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
         !invisibleUndetectedRenderLockMustStayLocked(target, state) &&
         coreOwnedPendingMovement &&
         tokenPrimaryRenderIsVisible(target) &&
-        currentPendingMovementSightLineSeesTarget(observer, target)
+        currentLosSeesTargetForDuringMove(observer, target, { useLivePolygon: true })
       ) {
         rememberCurrentSightLineGraceContext(observer, target);
         continue;
@@ -2324,7 +2325,9 @@ export function targetMustStayHiddenDuringPendingMovement(target) {
   if (!target?.document?.id) return false;
   if (shouldBypassAvsForGmVision()) return false;
   if (target.controlled) return false;
-  if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) {
+    return !selectedHiddenSoundwaveContextForTarget(target);
+  }
   return false;
 }
 
@@ -2560,7 +2563,7 @@ function getHiddenDetectionFilterPreservationContext(target, { hasDetectionWork 
   const context =
     pendingContext || getActiveControlledHiddenDetectionFilterContext(target) || storedContext;
   if (!context) return null;
-  if (context.foundryHidden) return null;
+  if (context.foundryHidden && !hiddenSoundwaveContextCanRenderTarget(context, target)) return null;
   if (context.visibilityState !== 'hidden') return null;
   return context;
 }
@@ -2947,6 +2950,24 @@ function contextShouldYieldToCoreDuringPendingMovement(context, target) {
   return shouldUseCoreDetectionDuringPendingMovement(observer, target);
 }
 
+function lockObserverIsStaleForCurrentView(context) {
+  if (!context || context.foundryHidden) return false;
+  const observerId = context.observerId;
+  if (!observerId) return false;
+
+  const viewObserverIds = new Set();
+  const draggedId = tokenIdOf(canvas?.tokens?._draggedToken);
+  if (draggedId) viewObserverIds.add(draggedId);
+  for (const observer of canvas?.tokens?.controlled || []) {
+    const id = tokenIdOf(observer);
+    if (id) viewObserverIds.add(id);
+  }
+  for (const id of pendingTokenMovementPositions.keys()) viewObserverIds.add(id);
+
+  if (viewObserverIds.size === 0) return false;
+  return !viewObserverIds.has(observerId);
+}
+
 function clearCoreOwnedPendingRenderLock(token, state) {
   const lockContext =
     getRememberedHiddenForceContext(token) ||
@@ -2981,6 +3002,7 @@ function getCoreOwnedRenderHiddenLockRefreshDecision(token) {
 
   const lock = getCoreOwnedRenderHiddenLockContext(token, state);
   if (!lock) return null;
+  if (shouldForceHiddenSoundwaveCanvasVisibility(token)) return 'restore';
 
   const currentSightSeesTarget = currentPendingMovementSightLineSeesTarget(lock.observer, token);
   const reachedObservedDestination = predictedObservedMovementReachedDestination(
@@ -3033,7 +3055,11 @@ function getStickyHiddenRenderLockContext(target, state) {
   if (!lockContext) return null;
 
   const foundryHidden = foundryHiddenRequiresVisionerRenderLock(target);
-  if (!foundryHidden && contextShouldYieldToCoreDuringPendingMovement(lockContext, target)) {
+  if (
+    !foundryHidden &&
+    (contextShouldYieldToCoreDuringPendingMovement(lockContext, target) ||
+      lockObserverIsStaleForCurrentView(lockContext))
+  ) {
     forgetHiddenForceContext(target);
     return null;
   }
@@ -3205,6 +3231,7 @@ function shouldSkipForcedInvisibleTokenRefresh(token) {
 
   const context = state.lastHiddenContext || getRememberedHiddenForceContext(token);
   if (context?.awaitingDetectionFilter) return false;
+  if (lockObserverIsStaleForCurrentView(context)) return false;
   if (tokenHasDetectionFilterVisual(token)) return false;
   if (invisibleUndetectedRenderLockMustStayLocked(token, context?.visibilityState)) {
     return token.visible === false && token.renderable === false && meshIsForcedInvisible(token.mesh);
@@ -3237,6 +3264,15 @@ export function restorePendingMovementTokenRendering(
   ) {
     const stickyDetectionFilterContext = getStickyHiddenRenderLockContext(token, state);
     if (stickyDetectionFilterContext?.awaitingDetectionFilter) return false;
+  }
+
+  const selectedHiddenSoundwaveContext = selectedHiddenSoundwaveContextForTarget(token);
+  if (!ignoreObserverLocks && selectedHiddenSoundwaveContext) {
+    clearHiddenRenderLock(token, state);
+    if (!showTokenForHiddenSoundwave(token)) return false;
+    clearPendingRenderState(token);
+    forgetHiddenForceContext(token);
+    return true;
   }
 
   if (ignoreObserverLocks) {
@@ -4687,6 +4723,8 @@ function refreshPendingMovementTokenVisibilityUncached(
           continue;
         }
 
+        const forceHiddenSoundwaveCanvasVisibility =
+          shouldForceHiddenSoundwaveCanvasVisibility(token);
         const shouldForceInvisible =
           shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork }) ||
           targetMustStayHiddenDuringPendingMovement(token) ||
@@ -4697,9 +4735,12 @@ function refreshPendingMovementTokenVisibilityUncached(
           if (shouldSkipForcedInvisibleTokenRefresh(token)) {
             continue;
           }
+        } else if (forceHiddenSoundwaveCanvasVisibility && !animationSoundwaveRefresh) {
+          showHiddenSoundwaveCanvasVisibilityTarget(token);
         }
         if (
           !shouldForceInvisible &&
+          !forceHiddenSoundwaveCanvasVisibility &&
           !isActualControlledDragPreviewOnlyActive() &&
           (clearObservedDetectionFilterVisualsForCurrentView(token) ||
             clearObservedDetectionFilterVisualsForCurrentSightLine(token))
@@ -4710,6 +4751,9 @@ function refreshPendingMovementTokenVisibilityUncached(
           const renderHiddenLockDecision = getCoreOwnedRenderHiddenLockRefreshDecision(token);
           if (renderHiddenLockDecision === 'restore') {
             restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
+            if (shouldForceHiddenSoundwaveCanvasVisibility(token)) {
+              showHiddenSoundwaveCanvasVisibilityTarget(token);
+            }
             continue;
           }
           if (renderHiddenLockDecision === 'keep-locked') {
@@ -4724,7 +4768,8 @@ function refreshPendingMovementTokenVisibilityUncached(
           !shouldForceInvisible &&
           !skipTokenRefresh &&
           !!token?.detectionFilter &&
-          shouldStabilizeHiddenDetectionFilterAnimation(token)
+          shouldStabilizeHiddenDetectionFilterAnimation(token) &&
+          !(forceHiddenSoundwaveCanvasVisibility && !tokenHasDetectionFilterMeshVisual(token))
         ) {
           withStableHiddenDetectionFilterAnimation(token, () => undefined);
           continue;
@@ -4798,7 +4843,9 @@ function refreshPendingMovementTokenVisibilityUncached(
             forcePendingMovementTokenInvisible(token);
           } else {
             const restored = restorePendingMovementTokenRendering(token, { ignoreObservedGrace });
-            if (!restored && hasPendingRenderState(token)) {
+            if (forceHiddenSoundwaveCanvasVisibility) {
+              showHiddenSoundwaveCanvasVisibilityTarget(token);
+            } else if (!restored && hasPendingRenderState(token)) {
               forcePendingMovementTokenInvisible(token);
             } else {
               const nativeRecomputedDetectionFilter =

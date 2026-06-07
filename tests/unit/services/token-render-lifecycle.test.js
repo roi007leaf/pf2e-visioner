@@ -262,6 +262,7 @@ describe('token render lifecycle service', () => {
     await expect(
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => false,
+        getControlledObserverDetectionVisualTargetIds: () => [],
         refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens,
       }),
@@ -273,6 +274,7 @@ describe('token render lifecycle service', () => {
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => true,
         getPendingMovementRefreshTargetIds: () => [],
+        getControlledObserverDetectionVisualTargetIds: () => [],
         refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens,
       }),
@@ -288,6 +290,7 @@ describe('token render lifecycle service', () => {
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => true,
         getPendingMovementRefreshTargetIds: () => ['target'],
+        getControlledObserverDetectionVisualTargetIds: () => [],
         refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
       }),
@@ -313,6 +316,7 @@ describe('token render lifecycle service', () => {
       handleAvsBatchCompleteRefresh({
         hasPendingMovementRenderWork: () => true,
         getPendingMovementRefreshTargetIds: () => ['target'],
+        getControlledObserverDetectionVisualTargetIds: () => [],
         refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens,
       }),
@@ -324,5 +328,28 @@ describe('token render lifecycle service', () => {
       targetTokenIds: ['target'],
     });
     expect(calls).toEqual(['pending', 'highlights']);
+  });
+
+  test('refreshes selected hidden visual targets after AVS batch completion without pending work', async () => {
+    const refreshPendingMovementTokenVisibility = jest.fn();
+    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn();
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => false,
+        getPendingMovementRefreshTargetIds: () => [],
+        getControlledObserverDetectionVisualTargetIds: () => ['rootfall'],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens,
+      }),
+    ).resolves.toEqual({ handled: true });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
+      targetTokenIds: ['rootfall'],
+      forceTokenRefresh: true,
+    });
+    expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
   });
 });

@@ -126,6 +126,32 @@ describe('CoverVisualization token perspective', () => {
     visualization.cleanup();
   });
 
+  test('GM fog-respecting overlay does not query Foundry isVisible for rendered hidden soundwave tokens', async () => {
+    const selected = makeToken('selected', 75, 75);
+    const hovered = makeToken('target', 175, 75);
+    const isVisibleGetter = jest.fn(() => true);
+    Object.defineProperty(hovered, 'isVisible', {
+      configurable: true,
+      get: isVisibleGetter,
+    });
+    hovered.visible = true;
+    hovered.renderable = true;
+    hovered.mesh = { visible: true, renderable: true, alpha: 1 };
+    hovered.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas.tokens.controlled = [selected];
+    global.canvas.tokens.placeables = [selected, hovered];
+
+    const { CoverVisualization } = await import('../../../scripts/cover/CoverVisualization.js');
+    const visualization = new CoverVisualization();
+
+    visualization.createCoverOverlay(hovered);
+
+    expect(mockDetectCoverBetweenTokens).toHaveBeenCalled();
+    expect(isVisibleGetter).not.toHaveBeenCalled();
+
+    visualization.cleanup();
+  });
+
   test('GM fog-respecting overlay falls back to selected token LOS when FOV is unavailable', async () => {
     const selected = makeToken('selected', 75, 75);
     delete selected.vision.fov;

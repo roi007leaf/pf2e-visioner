@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../constants.js';
 import { HoverTooltips } from '../services/HoverTooltips.js';
+import { canRenderTooltipToken } from '../services/HoverTooltip/hover-tooltip-visibility-requests.js';
 import { getVisibilityBetween } from '../utils.js';
 import autoCoverSystem from './auto-cover/AutoCoverSystem.js';
 import { doesWallBlockAtElevation } from '../helpers/wall-height-utils.js';
@@ -240,7 +241,7 @@ export class CoverVisualization {
         if (mousePosition && mousePosition.x !== undefined && mousePosition.y !== undefined) {
           const tokens = canvas.tokens.placeables.filter(
             (token) =>
-              token.isVisible &&
+              canRenderTooltipToken(token) &&
               token.bounds &&
               token.bounds.contains(mousePosition.x, mousePosition.y),
           );
@@ -757,8 +758,8 @@ export class CoverVisualization {
     // For players: Only show cover overlay for tokens that are currently visible (respects fog of war)
     // GMs can see cover overlay for all tokens regardless of vision
     if (
-      (!game.user.isGM && !hoveredToken.isVisible) ||
-      (game.user.isGM && respectFogForGM && !hoveredToken.isVisible)
+      (!game.user.isGM && !canRenderTooltipToken(hoveredToken)) ||
+      (game.user.isGM && respectFogForGM && !canRenderTooltipToken(hoveredToken))
     ) {
       // Player cannot see this token due to current vision/fog of war, don't show cover overlay
       return;

@@ -8,9 +8,13 @@ import {
   restorePendingMovementDetectionFilterVisualState,
   hasActivePendingTokenMovement,
   isPendingMovementCoreAnimationBypassActive,
+  primePendingMovementDetectionFilterVisuals,
   shouldHandlePendingMovementCanvasVisibilityForToken,
+  shouldForceHiddenSoundwaveCanvasVisibility,
   shouldPreservePendingMovementDetectionFilterVisuals,
+  shouldPrimePendingMovementDetectionFilterVisuals,
   shouldSuppressPendingMovementDetectionFilterVisuals,
+  showHiddenSoundwaveCanvasVisibilityTarget,
   withPreservedPendingMovementDetectionFilterVisuals,
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
@@ -48,11 +52,27 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   if (isPendingMovementHiddenStateVisibilityProbe()) {
     return wrapped(points, options);
   }
+  const object = options?.object;
   if (isPendingMovementCoreAnimationBypassActive()) {
+    if (shouldForceHiddenSoundwaveCanvasVisibility(object)) {
+      withDetectionFilterVisualPolicy(object, () => wrapped(points, options));
+      if (shouldPrimePendingMovementDetectionFilterVisuals(object)) {
+        primePendingMovementDetectionFilterVisuals(object);
+      }
+      showHiddenSoundwaveCanvasVisibilityTarget(object);
+      return true;
+    }
     return wrapped(points, options);
   }
-  const object = options?.object;
   if (!shouldHandlePendingMovementCanvasVisibilityForToken(object)) {
+    if (shouldForceHiddenSoundwaveCanvasVisibility(object)) {
+      withDetectionFilterVisualPolicy(object, () => wrapped(points, options));
+      if (shouldPrimePendingMovementDetectionFilterVisuals(object)) {
+        primePendingMovementDetectionFilterVisuals(object);
+      }
+      showHiddenSoundwaveCanvasVisibilityTarget(object);
+      return true;
+    }
     if (!hasActivePendingTokenMovement() && tokenHasDetectionFilterVisual(object)) {
       return withDetectionFilterVisualPolicy(object, () => wrapped(points, options));
     }
@@ -80,7 +100,22 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
             getPendingMovementHiddenStateBlock(options?.object);
 
         const detectionFilterState = capturePendingMovementDetectionFilterVisualState(object);
+        const forceHiddenSoundwaveCanvasVisibility =
+          shouldForceHiddenSoundwaveCanvasVisibility(object);
         const wrappedResult = withDetectionFilterVisualPolicy(object, callWrapped);
+        if (forceHiddenSoundwaveCanvasVisibility) {
+          const coreCreatedDetectionFilter =
+            wrappedResult &&
+            object?.detectionFilter &&
+            object.detectionFilter !== detectionFilterState?.detectionFilter;
+          if (coreCreatedDetectionFilter) return true;
+          restorePendingMovementDetectionFilterVisualState(object, detectionFilterState);
+          if (shouldPrimePendingMovementDetectionFilterVisuals(object)) {
+            primePendingMovementDetectionFilterVisuals(object);
+          }
+          showHiddenSoundwaveCanvasVisibilityTarget(object);
+          return true;
+        }
         if (sourceHiddenStateContext) {
           restorePendingMovementDetectionFilterVisualState(object, detectionFilterState);
           return false;

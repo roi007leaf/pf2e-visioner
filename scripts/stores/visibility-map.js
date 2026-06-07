@@ -392,7 +392,7 @@ function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
   }
 }
 
-function refreshHiddenDetectionFilterVisualsForCurrentObservers() {
+function refreshHiddenDetectionFilterVisualsForCurrentObservers({ allowTokenRefresh = false } = {}) {
   const observers = getControlledObserverTokens();
   if (!observers.length) return;
 
@@ -409,6 +409,19 @@ function refreshHiddenDetectionFilterVisualsForCurrentObservers() {
       }
       refreshCoreDetectionFilterForHiddenTarget(target);
       primeHiddenDetectionFilterVisuals(target);
+      if (
+        allowTokenRefresh &&
+        !hasActivePendingTokenMovement() &&
+        !target?.detectionFilter &&
+        !target._pvHiddenEcho
+      ) {
+        try {
+          target.refresh?.();
+          primeHiddenDetectionFilterVisuals(target);
+        } catch {
+          /* best-effort current hidden visual refresh */
+        }
+      }
     }
   }
 }
@@ -584,6 +597,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     scheduleObservedDetectionFilterVisualClears(entry.changes);
     scheduleHiddenDetectionFilterVisualRefreshes(entry.changes);
   }
+  refreshHiddenDetectionFilterVisualsForCurrentObservers({ allowTokenRefresh: true });
 
   const result = await applyTokenFlagUpdatePasses({
     updatePasses,
@@ -599,6 +613,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     scheduleObservedDetectionFilterVisualClears(entry.changes);
     scheduleHiddenDetectionFilterVisualRefreshes(entry.changes);
   }
+  refreshHiddenDetectionFilterVisualsForCurrentObservers({ allowTokenRefresh: true });
   const repaired = await repairStaleVisibilityBatchReadback(readbackEntries, options);
   return { ...result, repaired };
 }

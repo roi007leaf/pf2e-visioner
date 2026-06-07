@@ -27,6 +27,51 @@ function visibilityV2Flags(map) {
   };
 }
 
+function hiddenSoundwaveChromeSurfaces(token) {
+  return [
+    token?.voidMesh,
+    token?.border,
+    token?.nameplate,
+    token?.bars,
+    token?.tooltip,
+    token?.levelIndicator,
+    token?.effects,
+    token?.targetArrows,
+    token?.targetPips,
+    token?.turnMarker,
+    token?.turnMarker?.mesh,
+    token?.ring,
+    token?.ring?.mesh,
+    token?.ring?.subject,
+  ].filter((surface) => surface && 'visible' in surface);
+}
+
+function attachHiddenSoundwaveChrome(token) {
+  token.voidMesh = { visible: true };
+  token.border = { visible: true };
+  token.nameplate = { visible: true };
+  token.bars = { visible: true };
+  token.tooltip = { visible: true };
+  token.levelIndicator = { visible: true };
+  token.effects = { visible: true };
+  token.targetArrows = { visible: true };
+  token.targetPips = { visible: true };
+  token.turnMarker = { visible: true, mesh: { visible: true } };
+  token.ring = { visible: true, mesh: { visible: true }, subject: { visible: true } };
+}
+
+function setHiddenSoundwaveChromeVisible(token, visible) {
+  for (const surface of hiddenSoundwaveChromeSurfaces(token)) {
+    surface.visible = visible;
+  }
+}
+
+function expectHiddenSoundwaveChromeHidden(token) {
+  for (const surface of hiddenSoundwaveChromeSurfaces(token)) {
+    expect(surface.visible).toBe(false);
+  }
+}
+
 describe('canvas visibility wrapper', () => {
   let originalCanvas;
 
@@ -432,6 +477,300 @@ describe('canvas visibility wrapper', () => {
       renderable: true,
       alpha: 1,
     });
+  });
+
+  test('forces canvas visibility for selected hidden soundwave targets outside core LOS', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      actor: createMockActor({ type: 'npc' }),
+      visible: false,
+    });
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false, alpha: 0 };
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    attachHiddenSoundwaveChrome(target);
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      setHiddenSoundwaveChromeVisible(target, true);
+      return false;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expectHiddenSoundwaveChromeHidden(target);
+  });
+
+  test('forces canvas visibility for selected hidden soundwave targets during pending movement', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      actor: createMockActor({ type: 'npc' }),
+      visible: false,
+    });
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false, alpha: 0 };
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    attachHiddenSoundwaveChrome(target);
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      setHiddenSoundwaveChromeVisible(target, true);
+      return false;
+    });
+
+    forceTokenInvisibleForObserverVisibility(observer, target, 'hidden');
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expectHiddenSoundwaveChromeHidden(target);
+  });
+
+  test('forces canvas visibility for selected hidden soundwave targets during core animation bypass', () => {
+    jest.useFakeTimers();
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    observer.document.object = observer;
+    const target = createMockToken({
+      id: 'target',
+      actor: createMockActor({ type: 'npc' }),
+      visible: false,
+    });
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false, alpha: 0 };
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    attachHiddenSoundwaveChrome(target);
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      perception: {
+        update: jest.fn(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      setHiddenSoundwaveChromeVisible(target, true);
+      return false;
+    });
+
+    forceTokenInvisibleForObserverVisibility(observer, target, 'hidden');
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'hidden' },
+    });
+    expect(schedulePendingTokenMovementCompletion(observer.document)).toBe(true);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expectHiddenSoundwaveChromeHidden(target);
+    jest.useRealTimers();
+  });
+
+  test('keeps invisible tint when forcing hidden soundwave canvas visibility', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      actor: createMockActor({
+        type: 'npc',
+        hasCondition: jest.fn((slug) => slug === 'invisible'),
+        system: { conditions: { invisible: { active: true } } },
+      }),
+      visible: false,
+    });
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false, alpha: 0 };
+    const soundwaveFilter = { id: 'soundwave-filter' };
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    attachHiddenSoundwaveChrome(target);
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 1;
+      setHiddenSoundwaveChromeVisible(target, true);
+      return false;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 0.5,
+    });
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+    expectHiddenSoundwaveChromeHidden(target);
+  });
+
+  test('does not force canvas visibility for selected hidden loot targets', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      actor: createMockActor({ type: 'loot' }),
+      visible: false,
+    });
+    target.detectionFilter = { id: 'soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map([['observer', { active: true, object: observer }]]),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => false);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(false);
+    expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
   test('suppresses soundwave for unselected observer while current state is observed even if pending final state is hidden', () => {

@@ -15,8 +15,10 @@ import {
   shouldPrimePendingMovementDetectionFilterVisuals,
   shouldCoalescePendingMovementRefreshVisibilityPerception,
   shouldHandlePendingMovementCanvasVisibilityForToken,
+  shouldForceHiddenSoundwaveCanvasVisibility,
   shouldSuppressPendingMovementDetectionFilterVisuals,
   shouldTemporarilyForceTokenInvisible,
+  showHiddenSoundwaveCanvasVisibilityTarget,
   withCoalescedPendingMovementPerceptionUpdates,
   withPreservedPendingMovementDetectionFilterVisuals,
   withSuppressedPendingMovementDetectionFilterVisuals,
@@ -274,12 +276,14 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   const hasDetectionFilterMeshVisual = tokenHasDetectionFilterMeshVisual(this);
   const hasRenderLock = isPendingMovementRenderLocked(this);
   const hasRenderState = hasPendingRenderState(this);
+  const forceHiddenSoundwaveCanvasVisibility = shouldForceHiddenSoundwaveCanvasVisibility(this);
   if (
     isPendingMovementCoreAnimationPerceptionRefresh() &&
     !hasDetectionFilterVisual &&
     !hasDetectionFilterMeshVisual &&
     !hasRenderLock &&
-    !hasRenderState
+    !hasRenderState &&
+    !forceHiddenSoundwaveCanvasVisibility
   ) {
     return wrapped(...args);
   }
@@ -320,20 +324,27 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   ) {
     return wrapped(...args);
   }
-  const coreAnimationRefreshMode = getCoreAnimationVisibilityRefreshMode(this, {
-    handlesPendingMovementVisibility,
-    hasDetectionFilterMeshVisual,
-    hasDetectionFilterVisual,
-    hasRenderLock,
-    hasRenderState,
-  });
+  const coreAnimationRefreshMode = forceHiddenSoundwaveCanvasVisibility
+    ? 'full'
+    : getCoreAnimationVisibilityRefreshMode(this, {
+        handlesPendingMovementVisibility,
+        hasDetectionFilterMeshVisual,
+        hasDetectionFilterVisual,
+        hasRenderLock,
+        hasRenderState,
+      });
   if (coreAnimationRefreshMode === 'skip') {
     return this.visible;
   }
   if (coreAnimationRefreshMode === 'core-only') {
     const result = wrapped(...args);
     try {
-      if (shouldSuppressPendingMovementDetectionFilterVisuals(this)) {
+      if (forceHiddenSoundwaveCanvasVisibility) {
+        if (shouldPrimePendingMovementDetectionFilterVisuals(this)) {
+          primePendingMovementDetectionFilterVisuals(this);
+        }
+        showHiddenSoundwaveCanvasVisibilityTarget(this);
+      } else if (shouldSuppressPendingMovementDetectionFilterVisuals(this)) {
         clearDetectionFilterVisuals(this);
       } else if (shouldPrimePendingMovementDetectionFilterVisuals(this)) {
         primePendingMovementDetectionFilterVisuals(this);
@@ -346,21 +357,35 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
 
   if (bypassActiveAtEntry && !hasDetectionFilterVisual && !hasDetectionFilterMeshVisual) {
     if (!handlesPendingMovementVisibility) {
-      return wrapped(...args);
+      const result = wrapped(...args);
+      try {
+        if (forceHiddenSoundwaveCanvasVisibility) {
+          showHiddenSoundwaveCanvasVisibilityTarget(this);
+        }
+      } catch {
+        /* keep core visibility if hidden soundwave restore fails */
+      }
+      return result;
     }
 
     const result = wrapped(...args);
     try {
       if (this.visible) {
         if (
-          shouldTemporarilyForceTokenInvisible(this) ||
-          targetIsRenderHiddenForCurrentViewObserver(this)
+          !forceHiddenSoundwaveCanvasVisibility &&
+          (shouldTemporarilyForceTokenInvisible(this) ||
+            targetIsRenderHiddenForCurrentViewObserver(this))
         ) {
           forcePendingMovementTokenInvisible(this);
           clearDetectionFilterVisuals(this);
         } else {
           restorePendingMovementTokenRendering(this);
+          if (forceHiddenSoundwaveCanvasVisibility) {
+            showHiddenSoundwaveCanvasVisibilityTarget(this);
+          }
         }
+      } else if (forceHiddenSoundwaveCanvasVisibility) {
+        showHiddenSoundwaveCanvasVisibilityTarget(this);
       }
     } catch {
       /* keep Foundry visibility if guard fails */
@@ -368,7 +393,10 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     return result;
   }
 
-  if (targetIsRenderHiddenForCurrentViewObserver(this)) {
+  if (
+    !forceHiddenSoundwaveCanvasVisibility &&
+    targetIsRenderHiddenForCurrentViewObserver(this)
+  ) {
     const result = withSuppressedPendingMovementDetectionFilterVisuals(this, () => wrapped(...args));
     try {
       syncCurrentViewRenderHiddenState(this);
@@ -426,6 +454,9 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
       forcePendingMovementTokenInvisible(this);
     } else {
       restorePendingMovementTokenRendering(this);
+      if (forceHiddenSoundwaveCanvasVisibility) {
+        showHiddenSoundwaveCanvasVisibilityTarget(this);
+      }
       if (suppressDetectionFilterVisuals) {
         withSuppressedPendingMovementDetectionFilterVisuals(this, () => undefined);
       } else {
@@ -450,7 +481,8 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
         !this.detectionFilter &&
         !this._pvHiddenEcho &&
         tokenHasDetectionFilterMeshVisual(this) &&
-        !primeDetectionFilterVisuals
+        !primeDetectionFilterVisuals &&
+        !shouldForceHiddenSoundwaveCanvasVisibility(this)
       ) {
         clearDetectionFilterVisuals(this);
       }

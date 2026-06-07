@@ -2,6 +2,7 @@ import {
   hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
   hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
   getPendingMovementRefreshTargetIds as defaultGetPendingMovementRefreshTargetIds,
+  getControlledObserverDetectionVisualTargetIds as defaultGetControlledObserverDetectionVisualTargetIds,
   refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
   hasPendingRenderState as defaultHasPendingRenderState,
   forceTokenRenderStateInvisible as defaultForceTokenRenderStateInvisible,
@@ -169,21 +170,31 @@ export function handleTokenRefreshed(
 export async function handleAvsBatchCompleteRefresh({
   hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
   getPendingMovementRefreshTargetIds = defaultGetPendingMovementRefreshTargetIds,
+  getControlledObserverDetectionVisualTargetIds =
+    defaultGetControlledObserverDetectionVisualTargetIds,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
 } = {}) {
   try {
-    if (!hasPendingMovementRenderWork()) {
+    const hasRenderWork = hasPendingMovementRenderWork();
+    const targetTokenIds = [
+      ...new Set([
+        ...(hasRenderWork ? getPendingMovementRefreshTargetIds() : []),
+        ...getControlledObserverDetectionVisualTargetIds(),
+      ]),
+    ];
+
+    if (!hasRenderWork && !targetTokenIds.length) {
       return { handled: false, reason: 'no-pending-work' };
     }
 
-    const targetTokenIds = getPendingMovementRefreshTargetIds();
     if (targetTokenIds.length) {
       refreshPendingMovementTokenVisibility([], {
         ignoreObservedGrace: true,
         source: 'avs-batch-complete',
         targetTokenIds,
+        ...(!hasRenderWork ? { forceTokenRefresh: true } : {}),
       });
     }
     await refreshSystemHiddenHighlightsForControlledTokens();

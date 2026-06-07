@@ -1004,6 +1004,74 @@ describe('Visibility Map V2 profile storage', () => {
     }
   });
 
+  test('setVisibilityMapsBatch refreshes unchanged hidden current-observer target after mesh was cleared', async () => {
+    const flags = {
+      'pf2e-visioner': {
+        visibilityV2: {
+          target: {
+            detectionState: 'hidden',
+            hasConcealment: false,
+            coverState: 'none',
+            detectionSense: null,
+            awarenessState: null,
+          },
+        },
+      },
+    };
+    observer.controlled = true;
+    observer.document.getFlag.mockImplementation((moduleId, key) => flags[moduleId]?.[key] ?? null);
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 10, y: 20 }]);
+    const refreshedFilter = { id: 'refreshed-hidden-soundwave-filter' };
+    target.refresh = jest.fn(() => {
+      target.detectionFilter = refreshedFilter;
+      target.detectionFilterMesh.visible = true;
+      target.detectionFilterMesh.renderable = true;
+      target.detectionFilterMesh.alpha = 1;
+    });
+    const originalVisibility = global.canvas.visibility;
+    const originalTokens = global.canvas.tokens;
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.visibility = {
+      ...originalVisibility,
+      testVisibility: jest.fn(() => false),
+    };
+    global.canvas.tokens = {
+      ...global.canvas.tokens,
+      controlled: [observer],
+      get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+      placeables: [observer, target],
+    };
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn(async (_documentName, updates) => {
+      for (const update of updates) {
+        const nextMap = update['flags.pf2e-visioner.visibilityV2'];
+        if (nextMap) flags['pf2e-visioner'].visibilityV2 = nextMap;
+      }
+      return [];
+    });
+
+    try {
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'hidden' } }]);
+
+      expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith(
+        [{ x: 10, y: 20 }],
+        { object: target },
+      );
+      expect(target.refresh).toHaveBeenCalledTimes(1);
+      expect(target.detectionFilter).toBe(refreshedFilter);
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+    } finally {
+      global.canvas.visibility = originalVisibility;
+      global.canvas.tokens = originalTokens;
+      global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+    }
+  });
+
   test('setVisibilityMapsBatch does not refresh hidden target token during active pending movement', async () => {
     const flags = {
       'pf2e-visioner': {

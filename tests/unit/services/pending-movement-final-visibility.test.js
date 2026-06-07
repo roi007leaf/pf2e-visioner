@@ -136,6 +136,49 @@ describe('pending movement final visibility prediction', () => {
     expect(prediction.finalVisibilityStatesByTargetId.get('target')).toBe('undetected');
   });
 
+  test('cheaply predicts hidden when final sound is blocked but scent can reach target', () => {
+    const observer = createMockToken({
+      id: 'observer',
+      x: 0,
+      y: 0,
+      actorSystem: {
+        perception: {
+          senses: [{ type: 'scent', acuity: 'imprecise', range: 30 }],
+        },
+      },
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target', x: 6, y: 0 });
+    observer.document.object = observer;
+    target.document.object = target;
+    global.canvas.walls.placeables = [
+      {
+        document: {
+          id: 'sound-wall',
+          c: [180, -100, 180, 100],
+          sight: 1,
+          sound: 20,
+          door: 0,
+          ds: 0,
+        },
+      },
+    ];
+
+    const controller = createPendingMovementFinalVisibilityController({
+      getPlaceableTokens: () => [observer, target],
+      getStoredVisibilityState: (source, candidate) =>
+        source?.id === 'observer' && candidate?.id === 'target' ? 'observed' : 'observed',
+      hasLineOfSightToSampledToken: () => false,
+    });
+
+    const prediction = controller.predictCheapFinalVisibilityStates(observer.document, {
+      x: 100,
+      y: 0,
+    });
+
+    expect(prediction.finalVisibilityStatesByTargetId.get('target')).toBe('hidden');
+  });
+
   test('targets final prediction completion refresh to affected token ids', async () => {
     const entry = {
       serial: 7,

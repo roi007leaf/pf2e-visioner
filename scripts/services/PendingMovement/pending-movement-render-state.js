@@ -23,6 +23,28 @@ function tokenInterfaceSurfaces(token) {
   ].filter(([, surface]) => surface && 'visible' in surface);
 }
 
+function hiddenSoundwaveChromeSurfaces(token) {
+  const surfaces = [
+    ['voidMesh', token?.voidMesh],
+    ['nameplate', token?.nameplate],
+    ['bars', token?.bars],
+    ['tooltip', token?.tooltip],
+    ['levelIndicator', token?.levelIndicator],
+    ['effects', token?.effects],
+    ['targetArrows', token?.targetArrows],
+    ['targetPips', token?.targetPips],
+    ['turnMarker', token?.turnMarker],
+    ['turnMarkerMesh', token?.turnMarker?.mesh],
+    ['ring', token?.ring],
+    ['ringMesh', token?.ring?.mesh],
+    ['ringSubject', token?.ring?.subject],
+  ];
+
+  if (token?.hover !== true) surfaces.push(['border', token?.border]);
+
+  return surfaces.filter(([, surface]) => surface && 'visible' in surface);
+}
+
 function hideVisibleSurface(surface) {
   if (!surface || !('visible' in surface)) return false;
 
@@ -151,6 +173,12 @@ export function showTokenInterfaceSurfaces(token) {
     } catch {
       /* best-effort surface restore */
     }
+  }
+}
+
+export function hideTokenInterfaceChromeForHiddenSoundwave(token) {
+  for (const [, surface] of hiddenSoundwaveChromeSurfaces(token)) {
+    hideVisibleSurface(surface);
   }
 }
 

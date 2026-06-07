@@ -4,7 +4,7 @@ import {
   HoverTooltips,
   hideAllCoverIndicators,
   hideAllVisibilityIndicators,
-  showVisibilityIndicators,
+  showVisibilityIndicatorsForTokenPair,
 } from './HoverTooltips.js';
 import {
   VISIBILITY_FACTOR_BADGE_SIZE,
@@ -423,22 +423,15 @@ async function addDistanceText({ indicator, observer, token, size, pixi }) {
   }
 }
 
-async function showObserverHoverTooltips({ indicator, observer }) {
+async function showSystemHiddenHoverTooltips({ indicator, observer, token }) {
   try {
     const tooltipsEnabled = game.settings?.get?.(MODULE_ID, 'enableHoverTooltips');
     if (!tooltipsEnabled) return;
     if (HoverTooltips.isShowingKeyTooltips || HoverTooltips._isPanning) return;
 
-    indicator._pvPrevTooltipState = {
-      mode: HoverTooltips.tooltipMode,
-      hovered: HoverTooltips.currentHoveredToken,
-      keyboard: HoverTooltips._keyboardContext,
-    };
-
-    HoverTooltips.tooltipMode = 'observer';
-    HoverTooltips._keyboardContext = true;
-    HoverTooltips.currentHoveredToken = observer;
-    showVisibilityIndicators?.(observer);
+    hideAllVisibilityIndicators?.();
+    hideAllCoverIndicators?.();
+    showVisibilityIndicatorsForTokenPair?.(observer, token, 'target');
   } catch (err) {
     console.warn('PF2E Visioner | Error showing hover tooltips for lifesense indicator:', err);
   }
@@ -629,7 +622,7 @@ export async function createSystemHiddenIndicator({
   indicator.on('pointerover', async () => {
     indicator.alpha = 1.0;
     await addDistanceText({ indicator, observer, token, size, pixi });
-    await showObserverHoverTooltips({ indicator, observer });
+    await showSystemHiddenHoverTooltips({ indicator, observer, token });
     if (HoverTooltips?.isShowingFactorsOverlay) {
       await buildPairFactorsBadgeOutside();
     }

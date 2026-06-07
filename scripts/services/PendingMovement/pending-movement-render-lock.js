@@ -5,11 +5,11 @@ export {
   getPendingRenderState,
   hasPendingMovementRenderLocks,
   hasPendingRenderState,
+  hideTokenInterfaceChromeForHiddenSoundwave,
   hideTokenLevelIndicatorSurface,
   isPendingMovementRenderLocked,
   prunePendingMovementRenderLocks,
   restorePendingRenderStateVisuals,
-  showTokenInterfaceSurfaces,
 } from './pending-movement-render-state.js';
 
 export {
@@ -44,6 +44,8 @@ export {
   shouldPreservePendingMovementDetectionFilterVisuals,
   shouldCoalescePendingMovementRefreshVisibilityPerception,
   shouldHandlePendingMovementCanvasVisibilityForToken,
+  shouldForceHiddenSoundwaveCanvasVisibility,
+  showHiddenSoundwaveCanvasVisibilityTarget,
   shouldPrimePendingMovementDetectionFilterVisuals,
   shouldStabilizeHiddenDetectionFilterAnimation,
   shouldSkipPendingMovementTokenVisibilityRefresh,
