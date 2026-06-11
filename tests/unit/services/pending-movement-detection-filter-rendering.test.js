@@ -35,6 +35,38 @@ function createTintedToken({ tint = 0x111111 } = {}) {
 }
 
 describe('pending movement detection filter rendering', () => {
+  test('does not prime soundwave mesh for a pair with no live soundwave eligibility', () => {
+    const controller = createController({
+      shouldAllowSoundwaveMeshPriming: () => false,
+      tokenHasDetectionFilterMeshVisual: () => false,
+    });
+    const token = {
+      document: { id: 'target' },
+      detectionFilter: null,
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    };
+
+    expect(controller.shouldPrimePendingMovementDetectionFilterVisuals(token)).toBe(false);
+    expect(controller.primePendingMovementDetectionFilterVisuals(token)).toBe(false);
+    expect(token.detectionFilterMesh.visible).toBe(false);
+  });
+
+  test('still primes soundwave mesh for blocking-state or qualifying pairs', () => {
+    const controller = createController({
+      shouldAllowSoundwaveMeshPriming: () => true,
+      tokenHasDetectionFilterMeshVisual: () => false,
+    });
+    const token = {
+      document: { id: 'target' },
+      detectionFilter: null,
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    };
+
+    expect(controller.shouldPrimePendingMovementDetectionFilterVisuals(token)).toBe(true);
+    expect(controller.primePendingMovementDetectionFilterVisuals(token)).toBe(true);
+    expect(token.detectionFilterMesh.visible).toBe(true);
+  });
+
   test('does not let core detection-filter render pulse hidden token tint white', () => {
     const controller = createController();
     const token = createTintedToken({ tint: 0 });

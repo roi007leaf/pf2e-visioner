@@ -6,6 +6,7 @@ import {
   forceTokenRenderStateInvisible as defaultForceTokenRenderStateInvisible,
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
+  cleanupOrphanedSoundwaveMeshes as defaultCleanupOrphanedSoundwaveMeshes,
   getStaleRenderHiddenCurrentViewTargetIds as defaultGetStaleRenderHiddenReleaseTargetIds,
   releasePendingMovementAnimationSuppressionForStaleRenderRelease as defaultReleaseAnimationSuppressionForStaleRelease,
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
@@ -203,8 +204,14 @@ export async function handleAvsBatchCompleteRefresh({
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
   releaseAnimationSuppressionForStaleRelease = defaultReleaseAnimationSuppressionForStaleRelease,
+  cleanupOrphanedSoundwaveMeshesForBatch = defaultCleanupOrphanedSoundwaveMeshes,
 } = {}) {
   try {
+    try {
+      cleanupOrphanedSoundwaveMeshesForBatch();
+    } catch {
+      /* best-effort orphan mesh cleanup */
+    }
     const staleTargetTokenIds = getStaleRenderHiddenReleaseTargetIds();
     const sweepDeps = {
       getStaleRenderHiddenReleaseTargetIds,

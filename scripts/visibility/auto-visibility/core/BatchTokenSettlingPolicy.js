@@ -26,6 +26,8 @@ export function collectUnsettledChangedTokenIds({
     if (!token) continue;
 
     const isAnimating =
+      !!token.movementAnimationPromise ||
+      (token.animationContexts?.size ?? 0) > 0 ||
       movementAnimationIsRunning(token._animation) ||
       movementAnimationIsRunning(token.animation);
     const isDragging =

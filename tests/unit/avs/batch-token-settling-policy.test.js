@@ -35,6 +35,34 @@ describe('BatchTokenSettlingPolicy', () => {
     expect(result).toEqual(['animated', 'public-animated', 'dragging']);
   });
 
+  test('reports v14 movement animation (animationContexts/movementAnimationPromise) as unsettled', () => {
+    const tokens = new Map([
+      [
+        'v14-context',
+        token({
+          id: 'v14-context',
+          animation: {},
+          animationContexts: new Map([['Token.v14-context.animateMovement', {}]]),
+        }),
+      ],
+      [
+        'v14-promise',
+        token({ id: 'v14-promise', animation: {}, movementAnimationPromise: Promise.resolve() }),
+      ],
+      [
+        'v14-settled',
+        token({ id: 'v14-settled', animation: {}, animationContexts: new Map() }),
+      ],
+    ]);
+
+    const result = collectUnsettledChangedTokenIds({
+      changedTokens: new Set(['v14-context', 'v14-promise', 'v14-settled']),
+      getTokenById: (id) => tokens.get(id),
+    });
+
+    expect(result).toEqual(['v14-context', 'v14-promise']);
+  });
+
   test('reports render/document position drift and pending destination drift as unsettled', () => {
     const tokens = new Map([
       ['render-drift', token({ id: 'render-drift', x: 100, y: 100, documentX: 130, documentY: 100 })],

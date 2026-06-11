@@ -123,6 +123,84 @@ describe('OverrideValidationManager display filtering', () => {
     expect(indicatorHide).not.toHaveBeenCalled();
   });
 
+  test('keeps mover-observer override visible when target would be undetected without LOS', async () => {
+    const indicatorShow = jest.fn();
+    const indicatorHide = jest.fn();
+    const hasLineOfSight = jest.fn(() => false);
+
+    jest.doMock('../../../scripts/ui/OverrideValidationIndicator.js', () => ({
+      __esModule: true,
+      default: {
+        show: indicatorShow,
+        hide: indicatorHide,
+      },
+    }));
+
+    jest.doMock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({
+      __esModule: true,
+      VisionAnalyzer: {
+        getInstance: jest.fn(() => ({
+          clearCache: jest.fn(),
+          hasLineOfSight,
+        })),
+      },
+    }));
+
+    const { OverrideValidationManager } = await import(
+      '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'
+    );
+
+    const mover = global.createMockToken({ id: 'mover', name: 'Mover' });
+    const hiddenTarget = global.createMockToken({ id: 'hidden-target', name: 'Hidden Target' });
+    mover.document.name = 'Mover';
+    hiddenTarget.document.name = 'Hidden Target';
+
+    global.canvas.tokens.placeables = [mover, hiddenTarget];
+    global.canvas.tokens.get.mockImplementation((id) =>
+      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    );
+    global.game.pf2eVisioner.lastMovedTokenId = mover.id;
+
+    const manager = new OverrideValidationManager(
+      { isExcludedToken: jest.fn(() => false) },
+      { getTokenPosition: jest.fn(() => ({ x: 0, y: 0, elevation: 0 })) },
+      { calculateVisibility: jest.fn() },
+    );
+
+    await manager.showOverrideValidationDialog(
+      [
+        {
+          observerId: mover.id,
+          targetId: hiddenTarget.id,
+          override: {
+            state: 'hidden',
+            source: 'manual_action',
+            hasCover: false,
+            hasConcealment: false,
+          },
+          reason: 'would be undetected',
+          currentVisibility: 'undetected',
+          currentCover: 'none',
+          reasonIcons: [],
+        },
+      ],
+      mover.id,
+    );
+
+    expect(indicatorShow).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          observerId: mover.id,
+          targetId: hiddenTarget.id,
+          currentVisibility: 'undetected',
+        }),
+      ],
+      'Mover',
+      mover.id,
+    );
+    expect(indicatorHide).not.toHaveBeenCalled();
+  });
+
   test('propagates auto cover source from validity check into shown invalid overrides', async () => {
     const { OverrideValidationManager } = await import(
       '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'
@@ -766,6 +844,58 @@ describe('OverrideValidationManager display filtering', () => {
           shouldRemove: true,
           currentVisibility: 'observed',
           currentCover: 'none',
+        }),
+      );
+    });
+
+    test('flags hidden override when AVS would calculate undetected', async () => {
+      jest.doMock('../../../scripts/visibility/auto-visibility/VisibilityCalculator.js', () => ({
+        __esModule: true,
+        optimizedVisibilityCalculator: {
+          calculateVisibilityWithoutOverrides: jest.fn(async () => 'undetected'),
+        },
+      }));
+
+      const coverDetectorInstance = {
+        detectFromPoint: jest.fn(() => 'none'),
+        detectBetweenTokens: jest.fn(() => 'none'),
+      };
+      jest.doMock('../../../scripts/cover/auto-cover/CoverDetector.js', () => ({
+        __esModule: true,
+        CoverDetector: jest.fn(() => coverDetectorInstance),
+        default: coverDetectorInstance,
+      }));
+
+      const { OverrideValidationManager } = await import(
+        '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'
+      );
+
+      const observer = global.createMockToken({ id: 'observer', name: 'Observer' });
+      const target = global.createMockToken({ id: 'target', name: 'Target' });
+      global.canvas.tokens.placeables = [observer, target];
+      global.canvas.tokens.get.mockImplementation((id) =>
+        global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+      );
+
+      const manager = new OverrideValidationManager(
+        { isExcludedToken: jest.fn(() => false) },
+        { getTokenPosition: jest.fn(() => ({ x: 0, y: 0, elevation: 0 })) },
+        { calculateVisibility: jest.fn() },
+      );
+
+      const result = await manager.checkOverrideValidity(observer.id, target.id, {
+        state: 'hidden',
+        source: 'manual_action',
+        hasCover: false,
+        hasConcealment: false,
+        expectedCover: 'none',
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          shouldRemove: true,
+          reason: 'would be undetected',
+          currentVisibility: 'undetected',
         }),
       );
     });

@@ -181,7 +181,20 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     return this.visible;
   }
   if (coreAnimationRefreshMode === 'core-only') {
-    return wrapped(...args);
+    const result = wrapped(...args);
+    try {
+      if (
+        handlesPendingMovementVisibility &&
+        this.visible === false &&
+        !this.document?.hidden &&
+        !targetIsRenderHiddenForCurrentViewObserver(this)
+      ) {
+        this.visible = true;
+      }
+    } catch {
+      /* keep Foundry visibility if guard fails */
+    }
+    return result;
   }
 
   if (bypassActiveAtEntry && !hasDetectionFilterVisual && !hasDetectionFilterMeshVisual) {

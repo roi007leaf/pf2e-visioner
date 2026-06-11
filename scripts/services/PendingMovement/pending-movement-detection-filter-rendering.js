@@ -180,6 +180,7 @@ export function createPendingMovementDetectionFilterRenderingController({
   restorePendingMovementDetectionFilterVisualState,
   shouldAllowCoreHiddenSoundwaveForCurrentView,
   shouldPreserveHiddenSoundwaveForCurrentView,
+  shouldAllowSoundwaveMeshPriming,
   shouldTemporarilyForceTokenInvisible,
   targetQualifiesForLiveImpreciseSoundwave,
   tokenHasDetectionFilterMeshVisual,
@@ -246,6 +247,7 @@ export function createPendingMovementDetectionFilterRenderingController({
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return false;
     if (tokenHasDetectionFilterMeshVisual?.(token) || !!token?._pvHiddenEcho) return false;
     if (!token?.detectionFilterMesh) return false;
+    if (shouldAllowSoundwaveMeshPriming?.(token) === false) return false;
     return !!getHiddenDetectionFilterPreservationContext?.(token, { hasDetectionWork });
   }
 

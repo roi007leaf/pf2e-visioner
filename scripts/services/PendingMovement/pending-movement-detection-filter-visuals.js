@@ -171,9 +171,20 @@ export function clearNoObserverDetectionFilterVisuals(
 function tokenHasAnyHiddenAvsOverride(token) {
   const flags = token?.document?.flags?.['pf2e-visioner'];
   if (!flags) return false;
+
+  const viewObserverIds = new Set();
+  const addViewObserver = (observer) => {
+    const observerId = observer?.document?.id || observer?.id;
+    if (observerId) viewObserverIds.add(observerId);
+  };
+  addViewObserver(canvas?.tokens?._draggedToken);
+  for (const observer of canvas?.tokens?.controlled || []) addViewObserver(observer);
+
   for (const key of Object.keys(flags)) {
     if (!key.startsWith('avs-override-from-')) continue;
-    if (flags[key]?.state === 'hidden') return true;
+    if (flags[key]?.state !== 'hidden') continue;
+    if (viewObserverIds.size === 0) return true;
+    if (viewObserverIds.has(key.replace('avs-override-from-', ''))) return true;
   }
   return false;
 }

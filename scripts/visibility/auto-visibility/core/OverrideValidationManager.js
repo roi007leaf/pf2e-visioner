@@ -923,6 +923,20 @@ export class OverrideValidationManager {
         }
       }
 
+      if (
+        !ignoresStealthPositionValidation &&
+        shouldValidateObscuredVisibility &&
+        STEALTH_OVERRIDE_STATES.has(override.state) &&
+        (visibility === 'undetected' || visibility === 'unnoticed') &&
+        override.state !== visibility
+      ) {
+        reasons.push({
+          icon: 'fas fa-eye-slash',
+          text: `would be ${visibility}`,
+          type: `visibility-${visibility}`,
+        });
+      }
+
       const reasonIconsForUi = [];
       const sourceIconMap = {
         sneak_action: { icon: 'fas fa-user-ninja', text: 'sneak', type: 'sneak-source' },
@@ -1072,6 +1086,9 @@ export class OverrideValidationManager {
           dataToShow = overrideData.filter((o) => {
             try {
               if (o.targetId === headerId) return true;
+              if (o.currentVisibility === 'undetected' || o.currentVisibility === 'unnoticed') {
+                return true;
+              }
               const otherId = o.observerId === headerId ? o.targetId : o.observerId;
               const otherToken = canvas.tokens?.get(otherId);
               if (!otherToken) return false;

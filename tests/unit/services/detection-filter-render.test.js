@@ -92,6 +92,48 @@ describe('detection filter render wrapper', () => {
     }
   });
 
+  test('hides orphaned soundwave mesh on observed target with no detection filter', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      global.canvas.walls.placeables = [];
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'observed' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 75, y: 25 };
+      target.mesh = { visible: true, renderable: true, alpha: 1 };
+      target.detectionFilter = null;
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: { visionSources: new Map(), lightSources: new Map() },
+        tokens: {
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          controlled: [observer],
+          placeables: [observer, target],
+        },
+      };
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'observed' },
+      });
+
+      const wrapped = jest.fn(() => 'rendered');
+
+      expect(wrapTokenRenderDetectionFilter.call(target, wrapped)).toBe('rendered');
+      expect(target.detectionFilterMesh).toMatchObject({ visible: false, alpha: 0 });
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
   test('clears core-readded soundwave once live polygon sees blocking-state target mid-move', () => {
     const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
       getVisionCapabilities: jest.fn(() => ({ hasVision: true })),

@@ -13,6 +13,7 @@ export {
 } from './pending-movement-render-state.js';
 
 export {
+  cleanupOrphanedSoundwaveMeshes,
   clearNoObserverDetectionFilterVisuals,
   capturePendingMovementDetectionFilterVisualState,
   capturePendingMovementDetectionFilterState,
