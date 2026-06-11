@@ -310,8 +310,12 @@ export class VisionAnalyzer {
       let targetPos = { x: target.center.x, y: target.center.y };
       let usingPositionManager = false;
 
+      const positionedProxy =
+        observer?.isPendingMovementPositionProxy === true ||
+        target?.isPendingMovementPositionProxy === true;
+
       // Try to get more accurate positions from injected PositionManager
-      if (this.#positionManager) {
+      if (this.#positionManager && !positionedProxy) {
         try {
           const pmObserverPos = this.#positionManager.getTokenPosition(observer);
           const pmTargetPos = this.#positionManager.getTokenPosition(target);

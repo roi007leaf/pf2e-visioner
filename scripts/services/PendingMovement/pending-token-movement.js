@@ -1,4 +1,5 @@
 import { LightingLevel, MODULE_ID } from '../../constants.js';
+import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { getRawPerceptionProfileEntry } from '../../stores/visibility-profile-flag-persistence.js';
 import { LightingCalculator } from '../../visibility/auto-visibility/LightingCalculator.js';
@@ -236,6 +237,8 @@ const pendingFinalVisibilityController = createPendingMovementFinalVisibilityCon
   getStoredVisibilityState,
   hasLineOfSightToSampledToken,
   isTokenLikeTarget,
+  observerCanSenseTargetImprecisely: (observer, target) =>
+    pendingObserverCanSenseTargetImprecisely(observer, target),
   refreshTokenVisibility: (movingTokenIds, options) =>
     refreshPendingMovementTokenVisibility(movingTokenIds, options),
   renderHiddenFromObserverStates: RENDER_HIDDEN_FROM_OBSERVER_STATES,
@@ -312,6 +315,7 @@ const pendingDetectionFilterRenderingController =
     shouldAllowCoreHiddenSoundwaveForCurrentView,
     shouldPreserveHiddenSoundwaveForCurrentView,
     shouldTemporarilyForceTokenInvisible,
+    targetQualifiesForLiveImpreciseSoundwave,
     tokenHasDetectionFilterMeshVisual,
     tokenHasDetectionFilterVisual,
   });
@@ -902,6 +906,110 @@ function pendingObserverVisionCapabilities(observer) {
   });
 }
 
+function pendingObserverImpreciseSenseRanges(observer) {
+  const key = tokenIdOf(observer) || observer;
+  return cachePendingMovementEvaluation('observerImpreciseSenseRanges', key, () => {
+    try {
+      const capabilities = VisionAnalyzer.getInstance()?.getSensingCapabilities?.(observer);
+      return [
+        ...Object.values(capabilities?.imprecise ?? {}),
+        ...Object.values(capabilities?.precise ?? {}),
+      ].filter((range) => Number.isFinite(Number(range)) && Number(range) > 0);
+    } catch {
+      return [];
+    }
+  });
+}
+
+export function pendingObserverCanSenseTargetImprecisely(observer, target) {
+  try {
+    const senseRanges = pendingObserverImpreciseSenseRanges(observer);
+    if (!senseRanges.length) return false;
+
+    const observerCenter = centerForToken(observer);
+    const targetCenter = centerForToken(target);
+    if (!observerCenter || !targetCenter) return false;
+
+    const gridSize = Number(canvas?.grid?.size) || 100;
+    const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.grid?.distance) || 5;
+    const distance = calculateDistanceInFeet(observerCenter, targetCenter, gridSize, gridDistance);
+    return senseRanges.some((range) => distance <= Number(range));
+  } catch {
+    return false;
+  }
+}
+
+export function pairAllowsLiveImpreciseSoundwave(observer, target) {
+  if (!observer || !target?.document?.id) return false;
+
+  const storedVisibilityState = getStoredVisibilityState(observer, target);
+  if (storedVisibilityState === 'hidden') {
+    if (visionerStateHidesTargetRendering(storedVisibilityState, target)) return false;
+    if (currentVisionPolygonSeesTargetCenter(observer, target) === true) return false;
+    return pendingObserverCanSenseTargetImprecisely(observer, target);
+  }
+  if (storedVisibilityState === 'observed' || storedVisibilityState === 'concealed') {
+    if (hiddenStateShouldRenderHideTarget(target)) return false;
+    if (
+      !hasCoreOwnedPendingMovement(observer, target) &&
+      !isPendingMovementCoreAnimationBypassActive()
+    ) {
+      return false;
+    }
+    const transitionState =
+      getPredictedFinalVisibilityState(observer, target) ??
+      getRecentCompletedMovementVisibilityStateForObserver(observer, target);
+    if (transitionState !== 'hidden') return false;
+    if (currentSightLineActuallySeesTarget(observer, target)) return false;
+    return pendingObserverCanSenseTargetImprecisely(observer, target);
+  }
+  if (storedVisibilityState !== 'undetected') return false;
+  if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) return false;
+  if (hiddenStateShouldRenderHideTarget(target)) return false;
+  if (
+    !hasCoreOwnedPendingMovement(observer, target) &&
+    !isPendingMovementCoreAnimationBypassActive()
+  ) {
+    return false;
+  }
+  if (currentVisionPolygonSeesTargetCenter(observer, target) === true) return false;
+  return pendingObserverCanSenseTargetImprecisely(observer, target);
+}
+
+export function targetQualifiesForLiveImpreciseSoundwave(target) {
+  if (!target?.document?.id) return false;
+  const observers = [canvas?.tokens?._draggedToken, ...(canvas?.tokens?.controlled || [])];
+  const seen = new Set();
+  for (const observer of observers) {
+    const observerId = tokenIdOf(observer);
+    if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
+    seen.add(observerId);
+    if (pairAllowsLiveImpreciseSoundwave(observer, target)) return true;
+  }
+  return false;
+}
+
+export function targetYieldsToLiveSightDuringPendingMovement(target) {
+  if (!target?.document?.id) return false;
+  const observers = [canvas?.tokens?._draggedToken, ...(canvas?.tokens?.controlled || [])];
+  const seen = new Set();
+  for (const observer of observers) {
+    const observerId = tokenIdOf(observer);
+    if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
+    seen.add(observerId);
+    const storedVisibilityState = getStoredVisibilityState(observer, target);
+    if (!DETECTION_BLOCKING_VISIBILITY_STATES.has(storedVisibilityState)) continue;
+    if (
+      !hasCoreOwnedPendingMovement(observer, target) &&
+      !isPendingMovementCoreAnimationBypassActive()
+    ) {
+      continue;
+    }
+    if (currentVisionPolygonSeesTargetCenter(observer, target) === true) return true;
+  }
+  return false;
+}
+
 function pendingObserverHasPreciseVision(observer, senseType) {
   const capabilities = pendingObserverVisionCapabilities(observer);
   if (!capabilities) return false;
@@ -944,6 +1052,25 @@ function pendingLightingAllowsVisualDetection(observer, target) {
 function sourceVisuallyContainsAnyTargetPoint(observer, source, target, targetPoints) {
   if (!sourceContainsAnyTargetPoint(source, targetPoints)) return false;
   return pendingLightingAllowsVisualDetection(observer, target);
+}
+
+function currentVisionPolygonSeesTargetCenter(observer, target) {
+  if (!observerHasUsableSight(observer)) return null;
+  const sightSources = activeSightSourcesForObserver(observer).filter(sourceHasVisibilityPolygon);
+  if (!sightSources.length) return null;
+
+  const targetCenter = centerForToken(target);
+  if (!targetCenter) return false;
+  if (!sightSources.some((source) => sourceContainsAnyTargetPoint(source, [targetCenter]))) {
+    return false;
+  }
+  return pendingLightingAllowsVisualDetection(observer, target);
+}
+
+function currentSightLineActuallySeesTarget(observer, target) {
+  const polygonSeesCenter = currentVisionPolygonSeesTargetCenter(observer, target);
+  if (polygonSeesCenter !== null) return polygonSeesCenter;
+  return currentPendingMovementSightLineSeesTarget(observer, target);
 }
 
 function sightSourceObserverHasActiveMovement(observer, target) {
@@ -1025,6 +1152,7 @@ function rememberCurrentSightLineGraceContext(observer, target) {
   const observerId = tokenIdOf(observer);
   const targetId = tokenIdOf(target);
   if (!observerId || !targetId) return false;
+  if (pairAllowsLiveImpreciseSoundwave(observer, target)) return false;
 
   if (!pendingMovementCurrentSightLineGraceContexts.has(targetId)) {
     pendingMovementCurrentSightLineGraceContexts.set(targetId, new Map());
@@ -1069,6 +1197,7 @@ function getCurrentSightLineGraceContextForTarget(target) {
   const targetId = tokenIdOf(target);
   if (!targetId || foundryHiddenRequiresVisionerRenderLock(target)) return null;
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return null;
+  if (targetQualifiesForLiveImpreciseSoundwave(target)) return null;
 
   const contextsByObserver = pendingMovementCurrentSightLineGraceContexts.get(targetId);
   if (!contextsByObserver) return null;
@@ -1176,6 +1305,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
   if (foundryHiddenRequiresVisionerRenderLock(target)) return false;
   if (actorHasConditionSlug(actorOf(target), 'invisible')) return false;
   if (hasDetectionWork === false) return false;
+  if (targetQualifiesForLiveImpreciseSoundwave(target)) return false;
 
   const targetPoints = coreVisibilityTestPointsForPendingTarget(target);
   if (!targetPoints.length) return false;
@@ -1205,7 +1335,12 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
     if (!predictedFinalState && !observerHasPendingRevealMovement(stateObserver, target)) {
       continue;
     }
-    if (sourceVisuallyContainsAnyTargetPoint(stateObserver, source, target, targetPoints)) {
+    const targetCenter = centerForToken(target);
+    if (
+      targetCenter &&
+      sourceContainsAnyTargetPoint(source, [targetCenter]) &&
+      pendingLightingAllowsVisualDetection(stateObserver, target)
+    ) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
       }
@@ -1228,7 +1363,7 @@ function currentSightLineSeesHiddenTargetDuringPendingMovement(
     if (!predictedFinalState && !observerHasPendingRevealMovement(stateObserver, target)) {
       continue;
     }
-    if (currentPendingMovementSightLineSeesTarget(observer, target)) {
+    if (currentSightLineActuallySeesTarget(observer, target)) {
       if (hiddenSoundwaveShouldSurviveLimitedWall(stateObserver, target, targetPoints)) {
         continue;
       }
@@ -1264,6 +1399,10 @@ function getPredictedFinalVisibilityState(observer, target) {
   return null;
 }
 
+export function debugPendingMovementPredictedFinalState(observer, target) {
+  return getPredictedFinalVisibilityState(observer, target);
+}
+
 export function hasPendingMovementEntryForPair(observer, target) {
   const visibilityObserver = getPendingMovementCanonicalToken(observer);
   const visibilityTarget = getPendingMovementCanonicalToken(target);
@@ -1288,6 +1427,7 @@ function hasActiveControlledMovementPreview(observer, target) {
 function activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVisibilityState) {
   if (storedVisibilityState !== 'undetected') return false;
   if (invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState)) return false;
+  if (pairAllowsLiveImpreciseSoundwave(observer, target)) return false;
   const observerHasDragPreviewOrIntent =
     isControlledTokenDragActive(observer) || hasPendingControlledTokenDragIntent(observer);
   const targetHasDragPreviewOrIntent =
@@ -1306,10 +1446,17 @@ function activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVi
   ) {
     return false;
   }
-  return currentPendingMovementSightLineSeesTarget(observer, target);
+  return currentSightLineActuallySeesTarget(observer, target);
 }
 
 function getPendingMovementVisibilityState(observer, target) {
+  const resolvedState = resolvePendingMovementVisibilityState(observer, target);
+  if (!visionerStateHidesTargetRendering(resolvedState, target)) return resolvedState;
+  if (pairAllowsLiveImpreciseSoundwave(observer, target)) return 'hidden';
+  return resolvedState;
+}
+
+function resolvePendingMovementVisibilityState(observer, target) {
   const predictedFinalState = getPredictedFinalVisibilityState(observer, target);
   const coreOwnedMovement = hasCoreOwnedPendingMovement(observer, target);
   if (coreOwnedMovement) {
@@ -1452,24 +1599,44 @@ function currentCoreDetectionPolygonSeesTarget(observer, target, { requirePolygo
   );
 }
 
+function impreciseSenseSoundwaveStateForPolygonTransition(observer, target, fromState, toState) {
+  const candidate = fromState === 'hidden' ? fromState : toState === 'hidden' ? toState : null;
+  if (!candidate) return null;
+  if (visionerStateHidesTargetRendering(candidate, target)) return null;
+  return pendingObserverCanSenseTargetImprecisely(observer, target) ? candidate : null;
+}
+
 function renderVisibilityStateForCurrentPolygonTransition(observer, target, fromState, toState) {
   const fromRenderHidden = visionerStateHidesTargetRendering(fromState, target);
   const toRenderHidden = visionerStateHidesTargetRendering(toState, target);
   if (fromRenderHidden === toRenderHidden) return toState;
+
+  const impreciseSoundwaveState = impreciseSenseSoundwaveStateForPolygonTransition(
+    observer,
+    target,
+    fromState,
+    toState,
+  );
+  if (impreciseSoundwaveState) return impreciseSoundwaveState;
 
   const currentPolygonSeesTarget = currentCoreDetectionPolygonSeesTarget(observer, target, {
     requirePolygon: true,
   });
   if (currentPolygonSeesTarget === null) return fromState;
   if (fromRenderHidden && !toRenderHidden) {
-    if (currentPolygonSeesTarget) {
+    const polygonSeesCenter = currentVisionPolygonSeesTargetCenter(observer, target);
+    const revealSeesTarget =
+      polygonSeesCenter === null ? currentPolygonSeesTarget : polygonSeesCenter;
+    if (revealSeesTarget) {
       rememberCurrentSightLineGraceContext(observer, target);
       return toState;
     }
     return fromState;
   }
   if (!fromRenderHidden && toRenderHidden) {
-    if (currentPolygonSeesTarget) {
+    const polygonSeesCenter = currentVisionPolygonSeesTargetCenter(observer, target);
+    const keepSeesTarget = polygonSeesCenter === null ? currentPolygonSeesTarget : polygonSeesCenter;
+    if (keepSeesTarget) {
       rememberCurrentSightLineGraceContext(observer, target);
       return fromState;
     }
@@ -1483,13 +1650,20 @@ function visibleDetectionStateShouldWaitForCurrentPolygon(observer, target, from
   if (!CORE_LOS_TRANSITION_REFRESH_STATES.has(fromState)) return false;
   if (toState !== 'hidden') return false;
   if (!shouldUseCoreDetectionDuringPendingMovement(observer, target)) return false;
-  if (!currentPendingMovementSightLineSeesTarget(observer, target)) return false;
+  if (!currentSightLineActuallySeesTarget(observer, target)) return false;
 
   rememberCurrentSightLineGraceContext(observer, target);
   return true;
 }
 
 function getCurrentViewRenderHiddenVisibilityState(observer, target) {
+  const resolvedState = resolveCurrentViewRenderHiddenVisibilityState(observer, target);
+  if (!visionerStateHidesTargetRendering(resolvedState, target)) return resolvedState;
+  if (pairAllowsLiveImpreciseSoundwave(observer, target)) return 'hidden';
+  return resolvedState;
+}
+
+function resolveCurrentViewRenderHiddenVisibilityState(observer, target) {
   const storedVisibilityState =
     getInitialPendingMovementVisibilityState(observer, target) ||
     getStoredVisibilityState(observer, target);
@@ -1535,7 +1709,10 @@ function getCurrentViewRenderHiddenVisibilityState(observer, target) {
       const currentPolygonSeesTarget = currentCoreDetectionPolygonSeesTarget(observer, target, {
         requirePolygon: true,
       });
-      if (currentPolygonSeesTarget === true) {
+      const polygonSeesCenter = currentVisionPolygonSeesTargetCenter(observer, target);
+      const revealSeesTarget =
+        polygonSeesCenter === null ? currentPolygonSeesTarget === true : polygonSeesCenter;
+      if (revealSeesTarget) {
         rememberCurrentSightLineGraceContext(observer, target);
         return 'observed';
       }
@@ -1612,6 +1789,10 @@ function getAnimationRefreshTargetIdsForMovement(tokenId) {
 export function shouldUseFullAnimationRefreshCadence(tokenId) {
   const entry = pendingTokenMovementPositions.get(tokenId);
   const observer = tokenObjectForId(tokenId) || entry?.tokenDoc || null;
+  for (const [targetId, finalState] of entry?.finalVisibilityStatesByTargetId?.entries?.() || []) {
+    const target = tokenObjectForId(targetId);
+    if (target && visionerStateHidesTargetRendering(finalState, target)) return true;
+  }
   for (const targetId of getAnimationRefreshTargetIdsForMovement(tokenId)) {
     const target = tokenObjectForId(targetId);
     if (!target) continue;
@@ -1800,6 +1981,21 @@ function hasPendingFinalVisibilityStateForToken(token) {
   return false;
 }
 
+function hasRenderHiddenPendingFinalVisibilityStateForToken(token) {
+  const tokenId = tokenIdOf(token);
+  if (!tokenId) return false;
+
+  for (const entry of pendingTokenMovementPositions.values()) {
+    const finalState = entry?.finalVisibilityStatesByTargetId?.get(tokenId);
+    if (finalState && visionerStateHidesTargetRendering(finalState, token)) return true;
+  }
+  const ownEntry = pendingTokenMovementPositions.get(tokenId);
+  for (const finalState of ownEntry?.finalVisibilityStatesByObserverId?.values?.() || []) {
+    if (visionerStateHidesTargetRendering(finalState, token)) return true;
+  }
+  return false;
+}
+
 function hasActivePendingMovementVisibilityOwnershipForToken(token) {
   const tokenId = tokenIdOf(token);
   if (!tokenId) return false;
@@ -1978,7 +2174,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
       RENDER_HIDDEN_FROM_OBSERVER_STATES.has(storedVisibilityState) &&
       !invisibleUndetectedRenderLockMustStayLocked(target, storedVisibilityState) &&
       coreOwnedPendingMovement &&
-      currentPendingMovementSightLineSeesTarget(observer, target)
+      currentSightLineActuallySeesTarget(observer, target)
     ) {
       rememberCurrentSightLineGraceContext(observer, target);
     }
@@ -1991,7 +2187,7 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
         !invisibleUndetectedRenderLockMustStayLocked(target, state) &&
         coreOwnedPendingMovement &&
         tokenPrimaryRenderIsVisible(target) &&
-        currentPendingMovementSightLineSeesTarget(observer, target)
+        currentSightLineActuallySeesTarget(observer, target)
       ) {
         rememberCurrentSightLineGraceContext(observer, target);
         continue;
@@ -2000,6 +2196,41 @@ export function targetIsRenderHiddenForCurrentViewObserver(target) {
     }
   }
   return false;
+}
+
+export function releasePendingMovementAnimationSuppressionForStaleRenderRelease() {
+  try {
+    if (canvas?.tokens?._draggedToken) return false;
+    if (pendingTokenMovementPositions.size) return false;
+    for (const token of canvas?.tokens?.placeables || []) {
+      if (tokenIsAnimating(token)) return false;
+    }
+    pendingMovementCoreAnimationBypassUntil = 0;
+    restorePendingMovementOcclusionOnlyPerceptionSuppression();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getStaleRenderHiddenCurrentViewTargetIds() {
+  try {
+    if (!canvas?.tokens?._draggedToken && !(canvas?.tokens?.controlled || []).length) return [];
+
+    const ids = [];
+    for (const token of canvas?.tokens?.placeables || []) {
+      const tokenId = tokenIdOf(token);
+      if (!tokenId) continue;
+      if (token.visible !== false) continue;
+      if (token.controlled) continue;
+      if (token.document?.hidden) continue;
+      if (targetIsRenderHiddenForCurrentViewObserver(token)) continue;
+      ids.push(tokenId);
+    }
+    return ids;
+  } catch {
+    return [];
+  }
 }
 
 export function targetMustStayHiddenDuringPendingMovement(target) {
@@ -2647,12 +2878,26 @@ function getCoreOwnedRenderHiddenLockContext(token, state) {
   return { context, observer };
 }
 
+function hasStaleControlObserverRenderLock(token) {
+  if (hasActivePendingTokenMovement()) return false;
+  const lockContext =
+    getPendingRenderState(token)?.lastHiddenContext ?? getRememberedHiddenForceContext(token);
+  const lockObserverId = lockContext?.observerId;
+  if (!lockObserverId) return false;
+  if (lockContext.pendingPosition) return false;
+  if (pendingTokenMovementPositions.has(lockObserverId)) return false;
+  const controlled = canvas?.tokens?.controlled || [];
+  if (controlled.some((observer) => tokenIdOf(observer) === lockObserverId)) return false;
+  return !targetIsRenderHiddenForCurrentViewObserver(token);
+}
+
 function getCoreOwnedRenderHiddenLockRefreshDecision(token) {
   const state = getPendingRenderState(token);
   if (!state) return null;
 
   const lock = getCoreOwnedRenderHiddenLockContext(token, state);
   if (!lock) return null;
+  if (pairAllowsLiveImpreciseSoundwave(lock.observer, token)) return 'restore';
 
   const currentSightSeesTarget = currentPendingMovementSightLineSeesTarget(lock.observer, token);
   const reachedObservedDestination = predictedObservedMovementReachedDestination(
@@ -2991,6 +3236,9 @@ export function forceTokenInvisibleForObserverVisibility(observer, target, visib
   }
 
   if (!visionerStateHidesTargetRendering(visibilityState, target)) {
+    return false;
+  }
+  if (pairAllowsLiveImpreciseSoundwave(observer, target)) {
     return false;
   }
 
@@ -3466,13 +3714,18 @@ function pendingHiddenTargetIsVisibleFromCurrentSources(target, hiddenStateConte
               tolerance: 0,
               object: target,
             }),
-          { clearWhenTruthy: true },
+          { clearWhenTruthy: !contextObserverKeepsImpreciseSoundwave(hiddenStateContext, target) },
         ),
       ),
     );
   } catch {
     return false;
   }
+}
+
+function contextObserverKeepsImpreciseSoundwave(context, target) {
+  const observer = tokenObjectForId(context?.observerId);
+  return pairAllowsLiveImpreciseSoundwave(observer, target);
 }
 
 function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork = null } = {}) {
@@ -3537,6 +3790,10 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
       }
     }
 
+    if (contextObserverKeepsImpreciseSoundwave(hiddenStateContext, target)) {
+      forgetHiddenForceContext(target);
+      return false;
+    }
     rememberHiddenForceContext(target, hiddenStateContext);
     return true;
   }
@@ -3548,6 +3805,10 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
     ({ context }) => context.renderHiddenByVisioner || context.foundryHidden,
   );
   if (hiddenBlockedEntry) {
+    if (contextObserverKeepsImpreciseSoundwave(hiddenBlockedEntry.context, target)) {
+      forgetHiddenForceContext(target);
+      return false;
+    }
     rememberHiddenForceContext(target, hiddenBlockedEntry.context);
     return true;
   }
@@ -3558,6 +3819,10 @@ function shouldTemporarilyForceTokenInvisibleUncached(target, { hasDetectionWork
   const blockedSources = renderBlockedEntries.map(({ source }) => source);
   const renderLockContext = renderBlockedEntries[0]?.context ?? null;
   if (!hasActiveUnblockedObserverDetectionSource(blockedSources)) {
+    if (contextObserverKeepsImpreciseSoundwave(renderLockContext, target)) {
+      forgetHiddenForceContext(target);
+      return false;
+    }
     if (renderLockContext) {
       rememberHiddenForceContext(target, renderLockContext);
     }
@@ -3930,6 +4195,48 @@ function rememberCoreAnimationVisionRefreshPositions() {
   }
 }
 
+function probeCoreDetectionForLiveSoundwaveTarget(observer, target) {
+  if (!target) return;
+  if (!pairAllowsLiveImpreciseSoundwave(observer, target)) return;
+  if (target.detectionFilter) {
+    if ('visible' in target && target.visible === false) target.visible = true;
+    forceDetectionFilterMeshVisible(target);
+    return;
+  }
+
+  const testVisibility = canvas?.visibility?.testVisibility;
+  const targetPoints = coreVisibilityTestPointsForPendingTarget(target);
+  if (typeof testVisibility !== 'function' || !targetPoints.length) return;
+
+  try {
+    const targetVisible = testVisibility.call(canvas.visibility, targetPoints, { object: target });
+    if ('visible' in target) target.visible = targetVisible;
+    if (targetVisible && target.detectionFilter) {
+      forceDetectionFilterMeshVisible(target);
+    }
+  } catch {
+    /* best-effort live soundwave probe */
+  }
+}
+
+function coreAnimationRenderHideTrackingTargetIds(entry, observer) {
+  const targetTokenIds = [];
+  for (const [targetId, finalState] of entry?.finalVisibilityStatesByTargetId?.entries?.() || []) {
+    const target = tokenObjectForId(targetId);
+    if (!target) continue;
+    const storedState = observer ? getStoredVisibilityState(observer, target) : null;
+    if (
+      !visionerStateHidesTargetRendering(finalState, target) &&
+      !DETECTION_BLOCKING_VISIBILITY_STATES.has(finalState) &&
+      !DETECTION_BLOCKING_VISIBILITY_STATES.has(storedState)
+    ) {
+      continue;
+    }
+    targetTokenIds.push(targetId);
+  }
+  return targetTokenIds;
+}
+
 function scheduleCoreAnimationVisionRefreshes(tokenId, serial) {
   if (!tokenId) return;
   clearCoreAnimationVisionRefresh(tokenId);
@@ -3951,6 +4258,22 @@ function scheduleCoreAnimationVisionRefreshes(tokenId, serial) {
       withPendingMovementCoreAnimationPerceptionRefresh(() =>
         refreshPendingMovementCoreAnimationView(tokenId),
       );
+    }
+
+    if (tokenIsAnimating(token)) {
+      const renderHideTargetIds = coreAnimationRenderHideTrackingTargetIds(entry, token);
+      if (renderHideTargetIds.length) {
+        refreshPendingMovementTokenVisibility([tokenId], {
+          coalesceFrame: true,
+          ignoreObservedGrace: true,
+          skipPerceptionRefresh: true,
+          source: 'core-animation-render-hide-tracking',
+          targetTokenIds: renderHideTargetIds,
+        });
+        for (const targetId of renderHideTargetIds) {
+          probeCoreDetectionForLiveSoundwaveTarget(token, tokenObjectForId(targetId));
+        }
+      }
     }
 
     const visualPositionReached = tokenVisualPositionReached(token, entry.position);
@@ -4213,7 +4536,8 @@ function refreshPendingMovementTokenVisibilityUncached(
         const shouldForceInvisible =
           shouldTemporarilyForceTokenInvisible(token, { hasDetectionWork }) ||
           targetMustStayHiddenDuringPendingMovement(token) ||
-          (!hasActivePendingMovementVisibilityOwnershipForToken(token) &&
+          ((!hasActivePendingMovementVisibilityOwnershipForToken(token) ||
+            hasRenderHiddenPendingFinalVisibilityStateForToken(token)) &&
             targetIsRenderHiddenForCurrentViewObserver(token));
         if (shouldForceInvisible) {
           forcePendingMovementTokenInvisible(token);
@@ -4236,6 +4560,13 @@ function refreshPendingMovementTokenVisibilityUncached(
           }
           if (renderHiddenLockDecision === 'keep-locked') {
             forcePendingMovementTokenInvisible(token);
+            continue;
+          }
+          if (hasStaleControlObserverRenderLock(token)) {
+            restorePendingMovementTokenRendering(token, {
+              ignoreObservedGrace,
+              ignoreObserverLocks: true,
+            });
             continue;
           }
         }

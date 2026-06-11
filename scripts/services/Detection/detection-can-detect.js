@@ -4,6 +4,7 @@ import {
   isPendingMovementCoreAnimationBypassActive,
   isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
+  pairAllowsLiveImpreciseSoundwave,
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
@@ -32,7 +33,20 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
     const overrideHiddenActive = targetHasAnyHiddenAvsOverride(target);
-    if (!overrideHiddenActive && isPendingMovementCoreAnimationBypassActive()) return canDetect;
+    if (!overrideHiddenActive && isPendingMovementCoreAnimationBypassActive()) {
+      if (pairAllowsLiveImpreciseSoundwave(observerToken, target)) {
+        if (
+          threshold === VISIBILITY_DETECTION_THRESHOLDS.undetected &&
+          (!modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId))
+        ) {
+          return true;
+        }
+        if (modeId && !NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
+          return false;
+        }
+      }
+      return canDetect;
+    }
     if (
       !overrideHiddenActive &&
       (isPendingMovementCoreAnimationPerceptionRefresh() ||
@@ -61,6 +75,14 @@ export function createCanDetectVisibilityWrapper(threshold) {
     if (
       !pendingMovementSightBlocked &&
       canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)
+    ) {
+      return true;
+    }
+
+    if (
+      threshold === VISIBILITY_DETECTION_THRESHOLDS.undetected &&
+      (!modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) &&
+      pairAllowsLiveImpreciseSoundwave(observerToken, target)
     ) {
       return true;
     }

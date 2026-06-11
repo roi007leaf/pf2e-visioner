@@ -7,6 +7,8 @@ import {
   isPendingMovementCoreAnimationBypassActive,
   isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
+  pairAllowsLiveImpreciseSoundwave,
+  pendingObserverCanSenseTargetImprecisely,
   shouldBypassPendingMovementVisionerRenderState,
   shouldUseCoreDetectionDuringPendingMovement,
   withSuppressedDetectionSources,
@@ -16,6 +18,8 @@ export {
   isPendingMovementHiddenStateVisibilityProbe,
   isPendingMovementCoreAnimationBypassActive,
   isPendingMovementCoreAnimationPerceptionRefresh,
+  pairAllowsLiveImpreciseSoundwave,
+  pendingObserverCanSenseTargetImprecisely,
   shouldBypassPendingMovementVisionerRenderState,
   shouldUseCoreDetectionDuringPendingMovement,
 };

@@ -11,6 +11,8 @@ import {
   targetHasDetectionBlockingStoredVisibilityState,
   targetHasAnyHiddenAvsOverride,
   targetIsRenderHiddenForCurrentViewObserver,
+  targetQualifiesForLiveImpreciseSoundwave,
+  targetYieldsToLiveSightDuringPendingMovement,
 } from '../PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
@@ -44,6 +46,17 @@ export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
     );
   }
 
+  if (
+    hasPendingMovementRenderWork() &&
+    targetHasDetectionBlockingStoredVisibilityState(this) &&
+    !targetQualifiesForLiveImpreciseSoundwave(this) &&
+    targetYieldsToLiveSightDuringPendingMovement(this)
+  ) {
+    const result = wrapped(...args);
+    clearDetectionFilterVisuals(this);
+    return result;
+  }
+
   const shouldClearCoreAddedDetectionFilter =
     !this?.detectionFilter &&
     !this?.detectionFilterMesh &&
@@ -51,6 +64,9 @@ export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
     targetHasDetectionBlockingStoredVisibilityState(this);
   if (shouldClearCoreAddedDetectionFilter) {
     const result = wrapped(...args);
+    if (targetQualifiesForLiveImpreciseSoundwave(this)) {
+      return result;
+    }
     clearDetectionFilterVisuals(this);
     return result;
   }

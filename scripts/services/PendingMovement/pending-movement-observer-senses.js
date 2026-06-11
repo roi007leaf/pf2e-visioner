@@ -221,6 +221,18 @@ export function createPositionedTokenProxy(tokenOrDoc, position, { getTokenObjec
       if (prop === 'y') return y;
       if (prop === 'center') return center;
       if (prop === 'elevation') return elevation;
+      if (prop === 'vision') return undefined;
+      if (prop === 'isPendingMovementPositionProxy') return true;
+      if (prop === 'bounds' || prop === 'mechanicalBounds') {
+        const realBounds = target[prop];
+        if (!realBounds || typeof realBounds.x !== 'number') return realBounds;
+        const liveX = Number(target.document?.x ?? realBounds.x) || 0;
+        const liveY = Number(target.document?.y ?? realBounds.y) || 0;
+        return Object.assign(Object.create(Object.getPrototypeOf(realBounds)), realBounds, {
+          x: realBounds.x - liveX + x,
+          y: realBounds.y - liveY + y,
+        });
+      }
       if (prop === 'id') return doc.id;
       if (prop === 'name') return doc.name ?? target.name;
       if (prop === 'actor') return target.actor ?? doc.actor;

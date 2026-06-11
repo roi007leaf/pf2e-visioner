@@ -3,10 +3,14 @@ import '../../setup.js';
 import {
   clearPendingTokenMovementPosition,
   forceTokenInvisibleForObserverVisibility,
+  isPendingMovementCoreAnimationBypassActive,
+  releasePendingMovementAnimationSuppressionForStaleRenderRelease,
+  schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
   shouldHandlePendingMovementCanvasVisibilityForToken,
   shouldTemporarilyForceTokenInvisible,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
+import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import {
   getPendingMovementBlockedDetectionSources,
   shouldUseCoreDetectionDuringPendingMovement,
@@ -174,6 +178,278 @@ describe('canvas visibility wrapper', () => {
       renderable: true,
       alpha: 1,
     });
+  });
+
+  test('keeps non-visual hidden detection during core animation bypass while live imprecise range holds', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+      schedulePendingTokenMovementCompletion(observer.document);
+      expect(isPendingMovementCoreAnimationBypassActive()).toBe(true);
+
+      const wrapped = jest.fn(() => false);
+      const wrapper = createCanDetectVisibilityWrapper(3);
+      expect(wrapper.call({ id: 'scent' }, wrapped, { object: observer }, target)).toBe(true);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('yields to core during animation bypass once live imprecise range is passed', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 5000, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+      schedulePendingTokenMovementCompletion(observer.document);
+      expect(isPendingMovementCoreAnimationBypassActive()).toBe(true);
+
+      const wrapped = jest.fn(() => false);
+      const wrapper = createCanDetectVisibilityWrapper(3);
+      expect(wrapper.call({ id: 'scent' }, wrapped, { object: observer }, target)).toBe(false);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('detection mode keeps visioner hidden detection during bypass while live imprecise range holds', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+      schedulePendingTokenMovementCompletion(observer.document);
+      expect(isPendingMovementCoreAnimationBypassActive()).toBe(true);
+
+      const detectionMode = {
+        id: 'scent',
+        _canDetect: jest.fn(() => true),
+        _testPoint: jest.fn(() => false),
+      };
+      const result = testDetectionModeVisibility.call(
+        detectionMode,
+        { object: observer },
+        { id: 'scent', enabled: true },
+        { object: target, tests: [{ point: { x: 0, y: 0 } }] },
+      );
+      expect(result).toBe(true);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('detection mode yields to core during bypass once live imprecise range is passed', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 5000, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+      schedulePendingTokenMovementCompletion(observer.document);
+      expect(isPendingMovementCoreAnimationBypassActive()).toBe(true);
+
+      const detectionMode = {
+        id: 'scent',
+        _canDetect: jest.fn(() => true),
+        _testPoint: jest.fn(() => false),
+      };
+      const result = testDetectionModeVisibility.call(
+        detectionMode,
+        { object: observer },
+        { id: 'scent', enabled: true },
+        { object: target, tests: [{ point: { x: 0, y: 0 } }] },
+      );
+      expect(result).toBe(false);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('detection mode reveals undetected target during bypass once live imprecise range holds', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'undetected' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer]);
+      schedulePendingTokenMovementCompletion(observer.document);
+      expect(isPendingMovementCoreAnimationBypassActive()).toBe(true);
+
+      const detectionMode = {
+        id: 'scent',
+        _canDetect: jest.fn(() => true),
+        _testPoint: jest.fn(() => false),
+      };
+      const result = testDetectionModeVisibility.call(
+        detectionMode,
+        { object: observer },
+        { id: 'scent', enabled: true },
+        { object: target, tests: [{ point: { x: 0, y: 0 } }] },
+      );
+      expect(result).toBe(true);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('detection mode reveals undetected target mid-move after bypass expires while live range holds', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'undetected' }),
+      });
+      observer._animation = { active: true };
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: { visionSources: new Map(), lightSources: new Map() },
+        tokens: {
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'undetected' },
+      });
+      releasePendingMovementAnimationSuppressionForStaleRenderRelease();
+
+      const detectionMode = {
+        id: 'scent',
+        _canDetect: jest.fn(() => true),
+        _testPoint: jest.fn(() => false),
+      };
+      const result = testDetectionModeVisibility.call(
+        detectionMode,
+        { object: observer },
+        { id: 'scent', enabled: true },
+        { object: target, tests: [{ point: { x: 0, y: 0 } }] },
+      );
+      expect(result).toBe(true);
+    } finally {
+      clearPendingTokenMovementPosition('observer');
+      visionSpy.mockRestore();
+    }
   });
 
   test('GM Vision bypass keeps core can-detect result', () => {

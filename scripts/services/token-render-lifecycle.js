@@ -6,6 +6,8 @@ import {
   forceTokenRenderStateInvisible as defaultForceTokenRenderStateInvisible,
 } from './PendingMovement/pending-movement-render-lock.js';
 import {
+  getStaleRenderHiddenCurrentViewTargetIds as defaultGetStaleRenderHiddenReleaseTargetIds,
+  releasePendingMovementAnimationSuppressionForStaleRenderRelease as defaultReleaseAnimationSuppressionForStaleRelease,
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
   targetIsRenderHiddenForCurrentViewObserver,
 } from './PendingMovement/pending-token-movement.js';
@@ -162,19 +164,74 @@ export function handleTokenRefreshed(
     });
 }
 
+const STALE_RENDER_RELEASE_SWEEP_DELAYS_MS = [300, 800, 1500, 2500];
+
+function refreshStaleRenderHiddenReleaseTargets({
+  getStaleRenderHiddenReleaseTargetIds,
+  refreshPendingMovementTokenVisibility,
+  releaseAnimationSuppressionForStaleRelease,
+}) {
+  const staleTargetTokenIds = getStaleRenderHiddenReleaseTargetIds();
+  if (!staleTargetTokenIds.length) return false;
+
+  releaseAnimationSuppressionForStaleRelease();
+  refreshPendingMovementTokenVisibility([], {
+    ignoreObservedGrace: true,
+    source: 'avs-batch-complete-stale-render-release',
+    targetTokenIds: staleTargetTokenIds,
+  });
+  return true;
+}
+
+function scheduleStaleRenderHiddenReleaseSweeps(deps) {
+  for (const delayMs of STALE_RENDER_RELEASE_SWEEP_DELAYS_MS) {
+    setTimeout(() => {
+      try {
+        refreshStaleRenderHiddenReleaseTargets(deps);
+      } catch {
+        /* best-effort stale render-lock release */
+      }
+    }, delayMs);
+  }
+}
+
 export async function handleAvsBatchCompleteRefresh({
   hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
   getPendingMovementRefreshTargetIds = defaultGetPendingMovementRefreshTargetIds,
+  getStaleRenderHiddenReleaseTargetIds = defaultGetStaleRenderHiddenReleaseTargetIds,
   refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
+  releaseAnimationSuppressionForStaleRelease = defaultReleaseAnimationSuppressionForStaleRelease,
 } = {}) {
   try {
+    const staleTargetTokenIds = getStaleRenderHiddenReleaseTargetIds();
+    const sweepDeps = {
+      getStaleRenderHiddenReleaseTargetIds,
+      refreshPendingMovementTokenVisibility,
+      releaseAnimationSuppressionForStaleRelease,
+    };
+    if (staleTargetTokenIds.length) scheduleStaleRenderHiddenReleaseSweeps(sweepDeps);
+
     if (!hasPendingMovementRenderWork()) {
-      return { handled: false, reason: 'no-pending-work' };
+      if (!staleTargetTokenIds.length) {
+        return { handled: false, reason: 'no-pending-work' };
+      }
+      releaseAnimationSuppressionForStaleRelease();
+      refreshPendingMovementTokenVisibility([], {
+        ignoreObservedGrace: true,
+        source: 'avs-batch-complete-stale-render-release',
+        targetTokenIds: staleTargetTokenIds,
+      });
+      return { handled: true, staleRenderRelease: true };
+    }
+    if (staleTargetTokenIds.length) {
+      releaseAnimationSuppressionForStaleRelease();
     }
 
-    const targetTokenIds = getPendingMovementRefreshTargetIds();
+    const targetTokenIds = [
+      ...new Set([...getPendingMovementRefreshTargetIds(), ...staleTargetTokenIds]),
+    ];
     refreshPendingMovementTokenVisibility([], {
       ignoreObservedGrace: true,
       source: 'avs-batch-complete',

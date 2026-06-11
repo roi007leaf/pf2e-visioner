@@ -75,6 +75,7 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
   const getPlaceableTokens = adapter.getPlaceableTokens ?? (() => canvas?.tokens?.placeables || []);
   const getStoredVisibilityState = adapter.getStoredVisibilityState ?? (() => 'observed');
   const hasLineOfSightToSampledToken = adapter.hasLineOfSightToSampledToken ?? (() => false);
+  const observerCanSenseTargetImprecisely = adapter.observerCanSenseTargetImprecisely ?? (() => false);
   const getEntry = adapter.getEntry ?? (() => null);
   const refreshTokenVisibility = adapter.refreshTokenVisibility ?? (() => undefined);
   const warn = adapter.warn ?? ((...args) => console.warn(...args));
@@ -129,6 +130,15 @@ export function createPendingMovementFinalVisibilityController(adapter = {}) {
         return 'hidden';
       }
       return null;
+    }
+
+    if (
+      observerCanSenseTargetImprecisely(observer, target) &&
+      (DEFAULT_CORE_LOS_FINAL_PREDICTION_STATES.has(normalizedStoredState) ||
+        renderHiddenFromObserverStates.has(normalizedStoredState) ||
+        detectionBlockingVisibilityStates.has(normalizedStoredState))
+    ) {
+      return 'hidden';
     }
 
     if (DEFAULT_CORE_LOS_FINAL_PREDICTION_STATES.has(normalizedStoredState)) {

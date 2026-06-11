@@ -1,10 +1,28 @@
 import '../../setup.js';
 
+jest.mock('../../../scripts/services/HoverTooltips.js', () => ({
+  HoverTooltips: {
+    tooltipMode: 'observer',
+    currentHoveredToken: null,
+    _keyboardContext: false,
+    isShowingKeyTooltips: false,
+    _isPanning: false,
+  },
+  showVisibilityIndicators: jest.fn(),
+  hideAllVisibilityIndicators: jest.fn(),
+  hideAllCoverIndicators: jest.fn(),
+}));
+
 import {
   drawSystemHiddenIndicatorFrame,
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
+  showObserverHoverTooltips,
 } from '../../../scripts/services/system-hidden-indicator-rendering.js';
+import {
+  HoverTooltips,
+  showVisibilityIndicators,
+} from '../../../scripts/services/HoverTooltips.js';
 
 describe('system-hidden indicator rendering helpers', () => {
   const tokenDispositions = {
@@ -98,5 +116,23 @@ describe('system-hidden indicator rendering helpers', () => {
     expect(tooltipEl.remove).toHaveBeenCalledTimes(1);
     expect(indicator._pvFactorsBadgeEl).toBeNull();
     expect(indicator._pvFactorsTooltipEl).toBeNull();
+  });
+
+  test('indicator hover renders the sensed token in target mode (badge on the observer)', async () => {
+    global.game.settings.set('pf2e-visioner', 'enableHoverTooltips', true);
+    showVisibilityIndicators.mockClear();
+    HoverTooltips.tooltipMode = 'observer';
+    HoverTooltips.currentHoveredToken = null;
+    HoverTooltips.isShowingKeyTooltips = false;
+    HoverTooltips._isPanning = false;
+
+    const token = { document: { id: 'sensed-token' } };
+    const indicator = {};
+
+    await showObserverHoverTooltips({ indicator, token });
+
+    expect(HoverTooltips.tooltipMode).toBe('target');
+    expect(HoverTooltips.currentHoveredToken).toBe(token);
+    expect(showVisibilityIndicators).toHaveBeenCalledWith(token);
   });
 });

@@ -286,6 +286,94 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
   });
 
+  test('releases stale render-locks after AVS batch completion when no pending work remains', async () => {
+    const calls = [];
+    const refreshPendingMovementTokenVisibility = jest.fn(() => calls.push('refresh'));
+    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn();
+    const releaseAnimationSuppressionForStaleRelease = jest.fn(() => {
+      calls.push('release-suppression');
+      return true;
+    });
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => false,
+        getStaleRenderHiddenReleaseTargetIds: () => ['stale-target'],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens,
+        releaseAnimationSuppressionForStaleRelease,
+      }),
+    ).resolves.toEqual({ handled: true, staleRenderRelease: true });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete-stale-render-release',
+      targetTokenIds: ['stale-target'],
+    });
+    expect(releaseAnimationSuppressionForStaleRelease).toHaveBeenCalled();
+    expect(calls).toEqual(['release-suppression', 'refresh']);
+  });
+
+  test('still reports no pending work when no stale render-locks remain', async () => {
+    const refreshPendingMovementTokenVisibility = jest.fn();
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => false,
+        getStaleRenderHiddenReleaseTargetIds: () => [],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
+      }),
+    ).resolves.toEqual({ handled: false, reason: 'no-pending-work' });
+    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+  });
+
+  test('merges stale render-lock targets into pending-work AVS batch refresh', async () => {
+    const refreshPendingMovementTokenVisibility = jest.fn();
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => true,
+        getPendingMovementRefreshTargetIds: () => ['target'],
+        getStaleRenderHiddenReleaseTargetIds: () => ['stale-target'],
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
+      }),
+    ).resolves.toEqual({ handled: true });
+
+    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
+      ignoreObservedGrace: true,
+      source: 'avs-batch-complete',
+      targetTokenIds: ['target', 'stale-target'],
+    });
+  });
+
+  test('sweeps stale render-locks again after AVS batch completion until released', async () => {
+    jest.useFakeTimers();
+    try {
+      const refreshPendingMovementTokenVisibility = jest.fn();
+      const staleIds = ['stale-target'];
+
+      await handleAvsBatchCompleteRefresh({
+        hasPendingMovementRenderWork: () => true,
+        getPendingMovementRefreshTargetIds: () => [],
+        getStaleRenderHiddenReleaseTargetIds: () => staleIds,
+        refreshPendingMovementTokenVisibility,
+        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
+      });
+
+      const callsAfterHandler = refreshPendingMovementTokenVisibility.mock.calls.length;
+      jest.advanceTimersByTime(3000);
+      const sweepCalls = refreshPendingMovementTokenVisibility.mock.calls
+        .slice(callsAfterHandler)
+        .filter(([, options]) => options?.source === 'avs-batch-complete-stale-render-release');
+      expect(sweepCalls.length).toBeGreaterThan(0);
+      expect(sweepCalls[0][1].targetTokenIds).toEqual(['stale-target']);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('targets pending movement visibility refresh after AVS batch completion when targets are known', async () => {
     const refreshPendingMovementTokenVisibility = jest.fn();
 

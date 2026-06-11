@@ -4,6 +4,7 @@ import {
   isPendingMovementCoreAnimationBypassActive,
   isPendingMovementCoreAnimationPerceptionRefresh,
   isPendingMovementHiddenStateVisibilityProbe,
+  pairAllowsLiveImpreciseSoundwave,
   shouldUseCoreDetectionDuringPendingMovement,
   shouldTemporarilyBlockSightDetection,
 } from '../PendingMovement/pending-movement-detection-gate.js';
@@ -43,6 +44,9 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   const observerToken = visionSource?.object;
   const targetToken = config.object;
   if (isPendingMovementCoreAnimationBypassActive()) {
+    if (pairAllowsLiveImpreciseSoundwave(observerToken, targetToken)) {
+      return NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
+    }
     return testDetectionPoints(this, visionSource, mode, config);
   }
   if (
@@ -54,6 +58,13 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   }
   if (shouldUseCoreDetectionDuringPendingMovement(observerToken, targetToken)) {
     return testDetectionPoints(this, visionSource, mode, config);
+  }
+
+  if (
+    NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
+    pairAllowsLiveImpreciseSoundwave(observerToken, targetToken)
+  ) {
+    return true;
   }
 
   const hiddenStateContext = getPendingMovementHiddenStateBlock(targetToken);

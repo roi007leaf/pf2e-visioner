@@ -181,6 +181,7 @@ export function createPendingMovementDetectionFilterRenderingController({
   shouldAllowCoreHiddenSoundwaveForCurrentView,
   shouldPreserveHiddenSoundwaveForCurrentView,
   shouldTemporarilyForceTokenInvisible,
+  targetQualifiesForLiveImpreciseSoundwave,
   tokenHasDetectionFilterMeshVisual,
   tokenHasDetectionFilterVisual,
 } = {}) {
@@ -211,6 +212,7 @@ export function createPendingMovementDetectionFilterRenderingController({
     { hasDetectionWork = null } = {},
   ) {
     if (!token?.document?.id) return false;
+    if (targetQualifiesForLiveImpreciseSoundwave?.(token)) return false;
     if (getCurrentSightLineGraceContextForTarget?.(token)) return true;
     if (shouldPreserveHiddenSoundwaveForCurrentView?.(token)) return false;
     if (shouldAllowCoreHiddenSoundwaveForCurrentView?.(token)) return false;
