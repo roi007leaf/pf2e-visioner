@@ -72,6 +72,53 @@ describe('Tremorsense elevation gate', () => {
     expect(result.state).toBe('undetected');
   });
 
+  test('precise tremorsense observes a ground target', () => {
+    const result = calculateVisibility(
+      buildInput({
+        observer: {
+          elevation: 0,
+          precise: { tremorsense: { range: 60 } },
+          imprecise: {},
+        },
+        target: { elevation: 0 },
+      }),
+    );
+
+    expect(result.state).toBe('observed');
+    expect(result.detection.sense).toBe('tremorsense');
+    expect(result.detection.isPrecise).toBe(true);
+  });
+
+  test('precise tremorsense does not observe an elevated target', () => {
+    const result = calculateVisibility(
+      buildInput({
+        observer: {
+          elevation: 0,
+          precise: { tremorsense: { range: 60 } },
+          imprecise: {},
+        },
+        target: { elevation: 10 },
+      }),
+    );
+
+    expect(result.state).toBe('undetected');
+  });
+
+  test('precise tremorsense does not observe from an elevated observer', () => {
+    const result = calculateVisibility(
+      buildInput({
+        observer: {
+          elevation: 10,
+          precise: { tremorsense: { range: 60 } },
+          imprecise: {},
+        },
+        target: { elevation: 10 },
+      }),
+    );
+
+    expect(result.state).toBe('undetected');
+  });
+
   test('invisible previousState memory does not pin hidden once line of sight is wall-blocked', () => {
     const result = calculateVisibility({
       observer: {

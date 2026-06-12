@@ -486,6 +486,19 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
       continue;
     }
 
+    if (senseType === SenseType.TREMORSENSE) {
+      if (senseData && senseData.range > 0 && !tremorsenseGroundContactBroken(observer, target)) {
+        return {
+          state: VisibilityState.OBSERVED,
+          detection: {
+            isPrecise: true,
+            sense: SenseType.TREMORSENSE,
+          },
+        };
+      }
+      continue;
+    }
+
     // Any other non-visual precise sense allows observation
     if (senseData && senseData.range > 0) {
       return {
