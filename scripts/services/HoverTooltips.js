@@ -1120,7 +1120,7 @@ function addVisibilityIndicator(
   indicator.y = targetToken.y - 8; // slight padding above the token
   canvas.tokens.addChild(indicator);
 
-  const canvasRect = canvas.app.view.getBoundingClientRect();
+  const canvasRect = getCachedCanvasRect();
   const sizeConfig = readTooltipSizeConfig({
     settings: game.settings,
     fallbackFontPx: HoverTooltips.tooltipFontSize,
@@ -1315,17 +1315,21 @@ function ensureBadgeTicker() {
   } catch (_) { }
 }
 
-function updateBadgePositions() {
-  if (HoverTooltips._isPanning) {
-    return;
-  }
-
+function getCachedCanvasRect() {
   // Cache getBoundingClientRect to avoid layout thrashing (expensive DOM query)
   if (!HoverTooltips._canvasRectCache || HoverTooltips._canvasRectInvalidated) {
     HoverTooltips._canvasRectCache = canvas.app.view.getBoundingClientRect();
     HoverTooltips._canvasRectInvalidated = false;
   }
-  const canvasRect = HoverTooltips._canvasRectCache;
+  return HoverTooltips._canvasRectCache;
+}
+
+function updateBadgePositions() {
+  if (HoverTooltips._isPanning) {
+    return;
+  }
+
+  const canvasRect = getCachedCanvasRect();
 
   // Use cached sizes instead of reading from settings every frame
   const { badgeWidth, badgeHeight, spacing } = computeTooltipBadgeMetrics({
@@ -1443,7 +1447,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   indicator.y = targetToken.y - 8; // align above token
   canvas.tokens.addChild(indicator);
 
-  const canvasRect = canvas.app.view.getBoundingClientRect();
+  const canvasRect = getCachedCanvasRect();
   const sizeConfig = readTooltipSizeConfig({
     settings: game.settings,
     fallbackFontPx: HoverTooltips.tooltipFontSize,

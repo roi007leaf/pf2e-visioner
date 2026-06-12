@@ -120,7 +120,7 @@ export function calculateVisibility(input) {
 
   // 2b-2. Invisibility with previous state: degrade based on what observer knew before
   const isInvisible = target.auxiliary.includes('invisible');
-  if (!visualDetection.canDetect && isInvisible && previousState) {
+  if (!visualDetection.canDetect && isInvisible && previousState && hasLineOfSight !== false) {
     const invisibilityResult = resolveInvisibilityFromPreviousState(previousState);
     if (invisibilityResult) {
       allDetectionResults.push(invisibilityResult);
@@ -170,6 +170,7 @@ function normalizeTargetState(target) {
     auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
     traits: Array.isArray(target.traits) ? target.traits : [],
     movementAction: target.movementAction ?? 0,
+    elevation: Number(target.elevation ?? 0) || 0,
   };
 }
 
@@ -191,7 +192,30 @@ function normalizeObserverState(observer) {
     },
     lightingLevel: observer.lightingLevel || LightingLevel.BRIGHT, // Observer's own lighting level
     movementAction: observer.movementAction ?? 0, // Observer's movement action for tremorsense checks
+    elevation: Number(observer.elevation ?? 0) || 0,
   };
+}
+
+function tremorsenseGroundContactBroken(observer, target) {
+  const observerElevation = Number(observer.elevation ?? 0) || 0;
+  const targetElevation = Number(target.elevation ?? 0) || 0;
+  const broken =
+    observer.movementAction === 'fly' ||
+    target.movementAction === 'fly' ||
+    observerElevation !== targetElevation ||
+    observerElevation !== 0;
+  if (globalThis.pf2eVisionerDebugSenses) {
+    try {
+      console.warn('[visioner-debug] tremor gate', {
+        broken,
+        observerElevation,
+        targetElevation,
+        observerMove: observer.movementAction,
+        targetMove: target.movementAction,
+      });
+    } catch {}
+  }
+  return broken;
 }
 
 /**
@@ -227,13 +251,11 @@ function handleBlindedObserver(observer, target, soundBlocked) {
  * @returns {Object|null} Detection result or null
  */
 function checkNonAuditorySenses(observer, target) {
-  const { imprecise, movementAction: observerMovementAction } = observer;
-  const { movementAction: targetMovementAction } = target;
+  const { imprecise } = observer;
 
   // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
   if (imprecise.tremorsense) {
-    const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
-    if (!isTargetElevated) {
+    if (!tremorsenseGroundContactBroken(observer, target)) {
       return {
         state: VisibilityState.HIDDEN,
         detection: {
@@ -702,8 +724,8 @@ function determineVisualDetection(
  * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
  */
 function checkImpreciseSenses(observer, target, soundBlocked = false) {
-  const { imprecise, conditions, movementAction: observerMovementAction } = observer;
-  const { auxiliary, movementAction: targetMovementAction } = target;
+  const { imprecise, conditions } = observer;
+  const { auxiliary } = target;
   const isInvisible = auxiliary.includes('invisible');
 
   // Collect all working senses with their priority
@@ -714,7 +736,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   // Priority: 1 (highest)
   if (imprecise.tremorsense) {
     // Check if target is elevated (not on the ground at observer's level)
-    const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
+    const isTargetElevated = tremorsenseGroundContactBroken(observer, target);
 
     // Check if target has Petal Step feat (immune to tremorsense)
     const hasPetalStep = target.auxiliary.includes('petal-step');
@@ -807,6 +829,16 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   // Sort by priority (ascending) and return the best
   workingSenses.sort((a, b) => a.priority - b.priority);
   const best = workingSenses[0];
+
+  if (globalThis.pf2eVisionerDebugSenses) {
+    try {
+      console.warn('[visioner-debug] imprecise pick', {
+        impreciseKeys: Object.keys(imprecise),
+        working: workingSenses.map((s) => `${s.priority}:${s.detection?.sense ?? 'null'}:${s.state}`),
+        best: `${best.detection?.sense ?? 'null'}:${best.state}`,
+      });
+    } catch {}
+  }
 
   return {
     state: best.state,

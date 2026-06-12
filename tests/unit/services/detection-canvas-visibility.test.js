@@ -139,6 +139,146 @@ describe('canvas visibility wrapper', () => {
     });
   });
 
+  test('forces detection with soundwave filter for scent-hidden target when observer has no non-visual detection mode', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    const originalConfig = global.CONFIG;
+    class MockHearingDetectionMode {
+      static getDetectionFilter() {
+        return { id: 'soundwave-filter' };
+      }
+    }
+    global.CONFIG = {
+      ...global.CONFIG,
+      Canvas: {
+        ...global.CONFIG?.Canvas,
+        detectionModes: { hearing: new MockHearingDetectionMode() },
+      },
+    };
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      observer.document.detectionModes = {
+        basicSight: { enabled: true, range: 0 },
+        lightPerception: { enabled: true, range: null },
+      };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: false });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map([['observer', { active: true, object: observer }]]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          controlled: [],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+      const wrapped = jest.fn(() => false);
+
+      expect(wrapCanvasVisibilityTest(wrapped, [{ x: 50, y: 25 }], { object: target })).toBe(true);
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      expect(target.detectionFilter).toEqual({ id: 'soundwave-filter' });
+    } finally {
+      global.CONFIG = originalConfig;
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('leaves core result alone for scent-hidden target when observer still has an enabled non-visual detection mode', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      observer.document.detectionModes = {
+        basicSight: { enabled: true, range: 0 },
+        hearing: { enabled: true, range: null },
+      };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: false });
+      target.center = { x: 50, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map([['observer', { active: true, object: observer }]]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          controlled: [],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+      const wrapped = jest.fn(() => false);
+
+      expect(wrapCanvasVisibilityTest(wrapped, [{ x: 50, y: 25 }], { object: target })).toBe(false);
+      expect(wrapped).toHaveBeenCalledTimes(1);
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('does not force detection for sneaking scent-hidden target without non-visual detection modes', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { scent: 30 }, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      observer.document.detectionModes = {
+        basicSight: { enabled: true, range: 0 },
+      };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: false });
+      target.center = { x: 50, y: 25 };
+      const baseGetFlag = target.document.getFlag;
+      target.document.getFlag = jest.fn((moduleId, key) =>
+        moduleId === 'pf2e-visioner' && key === 'sneak-active'
+          ? true
+          : baseGetFlag?.call(target.document, moduleId, key),
+      );
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map([['observer', { active: true, object: observer }]]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          controlled: [],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+      const wrapped = jest.fn(() => false);
+
+      expect(wrapCanvasVisibilityTest(wrapped, [{ x: 50, y: 25 }], { object: target })).toBe(false);
+      expect(wrapped).toHaveBeenCalledTimes(1);
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
   test('GM Vision bypass keeps core canvas visibility result', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

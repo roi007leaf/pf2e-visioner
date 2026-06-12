@@ -1,8 +1,11 @@
+import { MODULE_ID } from '../../constants.js';
 import {
   getPendingMovementHiddenStateBlock,
   isPendingMovementHiddenStateVisibilityProbe,
+  pairAllowsLiveImpreciseSoundwave,
   withPendingMovementBlockedDetectionSourcesSuppressed,
 } from '../PendingMovement/pending-movement-detection-gate.js';
+import { NON_VISUAL_DETECTION_MODE_IDS } from './detection-visibility-context.js';
 import {
   capturePendingMovementDetectionFilterVisualState,
   restorePendingMovementDetectionFilterVisualState,
@@ -38,6 +41,47 @@ function hasActiveUnblockedDetectionSource(blockedSources = []) {
   );
 }
 
+function observerHasEnabledNonVisualDetectionMode(observer) {
+  const modes = observer?.document?.detectionModes;
+  if (!modes) return false;
+  const entries = Array.isArray(modes)
+    ? modes.map((mode) => [mode?.id, mode])
+    : Object.entries(modes);
+  return entries.some(([id, mode]) => !!mode?.enabled && NON_VISUAL_DETECTION_MODE_IDS.has(id));
+}
+
+function impreciseSenseDetectionFilter() {
+  try {
+    return CONFIG?.Canvas?.detectionModes?.hearing?.constructor?.getDetectionFilter?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function impreciseSenseFallbackDetects(object) {
+  try {
+    if (!object?.document) return false;
+    if (object.document.getFlag?.(MODULE_ID, 'sneak-active')) return false;
+    for (const entry of canvas?.effects?.visionSources ?? []) {
+      const source = sourceFromCollectionEntry(entry);
+      const observer = source?.object;
+      if (!source?.active || !observer || observer === object) continue;
+      if (observerHasEnabledNonVisualDetectionMode(observer)) continue;
+      if (pairAllowsLiveImpreciseSoundwave(observer, object)) return true;
+    }
+  } catch {
+    /* best-effort */
+  }
+  return false;
+}
+
+function applyImpreciseSenseFallbackDetection(object) {
+  if (!impreciseSenseFallbackDetects(object)) return false;
+  const detectionFilter = impreciseSenseDetectionFilter();
+  if (detectionFilter) object.detectionFilter = detectionFilter;
+  return true;
+}
+
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   if (isSelectAllTokenVisibilityBypassActive()) {
     return wrapped(points, options);
@@ -49,14 +93,17 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
     return wrapped(points, options);
   }
   if (isPendingMovementCoreAnimationBypassActive()) {
-    return wrapped(points, options);
+    return wrapped(points, options) || applyImpreciseSenseFallbackDetection(options?.object);
   }
   const object = options?.object;
   if (!shouldHandlePendingMovementCanvasVisibilityForToken(object)) {
     if (!hasActivePendingTokenMovement() && tokenHasDetectionFilterVisual(object)) {
-      return withDetectionFilterVisualPolicy(object, () => wrapped(points, options));
+      return (
+        withDetectionFilterVisualPolicy(object, () => wrapped(points, options)) ||
+        applyImpreciseSenseFallbackDetection(object)
+      );
     }
-    return wrapped(points, options);
+    return wrapped(points, options) || applyImpreciseSenseFallbackDetection(object);
   }
 
   let wrappedCalled = false;
@@ -95,7 +142,7 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
           return false;
         }
 
-        return wrappedResult;
+        return wrappedResult || applyImpreciseSenseFallbackDetection(object);
       },
     );
   } catch (error) {

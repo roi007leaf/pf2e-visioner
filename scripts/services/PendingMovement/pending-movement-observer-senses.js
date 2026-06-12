@@ -1,13 +1,50 @@
 import {
   actorHasConditionSlug,
+  calculateHearingDistanceInFeet,
+  hearingSenseForVisibility,
   observerCanHearTarget,
 } from '../sense-distance.js';
+import {
+  lineOfSightBlockedByWall,
+  lineOfSoundBlockedByWall,
+  sceneHasBlockingWallSense,
+} from './pending-movement-wall-blocking.js';
 import { VisionAnalyzer } from '../../visibility/auto-visibility/VisionAnalyzer.js';
 
 export {
   actorHasConditionSlug,
   observerCanHearTarget,
 };
+
+export function pendingHearingAllowsImpreciseSoundwave(
+  observer,
+  target,
+  capabilities,
+  { gridSize = 100 } = {},
+) {
+  try {
+    const observerCenter = observer?.center;
+    const targetCenter = target?.center;
+    if (!observerCenter || !targetCenter || !capabilities) return false;
+    if (
+      lineOfSightBlockedByWall(observerCenter, targetCenter, {
+        originToken: observer,
+        targetToken: target,
+      })
+    ) {
+      return false;
+    }
+    const hearingDistance = calculateHearingDistanceInFeet(observer, target, gridSize);
+    if (!hearingSenseForVisibility(capabilities, hearingDistance)) return false;
+    if (!sceneHasBlockingWallSense('sound')) return true;
+    return !lineOfSoundBlockedByWall(observerCenter, targetCenter, {
+      originToken: observer,
+      targetToken: target,
+    });
+  } catch {
+    return false;
+  }
+}
 
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;

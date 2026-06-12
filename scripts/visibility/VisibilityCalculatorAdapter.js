@@ -285,6 +285,7 @@ function extractTargetState(
     auxiliary,
     traits,
     movementAction: target.document.movementAction, // Add elevation for tremorsense checks
+    elevation: Number(target.document.elevation ?? 0) || 0,
   };
 }
 
@@ -380,6 +381,7 @@ function extractObserverState(
     conditions,
     lightingLevel: observerLightingLevel, // Observer's own lighting level
     movementAction: observer.document.movementAction, // Observer's movement action for tremorsense checks
+    elevation: Number(observer.document.elevation ?? 0) || 0,
     _visionAnalyzer: visionAnalyzer, // Pass through for fallback checks
     _observer: observer, // Pass through for fallback checks
   };
