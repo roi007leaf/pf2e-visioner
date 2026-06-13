@@ -166,4 +166,18 @@ describe('Visibility Replacement - Predicate Evaluation', () => {
     const res = RuleElementChecker.checkVisibilityReplacement(observer, target, 'undetected');
     expect(res).toEqual(expect.objectContaining({ state: 'hidden', type: 'visibilityReplacement' }));
   });
+
+  it('does not synthesize native Blind-Fight feat replacements', () => {
+    observer.document.getFlag.mockReturnValue(null);
+    target.document.getFlag.mockReturnValue(null);
+    observer.actor = {
+      itemTypes: { feat: [{ slug: 'blind-fight' }] },
+      system: { details: { level: { value: 8 } } },
+    };
+    target.actor = { system: { details: { level: { value: 8 } } } };
+
+    const res = RuleElementChecker.checkVisibilityReplacement(observer, target, 'undetected');
+
+    expect(res).toBeNull();
+  });
 });

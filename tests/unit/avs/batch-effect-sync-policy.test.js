@@ -65,4 +65,24 @@ describe('BatchEffectSyncPolicy', () => {
       },
     ]);
   });
+
+  test('carries profile metadata into effect sync targets', () => {
+    const observerA = token('A');
+    const targetB = token('B');
+    const profileMetadata = {
+      visibilityReplacementSource: 'blind-fight-adjacent',
+      visibilityReplacementOriginalState: 'undetected',
+    };
+
+    const plan = buildBatchEffectSyncPlan({
+      updates: [{ ...update(observerA, targetB, 'hidden'), profileMetadata }],
+    });
+
+    expect(plan).toEqual([
+      {
+        observer: observerA,
+        targets: [{ target: targetB, state: 'hidden', profileMetadata }],
+      },
+    ]);
+  });
 });

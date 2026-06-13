@@ -3,12 +3,15 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { getNativeVisibilityReplacement } from '../chat/services/feats/native-visibility-replacement.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getLogger } from '../utils/logger.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
 import {
   DEFAULT_PERCEPTION_PROFILE,
+  getVisibilityReplacementMetadata,
+  hasVisibilityReplacementMetadata,
   legacyVisibilityToProfile,
   normalizePerceptionProfile,
   profileToLegacyVisibility,
@@ -68,8 +71,37 @@ function profilesToLegacyVisibilityMap(profileMap = {}, options = {}) {
   return visibilityMap;
 }
 
+function getProfileMetadataByTargetId(options = {}) {
+  return options?.profileMetadataByTargetId || options?.profileMetadataMap || {};
+}
+
+function profileMetadataForVisibilityReplacement(replacement, originalState) {
+  if (!replacement) return {};
+  return {
+    visibilityReplacementSource: replacement.source,
+    visibilityReplacementOriginalState: replacement.fromState ?? originalState,
+  };
+}
+
+function applyNativeVisibilityReplacementToProfile(observer, target, profile = {}) {
+  const currentState =
+    profileToLegacyVisibility(profile, { preserveEncounterUnnoticed: true }) || 'observed';
+  const replacement = getNativeVisibilityReplacement(observer, target, currentState);
+  if (!replacement?.state) return normalizePerceptionProfile(profile);
+
+  return legacyVisibilityToProfile(
+    replacement.state,
+    profileMetadataForVisibilityReplacement(replacement, currentState),
+  );
+}
+
+function hasProfileMetadataOverride(metadataByTargetId = {}, targetId) {
+  return Object.prototype.hasOwnProperty.call(metadataByTargetId, targetId);
+}
+
 function legacyVisibilityMapToProfiles(visibilityMap = {}, previousProfiles = {}, options = {}) {
   const profileMap = {};
+  const profileMetadataByTargetId = getProfileMetadataByTargetId(options);
 
   for (const [id, state] of Object.entries(
     normalizeVisibilityMap(visibilityMap, { includeObserved: options.preserveObserved === true }),
@@ -77,20 +109,22 @@ function legacyVisibilityMapToProfiles(visibilityMap = {}, previousProfiles = {}
     if (!isKnownLegacyVisibilityState(state)) continue;
 
     const previousProfile = previousProfiles?.[id];
+    const hasMetadataOverride = hasProfileMetadataOverride(profileMetadataByTargetId, id);
     if (
       previousProfile &&
+      !hasMetadataOverride &&
       profileToLegacyVisibility(previousProfile, { preserveEncounterUnnoticed: true }) === state
     ) {
       profileMap[id] = normalizePerceptionProfile(previousProfile);
       continue;
     }
 
-    profileMap[id] = legacyVisibilityToProfile(
-      state,
-      state === 'observed' && options.preserveObserved === true
+    profileMap[id] = legacyVisibilityToProfile(state, {
+      ...(hasMetadataOverride ? (profileMetadataByTargetId[id] ?? {}) : {}),
+      ...(state === 'observed' && options.preserveObserved === true
         ? { detectionSense: AVS_EXPLICIT_VISIBLE_DETECTION_SENSE }
-        : {},
-    );
+        : {}),
+    });
   }
 
   return profileMap;
@@ -207,22 +241,16 @@ function tokenHasDetectionFilterMeshVisual(token) {
 
   const alpha = Number(mesh.alpha);
   const activeSignal =
-    mesh.visible === true ||
-    mesh.renderable === true ||
-    (Number.isFinite(alpha) && alpha > 0);
+    mesh.visible === true || mesh.renderable === true || (Number.isFinite(alpha) && alpha > 0);
   const hiddenSignal =
-    mesh.visible === false ||
-    mesh.renderable === false ||
-    (Number.isFinite(alpha) && alpha <= 0);
+    mesh.visible === false || mesh.renderable === false || (Number.isFinite(alpha) && alpha <= 0);
 
   return activeSignal && !hiddenSignal;
 }
 
 function tokenHasDetectionFilterVisual(token) {
   return (
-    !!token?.detectionFilter ||
-    tokenHasDetectionFilterMeshVisual(token) ||
-    !!token?._pvHiddenEcho
+    !!token?.detectionFilter || tokenHasDetectionFilterMeshVisual(token) || !!token?._pvHiddenEcho
   );
 }
 
@@ -298,6 +326,7 @@ export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, opt
   });
   const previousProfiles = getPerceptionProfileMap(token);
   const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
+    ...options,
     preserveObserved: options?.preserveObserved === true,
   });
   return buildPerceptionProfileFlagUpdatePasses(token, nextProfiles);
@@ -309,18 +338,14 @@ function visibilityMapValueFor(visibilityMap = {}, targetId) {
 }
 
 function collectVisibilityReadbackTargetIds(previousMap = {}, nextMap = {}) {
-  return Array.from(new Set([
-    ...Object.keys(previousMap ?? {}),
-    ...Object.keys(nextMap ?? {}),
-  ]));
+  return Array.from(new Set([...Object.keys(previousMap ?? {}), ...Object.keys(nextMap ?? {})]));
 }
 
 function hasVisibilityReadbackMismatch(token, visibilityMap = {}, targetIds = []) {
   const actualMap = getVisibilityMap(token);
   return targetIds.some(
     (targetId) =>
-      visibilityMapValueFor(actualMap, targetId) !==
-      visibilityMapValueFor(visibilityMap, targetId),
+      visibilityMapValueFor(actualMap, targetId) !== visibilityMapValueFor(visibilityMap, targetId),
   );
 }
 
@@ -351,7 +376,12 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
       includeObserved: options?.preserveObserved === true,
     });
     const previousProfiles = getPerceptionProfileMap(token);
+    const entryOptions = {
+      ...options,
+      profileMetadataByTargetId: entry.profileMetadataByTargetId ?? entry.profileMetadataMap,
+    };
     const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
+      ...entryOptions,
       preserveObserved: options?.preserveObserved === true,
     });
     const removedProfileTargetIds = Object.keys(previousProfiles).filter(
@@ -363,10 +393,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     readbackEntries.push({
       token,
       visibilityMap: entry.visibilityMap ?? {},
-      targetIds: collectVisibilityReadbackTargetIds(
-        previousMap,
-        entry.visibilityMap ?? {},
-      ),
+      targetIds: collectVisibilityReadbackTargetIds(previousMap, entry.visibilityMap ?? {}),
       changes: buildVisibilityMapDiff(previousMap, nextMap).map((change) => ({
         ...change,
         observerId,
@@ -374,7 +401,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
       })),
     });
 
-    const passes = buildVisibilityMapDocumentUpdatePasses(token, entry.visibilityMap, options);
+    const passes = buildVisibilityMapDocumentUpdatePasses(token, entry.visibilityMap, entryOptions);
     rememberPendingPerceptionProfileWrite(token, nextProfiles, {
       removedTargetIds: removedProfileTargetIds,
     });
@@ -395,9 +422,15 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
     waitForToken: waitForTokenDocumentUpdateSafe,
     scene: canvas?.scene,
     updateOptions: noRenderUpdateOptions(),
-    fallback: async () => Promise.all(
-      entries.map((entry) => setVisibilityMap(entry.token, entry.visibilityMap, options)),
-    ),
+    fallback: async () =>
+      Promise.all(
+        entries.map((entry) =>
+          setVisibilityMap(entry.token, entry.visibilityMap, {
+            ...options,
+            profileMetadataByTargetId: entry.profileMetadataByTargetId ?? entry.profileMetadataMap,
+          }),
+        ),
+      ),
   });
   for (const entry of readbackEntries) {
     refreshHiddenDetectionFilterVisualsForChanges(entry.changes);
@@ -508,7 +541,8 @@ export function getVisibilityBetween(observer, target) {
   const targetId = getTokenId(target);
   const profile = getRawPerceptionProfileEntry(observer, targetId);
   if (!profile) return 'observed';
-  return profileToLegacyVisibility(profile, { preserveEncounterUnnoticed: true }) || 'observed';
+  const effectiveProfile = applyNativeVisibilityReplacementToProfile(observer, target, profile);
+  return profileToLegacyVisibility(effectiveProfile, { preserveEncounterUnnoticed: true }) || 'observed';
 }
 
 /**
@@ -517,9 +551,11 @@ export function getVisibilityBetween(observer, target) {
  * @param {Token} target
  */
 export function getPerceptionProfileBetween(observer, target) {
-  return getRawPerceptionProfileEntry(observer, getTokenId(target)) || {
-    ...DEFAULT_PERCEPTION_PROFILE,
-  };
+  const profile =
+    getRawPerceptionProfileEntry(observer, getTokenId(target)) || {
+      ...DEFAULT_PERCEPTION_PROFILE,
+    };
+  return applyNativeVisibilityReplacementToProfile(observer, target, profile);
 }
 
 async function applyVisibilitySideEffects(observer, target, state, options = {}) {
@@ -536,7 +572,13 @@ async function applyVisibilitySideEffects(observer, target, state, options = {})
   const { OffGuardSuppression } = await import(
     '../rule-elements/operations/OffGuardSuppression.js'
   );
-  if (OffGuardSuppression.shouldSuppressOffGuardForState(observer, state, target)) {
+  const suppressionContext =
+    options.perceptionProfile ||
+    options.profileMetadata ||
+    getVisibilityReplacementMetadata(options);
+  if (
+    OffGuardSuppression.shouldSuppressOffGuardForState(observer, state, target, suppressionContext)
+  ) {
     // Remove any existing off-guard effects
     try {
       if (autoVisibilitySystem) {
@@ -585,7 +627,7 @@ function notifyVisibilityMapUpdated(observer, target, state, options = {}) {
       state,
       direction: options.direction || 'observer_to_target',
     });
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function logVisibilityPairChange(observer, target, from, to, options = {}) {
@@ -634,7 +676,7 @@ export async function setPerceptionProfileBetween(
 
   const profileMap = { ...getPerceptionProfileMap(observer) };
   const rawProfileMap = getRawPerceptionProfileMap(observer);
-  const currentProfile = getPerceptionProfileBetween(observer, target);
+  const currentProfile = rawProfileMap[targetId] || { ...DEFAULT_PERCEPTION_PROFILE };
   const nextProfile = normalizePerceptionProfile(profile);
   const legacyState =
     options.legacyState ||
@@ -642,8 +684,10 @@ export async function setPerceptionProfileBetween(
       preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
     });
   const currentLegacyState = getVisibilityBetween(observer, target);
-  const profileChanged =
-    !areTokenFlagValuesEqual(normalizePerceptionProfile(currentProfile), nextProfile);
+  const profileChanged = !areTokenFlagValuesEqual(
+    normalizePerceptionProfile(currentProfile),
+    nextProfile,
+  );
   const missingStoredProfile = !rawProfileMap[targetId] && !isDefaultProfile(nextProfile);
 
   if (profileChanged || missingStoredProfile) {
@@ -677,7 +721,10 @@ export async function setPerceptionProfileBetween(
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }
 
-  await applyVisibilitySideEffects(observer, target, legacyState, options);
+  await applyVisibilitySideEffects(observer, target, legacyState, {
+    ...options,
+    perceptionProfile: nextProfile,
+  });
 }
 
 /**
@@ -700,11 +747,31 @@ export async function setVisibilityBetween(
     return;
   }
 
-  await setPerceptionProfileBetween(observer, target, legacyVisibilityToProfile(state), {
-    ...options,
-    legacyState: state,
-    preserveEncounterUnnoticed: state === 'unnoticed' || options.preserveEncounterUnnoticed,
+  const hasExplicitProfileMetadata = Object.prototype.hasOwnProperty.call(
+    options ?? {},
+    'profileMetadata',
+  );
+  const currentProfile = getPerceptionProfileBetween(observer, target);
+  const currentState = profileToLegacyVisibility(currentProfile, {
+    preserveEncounterUnnoticed: true,
   });
+  const profileMetadata = hasExplicitProfileMetadata
+    ? (options.profileMetadata ?? {})
+    : currentState === state && hasVisibilityReplacementMetadata(currentProfile)
+      ? getVisibilityReplacementMetadata(currentProfile)
+      : {};
+
+  await setPerceptionProfileBetween(
+    observer,
+    target,
+    legacyVisibilityToProfile(state, profileMetadata),
+    {
+      ...options,
+      profileMetadata,
+      legacyState: state,
+      preserveEncounterUnnoticed: state === 'unnoticed' || options.preserveEncounterUnnoticed,
+    },
+  );
 }
 
 /**

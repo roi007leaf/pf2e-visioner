@@ -170,4 +170,34 @@ describe('BatchResultApplicationPolicy', () => {
     expect(plan.observerMaps.get(observerA)).toEqual({ B: 'concealed' });
     expect(plan.appliedUpdates).toEqual([expect.objectContaining({ visibility: 'concealed' })]);
   });
+
+  test('marks observer dirty when only visibility profile metadata changed', () => {
+    const observerA = observer('A');
+    const targetB = target('B');
+    const recordExplicitVisiblePair = jest.fn(() => false);
+
+    const plan = buildVisibilityMapApplicationPlan({
+      updates: [
+        {
+          observer: observerA,
+          target: targetB,
+          visibility: 'hidden',
+          profileMetadata: {},
+          forceProfileMetadataSync: true,
+        },
+      ],
+      getVisibilityMap: jest.fn(() => ({ B: 'hidden' })),
+      getStoredVisibilityMap: jest.fn(() => ({ B: 'hidden' })),
+      recordExplicitVisiblePair,
+      overrideMatchesVisibility: jest.fn(() => true),
+      moduleId: 'pf2e-visioner',
+    });
+
+    expect(plan.uniqueUpdateCount).toBe(1);
+    expect(plan.dirtyObservers).toEqual([observerA]);
+    expect(plan.observerMaps.get(observerA)).toEqual({ B: 'hidden' });
+    expect(plan.appliedUpdates).toEqual([
+      expect.objectContaining({ visibility: 'hidden', forceProfileMetadataSync: true }),
+    ]);
+  });
 });

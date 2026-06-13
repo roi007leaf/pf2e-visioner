@@ -61,4 +61,22 @@ export class RuleElementBatchContext {
     }
     return this.cache.get(key);
   }
+
+  checkVisibilityReplacement(observerToken, targetToken, currentVisibility = null) {
+    if (!this.hasRuleElementState || !currentVisibility) return null;
+
+    const observerId = tokenId(observerToken);
+    const targetId = tokenId(targetToken);
+    if (!observerId || !targetId) return null;
+
+    const key = `visibilityReplacement:${observerId}->${targetId}:${currentVisibility}`;
+    if (!this.cache.has(key)) {
+      this.cache.set(
+        key,
+        this.checker?.checkVisibilityReplacement?.(observerToken, targetToken, currentVisibility) ||
+          null,
+      );
+    }
+    return this.cache.get(key);
+  }
 }

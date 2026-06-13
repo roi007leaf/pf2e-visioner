@@ -20,6 +20,11 @@ import {
   resolveActor,
 } from '../../utils/actor-features.js';
 import EnvironmentHelper from '../../utils/environment.js';
+import {
+  getBlindFightAdjacentVisibilityReplacement,
+  getNativeVisibilityReplacement,
+  hasBlindFight,
+} from './feats/native-visibility-replacement.js';
 
 const OUTCOME_ORDER = ['critical-failure', 'failure', 'success', 'critical-success'];
 
@@ -151,6 +156,26 @@ export class FeatsHandler {
    */
   static hasFeat(tokenOrActor, slugOrSlugs) {
     return actorHasFeature(tokenOrActor, slugOrSlugs);
+  }
+
+  static hasBlindFight(tokenOrActor) {
+    return hasBlindFight(tokenOrActor);
+  }
+
+  static hasNativeVisibilityReplacementFeature(tokenOrActor) {
+    return FeatsHandler.hasBlindFight(tokenOrActor);
+  }
+
+  static getBlindFightAdjacentVisibilityReplacement(
+    observerToken,
+    targetToken,
+    currentVisibility,
+  ) {
+    return getBlindFightAdjacentVisibilityReplacement(observerToken, targetToken, currentVisibility);
+  }
+
+  static getVisibilityReplacement(observerToken, targetToken, currentVisibility) {
+    return getNativeVisibilityReplacement(observerToken, targetToken, currentVisibility);
   }
 
   /**

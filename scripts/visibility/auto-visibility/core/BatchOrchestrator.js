@@ -35,10 +35,7 @@ import { buildBatchPreflightPlan } from './BatchPreflightPolicy.js';
 import { buildBatchEffectSyncPlan } from './BatchEffectSyncPolicy.js';
 import { buildBatchResultApplicationPlan } from './BatchResultApplicationPolicy.js';
 import { createDefaultBatchWorkflowFactory } from './BatchWorkflowFactory.js';
-import {
-  buildCoalesceDrainPlan,
-  buildProcessBatchAdmissionPlan,
-} from './BatchQueuePolicy.js';
+import { buildCoalesceDrainPlan, buildProcessBatchAdmissionPlan } from './BatchQueuePolicy.js';
 import {
   isMovementVisibilityBatch,
   resolveVisibleBatchTokens,
@@ -78,13 +75,15 @@ export class BatchOrchestrator {
     this.positionManager = dependencies.positionManager || null;
     this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
-    this.nowProvider = dependencies.nowProvider || (() => {
-      try {
-        return performance?.now?.() ?? Date.now();
-      } catch {
-        return Date.now();
-      }
-    });
+    this.nowProvider =
+      dependencies.nowProvider ||
+      (() => {
+        try {
+          return performance?.now?.() ?? Date.now();
+        } catch {
+          return Date.now();
+        }
+      });
     this.workflowFactory =
       dependencies.workflowFactory ||
       createDefaultBatchWorkflowFactory({
@@ -97,8 +96,7 @@ export class BatchOrchestrator {
         warn: (...args) => console.warn(...args),
         applyBatchResults: (result, resultOptions) =>
           this._applyBatchResults(result, resultOptions),
-        syncEphemeralEffectsForUpdates: (updates) =>
-          this._syncEphemeralEffectsForUpdates(updates),
+        syncEphemeralEffectsForUpdates: (updates) => this._syncEphemeralEffectsForUpdates(updates),
         refreshPerceptionAfterBatch: () => this._refreshPerceptionAfterBatch(),
         setSuppressLightingRefreshAfterBatch,
         clearSuppressLightingRefreshAfterBatch,
@@ -476,13 +474,14 @@ export class BatchOrchestrator {
       changedTokens,
       movementSession: options.movementSession,
     });
-    const candidateTokens = isMovementBatch ? canvas.tokens?.placeables || [] : this._getAllTokens();
-    const { allTokens, visibleChangedTokens, hasVisibleChangedTokens } =
-      resolveVisibleBatchTokens({
-        changedTokens,
-        candidateTokens,
-        exclusionManager: this.exclusionManager,
-      });
+    const candidateTokens = isMovementBatch
+      ? canvas.tokens?.placeables || []
+      : this._getAllTokens();
+    const { allTokens, visibleChangedTokens, hasVisibleChangedTokens } = resolveVisibleBatchTokens({
+      changedTokens,
+      candidateTokens,
+      exclusionManager: this.exclusionManager,
+    });
 
     const visibilityPreflightPlan = buildBatchPreflightPlan({ hasVisibleChangedTokens });
     if (!visibilityPreflightPlan.shouldProcess) {
@@ -506,7 +505,7 @@ export class BatchOrchestrator {
         ...this._getDebugStackDetails(),
         movementSession: options.movementSession,
       }));
-    } catch { }
+    } catch {}
 
     // NOTE: VisionAnalyzer now uses PositionManager directly, so we don't need
     // to sync canvas token positions. The LOS calculation will use the correct
@@ -624,7 +623,7 @@ export class BatchOrchestrator {
           changed: visibleChangedTokens.size,
           updates: uniqueUpdateCount,
         }));
-      } catch { }
+      } catch {}
       telemetryStopped = true;
 
       // Clear movement session after successful batch
@@ -643,7 +642,7 @@ export class BatchOrchestrator {
       detectionBatch.discardIfOpen();
       try {
         console.error('PF2E Visioner | processBatch error:', error);
-      } catch { }
+      } catch {}
     } finally {
       this.workflowFactory.runFinalization({
         telemetryStopped,
@@ -720,11 +719,11 @@ export class BatchOrchestrator {
       const previous =
         this._lastPrecompute.map && now - this._lastPrecompute.ts < TTL_MS
           ? {
-            map: this._lastPrecompute.map,
-            posKeyMap: this._lastPrecompute.posKeyMap,
-            lightingHash: this._lastPrecompute.lightingHash,
-            ts: this._lastPrecompute.ts,
-          }
+              map: this._lastPrecompute.map,
+              posKeyMap: this._lastPrecompute.posKeyMap,
+              lightingHash: this._lastPrecompute.lightingHash,
+              ts: this._lastPrecompute.ts,
+            }
           : undefined;
 
       // Track cache hit/miss for better telemetry
@@ -758,7 +757,7 @@ export class BatchOrchestrator {
       // Best effort - continue without precomputation
       try {
         console.warn('PF2E Visioner | Failed to precompute lighting:', error);
-      } catch { }
+      } catch {}
     }
 
     return { precomputedLights, precomputeStats };
@@ -1024,24 +1023,37 @@ export class BatchOrchestrator {
       options.suppressVisibilityMapRender === true
         ? { suppressRender: true, preserveObserved: true }
         : undefined;
+    const profileMetadataByObserver = new Map();
+    for (const update of applicationPlan.appliedUpdates) {
+      const observer = update?.observer;
+      const targetId = update?.target?.document?.id;
+      const hasProfileMetadata = Object.prototype.hasOwnProperty.call(update, 'profileMetadata');
+      if (!observer || !targetId || (!hasProfileMetadata && !update?.forceProfileMetadataSync)) {
+        continue;
+      }
+      if (!profileMetadataByObserver.has(observer)) profileMetadataByObserver.set(observer, {});
+      profileMetadataByObserver.get(observer)[targetId] = update.profileMetadata ?? {};
+    }
     const dirtyVisibilityEntries = applicationPlan.dirtyObservers.map((observer) => ({
       token: observer,
       visibilityMap: applicationPlan.observerMaps.get(observer),
+      profileMetadataByTargetId: profileMetadataByObserver.get(observer) ?? {},
     }));
     const persistResults = this.visibilityMapService.setVisibilityMaps
       ? await Promise.allSettled([
-        this.visibilityMapService.setVisibilityMaps(
-          dirtyVisibilityEntries,
-          visibilityMapOptions,
-        ),
-      ])
+          this.visibilityMapService.setVisibilityMaps(dirtyVisibilityEntries, visibilityMapOptions),
+        ])
       : await Promise.allSettled(
-        dirtyVisibilityEntries.map(({ token, visibilityMap }) =>
-          visibilityMapOptions
-            ? this.visibilityMapService.setVisibilityMap(token, visibilityMap, visibilityMapOptions)
-            : this.visibilityMapService.setVisibilityMap(token, visibilityMap),
-        ),
-      );
+          dirtyVisibilityEntries.map(({ token, visibilityMap, profileMetadataByTargetId }) => {
+            const entryOptions =
+              Object.keys(profileMetadataByTargetId).length > 0
+                ? { ...(visibilityMapOptions ?? {}), profileMetadataByTargetId }
+                : visibilityMapOptions;
+            return entryOptions
+              ? this.visibilityMapService.setVisibilityMap(token, visibilityMap, entryOptions)
+              : this.visibilityMapService.setVisibilityMap(token, visibilityMap);
+          }),
+        );
 
     for (const result of persistResults) {
       if (result.status === 'rejected') {

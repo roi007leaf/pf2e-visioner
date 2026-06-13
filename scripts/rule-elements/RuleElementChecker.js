@@ -1,6 +1,7 @@
 import { PredicateHelper } from './PredicateHelper.js';
 import { SourceTracker } from './SourceTracker.js';
 import { getVisibilityBetween } from '../stores/visibility-map.js';
+import { getActorLevel } from '../utils/actor-features.js';
 
 export class RuleElementChecker {
   /**
@@ -22,7 +23,11 @@ export class RuleElementChecker {
     }
 
     // Check rule element overrides
-    const overrideResult = this.checkRuleElementOverride(observerToken, targetToken, currentVisibility);
+    const overrideResult = this.checkRuleElementOverride(
+      observerToken,
+      targetToken,
+      currentVisibility,
+    );
     if (overrideResult) {
       results.push(overrideResult);
     }
@@ -63,7 +68,6 @@ export class RuleElementChecker {
       auraVisibility: 150,
       distanceBasedVisibility: 100,
     };
-
 
     const winner = results.reduce((highest, current) => {
       const currentTypePri = typePriority[current.type] || 0;
@@ -147,7 +151,10 @@ export class RuleElementChecker {
           if (config.predicate && config.predicate.length > 0) {
             const observerOptions = PredicateHelper.getTokenRollOptions(observerToken);
             const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
-            const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
+            const combinedOptions = PredicateHelper.combineRollOptions(
+              observerOptions,
+              targetOptions,
+            );
 
             if (!PredicateHelper.evaluate(config.predicate, combinedOptions)) {
               return null;
@@ -189,8 +196,14 @@ export class RuleElementChecker {
           // Legacy combined predicate with target: prefix
           if (config.predicate && config.predicate.length > 0) {
             const targetOptions = PredicateHelper.getTokenRollOptions(targetToken);
-            const observerOptions = PredicateHelper.getTargetRollOptions(observerToken, targetToken);
-            const combinedOptions = PredicateHelper.combineRollOptions(targetOptions, observerOptions);
+            const observerOptions = PredicateHelper.getTargetRollOptions(
+              observerToken,
+              targetToken,
+            );
+            const combinedOptions = PredicateHelper.combineRollOptions(
+              targetOptions,
+              observerOptions,
+            );
 
             if (!PredicateHelper.evaluate(config.predicate, combinedOptions)) {
               return null;
@@ -258,7 +271,6 @@ export class RuleElementChecker {
       // Check target's sources (both directions store sources on targetToken)
       const targetSources = SourceTracker.getVisibilityStateSources(targetToken, observerToken.id);
       if (targetSources.length > 0) {
-
         // CRITICAL: Filter sources by direction BEFORE checking predicates
         // When checking observer->target, we should only consider sources with matching direction:
         // - 'to' direction sources: observer sees target differently (stored on target with observerId = observer.id)
@@ -271,7 +283,7 @@ export class RuleElementChecker {
         // Actually wait, let me think about this more carefully...
         // When direction='to': subjectToken sees observerToken differently
         //   - Stored on observerToken with observerId = subjectToken.id
-        // When direction='from': observerToken sees subjectToken differently  
+        // When direction='from': observerToken sees subjectToken differently
         //   - Stored on subjectToken with observerId = observerToken.id
         // So when checking observerToken->targetToken:
         // - direction='to' sources are stored on targetToken with observerId = someOtherToken.id (where someOtherToken is the subject)
@@ -299,15 +311,24 @@ export class RuleElementChecker {
             // Predicate should be evaluated with observer as subject, target as target
             const observerOptions = PredicateHelper.getTokenRollOptions(observerToken);
             const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
-            const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
+            const combinedOptions = PredicateHelper.combineRollOptions(
+              observerOptions,
+              targetOptions,
+            );
             predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
           } else if (source.direction === 'from') {
             // Direction 'from': target is seen differently by observer
             // This means the source should apply when checking observer->target
             // Predicate should be evaluated with target as subject, observer as target
             const targetOptions = PredicateHelper.getTokenRollOptions(targetToken);
-            const observerOptions = PredicateHelper.getTargetRollOptions(observerToken, targetToken);
-            const combinedOptions = PredicateHelper.combineRollOptions(targetOptions, observerOptions);
+            const observerOptions = PredicateHelper.getTargetRollOptions(
+              observerToken,
+              targetToken,
+            );
+            const combinedOptions = PredicateHelper.combineRollOptions(
+              targetOptions,
+              observerOptions,
+            );
             predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
           }
 
@@ -331,9 +352,11 @@ export class RuleElementChecker {
       // Also check the reverse direction: sources might be stored on observerToken for 'to' direction
       // When direction='to', source is stored on targetToken (which becomes observerToken in reverse check)
       // So we need to check observerToken's sources with targetToken.id as observerId
-      const observerSources = SourceTracker.getVisibilityStateSources(observerToken, targetToken.id);
+      const observerSources = SourceTracker.getVisibilityStateSources(
+        observerToken,
+        targetToken.id,
+      );
       if (observerSources.length > 0) {
-
         // Check if any of these are 'to' direction sources that should apply to observer->target check
         for (const source of observerSources) {
           if (!source.predicate?.length || source.direction !== 'to') continue;
@@ -342,9 +365,11 @@ export class RuleElementChecker {
           // When checking observerToken->targetToken, this source applies
           const observerOptions = PredicateHelper.getTokenRollOptions(observerToken);
           const targetOptions = PredicateHelper.getTargetRollOptions(targetToken, observerToken);
-          const combinedOptions = PredicateHelper.combineRollOptions(observerOptions, targetOptions);
+          const combinedOptions = PredicateHelper.combineRollOptions(
+            observerOptions,
+            targetOptions,
+          );
           const predicatePasses = PredicateHelper.evaluate(source.predicate, combinedOptions);
-
 
           if (predicatePasses) {
             const storedState = getVisibilityBetween(observerToken, targetToken);
@@ -402,8 +427,8 @@ export class RuleElementChecker {
 
           // Check level comparison if specified
           if (observerConfig.levelComparison) {
-            const observerLevel = observerToken.actor?.level ?? 0;
-            const targetLevel = targetToken.actor?.level ?? 0;
+            const observerLevel = getActorLevel(observerToken) ?? 0;
+            const targetLevel = getActorLevel(targetToken) ?? 0;
             const comparison = observerConfig.levelComparison;
 
             let levelCheckPassed = false;
@@ -445,6 +470,7 @@ export class RuleElementChecker {
             source: observerConfig.source,
             priority: observerConfig.priority || 100,
             type: 'visibilityReplacement',
+            fromState: currentVisibility,
           };
         }
       }
@@ -464,8 +490,8 @@ export class RuleElementChecker {
 
           // Check level comparison if specified
           if (targetConfig.levelComparison) {
-            const observerLevel = observerToken.actor?.level ?? 0;
-            const targetLevel = targetToken.actor?.level ?? 0;
+            const observerLevel = getActorLevel(observerToken) ?? 0;
+            const targetLevel = getActorLevel(targetToken) ?? 0;
             const comparison = targetConfig.levelComparison;
 
             let levelCheckPassed = false;
@@ -507,6 +533,7 @@ export class RuleElementChecker {
             source: targetConfig.source,
             priority: targetConfig.priority || 100,
             type: 'visibilityReplacement',
+            fromState: currentVisibility,
           };
         }
       }
@@ -592,7 +619,9 @@ export class RuleElementChecker {
         const auraTargets = auraConfig.auraTargets || 'all';
         if (auraTargets !== 'all') {
           const targetIsAlly = auraSource.actor?.isAllyOf?.(targetToken.actor) ?? false;
-          const shouldApply = (auraTargets === 'enemies' && !targetIsAlly) || (auraTargets === 'allies' && targetIsAlly);
+          const shouldApply =
+            (auraTargets === 'enemies' && !targetIsAlly) ||
+            (auraTargets === 'allies' && targetIsAlly);
           if (!shouldApply) continue;
         }
 

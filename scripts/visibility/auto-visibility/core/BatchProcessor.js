@@ -1,4 +1,5 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
+import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { getLogger } from '../../../utils/logger.js';
@@ -23,6 +24,10 @@ import {
 import { ViewportFilterService } from './ViewportFilterService.js';
 import { VisibilityMapBatchCache } from './VisibilityMapBatchCache.js';
 import { VisibilityMapService } from './VisibilityMapService.js';
+import {
+  getVisibilityReplacementMetadata,
+  visibilityReplacementMetadataEquals,
+} from '../../perception-profile.js';
 
 export { buildTokenSensesCacheKey } from './TokenSenseSignatureCache.js';
 
@@ -54,6 +59,15 @@ const NON_VISUAL_SENSE_DEFAULT_RANGES = {
   wavesense: 30,
   hearing: Infinity,
 };
+
+function buildVisibilityReplacementProfileMetadata(ruleElementResult, originalVisibility) {
+  if (ruleElementResult?.type !== 'visibilityReplacement') return {};
+  return {
+    visibilityReplacementSource: ruleElementResult.source,
+    visibilityReplacementOriginalState:
+      ruleElementResult.fromState ?? ruleElementResult.originalState ?? originalVisibility,
+  };
+}
 
 function normalizeSenseType(sense) {
   return String(sense?.type ?? '')
@@ -113,16 +127,19 @@ function calculateSenseDistanceInFeet(observer, target, distanceInGridUnits) {
 }
 
 function calculateApproximateSenseDistanceInFeet(distanceInGridUnits) {
-  const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
+  const gridDistance =
+    Number(canvas?.scene?.grid?.distance ?? canvas?.dimensions?.distance ?? 5) || 5;
   return distanceInGridUnits * gridDistance;
 }
 
 function shouldUseExactSenseDistance(sensingSummary) {
   const allSenses = [...(sensingSummary?.precise || []), ...(sensingSummary?.imprecise || [])];
-  if (allSenses.some((sense) => {
-    const senseType = normalizeSenseType(sense);
-    return senseType && !VISUAL_SENSE_TYPES.has(senseType);
-  })) {
+  if (
+    allSenses.some((sense) => {
+      const senseType = normalizeSenseType(sense);
+      return senseType && !VISUAL_SENSE_TYPES.has(senseType);
+    })
+  ) {
     return true;
   }
   return !!sensingSummary?.hearing;
@@ -175,9 +192,7 @@ export function buildTokenPositionCacheKey(tokens, posCache = null, positionMana
       const position = getTokenPositionForCacheKey(token, posCache, positionManager);
       const x = normalizeCacheKeyNumber(position?.x ?? token?.document?.x);
       const y = normalizeCacheKeyNumber(position?.y ?? token?.document?.y);
-      const elevation = normalizeCacheKeyNumber(
-        position?.elevation ?? token?.document?.elevation,
-      );
+      const elevation = normalizeCacheKeyNumber(position?.elevation ?? token?.document?.elevation);
       const width = normalizeCacheKeyNumber(token?.document?.width ?? 1);
       const height = normalizeCacheKeyNumber(token?.document?.height ?? 1);
 
@@ -230,8 +245,7 @@ function hasCoreLosFromControlledObserver(observerToken, targetToken) {
     return sources.some((source) =>
       points.some(
         (point) =>
-          source?.los?.contains?.(point.x, point.y) ||
-          source?.shape?.contains?.(point.x, point.y),
+          source?.los?.contains?.(point.x, point.y) || source?.shape?.contains?.(point.x, point.y),
       ),
     );
   } catch {
@@ -501,6 +515,11 @@ export class BatchProcessor {
         {},
     });
     documentVisCache.build(allTokens);
+    const profileCache = new VisibilityMapBatchCache({
+      getVisibilityMap: (token) =>
+        this.visibilityMapService?.getPerceptionProfileMap?.(token) ?? {},
+    });
+    profileCache.build(allTokens);
 
     // Per-batch override memoization (always needed fresh)
     const overridesCache = new OverrideBatchCache(this.overrideService);
@@ -610,6 +629,34 @@ export class BatchProcessor {
       checker: RuleElementChecker,
       tokens: allTokens,
     });
+    const applyVisibilityReplacement = (observerToken, targetToken, visibility) => {
+      if (!visibility) return { visibility, profileMetadata: {} };
+      const ruleElementResult = ruleElementContext.checkVisibilityReplacement(
+        observerToken,
+        targetToken,
+        visibility,
+      );
+      const featResult = FeatsHandler.getVisibilityReplacement(
+        observerToken,
+        targetToken,
+        visibility,
+      );
+      const replacementResult = ruleElementResult || featResult;
+      if (!replacementResult) return { visibility, profileMetadata: {} };
+      return {
+        visibility: replacementResult.state,
+        profileMetadata: buildVisibilityReplacementProfileMetadata(replacementResult, visibility),
+      };
+    };
+    const applyFeatVisibilityReplacement = (observerToken, targetToken, visibility) => {
+      if (!visibility) return { visibility, profileMetadata: {} };
+      const featResult = FeatsHandler.getVisibilityReplacement(observerToken, targetToken, visibility);
+      if (!featResult) return { visibility, profileMetadata: {} };
+      return {
+        visibility: featResult.state,
+        profileMetadata: buildVisibilityReplacementProfileMetadata(featResult, visibility),
+      };
+    };
 
     const mainLoopStart = this.nowProvider();
     for (const changedTokenId of changedTokenIds) {
@@ -639,7 +686,8 @@ export class BatchProcessor {
         relevantTokens,
         allTokens,
       );
-      const usedMovementFallback = calcOptions?.isMovementBatch === true && relevantTokens.length === 0;
+      const usedMovementFallback =
+        calcOptions?.isMovementBatch === true && relevantTokens.length === 0;
       if (usedMovementFallback) {
         relevantTokens = allTokens.filter(
           (token) => token?.document?.id && token.document.id !== changedTokenId,
@@ -693,12 +741,18 @@ export class BatchProcessor {
         // This ensures we compare against the true previous state, not values updated during processing
         const originalVisibility1 = visCache.getMapById(aId)?.[bId] || 'observed';
         const originalVisibility2 = visCache.getMapById(bId)?.[aId] || 'observed';
-        const originalDocumentVisibility1 =
-          documentVisCache.getMapById(aId)?.[bId] || 'observed';
-        const originalDocumentVisibility2 =
-          documentVisCache.getMapById(bId)?.[aId] || 'observed';
+        const originalDocumentVisibility1 = documentVisCache.getMapById(aId)?.[bId] || 'observed';
+        const originalDocumentVisibility2 = documentVisCache.getMapById(bId)?.[aId] || 'observed';
+        const originalProfileMetadata1 = getVisibilityReplacementMetadata(
+          profileCache.getMapById(aId)?.[bId],
+        );
+        const originalProfileMetadata2 = getVisibilityReplacementMetadata(
+          profileCache.getMapById(bId)?.[aId],
+        );
 
         let effectiveVisibility1, effectiveVisibility2;
+        let profileMetadata1 = {};
+        let profileMetadata2 = {};
         let hasOverride1 = false;
         let hasOverride2 = false;
 
@@ -717,6 +771,24 @@ export class BatchProcessor {
         } catch (overrideError) {
           console.warn('PF2E Visioner | Failed to check visibility overrides:', overrideError);
         }
+        if (hasOverride1) {
+          const replacement = applyVisibilityReplacement(
+            changedToken,
+            otherToken,
+            effectiveVisibility1,
+          );
+          effectiveVisibility1 = replacement.visibility;
+          profileMetadata1 = replacement.profileMetadata;
+        }
+        if (hasOverride2) {
+          const replacement = applyVisibilityReplacement(
+            otherToken,
+            changedToken,
+            effectiveVisibility2,
+          );
+          effectiveVisibility2 = replacement.visibility;
+          profileMetadata2 = replacement.profileMetadata;
+        }
 
         // For observer movement: recalculate visibility even if observer has overrides
         // Only skip if target has overrides that would prevent meaningful recalculation
@@ -730,23 +802,35 @@ export class BatchProcessor {
           if (
             hasOverride1 &&
             (effectiveVisibility1 !== originalVisibility1 ||
-              effectiveVisibility1 !== originalDocumentVisibility1)
+              effectiveVisibility1 !== originalDocumentVisibility1 ||
+              !visibilityReplacementMetadataEquals(originalProfileMetadata1, profileMetadata1))
           ) {
             updates.push({
               observer: changedToken,
               target: otherToken,
               visibility: effectiveVisibility1,
+              profileMetadata: profileMetadata1,
+              forceProfileMetadataSync: !visibilityReplacementMetadataEquals(
+                originalProfileMetadata1,
+                profileMetadata1,
+              ),
             });
           }
           if (
             hasOverride2 &&
             (effectiveVisibility2 !== originalVisibility2 ||
-              effectiveVisibility2 !== originalDocumentVisibility2)
+              effectiveVisibility2 !== originalDocumentVisibility2 ||
+              !visibilityReplacementMetadataEquals(originalProfileMetadata2, profileMetadata2))
           ) {
             updates.push({
               observer: otherToken,
               target: changedToken,
               visibility: effectiveVisibility2,
+              profileMetadata: profileMetadata2,
+              forceProfileMetadataSync: !visibilityReplacementMetadataEquals(
+                originalProfileMetadata2,
+                profileMetadata2,
+              ),
             });
           }
           continue;
@@ -757,12 +841,18 @@ export class BatchProcessor {
         if (
           hasOverride1 &&
           (effectiveVisibility1 !== originalVisibility1 ||
-            effectiveVisibility1 !== originalDocumentVisibility1)
+            effectiveVisibility1 !== originalDocumentVisibility1 ||
+            !visibilityReplacementMetadataEquals(originalProfileMetadata1, profileMetadata1))
         ) {
           updates.push({
             observer: changedToken,
             target: otherToken,
             visibility: effectiveVisibility1,
+            profileMetadata: profileMetadata1,
+            forceProfileMetadataSync: !visibilityReplacementMetadataEquals(
+              originalProfileMetadata1,
+              profileMetadata1,
+            ),
           });
         }
 
@@ -805,7 +895,8 @@ export class BatchProcessor {
             hit1 === originalVisibility1 &&
             hit2 === originalVisibility2 &&
             hit1 === originalDocumentVisibility1 &&
-            hit2 === originalDocumentVisibility2
+            hit2 === originalDocumentVisibility2 &&
+            !ruleElementContext.hasRuleElementState
           ) {
             // Nothing to update for this pair; skip LOS and further work
             breakdown.pairsSkippedNoChange++;
@@ -832,6 +923,13 @@ export class BatchProcessor {
           );
           if (!hasNonVisualSenses1) {
             effectiveVisibility1 = 'undetected';
+            const replacement = applyVisibilityReplacement(
+              changedToken,
+              otherToken,
+              effectiveVisibility1,
+            );
+            effectiveVisibility1 = replacement.visibility;
+            profileMetadata1 = replacement.profileMetadata;
             skipVisibilityCalc1 = true;
             breakdown.pairsSkippedLOS++;
           }
@@ -845,6 +943,13 @@ export class BatchProcessor {
           );
           if (!hasNonVisualSenses2) {
             effectiveVisibility2 = 'undetected';
+            const replacement = applyVisibilityReplacement(
+              otherToken,
+              changedToken,
+              effectiveVisibility2,
+            );
+            effectiveVisibility2 = replacement.visibility;
+            profileMetadata2 = replacement.profileMetadata;
             skipVisibilityCalc2 = true;
             breakdown.pairsSkippedLOS++;
           }
@@ -872,6 +977,19 @@ export class BatchProcessor {
           );
           if (ruleElementResult1) {
             effectiveVisibility1 = ruleElementResult1.state;
+            profileMetadata1 = buildVisibilityReplacementProfileMetadata(
+              ruleElementResult1,
+              visibility1,
+            );
+          }
+          const featReplacement1 = applyFeatVisibilityReplacement(
+            changedToken,
+            otherToken,
+            effectiveVisibility1,
+          );
+          effectiveVisibility1 = featReplacement1.visibility;
+          if (Object.keys(featReplacement1.profileMetadata).length > 0) {
+            profileMetadata1 = featReplacement1.profileMetadata;
           }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
@@ -894,6 +1012,19 @@ export class BatchProcessor {
           );
           if (ruleElementResult2) {
             effectiveVisibility2 = ruleElementResult2.state;
+            profileMetadata2 = buildVisibilityReplacementProfileMetadata(
+              ruleElementResult2,
+              visibility2,
+            );
+          }
+          const featReplacement2 = applyFeatVisibilityReplacement(
+            otherToken,
+            changedToken,
+            effectiveVisibility2,
+          );
+          effectiveVisibility2 = featReplacement2.visibility;
+          if (Object.keys(featReplacement2.profileMetadata).length > 0) {
+            profileMetadata2 = featReplacement2.profileMetadata;
           }
         }
         detailedTimings.visibilityCalculations += this.nowProvider() - stageStart;
@@ -905,8 +1036,18 @@ export class BatchProcessor {
         const needsEphemeralUpdate2 = effectiveVisibility2 !== originalVisibility2;
         const needsDocumentSync1 = effectiveVisibility1 !== originalDocumentVisibility1;
         const needsDocumentSync2 = effectiveVisibility2 !== originalDocumentVisibility2;
-        const needsVisibilityUpdate1 = needsEphemeralUpdate1 || needsDocumentSync1;
-        const needsVisibilityUpdate2 = needsEphemeralUpdate2 || needsDocumentSync2;
+        const needsProfileMetadataSync1 = !visibilityReplacementMetadataEquals(
+          originalProfileMetadata1,
+          profileMetadata1,
+        );
+        const needsProfileMetadataSync2 = !visibilityReplacementMetadataEquals(
+          originalProfileMetadata2,
+          profileMetadata2,
+        );
+        const needsVisibilityUpdate1 =
+          needsEphemeralUpdate1 || needsDocumentSync1 || needsProfileMetadataSync1;
+        const needsVisibilityUpdate2 =
+          needsEphemeralUpdate2 || needsDocumentSync2 || needsProfileMetadataSync2;
         const explicitVisiblePair1 =
           !hasOverride1 && los1 === true && EXPLICIT_VISIBLE_STATES.has(effectiveVisibility1);
         const explicitVisiblePair2 =
@@ -931,6 +1072,8 @@ export class BatchProcessor {
             observer: changedToken,
             target: otherToken,
             visibility: effectiveVisibility1,
+            profileMetadata: profileMetadata1,
+            forceProfileMetadataSync: needsProfileMetadataSync1,
             explicitVisiblePair: explicitVisiblePair1,
           });
         }
@@ -939,6 +1082,8 @@ export class BatchProcessor {
             observer: otherToken,
             target: changedToken,
             visibility: effectiveVisibility2,
+            profileMetadata: profileMetadata2,
+            forceProfileMetadataSync: needsProfileMetadataSync2,
             explicitVisiblePair: explicitVisiblePair2,
           });
         }

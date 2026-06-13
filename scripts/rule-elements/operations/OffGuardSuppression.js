@@ -61,7 +61,7 @@ function hasOffGuardImmunity(token) {
   if (!actor) return false;
   try {
     if (typeof actor.isImmuneTo === 'function' && actor.isImmuneTo('off-guard')) return true;
-  } catch (_) { }
+  } catch (_) {}
 
   const immunities = [
     ...(Array.isArray(actor?.attributes?.immunities) ? actor.attributes.immunities : []),
@@ -81,8 +81,22 @@ function hasOffGuardImmunity(token) {
 
   return getActorItems(actor).some((item) =>
     (Array.isArray(item?.system?.rules) ? item.system.rules : []).some(
-      (rule) => normalizeSlug(rule?.key) === 'immunity' && normalizeSlug(rule?.type) === 'off-guard',
+      (rule) =>
+        normalizeSlug(rule?.key) === 'immunity' && normalizeSlug(rule?.type) === 'off-guard',
     ),
+  );
+}
+
+function isBlindFightAdjacentUndetectedReplacement(context = {}) {
+  return (
+    normalizeSlug(context?.visibilityReplacementSource) === 'blind-fight-adjacent' &&
+    normalizeSlug(context?.visibilityReplacementOriginalState) === 'undetected'
+  );
+}
+
+function isBlindFightSuppressionEntry(suppression = {}) {
+  return ['id', 'type', 'source'].some((field) =>
+    normalizeSlug(suppression?.[field]).startsWith('blind-fight'),
   );
 }
 
@@ -155,14 +169,19 @@ export class OffGuardSuppression {
     }
   }
 
-  static shouldSuppressOffGuardForState(token, visibilityState, sourceToken = null) {
+  static shouldSuppressOffGuardForState(token, visibilityState, sourceToken = null, context = {}) {
     if (!token || !visibilityState) return false;
 
-    const decision = this.getOffGuardSuppressionDecision(token, visibilityState, sourceToken);
+    const decision = this.getOffGuardSuppressionDecision(
+      token,
+      visibilityState,
+      sourceToken,
+      context,
+    );
     return decision.result;
   }
 
-  static getOffGuardSuppressionDecision(token, visibilityState, sourceToken = null) {
+  static getOffGuardSuppressionDecision(token, visibilityState, sourceToken = null, context = {}) {
     const state = String(visibilityState ?? '').toLowerCase();
     const document = getTokenDocument(token);
     const suppressions = document?.getFlag?.('pf2e-visioner', 'offGuardSuppression') || {};
@@ -171,18 +190,23 @@ export class OffGuardSuppression {
     const denyAdvantage = hasDenyAdvantage(token);
     const starsongNectar = hasStarsongNectarEffect(token);
     const offGuardImmune = hasOffGuardImmunity(token);
-    const nativeDenyAdvantage =
-      denyAdvantage && hasNativeDenyAdvantageAgainst(token, sourceToken);
+    const nativeDenyAdvantage = denyAdvantage && hasNativeDenyAdvantageAgainst(token, sourceToken);
     const defenderLevel = getActorLevel(token);
     const attackerLevel = getActorLevel(sourceToken);
     const levelQualifies =
       defenderLevel !== null && attackerLevel !== null && attackerLevel <= defenderLevel;
+    const blindFightAdjacentUndetectedReplacement =
+      isBlindFightAdjacentUndetectedReplacement(context);
 
-    const explicitSuppression = suppressionArray.some((suppression) =>
-      suppression.suppressedStates?.includes(state),
+    const explicitSuppression = suppressionArray.some(
+      (suppression) =>
+        suppression.suppressedStates?.includes(state) &&
+        !(blindFightAdjacentUndetectedReplacement && isBlindFightSuppressionEntry(suppression)),
     );
-    const offGuardImmunitySuppression = offGuardImmune && VISIBILITY_OFF_GUARD_STATES.includes(state);
-    const blindFightSuppression = blindFight && state === 'hidden';
+    const offGuardImmunitySuppression =
+      offGuardImmune && VISIBILITY_OFF_GUARD_STATES.includes(state);
+    const blindFightSuppression =
+      blindFight && state === 'hidden' && !blindFightAdjacentUndetectedReplacement;
     const denyAdvantageSuppression =
       VISIBILITY_OFF_GUARD_STATES.includes(state) &&
       (denyAdvantage || nativeDenyAdvantage) &&
@@ -208,6 +232,7 @@ export class OffGuardSuppression {
       explicitSuppression,
       blindFight,
       blindFightSuppression,
+      blindFightAdjacentUndetectedReplacement,
       denyAdvantage,
       starsongNectar,
       offGuardImmune,

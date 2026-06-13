@@ -6,6 +6,11 @@ export const DEFAULT_PERCEPTION_PROFILE = {
   awarenessState: null,
 };
 
+export const VISIBILITY_REPLACEMENT_METADATA_KEYS = [
+  'visibilityReplacementSource',
+  'visibilityReplacementOriginalState',
+];
+
 const VALID_DETECTION_STATES = new Set(['observed', 'hidden', 'undetected']);
 const VALID_COVER_STATES = new Set(['none', 'lesser', 'standard', 'greater']);
 
@@ -18,17 +23,41 @@ function normalizeCoverState(coverState) {
 }
 
 function normalizeAwarenessState(awarenessState, detectionState) {
-  return detectionState === 'undetected' ? awarenessState ?? null : null;
+  return detectionState === 'undetected' ? (awarenessState ?? null) : null;
 }
 
 export function awarenessStateForLegacyVisibility(state) {
   return normalizeLegacyState(state) === 'unnoticed' ? 'unnoticed' : null;
 }
 
+export function getVisibilityReplacementMetadata(profile = {}) {
+  const metadata = {};
+  for (const key of VISIBILITY_REPLACEMENT_METADATA_KEYS) {
+    const value = profile?.[key];
+    if (value !== undefined && value !== null && value !== '') {
+      metadata[key] = String(value);
+    }
+  }
+  return metadata;
+}
+
+export function hasVisibilityReplacementMetadata(profile = {}) {
+  return Object.keys(getVisibilityReplacementMetadata(profile)).length > 0;
+}
+
+export function visibilityReplacementMetadataEquals(left = {}, right = {}) {
+  const leftMetadata = getVisibilityReplacementMetadata(left);
+  const rightMetadata = getVisibilityReplacementMetadata(right);
+  return VISIBILITY_REPLACEMENT_METADATA_KEYS.every(
+    (key) => (leftMetadata[key] ?? null) === (rightMetadata[key] ?? null),
+  );
+}
+
 export function legacyVisibilityToProfile(state, metadata = {}) {
   const legacyState = normalizeLegacyState(state);
   const profile = {
     ...DEFAULT_PERCEPTION_PROFILE,
+    ...getVisibilityReplacementMetadata(metadata),
     coverState: normalizeCoverState(metadata.coverState),
     detectionSense: metadata.detectionSense ?? DEFAULT_PERCEPTION_PROFILE.detectionSense,
     awarenessState: metadata.awarenessState ?? awarenessStateForLegacyVisibility(legacyState),
@@ -108,9 +137,9 @@ export function profileToLegacyVisibility(profile = {}, options = {}) {
 
   if (isConcealed(normalized)) return 'concealed';
   if (
-    isUndetected(normalized)
-    && isUnnoticedAwareness(normalized)
-    && options.preserveEncounterUnnoticed
+    isUndetected(normalized) &&
+    isUnnoticedAwareness(normalized) &&
+    options.preserveEncounterUnnoticed
   ) {
     return 'unnoticed';
   }
@@ -176,8 +205,8 @@ export function blocksCanvasDetection(profile) {
 export function hidesEncounterTracker(profile, { source } = {}) {
   const normalized = normalizePerceptionProfile(profile);
   return (
-    source === 'encounter_stealth_initiative'
-    && normalized.detectionState === 'undetected'
-    && normalized.awarenessState === 'unnoticed'
+    source === 'encounter_stealth_initiative' &&
+    normalized.detectionState === 'undetected' &&
+    normalized.awarenessState === 'unnoticed'
   );
 }

@@ -15,6 +15,7 @@ describe('AttackRollUseCase', () => {
     // Mock getCoverBetween function from utils
     jest.doMock('../../../../scripts/utils.js', () => ({
       getCoverBetween: jest.fn().mockReturnValue(false), // Return false (no manual cover) by default
+      getPerceptionProfileBetween: jest.fn().mockReturnValue({}),
       getVisibilityBetween: jest.fn().mockReturnValue('observed'),
       setVisibilityBetween: jest.fn(),
     }));
@@ -216,6 +217,38 @@ describe('AttackRollUseCase', () => {
           source: 'deny-advantage',
           feat: 'deny-advantage',
           label: 'Deny Advantage',
+          visibilityState: 'hidden',
+          preventedModifier: -2,
+          attackerName: 'Cutthroat',
+          defenderName: 'Calder',
+        }),
+      );
+    });
+
+    test('should store Blind-Fight off-guard suppression in chat flags from native feat handling', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === speakerToken ? 'hidden' : 'observed',
+      );
+
+      speakerToken.name = 'Cutthroat';
+      speakerToken.actor = { system: { details: { level: { value: 8 } } } };
+      targetToken.name = 'Calder';
+      targetToken.actor = {
+        system: { details: { level: { value: 8 } } },
+        itemTypes: { feat: [{ slug: 'blind-fight' }] },
+      };
+
+      await attackRollUseCase.handlePreCreateChatMessage(mockData);
+
+      expect(mockData.flags['pf2e-visioner'].offGuardSuppression).toEqual(
+        expect.objectContaining({
+          source: 'blind-fight',
+          feat: 'blind-fight',
+          label: 'Blind-Fight',
           visibilityState: 'hidden',
           preventedModifier: -2,
           attackerName: 'Cutthroat',
@@ -689,6 +722,49 @@ describe('AttackRollUseCase', () => {
       expect(mockDialog.context.dc.value).toBe(20);
     });
 
+    test('should keep off-guard when Blind-Fight only downgrades adjacent undetected to hidden', async () => {
+      const { getCoverBetween, getPerceptionProfileBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+      getPerceptionProfileBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken
+          ? {
+              detectionState: 'hidden',
+              hasConcealment: false,
+              visibilityReplacementSource: 'blind-fight-adjacent',
+              visibilityReplacementOriginalState: 'undetected',
+            }
+          : {},
+      );
+
+      targetToken.actor = {
+        itemTypes: {
+          feat: [{ slug: 'blind-fight' }],
+        },
+      };
+      mockDialog.context.dc = {
+        slug: 'ac',
+        value: 20,
+        statistic: { modifiers: [] },
+      };
+
+      await attackRollUseCase.handleCheckDialog(mockDialog, mockHtml);
+
+      expect(mockDialog.context.dc.value).toBe(18);
+      expect(mockDialog.context.dc.statistic.modifiers).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            slug: 'pf2e-visioner-off-guard',
+            modifier: -2,
+          }),
+        ]),
+      );
+    });
+
     test('should use resolved dialog target when callback target loses hidden visibility', async () => {
       const { getCoverBetween, getVisibilityBetween } = await import(
         '../../../../scripts/utils.js'
@@ -831,6 +907,7 @@ describe('AttackRollUseCase', () => {
       // Mock visibility functions
       jest.doMock('../../../../scripts/utils.js', () => ({
         getCoverBetween: jest.fn().mockReturnValue('none'),
+        getPerceptionProfileBetween: jest.fn().mockReturnValue({}),
         getVisibilityBetween: jest.fn().mockReturnValue('observed'),
         setVisibilityBetween: jest.fn(),
       }));
@@ -858,6 +935,63 @@ describe('AttackRollUseCase', () => {
         skipEphemeralUpdate: false,
         direction: 'observer_to_target',
       });
+    });
+
+    test('should carry Blind-Fight suppression from roll handling into chat flags', async () => {
+      const { getCoverBetween, getVisibilityBetween } = await import(
+        '../../../../scripts/utils.js'
+      );
+      getCoverBetween.mockReturnValue('none');
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer === targetToken && target === attackerToken ? 'hidden' : 'observed',
+      );
+
+      attackerToken.name = 'Cutthroat';
+      attackerToken.actor = { system: { details: { level: { value: 8 } } } };
+      targetToken.name = 'Calder';
+      targetToken.actor = {
+        system: { details: { level: { value: 8 } } },
+        itemTypes: { feat: [{ slug: 'blind-fight' }] },
+      };
+
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      targetToken.actor = {
+        system: { details: { level: { value: 8 } } },
+        itemTypes: { feat: [] },
+      };
+      attackRollUseCase.normalizeTokenRef = jest.fn((ref) => ref);
+      attackRollUseCase._resolveTargetTokenIdFromData = jest.fn(() => 'target');
+      attackRollUseCase.autoCoverSystem.getOverrideManager = jest.fn(() => ({
+        consumeOverride: jest.fn(() => null),
+      }));
+      global.canvas = {
+        tokens: {
+          get: jest.fn((id) => {
+            if (id === 'attacker') return attackerToken;
+            if (id === 'target') return targetToken;
+            return null;
+          }),
+        },
+      };
+      const mockData = {
+        speaker: { token: 'attacker' },
+        flags: { pf2e: { context: { target: { token: 'target' } } } },
+      };
+
+      await attackRollUseCase.handlePreCreateChatMessage(mockData);
+
+      expect(mockData.flags['pf2e-visioner'].offGuardSuppression).toEqual(
+        expect.objectContaining({
+          source: 'blind-fight',
+          feat: 'blind-fight',
+          label: 'Blind-Fight',
+          visibilityState: 'hidden',
+          preventedModifier: -2,
+          attackerName: 'Cutthroat',
+          defenderName: 'Calder',
+        }),
+      );
     });
 
     test('should clone attacker without stale aggregate off-guard when defender suppresses hidden off-guard', async () => {
@@ -914,9 +1048,7 @@ describe('AttackRollUseCase', () => {
 
       expect(originalAttackerActor.clone).toHaveBeenCalledWith(
         {
-          items: [
-            { id: 'real-effect', type: 'effect', name: 'Keep Me' },
-          ],
+          items: [{ id: 'real-effect', type: 'effect', name: 'Keep Me' }],
         },
         { keepId: true },
       );

@@ -20,6 +20,7 @@ import {
   withSuppressedPendingMovementDetectionFilterVisuals,
 } from '../PendingMovement/pending-movement-render-lock.js';
 import {
+  targetQualifiesForLivePreciseNonVisualDetection,
   targetIsRenderHiddenForCurrentViewObserver,
   targetMustStayHiddenDuringPendingMovement,
 } from '../PendingMovement/pending-token-movement.js';
@@ -74,6 +75,25 @@ function restoreRenderLockForGmVisionBypass(token) {
   }
 }
 
+function restoreLivePreciseNonVisualRendering(token) {
+  if (!targetQualifiesForLivePreciseNonVisualDetection(token)) return false;
+  if (token?.document?.hidden) return false;
+
+  try {
+    if ('visible' in token) token.visible = true;
+    token.renderable = true;
+    if (token.mesh) {
+      if ('visible' in token.mesh) token.mesh.visible = true;
+      if ('renderable' in token.mesh) token.mesh.renderable = true;
+      if ('alpha' in token.mesh && Number(token.mesh.alpha) <= 0) token.mesh.alpha = 1;
+    }
+    clearDetectionFilterVisuals(token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function syncCurrentViewRenderHiddenState(token) {
   if (
     targetMustStayHiddenDuringPendingMovement(token) ||
@@ -85,6 +105,7 @@ function syncCurrentViewRenderHiddenState(token) {
   }
 
   restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
+  restoreLivePreciseNonVisualRendering(token);
   return false;
 }
 
@@ -93,6 +114,8 @@ function refreshThenRestorePendingInvisible(token, refreshWrapped) {
   try {
     if (shouldTemporarilyForceTokenInvisible(token)) {
       forcePendingMovementTokenInvisible(token);
+    } else if (restoreLivePreciseNonVisualRendering(token)) {
+      return result;
     } else if (shouldSuppressPendingMovementDetectionFilterVisuals(token)) {
       clearDetectionFilterVisuals(token);
     }
@@ -285,6 +308,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
       forcePendingMovementTokenInvisible(this);
     } else {
       restorePendingMovementTokenRendering(this);
+      restoreLivePreciseNonVisualRendering(this);
       if (suppressDetectionFilterVisuals) {
         withSuppressedPendingMovementDetectionFilterVisuals(this, () => undefined);
       } else {

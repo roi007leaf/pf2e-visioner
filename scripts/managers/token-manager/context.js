@@ -13,6 +13,7 @@ import {
   getCoverMap,
   getLastRollTotalForActor,
   getSceneTargets,
+  getVisibilityBetween,
   getVisibilityMap,
   hasActiveEncounter,
 } from '../../utils.js';
@@ -33,6 +34,14 @@ function buildVisibilityStateContext(key, { selected = false, manual = true } = 
 
 function getOverrideDisplayState(overrideFlag) {
   return overrideToDisplayVisibility(overrideFlag) || 'observed';
+}
+
+function getEffectiveVisibilityState(observerToken, targetToken, fallback = 'observed') {
+  try {
+    return getVisibilityBetween(observerToken, targetToken) || fallback || 'observed';
+  } catch {
+    return fallback || 'observed';
+  }
 }
 
 function getTokenImage(token) {
@@ -292,17 +301,29 @@ export async function buildContext(app, options) {
               hasAvsOverride = false;
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
-              // Get the actual current state from the visibility map
-              actualCurrentState = app.visibilityData?.[token.document.id] || 'observed';
+              // Get the effective state so native feat replacements display in the manager.
+              actualCurrentState = getEffectiveVisibilityState(
+                app.observer,
+                token,
+                app.visibilityData?.[token.document.id] || 'observed',
+              );
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
             isAvsControlled = false;
-            actualCurrentState = currentVisibilityState || 'observed';
+            actualCurrentState = getEffectiveVisibilityState(
+              app.observer,
+              token,
+              currentVisibilityState || 'observed',
+            );
           }
         } catch {
           isAvsControlled = false;
-          actualCurrentState = currentVisibilityState || 'observed';
+          actualCurrentState = getEffectiveVisibilityState(
+            app.observer,
+            token,
+            currentVisibilityState || 'observed',
+          );
         }
 
         // Update selection based on override/AVS logic
@@ -465,17 +486,29 @@ export async function buildContext(app, options) {
               hasAvsOverride = false;
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
-              // Get the actual current state from the visibility map
-              actualCurrentState = observerVisibilityData?.[app.observer.document.id] || 'observed';
+              // Get the effective state so native feat replacements display in the manager.
+              actualCurrentState = getEffectiveVisibilityState(
+                observerToken,
+                app.observer,
+                observerVisibilityData?.[app.observer.document.id] || 'observed',
+              );
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
             isAvsControlled = false;
-            actualCurrentState = currentVisibilityState || 'observed';
+            actualCurrentState = getEffectiveVisibilityState(
+              observerToken,
+              app.observer,
+              currentVisibilityState || 'observed',
+            );
           }
         } catch {
           isAvsControlled = false;
-          actualCurrentState = currentVisibilityState || 'observed';
+          actualCurrentState = getEffectiveVisibilityState(
+            observerToken,
+            app.observer,
+            currentVisibilityState || 'observed',
+          );
         }
 
         // Update selection based on override/AVS logic

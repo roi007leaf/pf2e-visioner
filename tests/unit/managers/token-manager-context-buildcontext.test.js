@@ -29,6 +29,7 @@ jest.mock('../../../scripts/utils.js', () => ({
   getCoverMap: jest.fn(() => ({})),
   getLastRollTotalForActor: jest.fn(() => null),
   getSceneTargets: jest.fn(() => []),
+  getVisibilityBetween: jest.fn(() => 'observed'),
   getVisibilityMap: jest.fn(() => ({})),
   hasActiveEncounter: jest.fn(() => false),
 }));
@@ -254,12 +255,14 @@ describe('Token Manager Context Building - DC Display Fix', () => {
     // Configure the mocked utils functions
     const {
       getSceneTargets,
+      getVisibilityBetween,
       getVisibilityMap,
       getCoverMap,
       hasActiveEncounter,
       getLastRollTotalForActor,
     } = require('../../../scripts/utils.js');
     getSceneTargets.mockReturnValue([mockTarget1, mockTarget2]);
+    getVisibilityBetween.mockReturnValue('observed');
     getVisibilityMap.mockReturnValue({});
     require('../../../scripts/stores/visibility-map.js').getVisibilityMap.mockReturnValue({});
     getCoverMap.mockReturnValue({});
@@ -482,11 +485,17 @@ describe('Token Manager Context Building - DC Display Fix', () => {
             }
           : null,
       );
-      const { getVisibilityMap } = require('../../../scripts/utils.js');
+      const { getVisibilityBetween, getVisibilityMap } = require('../../../scripts/utils.js');
       getVisibilityMap.mockImplementation((token) =>
         token?.document?.id === mockTarget1.document.id
           ? { [mockObserver.document.id]: 'hidden' }
           : {},
+      );
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer?.document?.id === mockTarget1.document.id &&
+        target?.document?.id === mockObserver.document.id
+          ? 'hidden'
+          : 'observed',
       );
       require('../../../scripts/stores/visibility-map.js').getVisibilityMap.mockImplementation(
         (token) =>
@@ -504,6 +513,28 @@ describe('Token Manager Context Building - DC Display Fix', () => {
       expect(amiriTarget.visibilityStates.find((state) => state.value === 'avs')?.selected).toBe(
         true,
       );
+    });
+
+    test('observer mode displays effective Blind-Fight hidden state over raw undetected map', async () => {
+      mockApp.mode = 'observer';
+      const { getVisibilityBetween, getVisibilityMap } = require('../../../scripts/utils.js');
+      getVisibilityMap.mockImplementation((token) =>
+        token?.document?.id === mockObserver.document.id
+          ? { [mockTarget1.document.id]: 'undetected' }
+          : {},
+      );
+      getVisibilityBetween.mockImplementation((observer, target) =>
+        observer?.document?.id === mockObserver.document.id &&
+        target?.document?.id === mockTarget1.document.id
+          ? 'hidden'
+          : 'observed',
+      );
+
+      const context = await buildContext(mockApp, {});
+      const amiriTarget = context.pcTargets.find((t) => t.id === mockTarget1.document.id);
+
+      expect(amiriTarget.currentVisibilityState).toBe('hidden');
+      expect(amiriTarget.visibilityStates.find((state) => state.value === 'undetected').selected).toBe(false);
     });
 
     test('should set correct mode properties in observer mode', async () => {

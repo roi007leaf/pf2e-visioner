@@ -228,6 +228,56 @@ describe('OffGuardSuppression', () => {
       );
     });
 
+    it('should expose Blind-Fight as the source for native Blind-Fight feat suppression', () => {
+      mockToken.actor = {
+        items: [
+          {
+            type: 'feat',
+            slug: 'blind-fight',
+            system: { slug: 'blind-fight' },
+          },
+        ],
+      };
+      mockToken.document.getFlag.mockReturnValue({});
+
+      const decision = OffGuardSuppression.getOffGuardSuppressionDecision(mockToken, 'hidden');
+
+      expect(decision.result).toBe(true);
+      expect(decision.blindFight).toBe(true);
+      expect(decision.blindFightSuppression).toBe(true);
+      expect(decision.source).toBe('blind-fight');
+    });
+
+    it('should not suppress hidden off-guard for Blind-Fight adjacent undetected downgrade', () => {
+      mockToken.actor = {
+        items: [
+          {
+            type: 'feat',
+            slug: 'blind-fight',
+            system: { slug: 'blind-fight' },
+          },
+        ],
+      };
+      mockToken.document.getFlag.mockReturnValue({});
+
+      const context = {
+        visibilityReplacementSource: 'blind-fight-adjacent',
+        visibilityReplacementOriginalState: 'undetected',
+      };
+      const decision = OffGuardSuppression.getOffGuardSuppressionDecision(
+        mockToken,
+        'hidden',
+        null,
+        context,
+      );
+
+      expect(decision.result).toBe(false);
+      expect(decision.blindFightSuppression).toBe(false);
+      expect(
+        OffGuardSuppression.shouldSuppressOffGuardForState(mockToken, 'hidden', null, context),
+      ).toBe(false);
+    });
+
     it('should suppress hidden off-guard when PF2e passes a token document instead of a token', () => {
       const tokenDocument = {
         id: 'token-doc-1',
@@ -476,7 +526,9 @@ describe('OffGuardSuppression', () => {
           details: { level: { value: 8 } },
           attributes: { flanking: { offGuardable: 8 } },
         },
-        items: [{ type: 'effect', slug: 'effect-starsong-nectar', name: 'Effect: Starsong Nectar' }],
+        items: [
+          { type: 'effect', slug: 'effect-starsong-nectar', name: 'Effect: Starsong Nectar' },
+        ],
       };
       mockToken.document.getFlag.mockReturnValue({});
       const sameLevelAttacker = {
@@ -484,7 +536,11 @@ describe('OffGuardSuppression', () => {
       };
 
       expect(
-        OffGuardSuppression.shouldSuppressOffGuardForState(mockToken, 'undetected', sameLevelAttacker),
+        OffGuardSuppression.shouldSuppressOffGuardForState(
+          mockToken,
+          'undetected',
+          sameLevelAttacker,
+        ),
       ).toBe(true);
       expect(
         OffGuardSuppression.shouldSuppressOffGuardForState(mockToken, 'hidden', sameLevelAttacker),

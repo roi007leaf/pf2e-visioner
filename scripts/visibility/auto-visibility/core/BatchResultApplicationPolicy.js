@@ -9,11 +9,7 @@ export function dedupeBatchUpdates(updates = []) {
   return Array.from(uniqueUpdatesByKey.values());
 }
 
-function shouldApplyUpdate({
-  update,
-  moduleId,
-  overrideMatchesVisibility,
-} = {}) {
+function shouldApplyUpdate({ update, moduleId, overrideMatchesVisibility } = {}) {
   if (update?.forceEphemeralOnly) return false;
 
   try {
@@ -81,12 +77,9 @@ export function buildBatchResultApplicationPlan({
     const visibilityMap = observerMaps.get(observer);
     const from = visibilityMap[targetId] ?? 'observed';
     const storedVisibilityMap =
-      typeof getStoredVisibilityMap === 'function'
-        ? getStoredVisibilityMap(observer) || {}
-        : null;
-    const storedFrom = storedVisibilityMap ? storedVisibilityMap[targetId] ?? 'observed' : from;
-    const resolvedVisibility =
-      resolveVisibilityForUpdate?.(update, from) ?? update.visibility;
+      typeof getStoredVisibilityMap === 'function' ? getStoredVisibilityMap(observer) || {} : null;
+    const storedFrom = storedVisibilityMap ? (storedVisibilityMap[targetId] ?? 'observed') : from;
+    const resolvedVisibility = resolveVisibilityForUpdate?.(update, from) ?? update.visibility;
     const resolvedUpdate =
       resolvedVisibility === update.visibility
         ? update
@@ -104,8 +97,14 @@ export function buildBatchResultApplicationPlan({
     const resolvedHiddenAsVisible =
       update.visibility === 'hidden' &&
       (resolvedVisibility === 'observed' || resolvedVisibility === 'concealed');
+    const profileMetadataSync = resolvedUpdate.forceProfileMetadataSync === true;
 
-    if (from !== resolvedVisibility || staleStoredVisibility || resolvedHiddenAsVisible) {
+    if (
+      from !== resolvedVisibility ||
+      staleStoredVisibility ||
+      resolvedHiddenAsVisible ||
+      profileMetadataSync
+    ) {
       visibilityMap[targetId] = resolvedVisibility;
       dirtyObserverSet.add(observer);
       uniqueUpdateCount++;

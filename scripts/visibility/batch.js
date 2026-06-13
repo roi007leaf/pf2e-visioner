@@ -58,9 +58,15 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
     } catch (_) { }
     const receiver = effectTarget === 'observer' ? observerToken : update.target;
     const source = effectTarget === 'observer' ? update.target : observerToken;
+    const suppressionContext = update.profileMetadata || update.perceptionProfile || {};
     const suppressionActive =
       ['hidden', 'undetected'].includes(update.state) &&
-      OffGuardSuppression.shouldSuppressOffGuardForState(source, update.state, receiver);
+      OffGuardSuppression.shouldSuppressOffGuardForState(
+        source,
+        update.state,
+        receiver,
+        suppressionContext,
+      );
     if (
       (update.state === 'observed' || update.state === 'concealed') &&
       shouldSuppressObservedTargetForObserver(observerToken)

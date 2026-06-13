@@ -163,6 +163,49 @@ describe('pending token movement hidden detection guard', () => {
     ]);
   });
 
+  test('downgrades pending final undetected state to hidden for adjacent Blind-Fight observer', () => {
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'undetected' }),
+      actor: createMockActor({
+        itemTypes: { feat: [{ slug: 'blind-fight' }] },
+        system: { details: { level: { value: 8 } } },
+      }),
+    });
+    observer.distanceTo = jest.fn(() => 5);
+    const target = createMockToken({
+      id: 'target',
+      x: 3,
+      y: 0,
+      visible: true,
+      actor: createMockActor({
+        system: {
+          conditions: { invisible: { active: true } },
+          details: { level: { value: 8 } },
+        },
+      }),
+    });
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        _draggedToken: observer,
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+
+    expect(getPendingMovementBlockContext(observer, target).visibilityState).toBe('hidden');
+    expect(targetIsRenderHiddenForCurrentViewObserver(target)).toBe(false);
+  });
+
   test('does not let an unrelated active source render-hide the current GM view', () => {
     const hiddenObserver = createMockToken({
       id: 'hidden-observer',
@@ -1593,6 +1636,40 @@ describe('pending token movement hidden detection guard', () => {
       expect(pendingObserverCanSenseTargetImprecisely(observer, target)).toBe(true);
 
       target.center = { x: 375, y: 25 };
+      expect(pendingObserverCanSenseTargetImprecisely(observer, target)).toBe(false);
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('precise tremorsense does not qualify as an imprecise soundwave sense', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: {}, precise: { tremorsense: 30 } })),
+    });
+    try {
+      global.canvas.walls.placeables = [];
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'hidden' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 175, y: 25 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: { visionSources: new Map(), lightSources: new Map() },
+        tokens: {
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          _draggedToken: null,
+          controlled: [observer],
+          placeables: [observer, target],
+        },
+      };
+
       expect(pendingObserverCanSenseTargetImprecisely(observer, target)).toBe(false);
     } finally {
       visionSpy.mockRestore();

@@ -10,7 +10,12 @@ import {
 } from '../../../helpers/cover-helpers.js';
 import { MODULE_ID } from '../../../constants.js';
 import { OffGuardSuppression } from '../../../rule-elements/operations/OffGuardSuppression.js';
-import { getCoverBetween, getVisibilityBetween, setVisibilityBetween } from '../../../utils.js';
+import {
+  getCoverBetween,
+  getPerceptionProfileBetween,
+  getVisibilityBetween,
+  setVisibilityBetween,
+} from '../../../utils.js';
 import { getCoverLevelRollOptions } from '../../batch.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
 import coverDetector from '../CoverDetector.js';
@@ -28,6 +33,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     super();
     // Use the singleton auto-cover system directly
     this.autoCoverSystem = autoCoverSystem;
+    this._pendingOffGuardSuppressionChatRecords = new Map();
   }
 
   _assignActorToToken(token, clonedActor) {
@@ -37,7 +43,8 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       const actorDescriptor =
         Object.getOwnPropertyDescriptor(token, 'actor') ||
         Object.getOwnPropertyDescriptor(Object.getPrototypeOf(token), 'actor');
-      const canAssignActor = !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
+      const canAssignActor =
+        !actorDescriptor || !!actorDescriptor.writable || !!actorDescriptor.set;
       if (canAssignActor) {
         token.actor = clonedActor;
       }
@@ -163,17 +170,35 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     }
   }
 
+  _getVisibilityProfileForAttack(attacker, target) {
+    try {
+      return getPerceptionProfileBetween(target, attacker);
+    } catch (_) {
+      return {};
+    }
+  }
+
   _isOffGuardSuppressedForAttack(attacker, target, visibilityState = null) {
     const visState = visibilityState ?? this._getVisibilityStateForAttack(attacker, target);
     if (!['hidden', 'undetected'].includes(visState)) return false;
-    return OffGuardSuppression.shouldSuppressOffGuardForState(target, visState, attacker);
+    return OffGuardSuppression.shouldSuppressOffGuardForState(
+      target,
+      visState,
+      attacker,
+      this._getVisibilityProfileForAttack(attacker, target),
+    );
   }
 
   _getOffGuardSuppressionChatInfo(attacker, target, visibilityState = null) {
     const visState = visibilityState ?? this._getVisibilityStateForAttack(attacker, target);
     if (!['hidden', 'undetected'].includes(visState)) return null;
 
-    const decision = OffGuardSuppression.getOffGuardSuppressionDecision(target, visState, attacker);
+    const decision = OffGuardSuppression.getOffGuardSuppressionDecision(
+      target,
+      visState,
+      attacker,
+      this._getVisibilityProfileForAttack(attacker, target),
+    );
     const sourceInfo = OFF_GUARD_SUPPRESSION_CHAT[decision?.source];
     if (!decision?.result || !sourceInfo) return null;
 
@@ -190,8 +215,45 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     };
   }
 
-  _storeOffGuardSuppressionChatInfo(data, doc, attacker, target) {
+  _getAttackPairKey(attacker, target) {
+    const attackerId = attacker?.id ?? attacker?.document?.id ?? null;
+    const targetId = target?.id ?? target?.document?.id ?? null;
+    return attackerId && targetId ? `${attackerId}:${targetId}` : null;
+  }
+
+  _recordOffGuardSuppressionChatInfo(attacker, target) {
+    const key = this._getAttackPairKey(attacker, target);
+    if (!key) return null;
+
     const suppressionInfo = this._getOffGuardSuppressionChatInfo(attacker, target);
+    if (!suppressionInfo) return null;
+
+    this._pendingOffGuardSuppressionChatRecords.set(key, {
+      ...suppressionInfo,
+      ts: Date.now(),
+    });
+    return suppressionInfo;
+  }
+
+  _consumePendingOffGuardSuppressionChatInfo(attacker, target) {
+    const key = this._getAttackPairKey(attacker, target);
+    if (!key) return null;
+
+    const record = this._pendingOffGuardSuppressionChatRecords.get(key);
+    this._pendingOffGuardSuppressionChatRecords.delete(key);
+    if (!record || Date.now() - record.ts > 15000) return null;
+
+    const { ts: _ts, ...suppressionInfo } = record;
+    return suppressionInfo;
+  }
+
+  _storeOffGuardSuppressionChatInfo(data, doc, attacker, target) {
+    const liveSuppressionInfo = this._getOffGuardSuppressionChatInfo(attacker, target);
+    const pendingSuppressionInfo = this._consumePendingOffGuardSuppressionChatInfo(
+      attacker,
+      target,
+    );
+    const suppressionInfo = liveSuppressionInfo ?? pendingSuppressionInfo;
     if (!suppressionInfo) return false;
 
     if (!data.flags) data.flags = {};
@@ -292,7 +354,6 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         dcObj.value += adjustment.modifier;
       }
       changed = true;
-
     }
 
     if (changed) {
@@ -403,7 +464,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         else filtered.push(modifier);
       }
       if (filtered.length === modifiers.length) continue;
-      const dcPath = path.startsWith('context.dc') ? 'context.dc' : path.startsWith('dc') ? 'dc' : null;
+      const dcPath = path.startsWith('context.dc')
+        ? 'context.dc'
+        : path.startsWith('dc')
+          ? 'dc'
+          : null;
       const dcObj = dcPath ? foundry.utils.getProperty(container, dcPath) : null;
       const dcValueBefore = dcObj?.value ?? null;
       foundry.utils.setProperty(container, path, filtered);
@@ -585,6 +650,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     let target = this._resolveTargetFromCtx(ctx);
     if (!attacker || !target) return;
     await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
+    this._recordOffGuardSuppressionChatInfo(attacker, target);
     this._stripSuppressedOffGuardModifiers(dialog, attacker, target);
     this._stripSuppressedOffGuardModifiers(ctx, attacker, target);
     this._ensureUnsuppressedOffGuardModifier(dialog, attacker, target);
@@ -767,6 +833,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       if (attacker && target && (attacker.isOwner || game.user.isGM)) {
         // Ensure visibility-driven off-guard ephemerals are up-to-date on defender before any DC calculation
         await this._refreshDefenderVisibilityEffectsForAttack(attacker, target);
+        this._recordOffGuardSuppressionChatInfo(attacker, target);
         this._stripSuppressedOffGuardModifiers(check, attacker, target);
         this._stripSuppressedOffGuardModifiers(context, attacker, target);
         this._applySuppressedAttackerOffGuardClone(attacker, target, context, check);

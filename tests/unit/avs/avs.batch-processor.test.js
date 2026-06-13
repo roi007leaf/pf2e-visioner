@@ -402,9 +402,7 @@ describe('BatchProcessor', () => {
     processor.maxVisibilityDistance = 1;
     optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
     processor.visibilityMapService = {
-      getVisibilityMap: jest.fn((token) =>
-        token.document.id === 'A' ? { B: 'undetected' } : {},
-      ),
+      getVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'undetected' } : {})),
       getDocumentVisibilityMap: jest.fn((token) =>
         token.document.id === 'A' ? { B: 'undetected' } : {},
       ),
@@ -458,14 +456,12 @@ describe('BatchProcessor', () => {
       hasLineOfSight: jest.fn(() => false),
       getVisionCapabilities: jest.fn(() => ({
         sensingSummary: { precise: [], imprecise: [], hearing: null },
-        isDeafened: false,
+        isDeafened: true,
       })),
     };
     optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
     processor.visibilityMapService = {
-      getVisibilityMap: jest.fn((token) =>
-        token.document.id === 'A' ? { B: 'hidden' } : {},
-      ),
+      getVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'hidden' } : {})),
       getDocumentVisibilityMap: jest.fn((token) =>
         token.document.id === 'A' ? { B: 'hidden' } : {},
       ),
@@ -511,8 +507,7 @@ describe('BatchProcessor', () => {
       })),
     };
     const movementSightLineResolver = jest.fn(
-      (observer, target) =>
-        observer?.document?.id === 'B' && target?.document?.id === 'A',
+      (observer, target) => observer?.document?.id === 'B' && target?.document?.id === 'A',
     );
     optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
       async (observer, target, _observerPosition, _targetPosition, options) => {
@@ -529,9 +524,7 @@ describe('BatchProcessor', () => {
       positionManager,
       overrideService: { getActiveOverrideForTokens: getActiveOverride },
       visibilityMapService: {
-        getVisibilityMap: jest.fn((token) =>
-          token.document.id === 'B' ? { A: 'hidden' } : {},
-        ),
+        getVisibilityMap: jest.fn((token) => (token.document.id === 'B' ? { A: 'hidden' } : {})),
         getDocumentVisibilityMap: jest.fn((token) =>
           token.document.id === 'B' ? { A: 'hidden' } : {},
         ),
@@ -850,9 +843,7 @@ describe('BatchProcessor', () => {
     target.actor.system.traits = { value: ['humanoid'] };
     global.canvas.tokens.placeables = [observer, target];
     processor.visibilityMapService = {
-      getVisibilityMap: jest.fn((token) =>
-        token.document.id === 'A' ? { B: 'undetected' } : {},
-      ),
+      getVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'undetected' } : {})),
     };
     processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
     processor.visionAnalyzer.getVisionCapabilities.mockImplementation((token) => ({
@@ -899,9 +890,7 @@ describe('BatchProcessor', () => {
     const target = makeToken('B', 1000, 0);
     global.canvas.tokens.placeables = [observer, target];
     processor.visibilityMapService = {
-      getVisibilityMap: jest.fn((token) =>
-        token.document.id === 'A' ? { B: 'undetected' } : {},
-      ),
+      getVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'undetected' } : {})),
     };
     processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
     processor.visionAnalyzer.getVisionCapabilities.mockImplementation((token) => ({
@@ -1004,5 +993,168 @@ describe('BatchProcessor', () => {
           u.visibility === 'hidden',
       ),
     ).toBe(true);
+  });
+
+  test('adds provenance metadata when Blind-Fight downgrades adjacent undetected to hidden', async () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    observer.actor.level = 8;
+    target.actor.level = 8;
+    observer.document.flags['pf2e-visioner'] = {
+      visibilityReplacement: {
+        active: true,
+        direction: 'to',
+        fromStates: ['undetected'],
+        toState: 'hidden',
+        range: 5,
+        levelComparison: 'lte',
+        priority: 120,
+        source: 'blind-fight-adjacent',
+      },
+    };
+    observer.distanceTo = jest.fn(() => 5);
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('undetected');
+
+    const res = await processor.process([observer, target], new Set(['A']), {});
+
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'hidden',
+          profileMetadata: {
+            visibilityReplacementSource: 'blind-fight-adjacent',
+            visibilityReplacementOriginalState: 'undetected',
+          },
+        }),
+      ]),
+    );
+  });
+
+  test('downgrades active undetected override to hidden for adjacent Blind-Fight', async () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    observer.actor.level = 8;
+    target.actor.level = 8;
+    observer.document.flags['pf2e-visioner'] = {
+      visibilityReplacement: {
+        active: true,
+        direction: 'to',
+        fromStates: ['undetected'],
+        toState: 'hidden',
+        range: 5,
+        levelComparison: 'lte',
+        priority: 120,
+        source: 'blind-fight-adjacent',
+      },
+    };
+    observer.distanceTo = jest.fn(() => 5);
+    processor.overrideService = {
+      getActiveOverrideForTokens: jest.fn((obs, tgt) =>
+        obs === observer && tgt === target ? { state: 'undetected' } : null,
+      ),
+    };
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) => (token === observer ? { B: 'undetected' } : {})),
+      getDocumentVisibilityMap: jest.fn((token) =>
+        token === observer ? { B: 'undetected' } : {},
+      ),
+      getPerceptionProfileMap: jest.fn(() => ({})),
+    };
+
+    const res = await processor.process([observer, target], new Set(['A']), {});
+
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'hidden',
+          profileMetadata: {
+            visibilityReplacementSource: 'blind-fight-adjacent',
+            visibilityReplacementOriginalState: 'undetected',
+          },
+        }),
+      ]),
+    );
+  });
+
+  test('downgrades active undetected override to hidden for native adjacent Blind-Fight', async () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    observer.actor.itemTypes = { feat: [{ slug: 'blind-fight' }] };
+    observer.actor.level = 8;
+    target.actor.level = 8;
+    observer.distanceTo = jest.fn(() => 5);
+    processor.overrideService = {
+      getActiveOverrideForTokens: jest.fn((obs, tgt) =>
+        obs === observer && tgt === target ? { state: 'undetected' } : null,
+      ),
+    };
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) => (token === observer ? { B: 'undetected' } : {})),
+      getDocumentVisibilityMap: jest.fn((token) =>
+        token === observer ? { B: 'undetected' } : {},
+      ),
+      getPerceptionProfileMap: jest.fn(() => ({})),
+    };
+
+    const res = await processor.process([observer, target], new Set(['A']), {});
+
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'hidden',
+          profileMetadata: {
+            visibilityReplacementSource: 'blind-fight-adjacent',
+            visibilityReplacementOriginalState: 'undetected',
+          },
+        }),
+      ]),
+    );
+  });
+
+  test('downgrades LOS-shortcut undetected to hidden for adjacent Blind-Fight', async () => {
+    const [observer, target] = global.canvas.tokens.placeables;
+    observer.actor.level = 8;
+    target.actor.level = 8;
+    observer.document.flags['pf2e-visioner'] = {
+      visibilityReplacement: {
+        active: true,
+        direction: 'to',
+        fromStates: ['undetected'],
+        toState: 'hidden',
+        range: 5,
+        levelComparison: 'lte',
+        priority: 120,
+        source: 'blind-fight-adjacent',
+      },
+    };
+    observer.distanceTo = jest.fn(() => 5);
+    processor.visionAnalyzer = {
+      hasLineOfSight: jest.fn(() => false),
+      getVisionCapabilities: jest.fn(() => ({
+        sensingSummary: { precise: [], imprecise: [], hearing: null },
+        isDeafened: true,
+      })),
+    };
+    global.canvas.tokens.controlled = [];
+    global.canvas.effects = { visionSources: new Map(), lightSources: new Map() };
+
+    const res = await processor.process([observer, target], new Set(['A']), {});
+
+    expect(res.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+          target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+          visibility: 'hidden',
+          profileMetadata: {
+            visibilityReplacementSource: 'blind-fight-adjacent',
+            visibilityReplacementOriginalState: 'undetected',
+          },
+        }),
+      ]),
+    );
   });
 });

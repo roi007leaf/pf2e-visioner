@@ -5,11 +5,14 @@ import {
   refreshPendingMovementTokenVisibility,
   schedulePendingTokenMovementCompletion,
   setPendingTokenMovementPosition,
+  targetQualifiesForLiveImpreciseSoundwave,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import { flushScheduledCanvasPerceptionUpdate } from '../../../scripts/helpers/perception-refresh.js';
 import { forcePendingMovementTokenInvisible } from '../../../scripts/services/PendingMovement/pending-movement-render-lock.js';
 import { wrapTokenRefreshVisibility } from '../../../scripts/services/Detection/detection-token-refresh.js';
+import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
+import { FeatsHandler } from '../../../scripts/chat/services/FeatsHandler.js';
 
 function visibilityV2Flags(map) {
   return {
@@ -400,6 +403,244 @@ describe('detection token refresh wrapper', () => {
     expect(wrapped).toHaveBeenCalledTimes(1);
     expect(filterAfterClear).toBe(soundwaveFilter);
     expect(target.detectionFilter).toBe(soundwaveFilter);
+  });
+
+  test('preserves pending observer soundwave when control state is temporarily empty', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: { tremorsense: 30 }, precise: {} })),
+    });
+    try {
+      global.canvas.walls.placeables = [
+        createMockWall({ id: 'wall', c: [50, 0, 50, 100], sight: 1, sound: 1 }),
+      ];
+      const observer = createMockToken({
+        id: 'observer',
+        flags: visibilityV2Flags({ target: 'undetected' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 75, y: 25 };
+      const soundwaveFilter = { id: 'soundwave-filter' };
+      target.detectionFilter = soundwaveFilter;
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+      target.mesh = { visible: true, renderable: true, alpha: 1 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map(),
+          lightSources: new Map(),
+        },
+        tokens: {
+          _draggedToken: null,
+          controlled: [],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      expect(
+        setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+          finalVisibilityStatesByTargetId: { target: 'undetected' },
+        }),
+      ).toBe(true);
+      expect(targetQualifiesForLiveImpreciseSoundwave(target)).toBe(true);
+      const wrapped = jest.fn(() => {
+        target.detectionFilter = null;
+        target.detectionFilterMesh.visible = false;
+        target.detectionFilterMesh.renderable = false;
+        target.detectionFilterMesh.alpha = 0;
+        return 'wrapped-result';
+      });
+
+      const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+      expect(result).toBe('wrapped-result');
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      expect(target.detectionFilter).toBe(soundwaveFilter);
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+      expect(target.mesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('keeps observed precise tremorsense target rendered when sight drops at movement start', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: {}, precise: { tremorsense: 30 } })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'observed' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 75, y: 25 };
+      target.renderable = true;
+      target.mesh = { visible: true, renderable: true, alpha: 1 };
+      target.detectionFilter = null;
+      target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map([
+            [
+              'observer',
+              {
+                active: true,
+                object: observer,
+                los: { contains: jest.fn(() => false) },
+                shape: { contains: jest.fn(() => false) },
+              },
+            ],
+          ]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          _draggedToken: null,
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      expect(
+        setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+          finalVisibilityStatesByTargetId: { target: 'observed' },
+        }),
+      ).toBe(true);
+      const wrapped = jest.fn(() => {
+        target.visible = false;
+        target.renderable = false;
+        target.mesh.visible = false;
+        target.mesh.renderable = false;
+        target.mesh.alpha = 0;
+        return 'wrapped-result';
+      });
+
+      const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+      expect(result).toBe('wrapped-result');
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      expect(target.visible).toBe(true);
+      expect(target.renderable).toBe(true);
+      expect(target.mesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+      expect(target.detectionFilter).toBeNull();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('keeps precise nonvisual replacement rendered when current-view initial state was undetected', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: {}, precise: { tremorsense: 30 } })),
+    });
+    const replacementSpy = jest
+      .spyOn(FeatsHandler, 'getVisibilityReplacement')
+      .mockImplementation((observerToken, targetToken, currentVisibility) =>
+        observerToken?.id === 'observer' &&
+        targetToken?.id === 'target' &&
+        currentVisibility === 'undetected'
+          ? { state: 'observed', source: 'precise-tremorsense' }
+          : null,
+      );
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'undetected' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 75, y: 25 };
+      target.renderable = true;
+      target.mesh = { visible: true, renderable: true, alpha: 1 };
+      target.detectionFilter = null;
+      target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        effects: {
+          visionSources: new Map([
+            [
+              'observer',
+              {
+                active: true,
+                object: observer,
+                los: { contains: jest.fn(() => false) },
+                shape: { contains: jest.fn(() => false) },
+              },
+            ],
+          ]),
+          lightSources: new Map(),
+        },
+        tokens: {
+          _draggedToken: null,
+          controlled: [observer],
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          placeables: [observer, target],
+        },
+      };
+
+      expect(setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer])).toBe(
+        true,
+      );
+      const wrapped = jest.fn(() => {
+        target.visible = false;
+        target.renderable = false;
+        target.mesh.visible = false;
+        target.mesh.renderable = false;
+        target.mesh.alpha = 0;
+        return 'wrapped-result';
+      });
+
+      const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+      expect(result).toBe('wrapped-result');
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      expect(target.visible).toBe(true);
+      expect(target.renderable).toBe(true);
+      expect(target.mesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
+      expect(target.detectionFilter).toBeNull();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+    } finally {
+      replacementSpy.mockRestore();
+      visionSpy.mockRestore();
+    }
   });
 
   test('preserves hidden soundwave state without forcing token refresh visible', () => {

@@ -75,8 +75,8 @@ describe('OverrideValidationManager display filtering', () => {
     observer.document.name = 'Observer';
 
     global.canvas.tokens.placeables = [stealther, observer];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
     global.game.pf2eVisioner.lastMovedTokenId = stealther.id;
 
@@ -156,8 +156,8 @@ describe('OverrideValidationManager display filtering', () => {
     hiddenTarget.document.name = 'Hidden Target';
 
     global.canvas.tokens.placeables = [mover, hiddenTarget];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
     global.game.pf2eVisioner.lastMovedTokenId = mover.id;
 
@@ -221,8 +221,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [observer, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -307,8 +307,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [observerA, observerB, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -346,8 +346,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [observer, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -387,8 +387,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [observer, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -459,7 +459,10 @@ describe('OverrideValidationManager display filtering', () => {
       '../../../scripts/visibility/auto-visibility/core/OverrideValidationManager.js'
     );
 
-    const visibleObserver = global.createMockToken({ id: 'visible-observer', name: 'Visible Observer' });
+    const visibleObserver = global.createMockToken({
+      id: 'visible-observer',
+      name: 'Visible Observer',
+    });
     const behindWall = global.createMockToken({ id: 'behind-wall', name: 'Behind Wall' });
     const target = global.createMockToken({ id: 'target', name: 'Target' });
     target.document.flags['pf2e-visioner'] = {
@@ -482,8 +485,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [visibleObserver, behindWall, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -555,8 +558,8 @@ describe('OverrideValidationManager display filtering', () => {
     };
 
     global.canvas.tokens.placeables = [observer, target];
-    global.canvas.tokens.get.mockImplementation((id) =>
-      global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+    global.canvas.tokens.get.mockImplementation(
+      (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
     );
 
     const manager = new OverrideValidationManager(
@@ -568,9 +571,7 @@ describe('OverrideValidationManager display filtering', () => {
 
     const result = await manager.validateOverridesForToken(target.id);
 
-    expect(result.overrides).toEqual([
-      expect.not.objectContaining({ controlReleaseOnly: true }),
-    ]);
+    expect(result.overrides).toEqual([expect.not.objectContaining({ controlReleaseOnly: true })]);
     expect(result.__showAwareness).toBe(true);
     expect(manager.showOverrideValidationDialog).not.toHaveBeenCalled();
   });
@@ -587,11 +588,15 @@ describe('OverrideValidationManager display filtering', () => {
       delete global.game.pf2eVisioner;
     });
 
-    async function setupManagerForObservedTarget(targetActorItems = [], coverResult = 'none') {
+    async function setupManagerForObservedTarget(
+      targetActorItems = [],
+      coverResult = 'none',
+      visibilityResult = 'observed',
+    ) {
       jest.doMock('../../../scripts/visibility/auto-visibility/VisibilityCalculator.js', () => ({
         __esModule: true,
         optimizedVisibilityCalculator: {
-          calculateVisibilityWithoutOverrides: jest.fn(async () => 'observed'),
+          calculateVisibilityWithoutOverrides: jest.fn(async () => visibilityResult),
         },
       }));
 
@@ -632,8 +637,8 @@ describe('OverrideValidationManager display filtering', () => {
       });
 
       global.canvas.tokens.placeables = [observer, target];
-      global.canvas.tokens.get.mockImplementation((id) =>
-        global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+      global.canvas.tokens.get.mockImplementation(
+        (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
       );
 
       const manager = new OverrideValidationManager(
@@ -645,7 +650,7 @@ describe('OverrideValidationManager display filtering', () => {
       return { manager, observer, target };
     }
 
-    test.each(['sneak_action', 'manual_action'])(
+    test.each(['sneak_action', 'hide_action'])(
       'does not flag %s stealth overrides when the target has Legendary Sneak',
       async (source) => {
         const { manager, observer, target } = await setupManagerForObservedTarget([
@@ -662,6 +667,84 @@ describe('OverrideValidationManager display filtering', () => {
         expect(result).toBeNull();
       },
     );
+
+    test('still flags manual Legendary Sneak stealth overrides when the target is clearly observed', async () => {
+      const { manager, observer, target } = await setupManagerForObservedTarget([
+        { type: 'feat', system: { slug: 'legendary-sneak' } },
+      ]);
+
+      const result = await manager.checkOverrideValidity(observer.id, target.id, {
+        state: 'undetected',
+        source: 'manual_action',
+        hasCover: false,
+        hasConcealment: true,
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          shouldRemove: true,
+          currentVisibility: 'observed',
+          currentCover: 'none',
+        }),
+      );
+    });
+
+    test('still flags manual hidden Legendary Sneak overrides when AVS would calculate undetected', async () => {
+      const { manager, observer, target } = await setupManagerForObservedTarget(
+        [{ type: 'feat', system: { slug: 'legendary-sneak' } }],
+        'none',
+        'undetected',
+      );
+
+      const result = await manager.checkOverrideValidity(observer.id, target.id, {
+        state: 'hidden',
+        source: 'manual_action',
+        hasCover: false,
+        hasConcealment: false,
+      });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          shouldRemove: true,
+          reason: 'would be undetected',
+          currentVisibility: 'undetected',
+        }),
+      );
+    });
+
+    test('does not mark manual Legendary Sneak overrides with stealth bypass context', async () => {
+      const { manager, observer, target } = await setupManagerForObservedTarget(
+        [],
+        'none',
+        'hidden',
+      );
+      target.actor.getRollOptions = jest.fn(() => ['self:feat:legendary-sneak']);
+      target.document.flags['pf2e-visioner'] = {
+        [`avs-override-from-${observer.id}`]: {
+          state: 'hidden',
+          source: 'manual_action',
+          hasCover: false,
+          hasConcealment: true,
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+        },
+      };
+
+      const result = await manager.validateOverridesForToken(target.id);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          __showAwareness: true,
+          overrides: [
+            expect.not.objectContaining({
+              stealthPositionBypassFeat: 'legendary-sneak',
+            }),
+          ],
+        }),
+      );
+    });
 
     test('uses FeatsHandler for Legendary Sneak detection', async () => {
       const featsHandlerModulePath = '../../../scripts/chat/services/FeatsHandler.js';
@@ -873,8 +956,8 @@ describe('OverrideValidationManager display filtering', () => {
       const observer = global.createMockToken({ id: 'observer', name: 'Observer' });
       const target = global.createMockToken({ id: 'target', name: 'Target' });
       global.canvas.tokens.placeables = [observer, target];
-      global.canvas.tokens.get.mockImplementation((id) =>
-        global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+      global.canvas.tokens.get.mockImplementation(
+        (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
       );
 
       const manager = new OverrideValidationManager(
@@ -925,8 +1008,8 @@ describe('OverrideValidationManager display filtering', () => {
       const observer = global.createMockToken({ id: 'observer', name: 'Observer' });
       const target = global.createMockToken({ id: 'target', name: 'Target' });
       global.canvas.tokens.placeables = [observer, target];
-      global.canvas.tokens.get.mockImplementation((id) =>
-        global.canvas.tokens.placeables.find((token) => token.id === id) || null,
+      global.canvas.tokens.get.mockImplementation(
+        (id) => global.canvas.tokens.placeables.find((token) => token.id === id) || null,
       );
 
       const manager = new OverrideValidationManager(

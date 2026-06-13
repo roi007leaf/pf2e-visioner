@@ -42,19 +42,15 @@ describe('Visibility Map V2 profile storage', () => {
       'visibility',
       expect.anything(),
     );
-    expect(observer.document.setFlag).toHaveBeenCalledWith(
-      'pf2e-visioner',
-      'visibilityV2',
-      {
-        target: expect.objectContaining({
-          detectionState: 'observed',
-          hasConcealment: true,
-          coverState: 'none',
-          detectionSense: null,
-          awarenessState: null,
-        }),
-      },
-    );
+    expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2', {
+      target: expect.objectContaining({
+        detectionState: 'observed',
+        hasConcealment: true,
+        coverState: 'none',
+        detectionSense: null,
+        awarenessState: null,
+      }),
+    });
   });
 
   test('runtime readers ignore legacy visibility maps after v2 migration support', () => {
@@ -86,6 +82,43 @@ describe('Visibility Map V2 profile storage', () => {
     });
 
     expect(getVisibilityBetween(observer, target)).toBe('concealed');
+  });
+
+  test('getVisibilityBetween applies native Blind-Fight adjacent replacement for legacy callers', () => {
+    observer = global.createMockToken({
+      id: 'observer',
+      actor: {
+        items: [{ type: 'feat', system: { slug: 'blind-fight' } }],
+        system: { details: { level: { value: 8 } } },
+      },
+      distanceTo: jest.fn(() => 5),
+    });
+    target = global.createMockToken({
+      id: 'target',
+      actor: {
+        system: { details: { level: { value: 8 } } },
+      },
+    });
+
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId !== 'pf2e-visioner') return null;
+      if (key === 'visibilityV2') {
+        return {
+          target: {
+            detectionState: 'undetected',
+            hasConcealment: false,
+          },
+        };
+      }
+      return {};
+    });
+
+    expect(getVisibilityBetween(observer, target)).toBe('hidden');
+    expect(getPerceptionProfileBetween(observer, target)).toMatchObject({
+      detectionState: 'hidden',
+      visibilityReplacementSource: 'blind-fight-adjacent',
+      visibilityReplacementOriginalState: 'undetected',
+    });
   });
 
   test('getVisibilityBetween reads only the requested visibilityV2 profile', () => {
@@ -120,21 +153,42 @@ describe('Visibility Map V2 profile storage', () => {
       hasConcealment: true,
     });
 
-    expect(observer.document.setFlag).toHaveBeenCalledWith(
-      'pf2e-visioner',
-      'visibilityV2',
-      {
-        target: expect.objectContaining({
-          detectionState: 'hidden',
-          hasConcealment: true,
-        }),
-      },
-    );
+    expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2', {
+      target: expect.objectContaining({
+        detectionState: 'hidden',
+        hasConcealment: true,
+      }),
+    });
     expect(getPerceptionProfileBetween(observer, target)).toMatchObject({
       detectionState: 'hidden',
       hasConcealment: true,
     });
     expect(getVisibilityBetween(observer, target)).toBe('hidden');
+  });
+
+  test('setVisibilityBetween stores Blind-Fight replacement provenance in visibilityV2', async () => {
+    const profileMetadata = {
+      visibilityReplacementSource: 'blind-fight-adjacent',
+      visibilityReplacementOriginalState: 'undetected',
+    };
+
+    await setVisibilityBetween(observer, target, 'hidden', {
+      skipEphemeralUpdate: true,
+      profileMetadata,
+    });
+
+    expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2', {
+      target: expect.objectContaining({
+        detectionState: 'hidden',
+        visibilityReplacementSource: 'blind-fight-adjacent',
+        visibilityReplacementOriginalState: 'undetected',
+      }),
+    });
+    expect(getPerceptionProfileBetween(observer, target)).toMatchObject(profileMetadata);
+
+    await setVisibilityBetween(observer, target, 'hidden', { skipEphemeralUpdate: true });
+
+    expect(getPerceptionProfileBetween(observer, target)).toMatchObject(profileMetadata);
   });
 
   test('setVisibilityBetween ignores unknown legacy states instead of persisting legacy data', async () => {
@@ -182,6 +236,45 @@ describe('Visibility Map V2 profile storage', () => {
     );
 
     global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+  });
+
+  test('setVisibilityMapsBatch persists per-target replacement metadata', async () => {
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn().mockResolvedValue([]);
+
+    try {
+      await setVisibilityMapsBatch([
+        {
+          token: observer,
+          visibilityMap: { target: 'hidden' },
+          profileMetadataByTargetId: {
+            target: {
+              visibilityReplacementSource: 'blind-fight-adjacent',
+              visibilityReplacementOriginalState: 'undetected',
+            },
+          },
+        },
+      ]);
+
+      expect(global.canvas.scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
+        'Token',
+        [
+          {
+            _id: 'observer',
+            'flags.pf2e-visioner.visibilityV2': {
+              target: expect.objectContaining({
+                detectionState: 'hidden',
+                visibilityReplacementSource: 'blind-fight-adjacent',
+                visibilityReplacementOriginalState: 'undetected',
+              }),
+            },
+          },
+        ],
+        { diff: false, render: false, animate: false },
+      );
+    } finally {
+      global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+    }
   });
 
   test('setVisibilityMapsBatch removes observed entries without clearing the whole visibilityV2 map', async () => {
@@ -250,10 +343,14 @@ describe('Visibility Map V2 profile storage', () => {
         ],
         { diff: false, render: false, animate: false },
       );
-      expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0])
-        .not.toHaveProperty('flags.pf2e-visioner.-=visibilityV2');
-      expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0]['flags.pf2e-visioner.visibilityV2'])
-        .not.toHaveProperty('-=remove');
+      expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0]).not.toHaveProperty(
+        'flags.pf2e-visioner.-=visibilityV2',
+      );
+      expect(
+        global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0][
+          'flags.pf2e-visioner.visibilityV2'
+        ],
+      ).not.toHaveProperty('-=remove');
       expect(getVisibilityMap(observer)).toEqual({ keep: 'undetected' });
     } finally {
       global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
@@ -357,10 +454,9 @@ describe('Visibility Map V2 profile storage', () => {
     });
 
     try {
-      await setVisibilityMapsBatch(
-        [{ token: observer, visibilityMap: { target: 'observed' } }],
-        { preserveObserved: true },
-      );
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'observed' } }], {
+        preserveObserved: true,
+      });
 
       expect(target.detectionFilter).toBeNull();
       expect(target.detectionFilterMesh).toMatchObject({
@@ -435,10 +531,9 @@ describe('Visibility Map V2 profile storage', () => {
     });
 
     try {
-      await setVisibilityMapsBatch(
-        [{ token: observer, visibilityMap: { target: 'observed' } }],
-        { preserveObserved: true },
-      );
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'observed' } }], {
+        preserveObserved: true,
+      });
 
       expect(target.detectionFilter).toEqual({ id: 'controlled-soundwave-filter' });
       expect(target.detectionFilterMesh).toMatchObject({
@@ -499,16 +594,11 @@ describe('Visibility Map V2 profile storage', () => {
     });
 
     try {
-      setPendingTokenMovementPosition(
-        movingObserver.document,
-        { x: 100, y: 0 },
-        [movingObserver],
-      );
+      setPendingTokenMovementPosition(movingObserver.document, { x: 100, y: 0 }, [movingObserver]);
 
-      await setVisibilityMapsBatch(
-        [{ token: observer, visibilityMap: { target: 'observed' } }],
-        { preserveObserved: true },
-      );
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'observed' } }], {
+        preserveObserved: true,
+      });
 
       expect(target.detectionFilter).toEqual({ id: 'moving-view-soundwave-filter' });
       expect(target.detectionFilterMesh).toMatchObject({
@@ -594,10 +684,9 @@ describe('Visibility Map V2 profile storage', () => {
       setPendingTokenMovementPosition(observer.document, { x: 10, y: 0 }, [observer]);
       expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
 
-      await setVisibilityMapsBatch(
-        [{ token: observer, visibilityMap: { target: 'observed' } }],
-        { preserveObserved: true },
-      );
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'observed' } }], {
+        preserveObserved: true,
+      });
 
       expect(target.detectionFilter).toEqual({ id: 'stable-soundwave-filter' });
       expect(target.detectionFilterMesh).toMatchObject({
@@ -666,10 +755,9 @@ describe('Visibility Map V2 profile storage', () => {
     try {
       await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'hidden' } }]);
 
-      expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith(
-        [{ x: 10, y: 20 }],
-        { object: target },
-      );
+      expect(global.canvas.visibility.testVisibility).toHaveBeenCalledWith([{ x: 10, y: 20 }], {
+        object: target,
+      });
       expect(target.refresh).not.toHaveBeenCalled();
       expect(target.visible).toBe(true);
       expect(target.renderable).toBe(true);

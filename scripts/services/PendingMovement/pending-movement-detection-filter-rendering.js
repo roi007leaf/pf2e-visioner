@@ -236,6 +236,7 @@ export function createPendingMovementDetectionFilterRenderingController({
   ) {
     if (hasObservedTransitionDetectionFilterSuppression?.(token)) return false;
     if (!tokenHasDetectionFilterVisual?.(token)) return false;
+    if (targetQualifiesForLiveImpreciseSoundwave?.(token)) return true;
     return !!getHiddenDetectionFilterPreservationContext?.(token, { hasDetectionWork });
   }
 
@@ -293,12 +294,42 @@ export function createPendingMovementDetectionFilterRenderingController({
   }
 
   function withPreservedPendingMovementDetectionFilterVisuals(token, callback) {
+    const detectionFilterState = capturePendingMovementDetectionFilterVisualState?.(token);
     const restoreDetectionFilterProperty =
       preserveDetectionFilterProperty(token, tokenHasDetectionFilterVisual);
     try {
       return callback?.();
     } finally {
-      restoreDetectionFilterProperty?.();
+      try {
+        restoreDetectionFilterProperty?.();
+      } finally {
+        restoreDetectionFilterMeshVisualState(token, detectionFilterState);
+      }
+    }
+  }
+
+  function restoreDetectionFilterMeshVisualState(token, state) {
+    const meshState = state?.detectionFilterMesh;
+    const mesh = meshState?.mesh;
+    try {
+      if (mesh) {
+        if ('visible' in mesh && meshState.visible !== undefined && mesh.visible !== meshState.visible) {
+          mesh.visible = meshState.visible;
+        }
+        if ('renderable' in mesh && meshState.renderable !== undefined) {
+          if (mesh.renderable !== meshState.renderable) mesh.renderable = meshState.renderable;
+        }
+        if ('alpha' in mesh && meshState.alpha !== undefined && mesh.alpha !== meshState.alpha) {
+          mesh.alpha = meshState.alpha;
+        }
+      }
+      if (state?.hiddenEcho && 'visible' in state.hiddenEcho && state.hiddenEchoVisible !== undefined) {
+        if (state.hiddenEcho.visible !== state.hiddenEchoVisible) {
+          state.hiddenEcho.visible = state.hiddenEchoVisible;
+        }
+      }
+    } catch {
+      /* keep current visual state if restore fails */
     }
   }
 

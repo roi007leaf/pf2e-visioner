@@ -140,6 +140,45 @@ describe('batchUpdateVisibilityEffects', () => {
     expect(targetActor.createEmbeddedDocuments).not.toHaveBeenCalled();
   });
 
+  test('creates hidden aggregate when Blind-Fight only downgraded adjacent undetected to hidden', async () => {
+    const observerActor = makeActor('observer-actor', 'observer-sig', []);
+    observerActor.items = [
+      {
+        type: 'feat',
+        slug: 'blind-fight',
+        system: { slug: 'blind-fight' },
+      },
+    ];
+    const targetActor = makeActor('target-actor', 'target-sig', []);
+    const observer = makeToken('observer', 'Ranger', observerActor);
+    const target = makeToken('target', 'Adjacent Enemy', targetActor);
+
+    await batchUpdateVisibilityEffects(observer, [
+      {
+        target,
+        state: 'hidden',
+        profileMetadata: {
+          visibilityReplacementSource: 'blind-fight-adjacent',
+          visibilityReplacementOriginalState: 'undetected',
+        },
+      },
+    ]);
+
+    expect(targetActor.createEmbeddedDocuments).toHaveBeenCalledWith(
+      'Item',
+      expect.arrayContaining([
+        expect.objectContaining({
+          flags: expect.objectContaining({
+            'pf2e-visioner': expect.objectContaining({
+              aggregateOffGuard: true,
+              visibilityState: 'hidden',
+            }),
+          }),
+        }),
+      ]),
+    );
+  });
+
   test('removes existing hidden aggregate when observer suppresses hidden off-guard', async () => {
     const existingHiddenAggregate = {
       id: 'hidden-aggregate',

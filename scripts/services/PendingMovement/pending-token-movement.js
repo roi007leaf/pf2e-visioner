@@ -1,4 +1,5 @@
 import { LightingLevel, MODULE_ID } from '../../constants.js';
+import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
 import { calculateDistanceInFeet } from '../../helpers/geometry-utils.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { getRawPerceptionProfileEntry } from '../../stores/visibility-profile-flag-persistence.js';
@@ -835,12 +836,19 @@ function getStoredVisibilityState(observer, target) {
   const targetId = tokenIdOf(target);
   if (!targetId) return 'observed';
 
+  let visibilityState = 'observed';
   const profile = getRawPerceptionProfileEntry(observer, targetId);
   if (profile) {
-    return normalizeVisibilityState(profile) || 'observed';
+    visibilityState = normalizeVisibilityState(profile) || 'observed';
   }
 
-  return 'observed';
+  return applyFeatVisibilityReplacement(observer, target, visibilityState);
+}
+
+function applyFeatVisibilityReplacement(observer, target, visibilityState) {
+  if (!visibilityState) return visibilityState;
+  const replacement = FeatsHandler.getVisibilityReplacement(observer, target, visibilityState);
+  return normalizeVisibilityState(replacement?.state) || visibilityState;
 }
 
 function visibilityTestPointsForPendingTarget(target) {
@@ -928,10 +936,29 @@ function pendingObserverImpreciseSenseRanges(observer) {
   return cachePendingMovementEvaluation('observerImpreciseSenseRanges', key, () => {
     try {
       const capabilities = VisionAnalyzer.getInstance()?.getSensingCapabilities?.(observer);
-      return [
-        ...Object.values(capabilities?.imprecise ?? {}),
-        ...Object.values(capabilities?.precise ?? {}),
-      ].filter((range) => Number.isFinite(Number(range)) && Number(range) > 0);
+      return Object.values(capabilities?.imprecise ?? {}).filter(
+        (range) => Number.isFinite(Number(range)) && Number(range) > 0,
+      );
+    } catch {
+      return [];
+    }
+  });
+}
+
+function senseTypeIsVisual(senseType) {
+  const normalized = String(senseType ?? '').toLowerCase();
+  return normalized === 'sight' || normalized === 'vision' || normalized.includes('vision');
+}
+
+function pendingObserverPreciseNonVisualSenseRanges(observer) {
+  const key = tokenIdOf(observer) || observer;
+  return cachePendingMovementEvaluation('observerPreciseNonVisualSenseRanges', key, () => {
+    try {
+      const capabilities = VisionAnalyzer.getInstance()?.getSensingCapabilities?.(observer);
+      return Object.entries(capabilities?.precise ?? {})
+        .filter(([senseType]) => !senseTypeIsVisual(senseType))
+        .map(([, range]) => Number(range))
+        .filter((range) => Number.isFinite(range) && range > 0);
     } catch {
       return [];
     }
@@ -1002,12 +1029,51 @@ export function pendingObserverCanSenseTargetImprecisely(observer, target) {
   }
 }
 
+function pendingObserverCanSenseTargetPreciselyNonVisually(observer, target) {
+  try {
+    const observerCenter = centerForToken(observer);
+    const targetCenter = centerForToken(target);
+    if (!observerCenter || !targetCenter) return false;
+
+    const senseRanges = pendingObserverPreciseNonVisualSenseRanges(observer);
+    if (!senseRanges.length) return false;
+
+    const gridSize = Number(canvas?.grid?.size) || 100;
+    const gridDistance = Number(canvas?.scene?.grid?.distance ?? canvas?.grid?.distance) || 5;
+    const distance = pendingImprecisePairDistanceInFeet(
+      observer,
+      target,
+      observerCenter,
+      targetCenter,
+      gridSize,
+      gridDistance,
+    );
+    return senseRanges.some((range) => distance <= range);
+  } catch {
+    return false;
+  }
+}
+
 function pendingHearingKeepsLiveSoundwave(observer, target) {
   return pendingHearingAllowsImpreciseSoundwave(
     observer,
     target,
     pendingObserverVisionCapabilities(observer),
     { gridSize: Number(canvas?.grid?.size) || 100 },
+  );
+}
+
+function pairHasPendingMovementDetectionContext(observer, target) {
+  if (hasCoreOwnedPendingMovement(observer, target)) return true;
+  if (isPendingMovementCoreAnimationBypassActive()) return true;
+  if (currentViewHasDraggedOrControlledObserver()) return false;
+  return hasPendingMovementEntryForPair(observer, target);
+}
+
+function currentViewHasDraggedOrControlledObserver() {
+  return !!(
+    canvas?.tokens?._draggedToken ||
+    (canvas?.tokens?.controlled || []).some((observer) => !!observer)
   );
 }
 
@@ -1031,12 +1097,7 @@ export function pairAllowsLiveImpreciseSoundwave(observer, target) {
   }
   if (storedVisibilityState === 'observed' || storedVisibilityState === 'concealed') {
     if (hiddenStateShouldRenderHideTarget(target)) return false;
-    if (
-      !hasCoreOwnedPendingMovement(observer, target) &&
-      !isPendingMovementCoreAnimationBypassActive()
-    ) {
-      return false;
-    }
+    if (!pairHasPendingMovementDetectionContext(observer, target)) return false;
     if (currentSightLineActuallySeesTarget(observer, target)) return false;
     return pendingObserverCanSenseTargetImprecisely(observer, target);
   }
@@ -1049,17 +1110,45 @@ export function pairAllowsLiveImpreciseSoundwave(observer, target) {
     return false;
   }
   if (hiddenStateShouldRenderHideTarget(target)) return false;
-  if (
-    !hasCoreOwnedPendingMovement(observer, target) &&
-    !isPendingMovementCoreAnimationBypassActive()
-  ) {
-    return false;
-  }
+  if (!pairHasPendingMovementDetectionContext(observer, target)) return false;
   if (invisibleSightingRemembered) {
     return !invisibleRememberedSightLineBlocked(observer, target);
   }
   if (currentVisionPolygonSeesTargetCenter(observer, target) === true) return false;
   return pendingObserverCanSenseTargetImprecisely(observer, target);
+}
+
+function pairHasActiveOrQueuedMovementDetectionContext(observer, target) {
+  return (
+    hasCoreOwnedPendingMovement(observer, target) ||
+    hasPendingMovementEntryForPair(observer, target) ||
+    isPendingMovementCoreAnimationBypassActive()
+  );
+}
+
+function visibilityStateCanUsePreciseNonVisualRendering(visibilityState) {
+  return visibilityState === 'observed' || visibilityState === 'concealed';
+}
+
+function pairAllowsLivePreciseNonVisualDetection(observer, target) {
+  if (!observer || !target?.document?.id) return false;
+  if (!pairHasActiveOrQueuedMovementDetectionContext(observer, target)) return false;
+  const storedVisibilityState = getStoredVisibilityState(observer, target);
+  if (!visibilityStateCanUsePreciseNonVisualRendering(storedVisibilityState)) return false;
+  if (hiddenStateShouldRenderHideTarget(target)) return false;
+  return pendingObserverCanSenseTargetPreciselyNonVisually(observer, target);
+}
+
+export function targetQualifiesForLivePreciseNonVisualDetection(target) {
+  if (!target?.document?.id) return false;
+  const seen = new Set();
+  for (const observer of currentViewAndPendingMovementObservers()) {
+    const observerId = tokenIdOf(observer);
+    if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
+    seen.add(observerId);
+    if (pairAllowsLivePreciseNonVisualDetection(observer, target)) return true;
+  }
+  return false;
 }
 
 function invisibleRememberedSightLineBlocked(observer, target) {
@@ -1084,9 +1173,8 @@ function invisibleTargetRemembersObserverSighting(observer, target) {
 
 export function targetQualifiesForLiveImpreciseSoundwave(target) {
   if (!target?.document?.id) return false;
-  const observers = [canvas?.tokens?._draggedToken, ...(canvas?.tokens?.controlled || [])];
   const seen = new Set();
-  for (const observer of observers) {
+  for (const observer of currentViewAndPendingMovementObservers()) {
     const observerId = tokenIdOf(observer);
     if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
     seen.add(observerId);
@@ -1095,10 +1183,23 @@ export function targetQualifiesForLiveImpreciseSoundwave(target) {
   return false;
 }
 
+function currentViewAndPendingMovementObservers() {
+  const observers = [];
+  const add = (token) => {
+    if (token) observers.push(token);
+  };
+
+  add(canvas?.tokens?._draggedToken);
+  for (const observer of canvas?.tokens?.controlled || []) add(observer);
+  for (const [observerId, entry] of pendingTokenMovementPositions.entries()) {
+    add(tokenObjectForId(observerId) || entry?.tokenDoc?.object || entry?.tokenDoc);
+  }
+
+  return observers;
+}
+
 function shouldAllowSoundwaveMeshPrimingForToken(token) {
-  const hasViewObservers = !!(
-    canvas?.tokens?._draggedToken || (canvas?.tokens?.controlled || []).length
-  );
+  const hasViewObservers = !!currentViewAndPendingMovementObservers().length;
   if (!hasViewObservers) return true;
   return (
     targetQualifiesForLiveImpreciseSoundwave(token) ||
@@ -1132,9 +1233,8 @@ function restoreMissingSoundwaveMeshForToken(token) {
 function probeRestoreMissingSoundwaveForToken(token) {
   if (token?.detectionFilter) return false;
   if (!targetQualifiesForLiveImpreciseSoundwave(token)) return false;
-  const observers = [canvas?.tokens?._draggedToken, ...(canvas?.tokens?.controlled || [])];
   const seen = new Set();
-  for (const observer of observers) {
+  for (const observer of currentViewAndPendingMovementObservers()) {
     const observerId = tokenIdOf(observer);
     if (!observerId || seen.has(observerId) || observerId === tokenIdOf(token)) continue;
     seen.add(observerId);
@@ -1147,9 +1247,7 @@ function probeRestoreMissingSoundwaveForToken(token) {
 
 function releaseStaleLiveSoundwaveRenderForToken(token) {
   if (!token?.visible || !token?.detectionFilter) return false;
-  const hasViewObservers = !!(
-    canvas?.tokens?._draggedToken || (canvas?.tokens?.controlled || []).length
-  );
+  const hasViewObservers = !!currentViewAndPendingMovementObservers().length;
   if (!hasViewObservers) return false;
   if (!targetHasDetectionBlockingStoredVisibilityState(token)) return false;
   if (targetQualifiesForLiveImpreciseSoundwave(token)) return false;
@@ -1575,12 +1673,20 @@ function getPredictedFinalVisibilityState(observer, target) {
 
   const observerEntry = getPendingTokenMovementEntry(observerId);
   if (observerEntry?.finalVisibilityStatesByTargetId?.has(targetId)) {
-    return observerEntry.finalVisibilityStatesByTargetId.get(targetId);
+    return applyFeatVisibilityReplacement(
+      visibilityObserver,
+      visibilityTarget,
+      observerEntry.finalVisibilityStatesByTargetId.get(targetId),
+    );
   }
 
   const targetEntry = getPendingTokenMovementEntry(targetId);
   if (targetEntry?.finalVisibilityStatesByObserverId?.has(observerId)) {
-    return targetEntry.finalVisibilityStatesByObserverId.get(observerId);
+    return applyFeatVisibilityReplacement(
+      visibilityObserver,
+      visibilityTarget,
+      targetEntry.finalVisibilityStatesByObserverId.get(observerId),
+    );
   }
 
   return null;
@@ -1634,9 +1740,7 @@ function activePreviewCanRevealStoredUndetectedTarget(observer, target, storedVi
 
 function getPendingMovementVisibilityState(observer, target) {
   const resolvedState = resolvePendingMovementVisibilityState(observer, target);
-  if (!visionerStateHidesTargetRendering(resolvedState, target)) return resolvedState;
-  if (pairAllowsLiveImpreciseSoundwave(observer, target)) return 'hidden';
-  return resolvedState;
+  return applyLiveNonVisualRenderOverride(observer, target, resolvedState);
 }
 
 function resolvePendingMovementVisibilityState(observer, target) {
@@ -1839,7 +1943,12 @@ function visibleDetectionStateShouldWaitForCurrentPolygon(observer, target, from
 
 function getCurrentViewRenderHiddenVisibilityState(observer, target) {
   const resolvedState = resolveCurrentViewRenderHiddenVisibilityState(observer, target);
+  return applyLiveNonVisualRenderOverride(observer, target, resolvedState);
+}
+
+function applyLiveNonVisualRenderOverride(observer, target, resolvedState) {
   if (!visionerStateHidesTargetRendering(resolvedState, target)) return resolvedState;
+  if (pairAllowsLivePreciseNonVisualDetection(observer, target)) return 'observed';
   if (pairAllowsLiveImpreciseSoundwave(observer, target)) return 'hidden';
   return resolvedState;
 }
@@ -3399,9 +3508,8 @@ export function restorePendingMovementTokenRendering(
 }
 
 function anyCurrentViewObserverSightLineSeesTarget(target) {
-  const observers = [canvas?.tokens?._draggedToken, ...(canvas?.tokens?.controlled || [])];
   const seen = new Set();
-  for (const observer of observers) {
+  for (const observer of currentViewAndPendingMovementObservers()) {
     const observerId = tokenIdOf(observer);
     if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
     seen.add(observerId);

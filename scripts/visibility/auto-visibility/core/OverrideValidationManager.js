@@ -22,7 +22,7 @@ const STEALTH_POSITION_BYPASS_DETAILS = {
 
 function getStealthPositionBypassContext(target, override = {}) {
   const source = override.source || 'manual_action';
-  if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return null;
+  if (!['sneak_action', 'hide_action'].includes(source)) return null;
   if (!STEALTH_OVERRIDE_STATES.has(override.state)) return null;
   if (FeatsHandler.hasFeat(target, 'legendary-sneak')) {
     return STEALTH_POSITION_BYPASS_DETAILS['legendary-sneak'];
@@ -125,9 +125,9 @@ function loadVisionAnalyzerModule() {
 }
 
 function prewarmOverrideValidationModules() {
-  loadVisibilityCalculatorModule().catch(() => { });
-  loadCoverDetectorModule().catch(() => { });
-  loadVisionAnalyzerModule().catch(() => { });
+  loadVisibilityCalculatorModule().catch(() => {});
+  loadCoverDetectorModule().catch(() => {});
+  loadVisionAnalyzerModule().catch(() => {});
 }
 
 async function loadSharedValidationResources(options = {}) {
@@ -223,7 +223,7 @@ export class OverrideValidationManager {
     // Using setTimeout instead of requestAnimationFrame so validations work when window is unfocused
     try {
       await new Promise((resolve) => setTimeout(resolve, 0));
-    } catch { }
+    } catch {}
 
     const tokenIds = Array.from(this._tokensQueuedForValidation);
     this._tokensQueuedForValidation.clear();
@@ -262,7 +262,7 @@ export class OverrideValidationManager {
                 if (obsTok && !this.exclusionManager.isExcludedToken(obsTok)) ids.add(obsId);
               }
             }
-          } catch { }
+          } catch {}
           // mover as observer: flags on others
           try {
             const others = canvas.tokens?.placeables || [];
@@ -273,7 +273,7 @@ export class OverrideValidationManager {
                 if (!this.exclusionManager.isExcludedToken(ot)) ids.add(ot.id);
               }
             }
-          } catch { }
+          } catch {}
         }
         precomputedLights = new Map();
         for (const id of ids) {
@@ -300,14 +300,14 @@ export class OverrideValidationManager {
             if (lastMovedId && tokenId !== lastMovedId) {
               continue;
             }
-          } catch { }
+          } catch {}
         }
         let va = null;
         try {
           const { VisionAnalyzer } = await loadVisionAnalyzerModule();
           va = VisionAnalyzer.getInstance();
           va.clearCache();
-        } catch { }
+        } catch {}
         const movedToken = canvas.tokens?.get(tokenId);
         const filtered = result.overrides.filter((o) => {
           const prevCover = o.expectedCover ?? (o.hasCover ? 'standard' : 'none');
@@ -322,12 +322,12 @@ export class OverrideValidationManager {
             const otherToken = canvas.tokens?.get(otherId);
             if (!otherToken) return false;
             return va.hasLineOfSight(movedToken, otherToken) !== false;
-          } catch { return true; }
+          } catch {
+            return true;
+          }
         });
         try {
-          const { default: indicator } = await import(
-            '../../../ui/OverrideValidationIndicator.js'
-          );
+          const { default: indicator } = await import('../../../ui/OverrideValidationIndicator.js');
           if (filtered.length > 0) {
             const movedId = getLastMovedTokenId() || tokenId;
             const moverName = canvas.tokens?.get(movedId)?.document?.name || 'Token';
@@ -358,7 +358,7 @@ export class OverrideValidationManager {
       let hasExistingOverrides = false;
       try {
         isSneaking = !!movedToken.document.getFlag(MODULE_ID, 'sneak-active');
-      } catch { }
+      } catch {}
       try {
         const moverFlags = movedToken.document.flags['pf2e-visioner'] || {};
         hasExistingOverrides = Object.keys(moverFlags).some((k) =>
@@ -373,7 +373,7 @@ export class OverrideValidationManager {
             }
           }
         }
-      } catch { }
+      } catch {}
       if (!isSneaking && !hasExistingOverrides) return { overrides: [], __showAwareness: false };
       const awareness = [];
       try {
@@ -405,25 +405,27 @@ export class OverrideValidationManager {
             currentVisibility = visibility;
             const observerPos = this.positionManager.getTokenPosition(movedToken);
             currentCover = coverDetector?.detectFromPoint?.(observerPos, t);
-          } catch { }
-          awareness.push(withStealthPositionBypassContext(t, {
-            observerId: movedTokenId,
-            targetId: t.id,
-            observerName: movedToken.name,
-            targetName: t.name,
-            state: fd.state,
-            source: fd.source,
-            hasCover: fd.hasCover,
-            hasConcealment: fd.hasConcealment,
-            ...normalizeOverrideForValidation(fd),
-            expectedCover: fd.expectedCover,
-            coverOnly: fd.coverOnly,
-            coverOverrideSource: fd.coverOverrideSource,
-            currentVisibility,
-            currentCover,
-          }));
+          } catch {}
+          awareness.push(
+            withStealthPositionBypassContext(t, {
+              observerId: movedTokenId,
+              targetId: t.id,
+              observerName: movedToken.name,
+              targetName: t.name,
+              state: fd.state,
+              source: fd.source,
+              hasCover: fd.hasCover,
+              hasConcealment: fd.hasConcealment,
+              ...normalizeOverrideForValidation(fd),
+              expectedCover: fd.expectedCover,
+              coverOnly: fd.coverOnly,
+              coverOverrideSource: fd.coverOverrideSource,
+              currentVisibility,
+              currentCover,
+            }),
+          );
         }
-      } catch { }
+      } catch {}
       return { overrides: awareness, __showAwareness: awareness.length > 0 };
     }
 
@@ -521,9 +523,7 @@ export class OverrideValidationManager {
 
     const invalidOverrides = [];
     const stableReleaseOverrides = [];
-    const resources = overridesToCheck.length > 0
-      ? await getSharedValidationResources()
-      : {};
+    const resources = overridesToCheck.length > 0 ? await getSharedValidationResources() : {};
     const validationOptions = {
       ...(options || {}),
       ...resources,
@@ -604,24 +604,26 @@ export class OverrideValidationManager {
           currentVisibility = visibility;
           const observerPos = this.positionManager.getTokenPosition(obs);
           currentCover = coverDetector?.detectFromPoint?.(observerPos, movedToken);
-        } catch { }
-        awareness.push(withStealthPositionBypassContext(movedToken, {
-          observerId,
-          targetId: movedTokenId,
-          observerName: obs?.name || fd.observerName || 'Observer',
-          targetName: movedToken.name,
-          state: fd.state,
-          source: fd.source,
-          hasCover: fd.hasCover,
-          hasConcealment: fd.hasConcealment,
-          ...normalizeOverrideForValidation(fd),
-          expectedCover: fd.expectedCover,
-          coverOnly: fd.coverOnly,
-          coverOverrideSource: fd.coverOverrideSource,
-          suppressCoverChange,
-          currentVisibility,
-          currentCover,
-        }));
+        } catch {}
+        awareness.push(
+          withStealthPositionBypassContext(movedToken, {
+            observerId,
+            targetId: movedTokenId,
+            observerName: obs?.name || fd.observerName || 'Observer',
+            targetName: movedToken.name,
+            state: fd.state,
+            source: fd.source,
+            hasCover: fd.hasCover,
+            hasConcealment: fd.hasConcealment,
+            ...normalizeOverrideForValidation(fd),
+            expectedCover: fd.expectedCover,
+            coverOnly: fd.coverOnly,
+            coverOverrideSource: fd.coverOverrideSource,
+            suppressCoverChange,
+            currentVisibility,
+            currentCover,
+          }),
+        );
       }
       const allTokens = canvas.tokens?.placeables || [];
       for (const t of allTokens) {
@@ -656,25 +658,27 @@ export class OverrideValidationManager {
           currentVisibility = visibility;
           const observerPos = this.positionManager.getTokenPosition(movedToken);
           currentCover = coverDetector?.detectFromPoint?.(observerPos, t);
-        } catch { }
-        awareness.push(withStealthPositionBypassContext(t, {
-          observerId: movedTokenId,
-          targetId: t.id,
-          observerName: movedToken.name,
-          targetName: t.name,
-          state: fd.state,
-          source: fd.source,
-          hasCover: fd.hasCover,
-          hasConcealment: fd.hasConcealment,
-          ...normalizeOverrideForValidation(fd),
-          expectedCover: fd.expectedCover,
-          coverOnly: fd.coverOnly,
-          coverOverrideSource: fd.coverOverrideSource,
-          currentVisibility,
-          currentCover,
-        }));
+        } catch {}
+        awareness.push(
+          withStealthPositionBypassContext(t, {
+            observerId: movedTokenId,
+            targetId: t.id,
+            observerName: movedToken.name,
+            targetName: t.name,
+            state: fd.state,
+            source: fd.source,
+            hasCover: fd.hasCover,
+            hasConcealment: fd.hasConcealment,
+            ...normalizeOverrideForValidation(fd),
+            expectedCover: fd.expectedCover,
+            coverOnly: fd.coverOnly,
+            coverOverrideSource: fd.coverOverrideSource,
+            currentVisibility,
+            currentCover,
+          }),
+        );
       }
-    } catch { }
+    } catch {}
 
     return { overrides: awareness, __showAwareness: awareness.length > 0 };
   }
@@ -719,7 +723,7 @@ export class OverrideValidationManager {
       __obsPosKey = obsPosKey;
       __tgtPosKey = tgtPosKey;
       __cacheKey = cacheKey;
-    } catch { }
+    } catch {}
     markPerf('cache-check');
 
     try {
@@ -918,7 +922,7 @@ export class OverrideValidationManager {
                   });
                 }
               }
-            } catch { }
+            } catch {}
           }
         }
       }
@@ -990,7 +994,7 @@ export class OverrideValidationManager {
           obsPos: __obsPosKey,
           tgtPos: __tgtPosKey,
         });
-      } catch { }
+      } catch {}
       markPerf('cache-store');
       flushPerf({ reason: 'complete', visibility, coverResult, result });
 
@@ -1009,7 +1013,7 @@ export class OverrideValidationManager {
       if (lastMoved && movedTokenId && movedTokenId !== lastMoved) {
         return;
       }
-    } catch { }
+    } catch {}
     const overrideData = invalidOverrides.map(
       ({
         observerId,
@@ -1093,9 +1097,11 @@ export class OverrideValidationManager {
               const otherToken = canvas.tokens?.get(otherId);
               if (!otherToken) return false;
               return va.hasLineOfSight(moverToken, otherToken) !== false;
-            } catch { return true; }
+            } catch {
+              return true;
+            }
           });
-        } catch { }
+        } catch {}
       }
       if (dataToShow.length > 0) {
         indicator.show(dataToShow, movedTokenName, headerId);
@@ -1122,7 +1128,7 @@ export class OverrideValidationManager {
   _pruneCache() {
     try {
       this._overrideValidityCache.pruneIfDue(5000);
-    } catch { }
+    } catch {}
   }
 
   _hasActiveTimer(timedOverride) {

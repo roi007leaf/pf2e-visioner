@@ -23,6 +23,9 @@ export function buildBatchEffectSyncPlan({
     updatesByObserver.get(observerId).targets.push({
       target: update.target,
       state: update.visibility,
+      ...(Object.prototype.hasOwnProperty.call(update, 'profileMetadata')
+        ? { profileMetadata: update.profileMetadata ?? {} }
+        : {}),
     });
   }
 
