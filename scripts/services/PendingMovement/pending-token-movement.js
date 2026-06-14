@@ -11,6 +11,7 @@ import {
 } from '../runtime-state.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from '../Detection/select-all-token-visibility-bypass.js';
+import { getCacheInvalidationRevision } from '../../utils/cache-invalidation.js';
 import {
   createPendingMovementFinalVisibilityController,
   createPendingVisibilityStateMap,
@@ -128,6 +129,7 @@ const recentCompletedMovementRefreshTargetIds = new Map();
 let pendingMovementRefreshTargetIdSetCache = null;
 const pendingMovementTokenRefreshSignatures = new WeakMap();
 const pendingMovementRefreshVisibilityPerceptionTargets = new WeakMap();
+const controlledObserverDetectionVisualTargetCache = new Map();
 let pendingMovementCoalescedRefresh = null;
 let pendingMovementOcclusionOnlyPerceptionSuppression = null;
 let pendingMovementTokenRefreshPerceptionCoalescing = null;
@@ -454,6 +456,16 @@ function tokenIdOf(tokenOrDoc) {
   return tokenOrDoc?.document?.id || tokenOrDoc?.id || null;
 }
 
+function controlledObserverDetectionVisualTargetCacheKey(observerId) {
+  const sceneId = canvas?.scene?.id ?? canvas?.scene?._id ?? null;
+  const placeableIds = (canvas?.tokens?.placeables || [])
+    .map((token) => tokenIdOf(token))
+    .filter(Boolean)
+    .sort()
+    .join(',');
+  return `${sceneId || ''}:${getCacheInvalidationRevision()}:${observerId}:${placeableIds}`;
+}
+
 function observerTargetEvaluationKey(observer, target) {
   const observerId = tokenIdOf(observer);
   const targetId = tokenIdOf(target);
@@ -693,13 +705,28 @@ export function getControlledObserverDetectionVisualTargetIds(
   const observerId = tokenIdOf(observer);
   if (!observerId) return [];
 
-  return (canvas?.tokens?.placeables || [])
+  const cacheKey = controlledObserverDetectionVisualTargetCacheKey(observerId);
+  const cached = controlledObserverDetectionVisualTargetCache.get(observerId);
+  if (cached?.key === cacheKey) {
+    return [...cached.targetTokenIds];
+  }
+
+  const targetTokenIds = (canvas?.tokens?.placeables || [])
     .filter((token) => {
       const targetId = tokenIdOf(token);
       if (!targetId || targetId === observerId) return false;
       return DETECTION_BLOCKING_VISIBILITY_STATES.has(getStoredVisibilityState(observer, token));
     })
     .map((token) => tokenIdOf(token));
+
+  if (controlledObserverDetectionVisualTargetCache.size > 64) {
+    controlledObserverDetectionVisualTargetCache.clear();
+  }
+  controlledObserverDetectionVisualTargetCache.set(observerId, {
+    key: cacheKey,
+    targetTokenIds,
+  });
+  return [...targetTokenIds];
 }
 
 function shouldRefreshCoreLosTransitionTarget(observer, target, visibilityState) {

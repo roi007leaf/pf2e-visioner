@@ -5,6 +5,7 @@ import { rememberPendingPerceptionProfileWrite } from '../../../scripts/stores/v
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 import { LightingCalculator } from '../../../scripts/visibility/auto-visibility/LightingCalculator.js';
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { invalidateCaches } from '../../../scripts/utils/cache-invalidation.js';
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
@@ -162,6 +163,41 @@ describe('pending token movement hidden detection guard', () => {
       'hiddenTarget',
       'undetectedTarget',
     ]);
+  });
+
+  test('caches controlled observer selection refresh targets until visibility revision changes', () => {
+    const flags = visibilityV2Flags({
+      hiddenTarget: 'hidden',
+      observedTarget: 'observed',
+    });
+    const observer = createMockToken({ id: 'observer', flags });
+    const hiddenTarget = createMockToken({ id: 'hiddenTarget' });
+    const observedTarget = createMockToken({ id: 'observedTarget' });
+    global.canvas.tokens = {
+      get: jest.fn((id) =>
+        id === 'observer'
+          ? observer
+          : id === 'hiddenTarget'
+            ? hiddenTarget
+            : id === 'observedTarget'
+              ? observedTarget
+              : null,
+      ),
+      controlled: [observer],
+      placeables: [observer, hiddenTarget, observedTarget],
+    };
+
+    expect(getControlledObserverDetectionVisualTargetIds(observer)).toEqual(['hiddenTarget']);
+    const flagReadsAfterFirstCall = observer.document.getFlag.mock.calls.length;
+
+    expect(getControlledObserverDetectionVisualTargetIds(observer)).toEqual(['hiddenTarget']);
+    expect(observer.document.getFlag).toHaveBeenCalledTimes(flagReadsAfterFirstCall);
+
+    flags['pf2e-visioner'].visibilityV2.hiddenTarget = legacyVisibilityToProfile('observed');
+    invalidateCaches('test-visibility-change', { tokenId: observer.document.id });
+
+    expect(getControlledObserverDetectionVisualTargetIds(observer)).toEqual([]);
+    expect(observer.document.getFlag.mock.calls.length).toBeGreaterThan(flagReadsAfterFirstCall);
   });
 
   test('downgrades pending final undetected state to hidden for adjacent Blind-Fight observer', () => {

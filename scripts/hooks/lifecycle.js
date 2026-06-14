@@ -37,6 +37,8 @@ import {
 } from '../services/Detection/select-all-token-visibility-bypass.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
+import { getCacheInvalidationRevision } from '../utils/cache-invalidation.js';
+import { buildTokenSensesCacheKey } from '../visibility/auto-visibility/core/TokenSenseSignatureCache.js';
 
 const lifecycleBindingState = (globalThis.__pf2eVisionerLifecycleBindings ??= {
   hookKeys: new Set(),
@@ -47,6 +49,9 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   tokenId: null,
   timers: new Set(),
 });
+const controlTokenSelectionRecalcState = {
+  signatures: new Map(),
+};
 const CONTROL_TOKEN_RECALC_DELAY_MS = 180;
 const CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS = 700;
 const CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS = 180;
@@ -164,6 +169,69 @@ function refreshPendingVisibilityForActiveControlTokenSession(sequence, tokenId,
   const currentToken =
     canvas?.tokens?.controlled?.find?.((token) => token?.document?.id === tokenId) || fallbackToken;
   refreshPendingVisibilityAfterControlToken(currentToken);
+}
+
+function settleControlTokenSelectionRefreshes(session, token, { schedulePostRecalc = false } = {}) {
+  refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token);
+  const currentToken =
+    canvas?.tokens?.controlled?.find?.(
+      (controlledToken) => controlledToken?.document?.id === session.tokenId,
+    ) || token;
+  void refreshSystemHiddenHighlightsForControlToken(currentToken);
+  if (!schedulePostRecalc) return;
+
+  for (const delayMs of CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS) {
+    scheduleControlTokenSessionTimer(session.sequence, session.tokenId, delayMs, () =>
+      refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+    );
+  }
+}
+
+function tokenDataSignature(value) {
+  try {
+    return JSON.stringify(value?.toObject?.() ?? value ?? null);
+  } catch {
+    return String(value);
+  }
+}
+
+function controlTokenSelectionSignature(token) {
+  const tokenDoc = token?.document;
+  const tokenId = tokenDoc?.id;
+  if (!tokenId) return null;
+  return [
+    getCacheInvalidationRevision(),
+    canvas?.scene?.id ?? canvas?.scene?._id ?? tokenDoc?.parent?.id ?? '',
+    tokenId,
+    tokenDoc.x ?? '',
+    tokenDoc.y ?? '',
+    tokenDoc.elevation ?? '',
+    tokenDoc.width ?? '',
+    tokenDoc.height ?? '',
+    tokenDoc.hidden === true ? 1 : 0,
+    tokenDataSignature(tokenDoc.vision ?? tokenDoc.sight),
+    tokenDataSignature(tokenDoc.light),
+    buildTokenSensesCacheKey([token]),
+  ].join('|');
+}
+
+function shouldRunControlTokenSelectionAvsRecalc(token) {
+  const tokenId = token?.document?.id;
+  if (!tokenId) return true;
+
+  const signature = controlTokenSelectionSignature(token);
+  if (!signature) return true;
+
+  if (controlTokenSelectionRecalcState.signatures.get(tokenId) === signature) {
+    return false;
+  }
+
+  controlTokenSelectionRecalcState.signatures.set(tokenId, signature);
+  return true;
+}
+
+function clearControlTokenSelectionRecalcCache() {
+  controlTokenSelectionRecalcState.signatures.clear();
 }
 
 function scheduleRefreshPendingVisibilityAfterControlToken(token) {
@@ -1070,6 +1138,7 @@ export async function onCanvasReady() {
 
   bindHookOnce('resetControlTokenSessionOnCanvasTearDown', 'canvasTearDown', () => {
     resetControlTokenSession();
+    clearControlTokenSelectionRecalcCache();
   });
 
   bindHookOnce('avsRecalculateOnControlToken', 'controlToken', (token, controlled) => {
@@ -1085,30 +1154,16 @@ export async function onCanvasReady() {
         CONTROL_TOKEN_RECALC_DELAY_MS,
         () => {
           try {
-            const result =
-              window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
+            const shouldRecalculate = shouldRunControlTokenSelectionAvsRecalc(token);
+            const result = shouldRecalculate
+              ? window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
                 session.tokenId,
-              ]);
+              ])
+              : undefined;
             void Promise.resolve(result).finally(() => {
-              refreshPendingVisibilityForActiveControlTokenSession(
-                session.sequence,
-                session.tokenId,
-                token,
-              );
-              const currentToken =
-                canvas?.tokens?.controlled?.find?.(
-                  (controlledToken) => controlledToken?.document?.id === session.tokenId,
-                ) || token;
-              void refreshSystemHiddenHighlightsForControlToken(currentToken);
-              for (const delayMs of CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS) {
-                scheduleControlTokenSessionTimer(session.sequence, session.tokenId, delayMs, () =>
-                  refreshPendingVisibilityForActiveControlTokenSession(
-                    session.sequence,
-                    session.tokenId,
-                    token,
-                  ),
-                );
-              }
+              settleControlTokenSelectionRefreshes(session, token, {
+                schedulePostRecalc: shouldRecalculate,
+              });
             });
           } catch {
             /* best effort */
