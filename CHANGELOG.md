@@ -2,6 +2,15 @@
 
 ## [8.3.0] - 2026-05-06
 
+### Added
+
+- Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
+- Added a canonical perception-profile model for detection state, concealment, cover, and encounter awareness, with shared conversion helpers for legacy labels at UI/API boundaries.
+- Added public API support for reading and writing perception profiles and profile maps, including AVS override creation for manual profile writes so API callers and runtime validation use the same data shape.
+- Added migration coverage for legacy visibility maps, AVS override flags, scene cleanup, deleted-token restoration, rule-element cleanup, and purge flows that now operate on `visibilityV2` profile maps.
+- Added focused architecture guard tests for action handlers, action dialogs, detection wrappers, token flag persistence, walls, AVS invalidation, and v2 override boundaries.
+- Added Peek support for corners and doors, including token-side corner peeking, per-door Allow Peeking, optional blind-GM Perception DCs for door peeks, configurable slit/sweep/range settings, local peeker indicators, and GM mirror overlays for active peeks.
+
 ### Changed
 
 - Separated detection, concealment, cover, and encounter awareness semantics internally.
@@ -23,11 +32,6 @@
 
 ### Fixed
 
-- Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
-- Added a canonical perception-profile model for detection state, concealment, cover, and encounter awareness, with shared conversion helpers for legacy labels at UI/API boundaries.
-- Added public API support for reading and writing perception profiles and profile maps, including AVS override creation for manual profile writes so API callers and runtime validation use the same data shape.
-- Added migration coverage for legacy visibility maps, AVS override flags, scene cleanup, deleted-token restoration, rule-element cleanup, and purge flows that now operate on `visibilityV2` profile maps.
-- Added focused architecture guard tests for action handlers, action dialogs, detection wrappers, token flag persistence, walls, AVS invalidation, and v2 override boundaries.
 - **Seek rule elements can ignore concealment**: `modifyActionQualification` effects such as Thousand Visions now apply `seek.ignoreConcealment` during Seek target eligibility and outcome analysis, so concealed targets inside the rule element range can be found correctly instead of being skipped as non-actionable.
 - **Action qualification ranges work in Foundry v14**: Action qualification checks now preserve operation-level `range` values, support action-level range overrides, and fall back to v14 `measurePath` distance measurement when `measureDistance` is unavailable.
 - **Rule element examples match Visioner wiki semantics**: Thousand Visions is modeled as a Seek concealment qualification with sense range changes, while Blind-Fight remains off-guard suppression plus its adjacent undetected-to-hidden visibility handling instead of an attack concealment rule.
@@ -37,6 +41,8 @@
 - **Token selection no longer triggers heavy AVS work**: Switching controlled tokens now skips unnecessary override-indicator and pending-movement refresh paths, avoiding the FPS drop that happened when rapidly selecting observers such as Calder and Ed.
 - **Blind-Fight adjacent targets downgrade correctly**: Native Blind-Fight handling now treats adjacent undetected creatures of the defender's level or lower as hidden for that defender while preserving normal hidden off-guard behavior unless a separate suppression applies.
 - **Precise nonvisual senses stop using soundwave rendering**: Precise tremorsense and similar precise nonvisual senses now render as true observation instead of leaving imprecise-sense soundwaves visible until the next movement.
+- **Peek visibility stays constrained and synchronized**: Door and corner peeks now originate from the token side of the wall, follow the current mouse aim, keep GM overlays alive through heartbeat updates, clear ignored door edges on end, and cap ordinary cover against a corner-peeking defender at lesser unless they have Taken Cover.
+- **Aim-Aiding rune ignores allied ranged blockers**: Allied blockers wearing the PF2E Aim-Aiding armor rune no longer grant cover against ranged attacks, while still counting normally for melee cover.
 - Fresh AVS override flags now store canonical detection/concealment metadata, so `concealed` manual overrides save as `detectionState: "observed"` with `hasConcealment: true` instead of an old-shaped legacy-only override.
 - Visibility map updates now use Foundry v14 forced-deletion operators for `visibilityV2` profile entries instead of legacy `-=key` deletion syntax.
 - Manual perception-profile writes now refresh matching token visuals and AVS override state instead of leaving display state stale until the next movement or batch recalculation.
