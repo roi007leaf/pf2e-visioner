@@ -411,8 +411,18 @@ export function buildRuleElementRegistryValues(operations = []) {
           return 'distanceBasedVisibility';
         case 'overrideVisibility':
           return 'visibilityReplacement';
+        case 'conditionalState':
+          return 'conditionalState';
+        case 'overrideCover':
+          return 'overrideCover';
+        case 'provideCover':
+          return 'providesCover';
         case 'modifySenses':
           return 'originalSenses';
+        case 'modifyDetectionModes':
+          return 'originalDetectionModes';
+        case 'modifyActionQualification':
+          return 'actionQualifications';
         case 'modifyLighting':
           return `lightingModification.${operation.source || 'lighting'}`;
         case 'offGuardSuppression':
@@ -489,7 +499,13 @@ async function removeOperation(operation, token, ruleElementId, getOperationClas
   }
 }
 
-async function applyOperation(operation, token, ruleElementId, getOperationClass) {
+async function applyOperation(
+  operation,
+  token,
+  ruleElementId,
+  getOperationClass,
+  ruleElementContext = null,
+) {
   switch (operation.type) {
     case 'distanceBasedVisibility': {
       const OperationClass = await getOperationClass('DistanceBasedVisibility');
@@ -501,6 +517,21 @@ async function applyOperation(operation, token, ruleElementId, getOperationClass
       await OperationClass?.applyVisibilityOverride?.(operation, token);
       break;
     }
+    case 'conditionalState': {
+      const OperationClass = await getOperationClass('VisibilityOverride');
+      await OperationClass?.applyConditionalState?.(operation, token);
+      break;
+    }
+    case 'overrideCover': {
+      const OperationClass = await getOperationClass('CoverOverride');
+      await OperationClass?.applyCoverOverride?.(operation, token, ruleElementContext);
+      break;
+    }
+    case 'provideCover': {
+      const OperationClass = await getOperationClass('CoverOverride');
+      await OperationClass?.applyProvideCover?.(operation, token, ruleElementContext);
+      break;
+    }
     case 'modifySenses': {
       const OperationClass = await getOperationClass('SenseModifier');
       await OperationClass?.applySenseModifications?.(
@@ -509,6 +540,21 @@ async function applyOperation(operation, token, ruleElementId, getOperationClass
         ruleElementId,
         operation.predicate,
       );
+      break;
+    }
+    case 'modifyDetectionModes': {
+      const OperationClass = await getOperationClass('DetectionModeModifier');
+      await OperationClass?.applyDetectionModeModifications?.(
+        token,
+        operation.modeModifications,
+        ruleElementId,
+        operation.predicate,
+      );
+      break;
+    }
+    case 'modifyActionQualification': {
+      const OperationClass = await getOperationClass('ActionQualifier');
+      await OperationClass?.applyActionQualifications?.(operation, token);
       break;
     }
     case 'modifyLighting': {
@@ -554,9 +600,17 @@ async function refreshTokenRuleElementState({
   operations,
   registryKey,
   ruleElementId,
+  ruleSlug = 'effect',
   getOperationClass,
   warn,
 }) {
+  const ruleElementContext = {
+    item,
+    slug: ruleSlug,
+    ruleElementId,
+    ruleElementRegistryKey: registryKey,
+  };
+
   for (const operation of operations) {
     const operationWithSource = withRuleElementSource(operation, ruleElementId);
     try {
@@ -574,7 +628,13 @@ async function refreshTokenRuleElementState({
   for (const operation of operations) {
     const operationWithSource = withRuleElementSource(operation, ruleElementId);
     try {
-      await applyOperation(operationWithSource, token, ruleElementId, getOperationClass);
+      await applyOperation(
+        operationWithSource,
+        token,
+        ruleElementId,
+        getOperationClass,
+        ruleElementContext,
+      );
     } catch (error) {
       warn(`PF2E Visioner | Failed to apply operation ${operation.type}:`, error);
     }
@@ -615,6 +675,7 @@ export async function refreshVisionerRuleElementItem(
       operations,
       registryKey,
       ruleElementId,
+      ruleSlug: visionerRule.slug || 'effect',
       getOperationClass,
       warn,
     });

@@ -431,6 +431,41 @@ describe('PF2eVisionerEffect client permissions', () => {
     expect(token.document.setFlag).not.toHaveBeenCalled();
     expect(token.document.update).not.toHaveBeenCalled();
   });
+
+  it('removes aura visibility through the rule-element lifecycle cleanup path', async () => {
+    jest.resetModules();
+    global.game.user.isGM = true;
+    const removeAuraVisibility = jest.fn().mockResolvedValue(undefined);
+    jest.doMock('../../../scripts/rule-elements/operations/AuraVisibility.js', () => ({
+      AuraVisibility: { removeAuraVisibility },
+    }));
+
+    const token = {
+      id: 'token-1',
+      document: {
+        getFlag: jest.fn((moduleId, key) => {
+          if (moduleId === 'pf2e-visioner' && key === 'ruleElementRegistry') {
+            return { 'item-effect-1': ['auraVisibility'] };
+          }
+          return undefined;
+        }),
+        setFlag: jest.fn().mockResolvedValue(undefined),
+        update: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    const EffectRuleElement = await makeRuleElementClass();
+    const item = {
+      id: 'effect-1',
+      name: 'Effect 1',
+      actor: { getActiveTokens: () => [token] },
+    };
+    const operation = { type: 'auraVisibility', source: 'test-aura' };
+    const instance = new EffectRuleElement({ operations: [operation] }, item);
+
+    await instance.removeOperations();
+
+    expect(removeAuraVisibility).toHaveBeenCalledWith(operation, token);
+  });
 });
 
 
@@ -716,6 +751,34 @@ describe('Integration Tests', () => {
       expect(conditionalOp).toBeDefined();
       expect(conditionalOp.condition).toBe('invisible');
       expect(conditionalOp.thenState).toBe('concealed');
+    });
+
+    it('should configure Thousand Visions as a Seek concealment qualification', async () => {
+      const { default: examples } = await import('../../../scripts/rule-elements/examples.json');
+      const thousandVisions = examples.thousandVisions;
+
+      const qualificationOp = thousandVisions.rules[0].operations.find(
+        (op) => op.type === 'modifyActionQualification',
+      );
+
+      expect(qualificationOp).toBeDefined();
+      expect(qualificationOp.range).toBe(30);
+      expect(qualificationOp.qualifications.seek.ignoreConcealment).toBe(true);
+    });
+
+    it('should not configure Blind-Fight as an attack concealment qualification', async () => {
+      const { default: examples } = await import('../../../scripts/rule-elements/examples.json');
+      const blindFight = examples.blindFight;
+
+      const qualificationOp = blindFight.rules[0].operations.find(
+        (op) => op.type === 'modifyActionQualification',
+      );
+      const suppressionOp = blindFight.rules[0].operations.find(
+        (op) => op.type === 'offGuardSuppression',
+      );
+
+      expect(qualificationOp).toBeUndefined();
+      expect(suppressionOp).toBeDefined();
     });
   });
 

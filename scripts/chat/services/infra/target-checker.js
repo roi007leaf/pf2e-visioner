@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { ActionQualifier } from '../../../rule-elements/operations/ActionQualifier.js';
 import { getVisibilityBetween } from '../../../utils.js';
 // Debug logger removed
 import { isTokenWithinTemplate, shouldFilterAlly } from './shared-utils.js';
@@ -71,6 +72,14 @@ function createTargetCheckContext(actionData) {
       );
     }),
   };
+}
+
+function seekIgnoresConcealment(actionData, target) {
+  try {
+    return ActionQualifier.ignoreConcealment(actionData.actor, 'seek', target);
+  } catch {
+    return false;
+  }
 }
 
 export function checkForValidTargets(actionData) {
@@ -255,6 +264,7 @@ function checkSeekTargets(actionData, potentialTargets, checkContext) {
 
     const visibility = checkContext.getVisibilityBetween(actionData.actor, target);
     if (['hidden', 'undetected'].includes(visibility)) return true;
+    if (visibility === 'concealed' && seekIgnoresConcealment(actionData, target)) return true;
     if (target.actor) {
       const conditions = target.actor.conditions?.conditions || [];
       const isHiddenOrUndetected = conditions.some((c) =>

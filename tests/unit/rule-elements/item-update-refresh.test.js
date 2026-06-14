@@ -65,10 +65,20 @@ function makeOperationClasses() {
     CoverOverride: {
       removeCoverOverride: jest.fn().mockResolvedValue(undefined),
       removeProvideCover: jest.fn().mockResolvedValue(undefined),
+      applyCoverOverride: jest.fn().mockResolvedValue(undefined),
+      applyProvideCover: jest.fn().mockResolvedValue(undefined),
     },
     SenseModifier: {
       restoreSenses: jest.fn().mockResolvedValue(undefined),
       applySenseModifications: jest.fn().mockResolvedValue(undefined),
+    },
+    DetectionModeModifier: {
+      restoreDetectionModes: jest.fn().mockResolvedValue(undefined),
+      applyDetectionModeModifications: jest.fn().mockResolvedValue(undefined),
+    },
+    ActionQualifier: {
+      removeActionQualifications: jest.fn().mockResolvedValue(undefined),
+      applyActionQualifications: jest.fn().mockResolvedValue(undefined),
     },
     LightingModifier: {
       removeLightingModification: jest.fn().mockResolvedValue(undefined),
@@ -133,7 +143,12 @@ describe('rule-element item update refresh', () => {
       buildRuleElementRegistryValues([
         { type: 'distanceBasedVisibility' },
         { type: 'overrideVisibility' },
+        { type: 'conditionalState' },
+        { type: 'overrideCover' },
+        { type: 'provideCover' },
         { type: 'modifySenses' },
+        { type: 'modifyDetectionModes' },
+        { type: 'modifyActionQualification' },
         { type: 'modifyLighting', source: 'torch' },
         { type: 'modifyLighting' },
         { type: 'offGuardSuppression' },
@@ -144,7 +159,12 @@ describe('rule-element item update refresh', () => {
     ).toEqual([
       'distanceBasedVisibility',
       'visibilityReplacement',
+      'conditionalState',
+      'overrideCover',
+      'providesCover',
       'originalSenses',
+      'originalDetectionModes',
+      'actionQualifications',
       'lightingModification.torch',
       'lightingModification.lighting',
       'offGuardSuppression',
@@ -370,7 +390,12 @@ describe('rule-element item update refresh', () => {
       token,
     );
     expect(token.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'ruleElementRegistry', {
-      'item-item-1': ['visibilityReplacement', 'originalSenses', 'lightingModification.torch'],
+      'item-item-1': [
+        'visibilityReplacement',
+        'originalSenses',
+        'lightingModification.torch',
+        'providesCover',
+      ],
     });
     expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
     expect(
@@ -378,5 +403,66 @@ describe('rule-element item update refresh', () => {
     ).toBeLessThan(
       operationClasses.VisibilityOverride.applyVisibilityOverride.mock.invocationCallOrder[0],
     );
+  });
+
+  test('reapplies every supported Visioner rule-element operation type after item updates', async () => {
+    const operations = [
+      { type: 'conditionalState', condition: 'invisible', thenState: 'concealed' },
+      { type: 'overrideCover', state: 'standard' },
+      { type: 'provideCover', state: 'lesser' },
+      { type: 'modifyDetectionModes', modeModifications: { hearing: { range: 20 } } },
+      { type: 'modifyActionQualification', qualifications: { seek: { ignoreCover: true } } },
+    ];
+    const item = makeItem({ operations });
+    const token = makeToken('token-1');
+    const operationClasses = makeOperationClasses();
+    operationClasses.VisibilityOverride.applyConditionalState = jest.fn().mockResolvedValue(undefined);
+    const loadOperationClass = jest.fn(async (className) => operationClasses[className]);
+
+    await refreshVisionerRuleElementItem(item, [token], {
+      loadOperationClass,
+      recalculateTokenIds: jest.fn().mockResolvedValue(undefined),
+      warn: jest.fn(),
+    });
+
+    const ruleElementContext = expect.objectContaining({
+      item,
+      slug: 'effect',
+      ruleElementId: 'item-1-effect',
+    });
+
+    expect(operationClasses.VisibilityOverride.applyConditionalState).toHaveBeenCalledWith(
+      { ...operations[0], source: 'item-1-effect' },
+      token,
+    );
+    expect(operationClasses.CoverOverride.applyCoverOverride).toHaveBeenCalledWith(
+      { ...operations[1], source: 'item-1-effect' },
+      token,
+      ruleElementContext,
+    );
+    expect(operationClasses.CoverOverride.applyProvideCover).toHaveBeenCalledWith(
+      { ...operations[2], source: 'item-1-effect' },
+      token,
+      ruleElementContext,
+    );
+    expect(operationClasses.DetectionModeModifier.applyDetectionModeModifications).toHaveBeenCalledWith(
+      token,
+      operations[3].modeModifications,
+      'item-1-effect',
+      undefined,
+    );
+    expect(operationClasses.ActionQualifier.applyActionQualifications).toHaveBeenCalledWith(
+      { ...operations[4], source: 'item-1-effect' },
+      token,
+    );
+    expect(token.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'ruleElementRegistry', {
+      'item-item-1': [
+        'conditionalState',
+        'overrideCover',
+        'providesCover',
+        'originalDetectionModes',
+        'actionQualifications',
+      ],
+    });
   });
 });

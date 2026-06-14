@@ -212,4 +212,67 @@ describe('seek outcome analysis', () => {
     });
     expect(result.invisibleSeekCapApplied).toBeUndefined();
   });
+
+  test('rule element can make Seek ignore concealed state within range', async () => {
+    const seeker = createMockToken({
+      id: 'seeker',
+      center: { x: 0, y: 0 },
+      flags: {
+        'pf2e-visioner': {
+          actionQualifications: {
+            'thousand-visions': {
+              id: 'thousand-visions',
+              priority: 100,
+              range: 30,
+              qualifications: {
+                seek: { ignoreConcealment: true },
+              },
+            },
+          },
+        },
+      },
+    });
+    const subject = {
+      id: 'target',
+      center: { x: 100, y: 0 },
+      document: { id: 'target' },
+      actor: { type: 'character' },
+    };
+    global.canvas.grid = {
+      measurePath: jest.fn(() => ({ distance: 20 })),
+    };
+    const visionAnalyzer = {
+      getVisionCapabilities: jest.fn(() => ({
+        hasVision: true,
+        isBlinded: false,
+        sensingSummary: { precise: [{ type: 'vision', range: 30 }] },
+      })),
+      hasLineOfSight: jest.fn(() => true),
+      hasPreciseNonVisualInRange: jest.fn(() => false),
+    };
+
+    const result = await analyzeSeekOutcome(
+      { ...makeActionData(), actor: seeker },
+      subject,
+      baseDeps({
+        getVisibilityBetween: jest.fn(() => 'concealed'),
+        getDefaultNewStateFor: jest.fn((action, current) => current),
+        createSeekDialogAdapter: jest.fn(() => ({
+          determineSenseUsed: jest.fn(async () => ({
+            canDetect: true,
+            precision: 'precise',
+            senseType: 'vision',
+            range: 30,
+          })),
+        })),
+        visionAnalyzer,
+      }),
+    );
+
+    expect(result).toMatchObject({
+      currentVisibility: 'concealed',
+      newVisibility: 'observed',
+      changed: true,
+    });
+  });
 });

@@ -50,11 +50,16 @@ export class ActionQualifier {
 
     return Object.values(qualifications)
       .filter(q => q.qualifications?.[action])
-      .map(q => ({
-        id: q.id,
-        priority: q.priority,
-        ...q.qualifications[action]
-      }));
+      .map(q => {
+        const actionQualification = q.qualifications[action] || {};
+        return {
+          id: q.id,
+          priority: q.priority,
+          type: q.type,
+          ...actionQualification,
+          range: actionQualification.range ?? q.range
+        };
+      });
   }
 
   static canUseConcealment(token, action, source = null) {
@@ -125,17 +130,46 @@ export class ActionQualifier {
     return this.forcePositionQualifies(token, action, 'end');
   }
 
+  static _hasRange(qualification) {
+    return qualification?.range !== null && qualification?.range !== undefined;
+  }
+
+  static _tokenCenter(token) {
+    return token?.center || token?.getCenterPoint?.() || token?.document?.object?.center || null;
+  }
+
+  static _measureDistance(token, targetToken) {
+    try {
+      if (typeof canvas?.grid?.measureDistance === 'function') {
+        return canvas.grid.measureDistance(token, targetToken);
+      }
+
+      const start = this._tokenCenter(token);
+      const end = this._tokenCenter(targetToken);
+      if (start && end && typeof canvas?.grid?.measurePath === 'function') {
+        const result = canvas.grid.measurePath([start, end]);
+        return Number(result?.distance ?? result);
+      }
+    } catch (_) {}
+
+    return Number.POSITIVE_INFINITY;
+  }
+
   static ignoreConcealment(token, action, targetToken = null) {
     const qualifications = this.getActionQualifications(token, action);
 
     if (qualifications.length === 0) return false;
 
     if (targetToken) {
-      const distance = canvas.grid.measureDistance(token, targetToken);
+      const hasRangedQualification = qualifications.some(q => this._hasRange(q));
+      const distance = hasRangedQualification ? this._measureDistance(token, targetToken) : null;
       const result = qualifications.some(q => {
-        const rangeCheck = !q.range || distance <= q.range;
         const ignores = q.ignoreThisConcealment === true || q.ignoreConcealment === true;
 
+        if (!ignores) return false;
+        if (!this._hasRange(q)) return true;
+
+        const rangeCheck = Number.isFinite(distance) && distance <= q.range;
         return rangeCheck && ignores;
       });
       return result;
@@ -153,9 +187,10 @@ export class ActionQualifier {
     if (qualifications.length === 0) return false;
 
     if (targetToken) {
-      const distance = canvas.grid.measureDistance(token, targetToken);
+      const hasRangedQualification = qualifications.some(q => this._hasRange(q));
+      const distance = hasRangedQualification ? this._measureDistance(token, targetToken) : null;
       return qualifications.some(q => {
-        if (q.range && distance > q.range) return false;
+        if (this._hasRange(q) && (!Number.isFinite(distance) || distance > q.range)) return false;
         return q.ignoreThisCover === true;
       });
     }

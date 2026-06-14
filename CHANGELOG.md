@@ -1,22 +1,6 @@
 # Changelog
 
-## [8.3.1] - 2026-05-15
-
-### Fixed
-
-- **Door LOS visibility stays in sync with Foundry detection**: Door open/close recalculations now refresh explicit visible pairs and detection state so tokens revealed through a door remain actually visible to Foundry, instead of being kept hidden by stale core detection results.
-- **Door LOS recalculation is scoped to the changed door**: Door batches now only run expensive visibility work for token pairs whose sight rays cross the changed door segment, avoiding full-scene pair recalculation on crowded maps.
-- **Fast token movement no longer applies stale AVS batches**: Movement batches now discard results if another movement starts before the batch finishes, drop stale batched detection writes, and preserve pending movement tokens for the final post-move recalculation.
-
 ## [8.3.0] - 2026-05-06
-
-### Added
-
-- Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
-- Added a canonical perception-profile model for detection state, concealment, cover, and encounter awareness, with shared conversion helpers for legacy labels at UI/API boundaries.
-- Added public API support for reading and writing perception profiles and profile maps, including AVS override creation for manual profile writes so API callers and runtime validation use the same data shape.
-- Added migration coverage for legacy visibility maps, AVS override flags, scene cleanup, deleted-token restoration, rule-element cleanup, and purge flows that now operate on `visibilityV2` profile maps.
-- Added focused architecture guard tests for action handlers, action dialogs, detection wrappers, token flag persistence, walls, AVS invalidation, and v2 override boundaries.
 
 ### Changed
 
@@ -39,6 +23,20 @@
 
 ### Fixed
 
+- Added versioned `visibilityV2` profile storage and migration for legacy visibility maps and AVS override flags, preserving string-facing API compatibility while storing canonical detection/concealment metadata only.
+- Added a canonical perception-profile model for detection state, concealment, cover, and encounter awareness, with shared conversion helpers for legacy labels at UI/API boundaries.
+- Added public API support for reading and writing perception profiles and profile maps, including AVS override creation for manual profile writes so API callers and runtime validation use the same data shape.
+- Added migration coverage for legacy visibility maps, AVS override flags, scene cleanup, deleted-token restoration, rule-element cleanup, and purge flows that now operate on `visibilityV2` profile maps.
+- Added focused architecture guard tests for action handlers, action dialogs, detection wrappers, token flag persistence, walls, AVS invalidation, and v2 override boundaries.
+- **Seek rule elements can ignore concealment**: `modifyActionQualification` effects such as Thousand Visions now apply `seek.ignoreConcealment` during Seek target eligibility and outcome analysis, so concealed targets inside the rule element range can be found correctly instead of being skipped as non-actionable.
+- **Action qualification ranges work in Foundry v14**: Action qualification checks now preserve operation-level `range` values, support action-level range overrides, and fall back to v14 `measurePath` distance measurement when `measureDistance` is unavailable.
+- **Rule element examples match Visioner wiki semantics**: Thousand Visions is modeled as a Seek concealment qualification with sense range changes, while Blind-Fight remains off-guard suppression plus its adjacent undetected-to-hidden visibility handling instead of an attack concealment rule.
+- **Rule element item edits reapply all operation types**: Editing an item with Visioner rule elements now removes, clears, reapplies, and re-registers `conditionalState`, `overrideCover`, `provideCover`, `modifyDetectionModes`, and `modifyActionQualification` operations instead of dropping those effects until reload.
+- **Aura visibility cleans up through normal rule-element lifecycle**: Updating or removing an active rule element now calls the aura visibility cleanup path, preventing stale aura visibility flags and sources from surviving effect changes.
+- **Blinded player tokens remain targetable after deselecting**: A player-owned blinded PC no longer disappears from its own player when the token is deselected, preventing the token from becoming impossible to target until reload.
+- **Token selection no longer triggers heavy AVS work**: Switching controlled tokens now skips unnecessary override-indicator and pending-movement refresh paths, avoiding the FPS drop that happened when rapidly selecting observers such as Calder and Ed.
+- **Blind-Fight adjacent targets downgrade correctly**: Native Blind-Fight handling now treats adjacent undetected creatures of the defender's level or lower as hidden for that defender while preserving normal hidden off-guard behavior unless a separate suppression applies.
+- **Precise nonvisual senses stop using soundwave rendering**: Precise tremorsense and similar precise nonvisual senses now render as true observation instead of leaving imprecise-sense soundwaves visible until the next movement.
 - Fresh AVS override flags now store canonical detection/concealment metadata, so `concealed` manual overrides save as `detectionState: "observed"` with `hasConcealment: true` instead of an old-shaped legacy-only override.
 - Visibility map updates now use Foundry v14 forced-deletion operators for `visibilityV2` profile entries instead of legacy `-=key` deletion syntax.
 - Manual perception-profile writes now refresh matching token visuals and AVS override state instead of leaving display state stale until the next movement or batch recalculation.
@@ -59,6 +57,9 @@
 - **Invisible hidden targets no longer flicker during moves**: Moving or dragging an observer no longer fights the soundwave of an invisible hidden target in plain sight; the sight-reveal machinery now exempts invisible targets, which can never be revealed by vision.
 - **Invisible creatures reappear while emerging from cover**: Walking out from behind a wall now shows a remembered invisible creature's soundwave mid-walk as soon as the sight line clears, and drag-drops reveal it within about half a second of release, instead of waiting seconds for the movement to settle.
 - **Movement frame hitches reduced**: Hover tooltip visibility indicators no longer force a browser layout per badge per refresh, and the orphan-soundwave sweep skips while tokens are animating and caches its expensive checks — fixing token movement visually skipping ahead near the start and end of walks.
+- **Door LOS visibility stays in sync with Foundry detection**: Door open/close recalculations now refresh explicit visible pairs and detection state so tokens revealed through a door remain actually visible to Foundry, instead of being kept hidden by stale core detection results.
+- **Door LOS recalculation is scoped to the changed door**: Door batches now only run expensive visibility work for token pairs whose sight rays cross the changed door segment, avoiding full-scene pair recalculation on crowded maps.
+- **Fast token movement no longer applies stale AVS batches**: Movement batches now discard results if another movement starts before the batch finishes, drop stale batched detection writes, and preserve pending movement tokens for the final post-move recalculation.
 
 ## [8.2.11] - 2026-05-16
 

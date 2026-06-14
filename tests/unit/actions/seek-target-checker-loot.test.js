@@ -2,6 +2,8 @@ import '../../setup.js';
 
 describe('checkForValidTargets loot actor handling', () => {
   beforeEach(() => {
+    jest.resetModules();
+    jest.dontMock('../../../scripts/utils.js');
     global.canvas.tokens.placeables = [];
     global.canvas.walls.placeables = [];
     global.canvas.scene = {
@@ -145,5 +147,70 @@ describe('checkForValidTargets loot actor handling', () => {
 
     expect(canSeek).toBe(false);
     expect(getRollOptions).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not allow Seek for only concealed targets without ignore-concealment rule element', async () => {
+    jest.doMock('../../../scripts/utils.js', () => ({
+      getVisibilityBetween: jest.fn(() => 'concealed'),
+    }));
+    const seeker = createMockToken({
+      id: 'seeker-1',
+      actor: createMockActor({ id: 'seeker-actor', type: 'character' }),
+    });
+    const concealedNpc = createMockToken({
+      id: 'npc-1',
+      actor: createMockActor({ id: 'npc-actor', type: 'npc' }),
+    });
+    global.canvas.tokens.placeables = [seeker, concealedNpc];
+
+    const { checkForValidTargets } = await import(
+      '../../../scripts/chat/services/infra/target-checker.js'
+    );
+
+    const canSeek = checkForValidTargets({
+      actionType: 'seek',
+      actor: seeker,
+    });
+
+    expect(canSeek).toBe(false);
+  });
+
+  test('allows Seek for concealed targets when seeker ignores concealment by rule element', async () => {
+    jest.doMock('../../../scripts/utils.js', () => ({
+      getVisibilityBetween: jest.fn(() => 'concealed'),
+    }));
+    const seeker = createMockToken({
+      id: 'seeker-1',
+      actor: createMockActor({ id: 'seeker-actor', type: 'character' }),
+      flags: {
+        'pf2e-visioner': {
+          actionQualifications: {
+            'thousand-visions': {
+              id: 'thousand-visions',
+              priority: 100,
+              qualifications: {
+                seek: { ignoreConcealment: true },
+              },
+            },
+          },
+        },
+      },
+    });
+    const concealedNpc = createMockToken({
+      id: 'npc-1',
+      actor: createMockActor({ id: 'npc-actor', type: 'npc' }),
+    });
+    global.canvas.tokens.placeables = [seeker, concealedNpc];
+
+    const { checkForValidTargets } = await import(
+      '../../../scripts/chat/services/infra/target-checker.js'
+    );
+
+    const canSeek = checkForValidTargets({
+      actionType: 'seek',
+      actor: seeker,
+    });
+
+    expect(canSeek).toBe(true);
   });
 });

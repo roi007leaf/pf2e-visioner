@@ -1,4 +1,5 @@
 import { MODULE_ID, getVisibilityStateLabelKey } from '../../../../constants.js';
+import { ActionQualifier } from '../../../../rule-elements/operations/ActionQualifier.js';
 import { SeekDialogAdapter } from '../../../../visibility/auto-visibility/SeekDialogAdapter.js';
 import { buildSeekWallMetadata, getSeekWallCurrentVisibility } from './seek-wall-subjects.js';
 
@@ -99,6 +100,15 @@ async function getCurrentVisibility(actionData, subject, deps) {
   }
 
   return deps.getVisibilityBetween(getObserverToken(actionData), subject);
+}
+
+function seekIgnoresConcealment(actionData, subject, current) {
+  if (subject?._isWall || current !== 'concealed') return false;
+  try {
+    return ActionQualifier.ignoreConcealment(getObserverToken(actionData), 'seek', subject);
+  } catch {
+    return false;
+  }
 }
 
 function hasAnomalyAutoDetection(featsHandler, actionData, subject) {
@@ -354,6 +364,8 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
     ...deps,
     ...visibility,
   });
+  const ignoresConcealment = seekIgnoresConcealment(actionData, subject, current);
+  const effectiveCurrent = ignoresConcealment ? 'observed' : current;
   const thatsOddAuto = hasAnomalyAutoDetection(featsHandler, actionData, subject);
 
   let dc = subject?._isWall ? Number(subject.dc) || 15 : shared.extractStealthDC(subject);
@@ -370,11 +382,12 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
   const total = getRollTotal(actionData);
   const die = getDieResult(actionData);
   const outcome = shared.determineOutcome(total, die, dc);
-  let newVisibility = visibility.getDefaultNewStateFor('seek', current, outcome) || current;
+  let newVisibility =
+    visibility.getDefaultNewStateFor('seek', effectiveCurrent, outcome) || effectiveCurrent;
 
   try {
     newVisibility =
-      featsHandler?.adjustVisibility?.('seek', actionData.actor, current, newVisibility, {
+      featsHandler?.adjustVisibility?.('seek', actionData.actor, effectiveCurrent, newVisibility, {
         subjectType: subject?._isWall ? 'wall' : subject?.actor?.type,
         isHiddenWall: !!subject?._isWall,
         outcome,
@@ -400,7 +413,7 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
   }
 
   if (!subject?._isWall && !sense.usedSenseType && !sense.usedImprecise) {
-    newVisibility = current;
+    newVisibility = ignoresConcealment ? 'observed' : current;
   }
 
   if (subject?._isWall && (outcome === 'success' || outcome === 'critical-success')) {

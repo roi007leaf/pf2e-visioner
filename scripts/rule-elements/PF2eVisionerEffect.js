@@ -1008,6 +1008,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await OffGuardSuppression.removeOffGuardSuppression(operation, token);
           break;
 
+        case 'auraVisibility':
+          await AuraVisibility.removeAuraVisibility(operation, token);
+          break;
+
         case 'shareVision':
           await ShareVision.removeShareVision(operation, token);
           break;
