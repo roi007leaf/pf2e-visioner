@@ -13,7 +13,14 @@ import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
 import { handleDefeatEffectCreated } from '../services/defeated-actor-cleanup.js';
-import { handleVisionerRuleElementItemUpdate } from '../rule-elements/item-update-refresh.js';
+import {
+  captureActorPreparedSenseSnapshot,
+  handleActorSenseChangeItemEvent,
+  handleVisionerRuleElementItemUpdate,
+  scheduleActorPreparedSensesAvsRefresh,
+  watchActorPreparedSenses,
+  watchCurrentScenePreparedSenses,
+} from '../rule-elements/item-update-refresh.js';
 import { cleanupDeletedEffectItem } from '../services/deleted-effect-cleanup.js';
 import { createVisionMasterTokenRefresh } from '../services/vision-master-token-refresh.js';
 import { handleSceneDisableAvsRefresh } from '../services/scene-disable-avs-refresh.js';
@@ -37,6 +44,9 @@ export async function registerHooks() {
 
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
+  Hooks.on('canvasReady', () => {
+    watchCurrentScenePreparedSenses();
+  });
 
   const visionMasterTokenRefresh = createVisionMasterTokenRefresh();
 
@@ -78,9 +88,32 @@ export async function registerHooks() {
   // These work independently of the Auto-Visibility System
   await registerEffectPerceptionHooks();
 
+  Hooks.on('preUpdateActor', (actor, changes, options, userId) => {
+    void changes;
+    void options;
+    void userId;
+    captureActorPreparedSenseSnapshot(actor);
+  });
+
+  Hooks.on('updateActor', (actor, changes, options, userId) => {
+    void options;
+    void userId;
+    scheduleActorPreparedSensesAvsRefresh(actor, changes);
+    watchActorPreparedSenses(actor);
+  });
+
+  Hooks.on('createToken', (tokenDoc) => {
+    watchActorPreparedSenses(tokenDoc?.actor ?? tokenDoc?.object?.actor);
+  });
+
   // Register item update hooks for rule element updates
   Hooks.on('updateItem', async (item, changes, options, userId) => {
     handleVisionerRuleElementItemUpdate(item, changes, options, userId);
+    handleActorSenseChangeItemEvent(item, changes, options, userId);
+  });
+
+  Hooks.on('createItem', async (item, options, userId) => {
+    handleActorSenseChangeItemEvent(item, null, options, userId);
   });
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
@@ -151,6 +184,7 @@ export async function registerHooks() {
   // If effects are manually removed, clear corresponding token flags
   Hooks.on('deleteItem', async (item) => {
     await cleanupDeletedEffectItem(item);
+    handleActorSenseChangeItemEvent(item, null);
   });
 
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes

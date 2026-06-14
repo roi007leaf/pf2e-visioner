@@ -13,6 +13,7 @@ import {
   getPendingMovementPerformanceSnapshot,
   getPendingMovementRefreshTargetIds,
   getPendingTokenMovementPosition,
+  installOcclusionOnlyPerceptionSuppression,
   primePendingControlledTokenDragIntent,
   refreshPendingControlledTokenDragIntent,
   releasePendingControlledTokenDragIntent,
@@ -6114,6 +6115,48 @@ describe('pending token movement hidden detection guard', () => {
       refreshVision: true,
       refreshSounds: true,
       refreshOcclusion: true,
+    });
+  });
+
+  test('coalesces control-selection perception updates during suppression window', () => {
+    jest.useFakeTimers();
+    const perceptionUpdate = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      perception: {
+        update: perceptionUpdate,
+      },
+    };
+
+    installOcclusionOnlyPerceptionSuppression(700, {
+      coalesceSelectionRefresh: true,
+      selectionFlushDelayMs: 180,
+    });
+    global.canvas.perception.update({
+      initializeVisionModes: true,
+      refreshVision: true,
+      refreshLighting: true,
+    });
+    global.canvas.perception.update({
+      refreshVision: true,
+      refreshSounds: true,
+      refreshOcclusion: 2,
+    });
+    global.canvas.perception.update({ refreshOcclusion: true });
+
+    expect(perceptionUpdate).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(179);
+    expect(perceptionUpdate).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(perceptionUpdate).toHaveBeenCalledTimes(1);
+    expect(perceptionUpdate).toHaveBeenCalledWith({
+      initializeVisionModes: true,
+      refreshVision: true,
+      refreshLighting: true,
+      refreshSounds: true,
+      refreshOcclusion: 2,
     });
   });
 

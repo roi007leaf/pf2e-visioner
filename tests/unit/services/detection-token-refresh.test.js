@@ -116,6 +116,164 @@ describe('detection token refresh wrapper', () => {
     expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 0.5 });
   });
 
+  test('keeps player-owned blinded token rendered when deselected by v14 core visibility', () => {
+    global.game.user.isGM = false;
+    global.game.user.id = 'player';
+    const actor = {
+      hasCondition: jest.fn((slug) => slug === 'blinded'),
+      conditions: new Set(['blinded']),
+      itemTypes: { condition: [{ slug: 'blinded' }] },
+      isOwner: true,
+    };
+    const target = createMockToken({
+      id: 'pc',
+      actor,
+      controlled: false,
+      isOwner: true,
+      visible: true,
+    });
+    target.document.actor = actor;
+    target.document.testUserPermission = jest.fn(
+      (user, permission) => user?.id === 'player' && permission === 'OWNER',
+    );
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [],
+        get: jest.fn((id) => (id === 'pc' ? target : null)),
+        placeables: [target],
+      },
+    };
+
+    const wrapped = jest.fn(() => {
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      return 'wrapped-result';
+    });
+
+    const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+    expect(result).toBe('wrapped-result');
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  test('does not reveal player-owned blinded token when Foundry-hidden', () => {
+    global.game.user.isGM = false;
+    global.game.user.id = 'player';
+    const actor = {
+      hasCondition: jest.fn((slug) => slug === 'blinded'),
+      conditions: new Set(['blinded']),
+      itemTypes: { condition: [{ slug: 'blinded' }] },
+      isOwner: true,
+    };
+    const target = createMockToken({
+      id: 'pc',
+      actor,
+      controlled: false,
+      hidden: true,
+      isOwner: true,
+      visible: true,
+    });
+    target.document.actor = actor;
+    target.document.testUserPermission = jest.fn(
+      (user, permission) => user?.id === 'player' && permission === 'OWNER',
+    );
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [],
+        get: jest.fn((id) => (id === 'pc' ? target : null)),
+        placeables: [target],
+      },
+    };
+
+    const wrapped = jest.fn(() => {
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      return 'wrapped-result';
+    });
+
+    const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+    expect(result).toBe('wrapped-result');
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  test('does not reveal player-owned blinded token while another observer is selected', () => {
+    global.game.user.isGM = false;
+    global.game.user.id = 'player';
+    const actor = {
+      hasCondition: jest.fn((slug) => slug === 'blinded'),
+      conditions: new Set(['blinded']),
+      itemTypes: { condition: [{ slug: 'blinded' }] },
+      isOwner: true,
+    };
+    const target = createMockToken({
+      id: 'pc',
+      actor,
+      controlled: false,
+      isOwner: true,
+      visible: true,
+    });
+    const observer = createMockToken({ id: 'observer', controlled: true });
+    target.document.actor = actor;
+    target.document.testUserPermission = jest.fn(
+      (user, permission) => user?.id === 'player' && permission === 'OWNER',
+    );
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'pc' ? target : id === 'observer' ? observer : null)),
+        placeables: [observer, target],
+      },
+    };
+
+    const wrapped = jest.fn(() => {
+      target.visible = false;
+      target.renderable = false;
+      target.mesh.visible = false;
+      target.mesh.renderable = false;
+      target.mesh.alpha = 0;
+      return 'wrapped-result';
+    });
+
+    const result = wrapTokenRefreshVisibility.call(target, wrapped);
+
+    expect(result).toBe('wrapped-result');
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+  });
+
   test('GM Vision bypass restores existing AVS render lock before token refresh', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

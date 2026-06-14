@@ -26,6 +26,7 @@ import {
 import { updateWallVisuals } from '../services/visual-effects.js';
 import {
   forcePendingMovementTokenInvisible,
+  installOcclusionOnlyPerceptionSuppression,
   targetMustStayHiddenDuringPendingMovement,
 } from '../services/PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
@@ -46,7 +47,10 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   tokenId: null,
   timers: new Set(),
 });
-const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
+const CONTROL_TOKEN_RECALC_DELAY_MS = 180;
+const CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS = 700;
+const CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS = 180;
+const CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS = 180;
 const CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([75, 250]);
 const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
 const CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS = 50;
@@ -162,6 +166,21 @@ function refreshPendingVisibilityForActiveControlTokenSession(sequence, tokenId,
   refreshPendingVisibilityAfterControlToken(currentToken);
 }
 
+function scheduleRefreshPendingVisibilityAfterControlToken(token) {
+  const session = getControlTokenSession(token);
+  if (!session) {
+    refreshPendingVisibilityAfterControlToken(token);
+    return;
+  }
+
+  scheduleControlTokenSessionTimer(
+    session.sequence,
+    session.tokenId,
+    CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS,
+    () => refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+  );
+}
+
 function scheduleNoObserverVisibilityRefresh() {
   let completed = false;
   const run = () => {
@@ -208,7 +227,7 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
           ignoreObservedGrace: true,
           source: 'control-token-session',
           targetTokenIds,
-          ...(!hasRenderWork ? { skipPerceptionRefresh: true } : {}),
+          skipPerceptionRefresh: true,
         }
         : {
           ignoreObservedGrace: true,
@@ -777,11 +796,19 @@ export async function onCanvasReady() {
       }
     }
 
+    bindHookOnce('controlTokenSessionTracker', 'controlToken', (token, controlled) => {
+      trackControlTokenSession(token, controlled);
+    });
+
     // Also set up a hook to restore indicators when tokens are controlled after canvas ready
     // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
     bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
       if (controlled) {
-        refreshPendingVisibilityAfterControlToken(token);
+        installOcclusionOnlyPerceptionSuppression(CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS, {
+          coalesceSelectionRefresh: true,
+          selectionFlushDelayMs: CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS,
+        });
+        scheduleRefreshPendingVisibilityAfterControlToken(token);
       }
 
       // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
@@ -1039,10 +1066,6 @@ export async function onCanvasReady() {
     } catch (error) {
       console.warn('PF2E Visioner | Failed to update shared vision indicator:', error);
     }
-  });
-
-  bindHookOnce('controlTokenSessionTracker', 'controlToken', (token, controlled) => {
-    trackControlTokenSession(token, controlled);
   });
 
   bindHookOnce('resetControlTokenSessionOnCanvasTearDown', 'canvasTearDown', () => {

@@ -30,6 +30,7 @@ import {
   tokenHasDetectionFilterVisual,
 } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { isTokenBlinded } from './detection-visibility-context.js';
 
 const CORE_ANIMATION_TOKEN_VISIBILITY_THROTTLE_MS = 22;
 const coreAnimationTokenVisibilityRefreshTimes = new WeakMap();
@@ -55,6 +56,62 @@ function tokenOwnsDetectionSource(token) {
     ...Array.from(canvas?.effects?.lightSources || [], sourceFromCollectionEntry),
   ];
   return sources.some((source) => sameToken(source?.object, token));
+}
+
+function currentUserOwnsToken(token) {
+  const user = game?.user;
+  if (!user || user.isGM || !token) return false;
+
+  try {
+    if (token.document?.testUserPermission?.(user, 'OWNER')) return true;
+  } catch {
+    /* fall through to local ownership flags */
+  }
+
+  const ownerLevel = Number(globalThis.CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3);
+  const ownershipLevel =
+    token.document?.ownership?.[user.id] ??
+    token.actor?.ownership?.[user.id] ??
+    token.document?.actor?.ownership?.[user.id] ??
+    null;
+  return (
+    token.isOwner === true ||
+    token.document?.isOwner === true ||
+    token.actor?.isOwner === true ||
+    token.document?.actor?.isOwner === true ||
+    Number(ownershipLevel ?? 0) >= ownerLevel
+  );
+}
+
+function shouldRestorePlayerOwnedBlindedDeselectRendering(token) {
+  if (!token?.document?.id) return false;
+  if (game?.user?.isGM) return false;
+  if (token.controlled) return false;
+  if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return false;
+  if (token.document?.hidden) return false;
+  if (!isTokenBlinded(token)) return false;
+  if (!currentUserOwnsToken(token)) return false;
+  if (targetMustStayHiddenDuringPendingMovement(token)) return false;
+  if (targetIsRenderHiddenForCurrentViewObserver(token)) return false;
+  return true;
+}
+
+function restorePlayerOwnedBlindedDeselectRendering(token) {
+  if (!shouldRestorePlayerOwnedBlindedDeselectRendering(token)) return false;
+
+  try {
+    if ('visible' in token) token.visible = true;
+    token.renderable = true;
+    if (token.mesh) {
+      if ('visible' in token.mesh) token.mesh.visible = true;
+      if ('renderable' in token.mesh) token.mesh.renderable = true;
+      if ('alpha' in token.mesh && Number(token.mesh.alpha) <= 0) token.mesh.alpha = 1;
+    }
+    clearDetectionFilterVisuals(token);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function tokenDrivesCurrentVisionPolygon(token) {
@@ -106,13 +163,16 @@ function syncCurrentViewRenderHiddenState(token) {
 
   restorePendingMovementTokenRendering(token, { ignoreObservedGrace: true });
   restoreLivePreciseNonVisualRendering(token);
+  restorePlayerOwnedBlindedDeselectRendering(token);
   return false;
 }
 
 function refreshThenRestorePendingInvisible(token, refreshWrapped) {
   const result = refreshWrapped();
   try {
-    if (shouldTemporarilyForceTokenInvisible(token)) {
+    if (restorePlayerOwnedBlindedDeselectRendering(token)) {
+      return result;
+    } else if (shouldTemporarilyForceTokenInvisible(token)) {
       forcePendingMovementTokenInvisible(token);
     } else if (restoreLivePreciseNonVisualRendering(token)) {
       return result;
@@ -304,6 +364,9 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
       ? withPreservedPendingMovementDetectionFilterVisuals(this, refreshWrapped)
       : refreshWrapped();
   try {
+    if (restorePlayerOwnedBlindedDeselectRendering(this)) {
+      return result;
+    }
     if (shouldTemporarilyForceTokenInvisible(this)) {
       forcePendingMovementTokenInvisible(this);
     } else {

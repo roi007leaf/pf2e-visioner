@@ -42,6 +42,16 @@ function makeItem({ id = 'item-1', actorId = 'actor-1', operations = [], rules =
   };
 }
 
+function preparedSense(type, { acuity = 'imprecise', range = 60 } = {}) {
+  const sense = { key: type };
+  Object.defineProperty(sense, 'value', {
+    configurable: true,
+    enumerable: false,
+    value: { type, acuity, range, source: null },
+  });
+  return sense;
+}
+
 function makeOperationClasses() {
   return {
     VisibilityOverride: {
@@ -180,6 +190,137 @@ describe('rule-element item update refresh', () => {
       }),
     ).toBe(false);
 
+    expect(scheduler).not.toHaveBeenCalled();
+  });
+
+  test('schedules AVS recalculation when native sense rule range or acuity changes', async () => {
+    const token = makeToken('token-1');
+    const item = {
+      id: 'sense-item',
+      parent: { id: 'actor-1' },
+      system: {
+        rules: [{ key: 'Sense', type: 'tremorsense', acuity: 'precise', range: 60 }],
+      },
+    };
+    const changes = {
+      system: {
+        rules: [{ key: 'Sense', type: 'tremorsense', acuity: 'imprecise', range: 30 }],
+      },
+    };
+    let scheduledCallback;
+    const scheduler = jest.fn((callback, delayMs) => {
+      scheduledCallback = callback;
+      return 123;
+    });
+    const recalculateTokenIds = jest.fn().mockResolvedValue(undefined);
+
+    expect(
+      itemUpdateRefresh.scheduleActorSenseChangeAvsRefresh(item, changes, {
+        isGM: () => true,
+        getTokensForActor: () => [token],
+        scheduler,
+        recalculateTokenIds,
+      }),
+    ).toBe(true);
+    expect(scheduler).toHaveBeenCalledWith(expect.any(Function), 500);
+
+    await scheduledCallback();
+
+    expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
+  });
+
+  test('schedules AVS recalculation when prepared actor Sense.value changes', async () => {
+    const token = makeToken('token-1');
+    const tremorsense = preparedSense('tremorsense', { acuity: 'precise', range: 60 });
+    const actor = {
+      id: 'actor-1',
+      perception: {
+        senses: new Map([['tremorsense', tremorsense]]),
+      },
+    };
+    let scheduledCallback;
+    const scheduler = jest.fn((callback) => {
+      scheduledCallback = callback;
+      return 123;
+    });
+    const recalculateTokenIds = jest.fn().mockResolvedValue(undefined);
+
+    itemUpdateRefresh.captureActorPreparedSenseSnapshot(actor, { isGM: () => true });
+
+    tremorsense.value.acuity = 'imprecise';
+    tremorsense.value.range = 30;
+
+    expect(
+      itemUpdateRefresh.scheduleActorPreparedSensesAvsRefresh(actor, {}, {
+        isGM: () => true,
+        getTokensForActor: () => [token],
+        scheduler,
+        recalculateTokenIds,
+      }),
+    ).toBe(true);
+
+    await scheduledCallback();
+
+    expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
+  });
+
+  test('schedules AVS recalculation when prepared actor sense is mutated directly', async () => {
+    const token = makeToken('token-1');
+    const tremorsense = { type: 'tremorsense', acuity: 'imprecise', range: 60 };
+    const actor = {
+      id: 'actor-1',
+      perception: {
+        senses: new Map([['tremorsense', tremorsense]]),
+      },
+    };
+    let scheduledCallback;
+    const scheduler = jest.fn((callback) => {
+      scheduledCallback = callback;
+      return 123;
+    });
+    const recalculateTokenIds = jest.fn().mockResolvedValue(undefined);
+    const clearVisionCacheForTokenIds = jest.fn();
+
+    expect(
+      itemUpdateRefresh.watchActorPreparedSenses(actor, {
+        isGM: () => true,
+        getTokensForActor: () => [token],
+        scheduler,
+        recalculateTokenIds,
+        clearVisionCacheForTokenIds,
+      }),
+    ).toBe(true);
+
+    tremorsense.acuity = 'precise';
+
+    expect(clearVisionCacheForTokenIds).toHaveBeenCalledWith(['token-1']);
+    expect(scheduler).toHaveBeenCalledWith(expect.any(Function), 500);
+    await scheduledCallback();
+
+    expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
+  });
+
+  test('does not schedule AVS recalculation for unrelated item rule updates', () => {
+    const scheduler = jest.fn();
+    const item = {
+      id: 'non-sense-item',
+      parent: { id: 'actor-1' },
+      system: {
+        rules: [{ key: 'FlatModifier', selector: 'perception', value: 1 }],
+      },
+    };
+
+    expect(
+      itemUpdateRefresh.scheduleActorSenseChangeAvsRefresh(
+        item,
+        { system: { rules: [{ key: 'FlatModifier', selector: 'perception', value: 2 }] } },
+        {
+          isGM: () => true,
+          getTokensForActor: () => [makeToken('token-1')],
+          scheduler,
+        },
+      ),
+    ).toBe(false);
     expect(scheduler).not.toHaveBeenCalled();
   });
 

@@ -55,6 +55,98 @@ function stableStringify(value) {
   return JSON.stringify(stableNormalize(value));
 }
 
+function senseDataObject(value) {
+  return value && typeof value === 'object' ? value : null;
+}
+
+function normalizePreparedSenseEntry(type, sense) {
+  const senseObject = senseDataObject(sense);
+  if (!senseObject) {
+    return {
+      key: String(type ?? ''),
+      type: type ?? null,
+      value: sense ?? null,
+    };
+  }
+
+  const value = senseDataObject(senseObject.value);
+  const source = senseDataObject(senseObject.source);
+  const data = value ?? senseObject;
+  const resolvedType =
+    data?.type ??
+    senseObject.type ??
+    senseObject.slug ??
+    senseObject.id ??
+    senseObject.key ??
+    source?.type ??
+    type ??
+    null;
+
+  return {
+    key: String(type ?? senseObject.key ?? resolvedType ?? ''),
+    type: resolvedType,
+    acuity: data?.acuity ?? senseObject.acuity ?? source?.acuity ?? null,
+    range: data?.range ?? senseObject.range ?? source?.range ?? null,
+    source: data?.source ?? source?.source ?? null,
+  };
+}
+
+function normalizePreparedSensesForSignature(senses) {
+  if (!senses) return null;
+
+  const entries = [];
+  const addEntry = (type, sense) => {
+    entries.push(normalizePreparedSenseEntry(type, sense));
+  };
+
+  if (Array.isArray(senses)) {
+    senses.forEach((sense, index) => addEntry(sense?.type ?? sense?.key ?? index, sense));
+  } else if (Array.isArray(senses.contents)) {
+    senses.contents.forEach((sense, index) => addEntry(sense?.type ?? sense?.key ?? index, sense));
+  } else if (typeof senses.entries === 'function') {
+    try {
+      for (const [type, sense] of senses.entries()) addEntry(type, sense);
+    } catch {
+      // Fall through to other collection shapes.
+    }
+  }
+
+  if (entries.length === 0 && typeof senses.values === 'function') {
+    try {
+      for (const sense of senses.values()) addEntry(sense?.type ?? sense?.key, sense);
+    } catch {
+      // Fall through to other collection shapes.
+    }
+  }
+
+  if (entries.length === 0 && typeof senses[Symbol.iterator] === 'function') {
+    try {
+      for (const entry of senses) {
+        if (Array.isArray(entry) && entry.length >= 2) {
+          addEntry(entry[0], entry[1]);
+        } else {
+          addEntry(entry?.type ?? entry?.key, entry);
+        }
+      }
+    } catch {
+      // Fall through to object values.
+    }
+  }
+
+  if (entries.length === 0 && typeof senses === 'object') {
+    for (const [type, sense] of Object.entries(senses)) addEntry(type, sense);
+  }
+
+  return entries
+    .map((entry) => stableNormalize(entry))
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+
+export function buildPreparedSensesSignature(actorOrSenses) {
+  const senses = actorOrSenses?.perception?.senses ?? actorOrSenses;
+  return stableStringify(normalizePreparedSensesForSignature(senses));
+}
+
 function getActorConditions(actor) {
   const entries = [];
   const addCondition = (condition) => {
@@ -129,6 +221,7 @@ function buildTokenSenseSignature(token) {
       type: actor?.type ?? null,
       conditions: getActorConditions(actor),
       system: getActorSensesSystemSignature(actor),
+      preparedSenses: normalizePreparedSensesForSignature(actor?.perception?.senses),
     },
   };
 }

@@ -162,7 +162,7 @@ describe('AVS token refresh service', () => {
     expect(perception.update).not.toHaveBeenCalled();
   });
 
-  test('recalculates token ids through the runtime AVS service without override validation', async () => {
+  test('recalculates token ids through the runtime AVS service without forcing perception refresh', async () => {
     const refreshService = service.createAvsTokenRefreshService({
       getWindowAutoVisibilitySystem: () => windowAutoVisibilitySystem,
       getCanvasPerception: () => perception,
@@ -174,6 +174,7 @@ describe('AVS token refresh service', () => {
     expect(overrideValidationManager.queueOverrideValidation).not.toHaveBeenCalled();
     expect(perception.update).not.toHaveBeenCalled();
     expect(result.windowRecalculated).toBe(true);
+    expect(result.perceptionRefreshed).toBe(false);
   });
 
   test('runtime token recalculation falls back to perception when AVS is unavailable', async () => {

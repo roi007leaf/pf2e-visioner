@@ -175,6 +175,7 @@ const pendingMovementRefreshScheduler = {
 function restorePendingMovementOcclusionOnlyPerceptionSuppression() {
   const state = pendingMovementOcclusionOnlyPerceptionSuppression;
   if (!state) return;
+  flushSuppressedControlSelectionPerceptionUpdate(state);
   if (state.perception?.update === state.wrappedUpdate) {
     state.perception.update = state.originalUpdate;
   }
@@ -182,6 +183,46 @@ function restorePendingMovementOcclusionOnlyPerceptionSuppression() {
     state.perception.applyRenderFlags = state.originalApplyRenderFlags;
   }
   pendingMovementOcclusionOnlyPerceptionSuppression = null;
+}
+
+function isControlSelectionPerceptionUpdate(flags) {
+  if (!flags || typeof flags !== 'object') return false;
+  if (flags.refreshVision !== true) return false;
+
+  return !!(
+    Object.prototype.hasOwnProperty.call(flags, 'initializeVisionModes') ||
+    Object.prototype.hasOwnProperty.call(flags, 'initializeVision') ||
+    Object.prototype.hasOwnProperty.call(flags, 'initializeLightSources') ||
+    flags.refreshLighting === true ||
+    flags.refreshSounds === true ||
+    flags.refreshPrimary === true
+  );
+}
+
+function flushSuppressedControlSelectionPerceptionUpdate(state) {
+  if (!state) return;
+  if (state.selectionFlushTimer !== null) {
+    clearTimeout(state.selectionFlushTimer);
+    state.selectionFlushTimer = null;
+  }
+
+  const flags = state.suppressedSelectionFlags;
+  state.suppressedSelectionFlags = null;
+  if (!flags) return;
+
+  state.originalUpdate.call(state.perception, flags);
+}
+
+function scheduleSuppressedControlSelectionPerceptionFlush(state) {
+  if (!state) return;
+  if (state.selectionFlushTimer !== null) {
+    clearTimeout(state.selectionFlushTimer);
+  }
+
+  state.selectionFlushTimer = setTimeout(() => {
+    if (pendingMovementOcclusionOnlyPerceptionSuppression !== state) return;
+    flushSuppressedControlSelectionPerceptionUpdate(state);
+  }, state.selectionFlushDelayMs);
 }
 
 function requestPendingMovementCoreAnimationFrame(callback) {
@@ -4669,7 +4710,10 @@ function mergePerceptionUpdateFlags(base, next) {
   return merged;
 }
 
-function installOcclusionOnlyPerceptionSuppression(durationMs = 400) {
+export function installOcclusionOnlyPerceptionSuppression(
+  durationMs = 400,
+  { coalesceSelectionRefresh = false, selectionFlushDelayMs = 180 } = {},
+) {
   const perception = canvas?.perception;
   const originalUpdate = perception?.update;
   const originalApplyRenderFlags = perception?.applyRenderFlags;
@@ -4687,20 +4731,41 @@ function installOcclusionOnlyPerceptionSuppression(durationMs = 400) {
       pendingMovementOcclusionOnlyPerceptionSuppression.expiresAt,
       now + durationMs,
     );
+    pendingMovementOcclusionOnlyPerceptionSuppression.coalesceSelectionRefresh =
+      pendingMovementOcclusionOnlyPerceptionSuppression.coalesceSelectionRefresh ||
+      coalesceSelectionRefresh;
+    pendingMovementOcclusionOnlyPerceptionSuppression.selectionFlushDelayMs =
+      selectionFlushDelayMs;
     return true;
   }
 
   const state = {
+    coalesceSelectionRefresh,
     originalApplyRenderFlags,
     perception,
     originalUpdate,
     expiresAt: now + durationMs,
+    selectionFlushDelayMs,
+    selectionFlushTimer: null,
+    suppressedSelectionFlags: null,
     wrappedApplyRenderFlags: null,
     wrappedUpdate: null,
   };
 
   state.wrappedUpdate = function wrappedPendingMovementPerceptionUpdate(flags, ...args) {
     if (Date.now() <= state.expiresAt && isOcclusionOnlyPerceptionUpdate(flags)) {
+      return undefined;
+    }
+    if (
+      Date.now() <= state.expiresAt &&
+      state.coalesceSelectionRefresh &&
+      isControlSelectionPerceptionUpdate(flags)
+    ) {
+      state.suppressedSelectionFlags = mergePerceptionUpdateFlags(
+        state.suppressedSelectionFlags,
+        flags,
+      );
+      scheduleSuppressedControlSelectionPerceptionFlush(state);
       return undefined;
     }
     const callOriginal = () => state.originalUpdate.call(this, flags, ...args);

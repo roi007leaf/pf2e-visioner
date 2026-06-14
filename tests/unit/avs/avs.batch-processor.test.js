@@ -11,6 +11,16 @@ import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibili
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
 
+function preparedSense(type, { acuity = 'imprecise', range = 60 } = {}) {
+  const sense = { key: type };
+  Object.defineProperty(sense, 'value', {
+    configurable: true,
+    enumerable: false,
+    value: { type, acuity, range, source: null },
+  });
+  return sense;
+}
+
 describe('buildTokenPositionCacheKey', () => {
   let previousCanvas;
 
@@ -593,6 +603,23 @@ describe('BatchProcessor', () => {
     const firstCache = processor._persistentCaches.sensesCache;
 
     tA.actor.itemTypes.condition = [{ slug: 'deafened' }];
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+    expect(processor._persistentCaches.sensesCache).not.toBe(firstCache);
+  });
+
+  test('rebuilds senses cache inside TTL when prepared Sense.value changes', async () => {
+    const [tA] = global.canvas.tokens.placeables;
+    const tremorsense = preparedSense('tremorsense', { acuity: 'precise', range: 60 });
+    tA.actor.perception = {
+      senses: new Map([['tremorsense', tremorsense]]),
+    };
+
+    await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    const firstCache = processor._persistentCaches.sensesCache;
+
+    tremorsense.value.acuity = 'imprecise';
+    tremorsense.value.range = 30;
     await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
 
     expect(processor._persistentCaches.sensesCache).not.toBe(firstCache);

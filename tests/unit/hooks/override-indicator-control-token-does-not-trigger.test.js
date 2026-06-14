@@ -309,13 +309,13 @@ describe('Override indicator should not trigger on controlToken', () => {
 
         trackerCb(token, true);
         recalcCb(token, true);
-        jest.advanceTimersByTime(100);
+        jest.advanceTimersByTime(180);
 
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .toHaveBeenCalledWith(['t1']);
     });
 
-    test('controlToken AVS recalculation runs on the next tick, not after a visible delay', async () => {
+    test('controlToken AVS recalculation is debounced during rapid selection changes', async () => {
         const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
         await onCanvasReady();
 
@@ -341,7 +341,12 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .not.toHaveBeenCalled();
 
-        jest.advanceTimersByTime(0);
+        jest.advanceTimersByTime(179);
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(1);
 
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .toHaveBeenCalledWith(['t1']);
@@ -386,7 +391,7 @@ describe('Override indicator should not trigger on controlToken', () => {
 
         trackerCb(token, true);
         recalcCb(token, true);
-        jest.advanceTimersByTime(0);
+        jest.advanceTimersByTime(180);
         await Promise.resolve();
         await Promise.resolve();
 
@@ -438,7 +443,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(updateSystemHiddenTokenHighlights).not.toHaveBeenCalled();
 
         recalcCb(token, true);
-        jest.advanceTimersByTime(0);
+        jest.advanceTimersByTime(180);
         for (let i = 0; i < 5; i += 1) {
             await Promise.resolve();
         }
@@ -448,7 +453,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         expect(updateSystemHiddenTokenHighlights).toHaveBeenCalledWith('t1');
     });
 
-    test('controlToken immediately settles pending hidden render locks for the new observer', async () => {
+    test('controlToken debounces pending hidden render locks for the new observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
@@ -471,22 +476,34 @@ describe('Override indicator should not trigger on controlToken', () => {
         const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
             String(cb).includes('allowControlledFallback'),
         );
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
 
         expect(restoreIndicatorsCb).toBeTruthy();
 
         const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
         global.canvas.tokens.controlled = [token];
 
+        trackerCb(token, true);
         await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(179);
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(1);
 
         expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
             ignoreObservedGrace: true,
             source: 'control-token-session',
             targetTokenIds: ['target'],
+            skipPerceptionRefresh: true,
         });
     });
 
-    test('controlToken settles stale observed soundwaves without pending render work', async () => {
+    test('controlToken debounces stale observed soundwave cleanup without pending render work', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             getControlledObserverDetectionVisualTargetIds: jest.fn(() => []),
@@ -509,13 +526,24 @@ describe('Override indicator should not trigger on controlToken', () => {
         const restoreIndicatorsCb = controlTokenCbs.find((cb) =>
             String(cb).includes('allowControlledFallback'),
         );
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
 
         expect(restoreIndicatorsCb).toBeTruthy();
 
         const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
         global.canvas.tokens.controlled = [token];
 
+        trackerCb(token, true);
         await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(179);
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(1);
 
         expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
             ignoreObservedGrace: true,
@@ -524,7 +552,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         });
     });
 
-    test('controlToken immediately refreshes hidden targets for selected observer', async () => {
+    test('controlToken debounces hidden target refresh for selected observer', async () => {
         const refreshPendingMovementTokenVisibility = jest.fn();
         jest.doMock('../../../scripts/services/PendingMovement/pending-movement-render-lock.js', () => ({
             getControlledObserverDetectionVisualTargetIds: jest.fn(() => ['alon', 'centipede']),
@@ -543,13 +571,25 @@ describe('Override indicator should not trigger on controlToken', () => {
             .filter((c) => c?.[0] === 'controlToken')
             .map((c) => c?.[1])
             .find((cb) => String(cb).includes('allowControlledFallback'));
+        const trackerCb = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .find((cb) => String(cb).includes('trackControlTokenSession'));
 
         expect(restoreIndicatorsCb).toBeTruthy();
 
         const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
         global.canvas.tokens.controlled = [token];
 
+        trackerCb(token, true);
         await restoreIndicatorsCb(token, true);
+
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(179);
+        expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(1);
 
         expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
             ignoreObservedGrace: true,
@@ -589,7 +629,7 @@ describe('Override indicator should not trigger on controlToken', () => {
         trackerCb(token, false);
         recalcCb(token, false);
 
-        jest.advanceTimersByTime(100);
+        jest.advanceTimersByTime(200);
 
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .not.toHaveBeenCalled();
@@ -760,7 +800,12 @@ describe('Override indicator should not trigger on controlToken', () => {
         trackerCb(tokenB, true);
         recalcCb(tokenB, true);
 
-        jest.advanceTimersByTime(100);
+        jest.advanceTimersByTime(179);
+
+        expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
+            .not.toHaveBeenCalled();
+
+        jest.advanceTimersByTime(1);
 
         expect(global.window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens)
             .toHaveBeenCalledTimes(1);

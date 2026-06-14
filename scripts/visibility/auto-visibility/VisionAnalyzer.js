@@ -1961,11 +1961,13 @@ export class VisionAnalyzer {
     if (!senses) return [];
 
     if (Array.isArray(senses)) {
-      return senses;
+      return senses.map((sense) => this.#normalizeSenseEntry(sense?.type ?? sense?.key, sense));
     }
 
     if (Array.isArray(senses.contents)) {
-      return senses.contents;
+      return senses.contents.map((sense) =>
+        this.#normalizeSenseEntry(sense?.type ?? sense?.key, sense),
+      );
     }
 
     if (typeof senses.entries === 'function') {
@@ -1980,7 +1982,9 @@ export class VisionAnalyzer {
 
     if (typeof senses.values === 'function') {
       try {
-        return Array.from(senses.values());
+        return Array.from(senses.values()).map((sense) =>
+          this.#normalizeSenseEntry(sense?.type ?? sense?.key, sense),
+        );
       } catch {
         // Fall through to other collection shapes.
       }
@@ -1988,7 +1992,12 @@ export class VisionAnalyzer {
 
     if (typeof senses[Symbol.iterator] === 'function') {
       try {
-        return Array.from(senses);
+        return Array.from(senses).map((entry) => {
+          if (Array.isArray(entry) && entry.length >= 2) {
+            return this.#normalizeSenseEntry(entry[0], entry[1]);
+          }
+          return this.#normalizeSenseEntry(entry?.type ?? entry?.key, entry);
+        });
       } catch {
         // Fall through to object values.
       }
@@ -2017,9 +2026,24 @@ export class VisionAnalyzer {
 
   #normalizeSenseEntry(type, sense) {
     if (sense && typeof sense === 'object') {
+      const value = sense.value && typeof sense.value === 'object' ? sense.value : null;
+      const source = sense.source && typeof sense.source === 'object' ? sense.source : null;
+      const data = value ?? sense;
+      const resolvedRange = data.range ?? sense.range ?? source?.range;
+      const resolvedAcuity = data.acuity ?? sense.acuity ?? source?.acuity;
+
       return {
         ...sense,
-        type: sense.type ?? sense.slug ?? sense.id ?? type,
+        type:
+          data.type ??
+          sense.type ??
+          sense.slug ??
+          sense.id ??
+          sense.key ??
+          source?.type ??
+          type,
+        ...(resolvedRange !== undefined ? { range: resolvedRange } : {}),
+        ...(resolvedAcuity !== undefined ? { acuity: resolvedAcuity } : {}),
       };
     }
 

@@ -134,11 +134,21 @@ export class SensingCapabilitiesBuilder {
         if (Array.isArray(senses)) {
             // NPC format: array of sense objects
             for (const sense of senses) {
-                const type = sense?.type ?? sense?.slug ?? sense?.name ?? sense?.label ?? sense?.id;
+                const value = sense?.value && typeof sense.value === 'object' ? sense.value : null;
+                const source = sense?.source && typeof sense.source === 'object' ? sense.source : null;
+                const type =
+                    value?.type ??
+                    sense?.type ??
+                    sense?.slug ??
+                    sense?.name ??
+                    sense?.label ??
+                    sense?.id ??
+                    sense?.key ??
+                    source?.type;
                 if (!type) continue;
 
-                const acuity = sense?.acuity ?? sense?.value?.acuity ?? IMPRECISE;
-                const range = sense?.range ?? sense?.value?.range ?? Infinity;
+                const acuity = value?.acuity ?? sense?.acuity ?? source?.acuity ?? IMPRECISE;
+                const range = value?.range ?? sense?.range ?? source?.range ?? Infinity;
 
                 this.#addSense(capabilities, {
                     type,
@@ -150,11 +160,19 @@ export class SensingCapabilitiesBuilder {
         } else if (typeof senses === 'object') {
             // PC format: object with sense keys
             for (const [type, senseData] of Object.entries(senses)) {
-                const acuity = senseData?.acuity ?? senseData?.value ?? IMPRECISE;
-                const range = senseData?.range ?? Infinity;
+                const value =
+                    senseData?.value && typeof senseData.value === 'object' ? senseData.value : null;
+                const source =
+                    senseData?.source && typeof senseData.source === 'object' ? senseData.source : null;
+                const acuity =
+                    value?.acuity ??
+                    senseData?.acuity ??
+                    source?.acuity ??
+                    (typeof senseData?.value === 'string' ? senseData.value : IMPRECISE);
+                const range = value?.range ?? senseData?.range ?? source?.range ?? Infinity;
 
                 this.#addSense(capabilities, {
-                    type,
+                    type: value?.type ?? senseData?.type ?? senseData?.key ?? source?.type ?? type,
                     acuity,
                     range,
                     allowOverride: true,
