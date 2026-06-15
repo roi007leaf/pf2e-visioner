@@ -31,6 +31,17 @@ describe('Search exploration Seek automation helpers', () => {
 
     expect(
       actorHasSearchExplorationActivity({
+        system: { exploration: ['search-item-id'] },
+        items: {
+          get: jest.fn((id) =>
+            id === 'search-item-id' ? { id, slug: 'search', name: 'Search' } : null,
+          ),
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      actorHasSearchExplorationActivity({
         system: { exploration: [] },
         items: [{ slug: 'expeditious-search', name: 'Expeditious Search' }],
       }),

@@ -107,6 +107,25 @@ function collectionHasSearchExplorationEffect(collection, requireEffectType = fa
   });
 }
 
+function resolveActorItem(actor, itemId) {
+  if (!actor || !itemId) return null;
+  try {
+    const direct = actor.items?.get?.(itemId);
+    if (direct) return direct;
+  } catch {}
+
+  return (
+    collectionValues(actor.items).find((item) => item?.id === itemId || item?._id === itemId) ||
+    null
+  );
+}
+
+function activeExplorationIdsIncludeSearchActivity(actor) {
+  const exploration = actor?.system?.exploration;
+  const activeIds = collectionValues(exploration).filter((entry) => typeof entry === 'string');
+  return activeIds.some((id) => objectLooksLikeSearchActivity(resolveActorItem(actor, id)));
+}
+
 function createActorSearchActivityReader() {
   const cache = new WeakMap();
   return (actor) => {
@@ -130,7 +149,12 @@ export function actorHasSearchExplorationActivity(actor) {
       actor.flags?.pf2e?.party?.exploration,
     ];
 
-    if (candidates.some((candidate) => valueHasSearchActivity(candidate))) return true;
+    if (
+      candidates.some((candidate) => valueHasSearchActivity(candidate)) ||
+      activeExplorationIdsIncludeSearchActivity(actor)
+    ) {
+      return true;
+    }
 
     return (
       collectionHasSearchExplorationEffect(actor.itemTypes?.effect) ||
