@@ -1,6 +1,8 @@
 import '../../setup.js';
 
 import {
+  actorHasConditionSlug,
+  clearActorConditionSlugCache,
   createDefaultHearingSense,
   effectiveHearingRange,
   hearingSenseForVisibility,
@@ -25,6 +27,7 @@ describe('sense distance', () => {
   });
 
   afterEach(() => {
+    clearActorConditionSlugCache();
     global.canvas = previousCanvas;
   });
 
@@ -73,5 +76,27 @@ describe('sense distance', () => {
 
     expect(observerCanHearTarget(observer, nearTarget)).toBe(true);
     expect(observerCanHearTarget(observer, farTarget)).toBe(false);
+  });
+
+  test('caches actor condition lookups until cleared', () => {
+    let items = [{ slug: 'blinded' }];
+    const actor = {
+      hasCondition: jest.fn(() => false),
+      items: {
+        values: jest.fn(() => items),
+      },
+    };
+
+    expect(actorHasConditionSlug(actor, 'blinded')).toBe(true);
+    expect(actorHasConditionSlug(actor, 'blinded')).toBe(true);
+    expect(actor.hasCondition).toHaveBeenCalledTimes(1);
+    expect(actor.items.values).toHaveBeenCalledTimes(1);
+
+    items = [{ slug: 'deafened' }];
+    clearActorConditionSlugCache(actor);
+
+    expect(actorHasConditionSlug(actor, 'deafened')).toBe(true);
+    expect(actor.hasCondition).toHaveBeenCalledTimes(2);
+    expect(actor.items.values).toHaveBeenCalledTimes(2);
   });
 });

@@ -46,6 +46,25 @@ export function pendingHearingAllowsImpreciseSoundwave(
   }
 }
 
+export function pendingHearingCanReachTargetThroughSoundPath(
+  observer,
+  target,
+  { gridSize = 100 } = {},
+) {
+  try {
+    if (!observerCanHearTarget(observer, target, { gridSize })) return false;
+    const observerCenter = observer?.center;
+    const targetCenter = target?.center;
+    if (!observerCenter || !targetCenter) return false;
+    return !lineOfSoundBlockedByWall(observerCenter, targetCenter, {
+      originToken: observer,
+      targetToken: target,
+    });
+  } catch {
+    return false;
+  }
+}
+
 function tokenDocOf(tokenOrDoc) {
   return tokenOrDoc?.document || tokenOrDoc || null;
 }

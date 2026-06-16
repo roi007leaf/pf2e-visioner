@@ -13,6 +13,7 @@ import {
   targetHasAnyHiddenAvsOverride,
   targetIsRenderHiddenForCurrentViewObserver,
   targetQualifiesForLiveImpreciseSoundwave,
+  targetShouldKeepCoreObservedHiddenSoundwave,
   targetYieldsToLiveSightDuringPendingMovement,
 } from '../PendingMovement/pending-token-movement.js';
 import { clearDetectionFilterVisuals } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
@@ -40,6 +41,7 @@ function hasObserverAvsOverride(observer, target) {
 
 function shouldKeepCoreAddedLiveImpreciseSoundwave(token) {
   if (!token?.detectionFilter) return false;
+  if (targetShouldKeepCoreObservedHiddenSoundwave(token)) return true;
   if (!targetHasDetectionBlockingStoredVisibilityState(token)) return false;
 
   const targetId = tokenIdOf(token);
@@ -52,6 +54,19 @@ function shouldKeepCoreAddedLiveImpreciseSoundwave(token) {
     if (pendingObserverCanSenseTargetImprecisely(observer, token)) return true;
   }
   return false;
+}
+
+function showDetectionFilterMesh(token) {
+  const mesh = token?.detectionFilterMesh;
+  if (!mesh) return;
+
+  try {
+    if ('visible' in mesh) mesh.visible = true;
+    if ('renderable' in mesh) mesh.renderable = true;
+    if ('alpha' in mesh) mesh.alpha = 1;
+  } catch {
+    /* best-effort */
+  }
 }
 
 function hideDetectionFilterMesh(token) {
@@ -76,7 +91,10 @@ export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
       () => {
         hideDetectionFilterMesh(this);
         const result = wrapped(...args);
-        if (shouldKeepCoreAddedLiveImpreciseSoundwave(this)) return result;
+        if (shouldKeepCoreAddedLiveImpreciseSoundwave(this)) {
+          showDetectionFilterMesh(this);
+          return result;
+        }
         hideDetectionFilterMesh(this);
         return result;
       },
@@ -125,6 +143,13 @@ export function wrapTokenRenderDetectionFilter(wrapped, ...args) {
   }
   if (targetHasAnyHiddenAvsOverride(this)) {
     return withStableHiddenDetectionFilterAnimation(this, () => wrapped(...args));
+  }
+  if (targetShouldKeepCoreObservedHiddenSoundwave(this)) {
+    return withStableHiddenDetectionFilterAnimation(this, () => {
+      const result = wrapped(...args);
+      if (this?.detectionFilter) showDetectionFilterMesh(this);
+      return result;
+    });
   }
   return withStableHiddenDetectionFilterAnimation(this, () =>
     withSuppressedPendingMovementDetectionFilterRender(this, () => wrapped(...args)),

@@ -4,9 +4,12 @@ import { wrapTokenRenderDetectionFilter } from '../../../scripts/services/Detect
 import {
   clearPendingTokenMovementPosition,
   completePendingTokenMovement,
+  currentPendingMovementSightLineSeesTarget,
+  pendingObserverCanSenseTargetImprecisely,
   primePendingControlledTokenDragIntent,
   releasePendingControlledTokenDragIntent,
   setPendingTokenMovementPosition,
+  targetShouldKeepCoreObservedHiddenSoundwave,
   targetIsRenderHiddenForCurrentViewObserver,
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
@@ -87,6 +90,71 @@ describe('detection filter render wrapper', () => {
         alpha: 1,
       });
       expect(target.mesh.alpha).toBe(1);
+    } finally {
+      visionSpy.mockRestore();
+    }
+  });
+
+  test('primes observed-to-hidden soundwave mesh when native filter appears after sound-open wall move', () => {
+    const visionSpy = jest.spyOn(VisionAnalyzer, 'getInstance').mockReturnValue({
+      getVisionCapabilities: jest.fn(() => ({ hasVision: true, isDeafened: false })),
+      getSensingCapabilities: jest.fn(() => ({ imprecise: {}, precise: {} })),
+    });
+    try {
+      const observer = createMockToken({
+        id: 'observer',
+        x: 0,
+        y: 0,
+        controlled: true,
+        flags: visibilityV2Flags({ target: 'observed' }),
+      });
+      observer.center = { x: 25, y: 25 };
+      const target = createMockToken({ id: 'target', x: 3, y: 0, visible: true });
+      target.center = { x: 175, y: 25 };
+      target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 175, y: 25 }]);
+      target.mesh = { visible: true, renderable: true, alpha: 1 };
+      target.detectionFilter = null;
+      target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      global.canvas = {
+        ...global.canvas,
+        grid: { size: 50 },
+        scene: { ...global.canvas.scene, grid: { distance: 5 } },
+        walls: {
+          placeables: [
+            createMockWall({ id: 'sight-wall', c: [100, -100, 100, 200], sight: 1, sound: 0 }),
+          ],
+        },
+        effects: {
+          visionSources: new Map(),
+          lightSources: new Map(),
+        },
+        tokens: {
+          get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+          _draggedToken: null,
+          controlled: [observer],
+          placeables: [observer, target],
+        },
+      };
+      setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+        finalVisibilityStatesByTargetId: { target: 'hidden' },
+      });
+      target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+      const soundwaveFilter = { id: 'native-hearing-soundwave-filter' };
+      const wrapped = jest.fn(() => {
+        target.detectionFilter = soundwaveFilter;
+        return 'rendered';
+      });
+
+      expect(currentPendingMovementSightLineSeesTarget(observer, target)).toBe(false);
+      expect(pendingObserverCanSenseTargetImprecisely(observer, target)).toBe(false);
+      expect(targetShouldKeepCoreObservedHiddenSoundwave(target)).toBe(true);
+      expect(wrapTokenRenderDetectionFilter.call(target, wrapped, 'renderer')).toBe('rendered');
+      expect(target.detectionFilter).toBe(soundwaveFilter);
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: true,
+        renderable: true,
+        alpha: 1,
+      });
     } finally {
       visionSpy.mockRestore();
     }

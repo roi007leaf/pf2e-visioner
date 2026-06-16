@@ -2,6 +2,7 @@ import { doesWallSenseBlockFromPoint, getWallSenseTypes } from '../../helpers/wa
 import { LevelsIntegration } from '../LevelsIntegration.js';
 
 const pendingMovementWallRayCacheStack = [];
+let pendingMovementWallGeometryCache = null;
 
 function activeWallRayCache() {
   return pendingMovementWallRayCacheStack[pendingMovementWallRayCacheStack.length - 1] ?? null;
@@ -15,10 +16,10 @@ function pointCacheKey(point) {
   return `${x},${y},${Number.isFinite(elevation) ? elevation : 0}`;
 }
 
-function wallRayCacheKey(originPoint, targetPoint) {
+function wallRayCacheKey(originPoint, targetPoint, senseKey = 'all') {
   const originKey = pointCacheKey(originPoint);
   const targetKey = pointCacheKey(targetPoint);
-  return originKey && targetKey ? `${originKey}>${targetKey}` : null;
+  return originKey && targetKey ? `${senseKey}:${originKey}>${targetKey}` : null;
 }
 
 function hasPointCollisionTokenContext(options = {}) {
@@ -79,7 +80,133 @@ export function withPendingMovementWallRayCache(callback) {
   }
 }
 
-function wallSensePassage(wall, sourcePoint, targetPoint, senseType, { customOnly = false } = {}) {
+export function clearPendingMovementWallGeometryCache() {
+  pendingMovementWallGeometryCache = null;
+}
+
+function limitedOrThresholdWallSense(wallSense, senseTypes = getWallSenseTypes()) {
+  return (
+    wallSense === Number(senseTypes.LIMITED ?? 10) ||
+    wallSense === Number(senseTypes.PROXIMITY ?? 30) ||
+    wallSense === Number(senseTypes.DISTANCE ?? 40)
+  );
+}
+
+function buildWallGeometryIndex() {
+  const walls = canvas?.walls?.placeables || [];
+  const senseTypes = getWallSenseTypes();
+  const openSense = Number(senseTypes.NONE ?? 0);
+  const entries = [];
+  const bySense = {
+    sight: { all: [], custom: [] },
+    sound: { all: [], custom: [] },
+  };
+  const hasBlocking = { sight: false, sound: false };
+  const hasLimitedOrThreshold = { sight: false, sound: false };
+
+  for (const wall of walls) {
+    const doc = wall?.document || wall;
+    if (!doc || wallIsOpenDoor(doc)) continue;
+
+    const sightSense = wallSenseValue(doc, 'sight', senseTypes);
+    const soundSense = wallSenseValue(doc, 'sound', senseTypes);
+    const sightBlocks = sightSense !== openSense;
+    const soundBlocks = soundSense !== openSense;
+    if (!sightBlocks && !soundBlocks) continue;
+
+    const sightCustom = limitedOrThresholdWallSense(sightSense, senseTypes);
+    const soundCustom = limitedOrThresholdWallSense(soundSense, senseTypes);
+    const entry = {
+      wall,
+      doc,
+      sense: {
+        sight: { blocks: sightBlocks, custom: sightCustom },
+        sound: { blocks: soundBlocks, custom: soundCustom },
+      },
+      segment: null,
+      segmentResolved: false,
+    };
+    entries.push(entry);
+
+    if (sightBlocks) {
+      bySense.sight.all.push(entry);
+      hasBlocking.sight = true;
+      if (sightCustom) {
+        bySense.sight.custom.push(entry);
+        hasLimitedOrThreshold.sight = true;
+      }
+    }
+    if (soundBlocks) {
+      bySense.sound.all.push(entry);
+      hasBlocking.sound = true;
+      if (soundCustom) {
+        bySense.sound.custom.push(entry);
+        hasLimitedOrThreshold.sound = true;
+      }
+    }
+  }
+
+  return {
+    source: walls,
+    length: Number.isFinite(walls?.length) ? walls.length : null,
+    entries,
+    bySense,
+    hasBlocking,
+    hasLimitedOrThreshold,
+  };
+}
+
+function getWallGeometryIndex() {
+  const walls = canvas?.walls?.placeables || [];
+  const length = Number.isFinite(walls?.length) ? walls.length : null;
+  if (
+    pendingMovementWallGeometryCache?.source === walls &&
+    (length === null || pendingMovementWallGeometryCache.length === length)
+  ) {
+    return pendingMovementWallGeometryCache;
+  }
+
+  pendingMovementWallGeometryCache = buildWallGeometryIndex();
+  return pendingMovementWallGeometryCache;
+}
+
+function wallEntriesForSense(senseType, customOnly = false) {
+  const index = getWallGeometryIndex();
+  if (senseType === 'sight' || senseType === 'sound') {
+    return index.bySense[senseType][customOnly ? 'custom' : 'all'];
+  }
+  return index.entries;
+}
+
+function resolveWallSegment(entry) {
+  if (!entry || entry.segmentResolved) return entry?.segment ?? null;
+  entry.segmentResolved = true;
+
+  const doc = entry.doc;
+  const rawCoords = doc?.c;
+  const coords = Array.isArray(rawCoords) ? rawCoords : [doc?.x, doc?.y, doc?.x2, doc?.y2];
+  const [x1, y1, x2, y2] = coords.map(Number);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+
+  entry.segment = {
+    coords: [x1, y1, x2, y2],
+    start: { x: x1, y: y1 },
+    end: { x: x2, y: y2 },
+    minX: Math.min(x1, x2),
+    maxX: Math.max(x1, x2),
+    minY: Math.min(y1, y2),
+    maxY: Math.max(y1, y2),
+  };
+  return entry.segment;
+}
+
+function wallSensePassage(
+  wall,
+  sourcePoint,
+  targetPoint,
+  senseType,
+  { customOnly = false, coordsOverride = null } = {},
+) {
   const doc = wall?.document || wall;
   if (!doc) return 'open';
 
@@ -97,7 +224,8 @@ function wallSensePassage(wall, sourcePoint, targetPoint, senseType, { customOnl
   if (customOnly && !isLimitedSense && !isThresholdSense) return 'open';
 
   if (isThresholdSense) {
-    const coords = Array.isArray(doc.c) ? doc.c : [doc.x, doc.y, doc.x2, doc.y2];
+    const rawCoords = coordsOverride || doc.c;
+    const coords = Array.isArray(rawCoords) ? rawCoords : [doc.x, doc.y, doc.x2, doc.y2];
     return doesWallSenseBlockFromPoint(doc, sourcePoint, coords, senseType, {
       targetPoint,
       system: 'pending-movement',
@@ -121,34 +249,11 @@ function wallSenseValue(doc, senseType, senseTypes = getWallSenseTypes()) {
 }
 
 export function sceneHasBlockingWallSense(senseType) {
-  const senseTypes = getWallSenseTypes();
-  const openSense = Number(senseTypes.NONE ?? 0);
-
-  for (const wall of canvas?.walls?.placeables || []) {
-    const doc = wall?.document || wall;
-    if (!doc || wallIsOpenDoor(doc)) continue;
-    if (wallSenseValue(doc, senseType, senseTypes) !== openSense) return true;
-  }
-
-  return false;
+  return !!getWallGeometryIndex().hasBlocking?.[senseType];
 }
 
 export function sceneHasLimitedOrThresholdWallSense(senseType) {
-  const senseTypes = getWallSenseTypes();
-  const limitedSense = Number(senseTypes.LIMITED ?? 10);
-  const thresholdSenses = new Set([
-    Number(senseTypes.PROXIMITY ?? 30),
-    Number(senseTypes.DISTANCE ?? 40),
-  ]);
-
-  for (const wall of canvas?.walls?.placeables || []) {
-    const doc = wall?.document || wall;
-    if (!doc || wallIsOpenDoor(doc)) continue;
-    const wallSense = wallSenseValue(doc, senseType, senseTypes);
-    if (wallSense === limitedSense || thresholdSenses.has(wallSense)) return true;
-  }
-
-  return false;
+  return !!getWallGeometryIndex().hasLimitedOrThreshold?.[senseType];
 }
 
 function cross(first, second) {
@@ -168,30 +273,38 @@ function segmentIntersectionParameter(a, b, c, d) {
   return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : null;
 }
 
-function intersectingWallHits(originPoint, targetPoint) {
+function intersectingWallHits(originPoint, targetPoint, { senseType = null, customOnly = false } = {}) {
   if (!originPoint || !targetPoint) return [];
 
   const cache = activeWallRayCache();
-  const cacheKey = cache ? wallRayCacheKey(originPoint, targetPoint) : null;
+  const senseKey = `${senseType || 'all'}:${customOnly ? 'custom' : 'all'}`;
+  const cacheKey = cache ? wallRayCacheKey(originPoint, targetPoint, senseKey) : null;
   if (cacheKey && cache.has(cacheKey)) return cache.get(cacheKey);
 
-  const walls = canvas?.walls?.placeables || [];
+  const rayMinX = Math.min(originPoint.x, targetPoint.x);
+  const rayMaxX = Math.max(originPoint.x, targetPoint.x);
+  const rayMinY = Math.min(originPoint.y, targetPoint.y);
+  const rayMaxY = Math.max(originPoint.y, targetPoint.y);
   const hits = [];
-  for (const wall of walls) {
-    const doc = wall?.document || wall;
-    if (!doc) continue;
-    const coords = Array.isArray(doc.c) ? doc.c : [doc.x, doc.y, doc.x2, doc.y2];
-    const [x1, y1, x2, y2] = coords.map(Number);
-    if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
-
+  for (const entry of wallEntriesForSense(senseType, customOnly)) {
+    const segment = resolveWallSegment(entry);
+    if (
+      !segment ||
+      segment.maxX < rayMinX ||
+      segment.minX > rayMaxX ||
+      segment.maxY < rayMinY ||
+      segment.minY > rayMaxY
+    ) {
+      continue;
+    }
     const distance = segmentIntersectionParameter(
       originPoint,
       targetPoint,
-      { x: x1, y: y1 },
-      { x: x2, y: y2 },
+      segment.start,
+      segment.end,
     );
     if (distance === null) continue;
-    hits.push({ wall, distance });
+    hits.push({ wall: entry.wall, entry, distance });
   }
 
   hits.sort((first, second) => first.distance - second.distance);
@@ -215,14 +328,15 @@ function lineBlockedByWallSense(
     if (coreDecision !== null) return coreDecision;
   }
 
-  const hits = intersectingWallHits(originPoint, targetPoint);
+  const hits = intersectingWallHits(originPoint, targetPoint, { senseType, customOnly });
   let passedLimitedWall = false;
 
-  for (const { wall } of hits) {
+  for (const { wall, entry } of hits) {
     const sourcePoint = senseType === 'sound' ? targetPoint : originPoint;
     const destinationPoint = senseType === 'sound' ? originPoint : targetPoint;
     const passage = wallSensePassage(wall, sourcePoint, destinationPoint, senseType, {
       customOnly,
+      coordsOverride: entry?.segment?.coords,
     });
     if (passage === 'open') continue;
     if (passage === 'block') return true;
@@ -248,14 +362,18 @@ export function lineOfSoundBlockedByWall(originPoint, targetPoint, options = {})
 }
 
 export function lineIntersectsLimitedWall(originPoint, targetPoint, senseType = 'sight') {
-  const hits = intersectingWallHits(originPoint, targetPoint);
+  const hits = intersectingWallHits(originPoint, targetPoint, {
+    senseType,
+    customOnly: true,
+  });
 
-  for (const { wall } of hits) {
+  for (const { wall, entry } of hits) {
     const sourcePoint = senseType === 'sound' ? targetPoint : originPoint;
     const destinationPoint = senseType === 'sound' ? originPoint : targetPoint;
     if (
       wallSensePassage(wall, sourcePoint, destinationPoint, senseType, {
         customOnly: true,
+        coordsOverride: entry?.segment?.coords,
       }) === 'limited'
     ) {
       return true;

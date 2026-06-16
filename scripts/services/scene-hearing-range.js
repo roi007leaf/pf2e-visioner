@@ -1,5 +1,8 @@
 const PF2E_SYSTEM_ID = 'pf2e';
 
+let activeSceneHearingRangeObjectCache = new WeakMap();
+let activeSceneHearingRangeIdCache = new Map();
+
 export function normalizeSceneHearingRange(value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
@@ -36,6 +39,67 @@ function sceneIdOf(scene) {
   return scene?.id ?? scene?._id ?? scene?.value?.id ?? scene?.value?._id ?? null;
 }
 
+function cacheKeyForSceneId(sceneId) {
+  return sceneId ? String(sceneId) : null;
+}
+
+function directSceneRangeSignature(scene) {
+  if (!scene || typeof scene !== 'object') return null;
+
+  const values = [
+    scene.hearingRange,
+    scene.value?.hearingRange,
+    scene.flags?.[PF2E_SYSTEM_ID]?.hearingRange,
+    scene.value?.flags?.[PF2E_SYSTEM_ID]?.hearingRange,
+    scene._source?.flags?.[PF2E_SYSTEM_ID]?.hearingRange,
+    scene.value?._source?.flags?.[PF2E_SYSTEM_ID]?.hearingRange,
+  ];
+  return values.map((value) => String(value ?? '')).join('|');
+}
+
+function getCachedSceneHearingRange(scene, sceneId) {
+  const signature = directSceneRangeSignature(scene);
+  if (scene && (typeof scene === 'object' || typeof scene === 'function')) {
+    const cached = activeSceneHearingRangeObjectCache.get(scene);
+    if (cached && cached.sceneId === sceneId && cached.signature === signature) return cached.range;
+  }
+
+  const idKey = cacheKeyForSceneId(sceneId);
+  if (idKey && activeSceneHearingRangeIdCache.has(idKey)) {
+    const cached = activeSceneHearingRangeIdCache.get(idKey);
+    if (cached.signature === signature) return cached.range;
+  }
+
+  return undefined;
+}
+
+function cacheSceneHearingRange(scene, sceneId, range) {
+  const signature = directSceneRangeSignature(scene);
+  if (scene && (typeof scene === 'object' || typeof scene === 'function')) {
+    activeSceneHearingRangeObjectCache.set(scene, { sceneId, range, signature });
+  }
+
+  const idKey = cacheKeyForSceneId(sceneId);
+  if (idKey) activeSceneHearingRangeIdCache.set(idKey, { range, signature });
+}
+
+export function clearActiveSceneHearingRangeCache(scene = null) {
+  if (!scene) {
+    activeSceneHearingRangeObjectCache = new WeakMap();
+    activeSceneHearingRangeIdCache = new Map();
+    return;
+  }
+
+  if (typeof scene === 'object' || typeof scene === 'function') {
+    activeSceneHearingRangeObjectCache.delete(scene);
+  }
+
+  const idKey = cacheKeyForSceneId(
+    typeof scene === 'string' ? scene : sceneIdOf(scene) ?? scene?.document?.id ?? null,
+  );
+  if (idKey) activeSceneHearingRangeIdCache.delete(idKey);
+}
+
 function sceneCollectionValues(scenes) {
   if (!scenes) return [];
   if (Array.isArray(scenes)) return scenes;
@@ -57,6 +121,10 @@ export function getActiveSceneHearingRange({
   gameRef = globalThis.game,
   sceneId = canvasRef?.scene?.id ?? canvasRef?.scene?._id ?? null,
 } = {}) {
+  const primaryScene = canvasRef?.scene;
+  const cachedRange = getCachedSceneHearingRange(primaryScene, sceneId);
+  if (cachedRange !== undefined) return cachedRange;
+
   const candidates = [];
   const seen = new Set();
   const addCandidate = (scene) => {
@@ -85,9 +153,13 @@ export function getActiveSceneHearingRange({
 
   for (const scene of candidates) {
     const range = readSceneRangeCandidate(scene);
-    if (range !== null) return range;
+    if (range !== null) {
+      cacheSceneHearingRange(primaryScene ?? scene, sceneId, range);
+      return range;
+    }
   }
 
+  cacheSceneHearingRange(primaryScene, sceneId, null);
   return null;
 }
 

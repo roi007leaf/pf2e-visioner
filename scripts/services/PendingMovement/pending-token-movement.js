@@ -54,6 +54,7 @@ import {
 import {
   actorHasConditionSlug,
   observerHasUsableSight,
+  pendingHearingCanReachTargetThroughSoundPath,
   pendingHearingAllowsImpreciseSoundwave,
 } from './pending-movement-observer-senses.js';
 import {
@@ -1247,6 +1248,36 @@ export function targetQualifiesForLiveImpreciseSoundwave(target) {
     if (!observerId || seen.has(observerId) || observerId === tokenIdOf(target)) continue;
     seen.add(observerId);
     if (pairAllowsLiveImpreciseSoundwave(observer, target)) return true;
+  }
+  return false;
+}
+
+export function targetShouldKeepCoreObservedHiddenSoundwave(target) {
+  if (!target?.document?.id) return false;
+  const targetId = tokenIdOf(target);
+  const seen = new Set();
+  for (const observer of currentViewAndPendingMovementObservers()) {
+    const observerId = tokenIdOf(observer);
+    if (!observerId || observerId === targetId || seen.has(observerId)) continue;
+    seen.add(observerId);
+
+    const storedVisibilityState = getStoredVisibilityState(observer, target);
+    if (storedVisibilityState !== 'observed' && storedVisibilityState !== 'concealed') continue;
+
+    const visibilityState =
+      getPredictedFinalVisibilityState(observer, target) ||
+      getRecentCompletedMovementVisibilityStateForObserver(observer, target) ||
+      getPendingMovementVisibilityState(observer, target);
+    if (visibilityState !== 'hidden') continue;
+    if (currentPendingMovementSightLineSeesTarget(observer, target)) continue;
+    if (
+      pendingObserverCanSenseTargetImprecisely(observer, target) ||
+      pendingHearingCanReachTargetThroughSoundPath(observer, target, {
+        gridSize: Number(canvas?.grid?.size) || 100,
+      })
+    ) {
+      return true;
+    }
   }
   return false;
 }

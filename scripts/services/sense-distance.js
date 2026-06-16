@@ -9,6 +9,20 @@ function actorOf(tokenOrDoc) {
   return tokenOrDoc?.actor || tokenDocOf(tokenOrDoc)?.actor || null;
 }
 
+let actorConditionSlugCache = new WeakMap();
+
+export function clearActorConditionSlugCache(tokenOrActor = null) {
+  if (!tokenOrActor) {
+    actorConditionSlugCache = new WeakMap();
+    return;
+  }
+
+  const actor = actorOf(tokenOrActor) || tokenOrActor;
+  if (actor && (typeof actor === 'object' || typeof actor === 'function')) {
+    actorConditionSlugCache.delete(actor);
+  }
+}
+
 function collectionValues(collection) {
   if (!collection) return [];
   if (Array.isArray(collection)) return collection;
@@ -20,7 +34,19 @@ function collectionValues(collection) {
 export function actorHasConditionSlug(actor, slug) {
   if (!actor || !slug) return false;
   const normalizedSlug = String(slug).toLowerCase();
+  if (typeof actor !== 'object' && typeof actor !== 'function') return false;
 
+  const cached = actorConditionSlugCache.get(actor);
+  if (cached?.has(normalizedSlug)) return cached.get(normalizedSlug);
+
+  const result = actorHasConditionSlugUncached(actor, normalizedSlug);
+  const actorCache = cached || new Map();
+  actorCache.set(normalizedSlug, result);
+  actorConditionSlugCache.set(actor, actorCache);
+  return result;
+}
+
+function actorHasConditionSlugUncached(actor, normalizedSlug) {
   try {
     if (actor.hasCondition?.(normalizedSlug)) return true;
   } catch {}

@@ -1,6 +1,7 @@
 import '../../setup.js';
 
 import {
+  clearPendingMovementWallGeometryCache,
   lineIntersectsLimitedWall,
   lineOfSightBlockedByCustomSightWall,
   lineOfSightBlockedByWall,
@@ -68,6 +69,7 @@ describe('pending movement wall sense blocking', () => {
   });
 
   afterEach(() => {
+    clearPendingMovementWallGeometryCache();
     global.canvas = originalCanvas;
     global.CONFIG = originalConfig;
     if (originalConst === undefined) delete global.CONST;
@@ -241,6 +243,51 @@ describe('pending movement wall sense blocking', () => {
     expect(withPendingMovementWallRayCache(() => lineOfSightBlockedByWall(origin, target))).toBe(
       true,
     );
+  });
+
+  test('sound wall checks skip geometry for walls that do not block sound', () => {
+    const soundOpenSightWall = {
+      id: 'sight-only',
+      document: {
+        id: 'sight-only',
+        get c() {
+          throw new Error('sound-open wall geometry should not be read');
+        },
+        sight: WALL_SENSE_TYPES.NORMAL,
+        sound: WALL_SENSE_TYPES.NONE,
+        door: 0,
+        ds: 0,
+      },
+    };
+
+    global.canvas.walls.placeables = [
+      soundOpenSightWall,
+      verticalWall({
+        id: 'sound-blocker',
+        x: 50,
+        sight: WALL_SENSE_TYPES.NONE,
+        sound: WALL_SENSE_TYPES.NORMAL,
+      }),
+    ];
+
+    expect(lineOfSoundBlockedByWall({ x: 0, y: 0 }, { x: 100, y: 0 })).toBe(true);
+  });
+
+  test('wall geometry cache can be cleared after wall sense updates', () => {
+    const wall = verticalWall({
+      id: 'updated-wall',
+      x: 50,
+      sight: WALL_SENSE_TYPES.NONE,
+      sound: WALL_SENSE_TYPES.NONE,
+    });
+    global.canvas.walls.placeables = [wall];
+
+    expect(lineOfSoundBlockedByWall({ x: 0, y: 0 }, { x: 100, y: 0 })).toBe(false);
+
+    wall.document.sound = WALL_SENSE_TYPES.NORMAL;
+    clearPendingMovementWallGeometryCache();
+
+    expect(lineOfSoundBlockedByWall({ x: 0, y: 0 }, { x: 100, y: 0 })).toBe(true);
   });
 
   test('uses v14 core level collision to keep elevated clear sight from being blocked by 2d walls', () => {

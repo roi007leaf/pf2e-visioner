@@ -1,11 +1,8 @@
 import '../../setup.js';
 
-import {
-  actorHasFeature,
-  getActorFeatureSlugs,
-  getActorLevel,
-  normalizeSlug,
-} from '../../../scripts/utils/actor-features.js';
+import * as actorFeatures from '../../../scripts/utils/actor-features.js';
+
+const { actorHasFeature, getActorFeatureSlugs, getActorLevel, normalizeSlug } = actorFeatures;
 
 describe('actor feature helpers', () => {
   test('normalizes feature labels and apostrophes consistently', () => {
@@ -43,6 +40,28 @@ describe('actor feature helpers', () => {
     };
 
     expect(actorHasFeature({ actor }, 'legendary-sneak')).toBe(true);
+  });
+
+  test('caches feature slug scans for the same actor until cleared', () => {
+    let items = [{ type: 'feat', name: 'Blind-Fight' }];
+    const actor = {
+      items: {
+        values: jest.fn(() => items),
+      },
+      getRollOptions: jest.fn(() => []),
+    };
+
+    expect(actorHasFeature(actor, 'blind-fight')).toBe(true);
+    expect(actorHasFeature({ actor }, 'blind-fight')).toBe(true);
+    expect(actor.items.values).toHaveBeenCalledTimes(1);
+    expect(actor.getRollOptions).toHaveBeenCalledTimes(1);
+
+    items = [{ type: 'feat', name: 'Legendary Sneak' }];
+    actorFeatures.clearActorFeatureCache(actor);
+
+    expect(actorHasFeature(actor, 'legendary-sneak')).toBe(true);
+    expect(actor.items.values).toHaveBeenCalledTimes(2);
+    expect(actor.getRollOptions).toHaveBeenCalledTimes(2);
   });
 
   test('reads levels from token or raw actor references', () => {

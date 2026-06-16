@@ -27,6 +27,20 @@ export function resolveActor(tokenOrActor) {
   return null;
 }
 
+let actorFeatureSlugCache = new WeakMap();
+
+export function clearActorFeatureCache(tokenOrActor = null) {
+  if (!tokenOrActor) {
+    actorFeatureSlugCache = new WeakMap();
+    return;
+  }
+
+  const actor = resolveActor(tokenOrActor);
+  if (actor && (typeof actor === 'object' || typeof actor === 'function')) {
+    actorFeatureSlugCache.delete(actor);
+  }
+}
+
 export function getActorItems(actor) {
   const items = actor?.items;
   const resolvedItems = (() => {
@@ -83,22 +97,35 @@ function addFeatureSlugFromRollOption(slugs, option) {
   }
 }
 
-export function getActorFeatureSlugs(tokenOrActor) {
+function buildActorFeatureSlugs(actor) {
+  const slugs = new Set();
+  for (const item of getActorItems(actor)) {
+    if (item?.type === 'feat') {
+      const slug = normalizeSlug(item.system?.slug ?? item.slug ?? item.name);
+      if (slug) slugs.add(slug);
+    } else if (item?.system?.actionType?.value === 'passive') {
+      const slug = normalizeSlug(item.system?.slug ?? item.slug ?? item.name);
+      if (slug) slugs.add(slug);
+    }
+  }
+  for (const option of getActorRollOptions(actor)) {
+    addFeatureSlugFromRollOption(slugs, option);
+  }
+  return slugs;
+}
+
+function getCachedActorFeatureSlugs(tokenOrActor) {
   try {
     const actor = resolveActor(tokenOrActor);
-    const slugs = new Set();
-    for (const item of getActorItems(actor)) {
-      if (item?.type === 'feat') {
-        const slug = normalizeSlug(item.system?.slug ?? item.slug ?? item.name);
-        if (slug) slugs.add(slug);
-      } else if (item?.system?.actionType?.value === 'passive') {
-        const slug = normalizeSlug(item.system?.slug ?? item.slug ?? item.name);
-        if (slug) slugs.add(slug);
-      }
+    if (!actor || (typeof actor !== 'object' && typeof actor !== 'function')) {
+      return new Set();
     }
-    for (const option of getActorRollOptions(actor)) {
-      addFeatureSlugFromRollOption(slugs, option);
-    }
+
+    const cached = actorFeatureSlugCache.get(actor);
+    if (cached) return cached;
+
+    const slugs = buildActorFeatureSlugs(actor);
+    actorFeatureSlugCache.set(actor, slugs);
     return slugs;
   } catch (error) {
     console.warn('PF2E Visioner | Failed to read actor features:', error);
@@ -106,8 +133,12 @@ export function getActorFeatureSlugs(tokenOrActor) {
   }
 }
 
+export function getActorFeatureSlugs(tokenOrActor) {
+  return new Set(getCachedActorFeatureSlugs(tokenOrActor));
+}
+
 export function actorHasFeature(tokenOrActor, slugOrSlugs) {
-  const featureSlugs = getActorFeatureSlugs(tokenOrActor);
+  const featureSlugs = getCachedActorFeatureSlugs(tokenOrActor);
   if (Array.isArray(slugOrSlugs)) {
     return slugOrSlugs.some((slug) => featureSlugs.has(normalizeSlug(slug)));
   }
