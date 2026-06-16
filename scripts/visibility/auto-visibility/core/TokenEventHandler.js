@@ -31,6 +31,40 @@ function getActiveMovementAnimation(token) {
   return null;
 }
 
+const MOVEMENT_ANIMATION_SETTLE_POLL_MS = 25;
+const MOVEMENT_ANIMATION_SETTLE_TIMEOUT_MS = 2000;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getCurrentTokenForAnimation(tokenId, fallbackToken) {
+  try {
+    const currentToken = canvas.tokens?.get?.(tokenId);
+    if (getActiveMovementAnimation(currentToken)) return currentToken;
+  } catch {
+    /* fall through to fallback */
+  }
+  return fallbackToken;
+}
+
+async function waitForMovementAnimationToSettle(token, animation = null) {
+  if (animation?.promise) {
+    try {
+      await animation.promise;
+    } catch {
+      /* ignore animation errors */
+    }
+  }
+
+  const startedAt = Date.now();
+  while (getActiveMovementAnimation(token)) {
+    if (Date.now() - startedAt >= MOVEMENT_ANIMATION_SETTLE_TIMEOUT_MS) return false;
+    await delay(MOVEMENT_ANIMATION_SETTLE_POLL_MS);
+  }
+  return true;
+}
+
 /**
  * Handles token-related events and updates for the auto-visibility system.
  * Manages position changes, light updates, exclusions, and override validations.
@@ -125,12 +159,11 @@ export class TokenEventHandler {
     }
 
     try {
-      if (activeAnimation?.promise && activeAnimation.state !== 'completed') {
-        try {
-          await activeAnimation.promise;
-        } catch {
-          /* ignore animation errors */
-        }
+      if (activeAnimation && activeAnimation.state !== 'completed') {
+        await waitForMovementAnimationToSettle(
+          getCurrentTokenForAnimation(tokenId, token),
+          activeAnimation,
+        );
 
         if (
           this._wasAnimatedMoveHandledRecently(tokenId, movementChanges) ||
@@ -347,7 +380,7 @@ export class TokenEventHandler {
         // CRITICAL: Notify batch orchestrator that token is moving BEFORE we skip
         // This ensures the orchestrator knows to defer batch processing until movement completes
         if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
-          this.batchOrchestrator.notifyTokenMovementStart();
+          this.batchOrchestrator.notifyTokenMovementStart(tokenDoc.id);
         }
 
         // CRITICAL: Store the updated document position BEFORE returning early
@@ -369,6 +402,10 @@ export class TokenEventHandler {
 
           activeAnimation.promise
             .then(async () => {
+              await waitForMovementAnimationToSettle(
+                getCurrentTokenForAnimation(tokenId, tokenDoc.object),
+                activeAnimation,
+              );
               // After animation completes, clear position-dependent caches and trigger visibility recalculation
               try {
                 if (!this._isAnimatedMoveDeferred(tokenId, movementChanges)) return;
@@ -411,7 +448,7 @@ export class TokenEventHandler {
 
       if (options?.method === 'dragging') {
         if (changeFlags.positionChanged && this.batchOrchestrator?.notifyTokenMovementStart) {
-          this.batchOrchestrator.notifyTokenMovementStart();
+          this.batchOrchestrator.notifyTokenMovementStart(tokenDoc.id);
         }
         const movementChanges = { x: newX, y: newY };
         this._storeMovementDestination(tokenDoc, movementChanges);

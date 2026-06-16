@@ -101,6 +101,7 @@ const PENDING_MOVEMENT_CURRENT_SIGHT_LINE_GRACE_MS = 2000;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_DELAY_MS = 50;
 const PENDING_MOVEMENT_ANIMATION_DETECTION_SETTLE_MS = 250;
 const PENDING_MOVEMENT_OCCLUSION_SUPPRESSION_MS = PENDING_MOVEMENT_TTL_MS;
+const PENDING_MOVEMENT_CORE_ANIMATION_RENDER_HIDE_REFRESH_MIN_MS = 200;
 const PENDING_MOVEMENT_REFRESH_VISIBILITY_PERCEPTION_COALESCE_MS = 3000;
 export const DETECTION_BLOCKING_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
@@ -138,6 +139,7 @@ let pendingMovementCoreAnimationPerceptionDepth = 0;
 let pendingMovementCoreAnimationBypassUntil = 0;
 const pendingMovementCoreAnimationVisionRefreshFrames = new Map();
 const pendingMovementCoreAnimationVisionRefreshPositionKeys = new Map();
+const pendingMovementCoreAnimationRenderHideRefreshes = new Map();
 let pendingMovementCanvasVisibilityHandleCache = null;
 let pendingMovementBlockedDetectionEntriesCache = null;
 let pendingMovementHiddenStateContextCache = null;
@@ -248,14 +250,16 @@ function requestPendingMovementCoreAnimationFrame(callback) {
 
 function clearCoreAnimationVisionRefresh(tokenId) {
   const frame = pendingMovementCoreAnimationVisionRefreshFrames.get(tokenId);
-  if (!frame) return;
-  try {
-    frame.cancel?.();
-  } catch {
-    /* best-effort frame cancellation */
+  if (frame) {
+    try {
+      frame.cancel?.();
+    } catch {
+      /* best-effort frame cancellation */
+    }
   }
   pendingMovementCoreAnimationVisionRefreshFrames.delete(tokenId);
   pendingMovementCoreAnimationVisionRefreshPositionKeys.delete(tokenId);
+  pendingMovementCoreAnimationRenderHideRefreshes.delete(tokenId);
 }
 
 function clearPendingMovementAnimationSuppressionIfIdle({
@@ -4289,6 +4293,7 @@ export function resetPendingMovementPerformanceCounters() {
   pendingMovementPerformanceCounters.tokensRefreshed = 0;
   pendingMovementPerformanceCounters.bySource = {};
   pendingMovementCoalescedRefresh = null;
+  pendingMovementCoreAnimationRenderHideRefreshes.clear();
 }
 
 export function getPendingMovementPerformanceSnapshot() {
@@ -4650,6 +4655,30 @@ function coreAnimationRenderHideTrackingTargetIds(entry, observer) {
   return targetTokenIds;
 }
 
+function coreAnimationRenderHideTrackingTargetKey(targetTokenIds) {
+  return [...new Set(targetTokenIds || [])].filter(Boolean).sort().join('|');
+}
+
+function shouldRefreshCoreAnimationRenderHideTargets(tokenId, targetTokenIds, now = Date.now()) {
+  if (!tokenId) return false;
+  const targetKey = coreAnimationRenderHideTrackingTargetKey(targetTokenIds);
+  if (!targetKey) return false;
+
+  const previous = pendingMovementCoreAnimationRenderHideRefreshes.get(tokenId);
+  if (
+    previous?.targetKey === targetKey &&
+    now - previous.refreshedAt < PENDING_MOVEMENT_CORE_ANIMATION_RENDER_HIDE_REFRESH_MIN_MS
+  ) {
+    return false;
+  }
+
+  pendingMovementCoreAnimationRenderHideRefreshes.set(tokenId, {
+    refreshedAt: now,
+    targetKey,
+  });
+  return true;
+}
+
 function scheduleCoreAnimationVisionRefreshes(tokenId, serial) {
   if (!tokenId) return;
   clearCoreAnimationVisionRefresh(tokenId);
@@ -4676,13 +4705,15 @@ function scheduleCoreAnimationVisionRefreshes(tokenId, serial) {
     if (tokenIsAnimating(token)) {
       const renderHideTargetIds = coreAnimationRenderHideTrackingTargetIds(entry, token);
       if (renderHideTargetIds.length) {
-        refreshPendingMovementTokenVisibility([tokenId], {
-          coalesceFrame: true,
-          ignoreObservedGrace: true,
-          skipPerceptionRefresh: true,
-          source: 'core-animation-render-hide-tracking',
-          targetTokenIds: renderHideTargetIds,
-        });
+        if (shouldRefreshCoreAnimationRenderHideTargets(tokenId, renderHideTargetIds)) {
+          refreshPendingMovementTokenVisibility([tokenId], {
+            coalesceFrame: true,
+            ignoreObservedGrace: true,
+            skipPerceptionRefresh: true,
+            source: 'core-animation-render-hide-tracking',
+            targetTokenIds: renderHideTargetIds,
+          });
+        }
         for (const targetId of renderHideTargetIds) {
           const target = tokenObjectForId(targetId);
           probeCoreDetectionForLiveSoundwaveTarget(token, target);

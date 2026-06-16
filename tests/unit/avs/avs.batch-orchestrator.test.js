@@ -442,6 +442,59 @@ describe('BatchOrchestrator', () => {
     expect(batchProcessor.process).toHaveBeenCalledTimes(1);
   });
 
+  test('movement stop timer stays active while tracked token animation is running', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+    const token = global.canvas.tokens.get('A');
+    token._animation = { active: true, state: 'running' };
+
+    orchestrator.notifyTokenMovementStart('A');
+    await jest.advanceTimersByTimeAsync(250);
+
+    expect(orchestrator.isTokenMovementActive()).toBe(true);
+
+    orchestrator.enqueueTokens(new Set(['B']));
+    await jest.advanceTimersByTimeAsync(0);
+    await flushPromises();
+
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+
+    token._animation.active = false;
+    token._animation.state = 'completed';
+    await jest.advanceTimersByTimeAsync(250);
+    await flushPromises();
+
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+  });
+
+  test('movement stop timer releases after stuck animation guard expires', async () => {
+    jest.useFakeTimers();
+    orchestrator._syncEphemeralEffectsForUpdates = jest.fn(async () => { });
+    orchestrator._precomputeLighting = jest.fn(async () => ({
+      precomputedLights: null,
+      precomputeStats: { observerUsed: 0, observerMiss: 0, targetUsed: 0, targetMiss: 0 },
+    }));
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+    const token = global.canvas.tokens.get('A');
+    token._animation = { active: true, state: 'running' };
+
+    orchestrator.notifyTokenMovementStart('A');
+    orchestrator.enqueueTokens(new Set(['B']));
+
+    await jest.advanceTimersByTimeAsync(1900);
+    await flushPromises();
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(250);
+    await flushPromises();
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+  });
+
   test('movement start recreates missing session when moving flag survived cleanup', async () => {
     jest.useFakeTimers();
     const consoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => { });

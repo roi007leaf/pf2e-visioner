@@ -76,7 +76,7 @@ export class AvsMovementInvalidationWorkflow {
     this.#clearTokenPositionCaches();
     this.visionAnalyzer?.clearCache?.(tokenDoc);
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
-    this.batchOrchestrator?.notifyTokenMovementComplete?.();
+    this.batchOrchestrator?.notifyTokenMovementComplete?.(tokenDoc?.id ?? tokenDoc?.document?.id);
     this.#queueMovementOverrideValidation(tokenDoc, { processQueuedValidations: true });
     return true;
   }
@@ -87,7 +87,7 @@ export class AvsMovementInvalidationWorkflow {
 
     setSuppressTokenMovementLightingRefresh();
     this.#clearTokenPositionCaches();
-    this.batchOrchestrator?.notifyTokenMovementStart?.();
+    this.batchOrchestrator?.notifyTokenMovementStart?.(tokenDoc?.id ?? tokenDoc?.document?.id);
     this.visibilityState?.markTokenChangedWithSpatialOptimization?.(tokenDoc, movementChanges);
     this.#queueMovementOverrideValidation(tokenDoc, { recordLastMoved: true });
     return true;

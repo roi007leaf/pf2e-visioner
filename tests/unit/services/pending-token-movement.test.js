@@ -6064,6 +6064,60 @@ describe('pending token movement hidden detection guard', () => {
     expect(shouldUseFullAnimationRefreshCadence('observer')).toBe(true);
   });
 
+  test('throttles render-hidden animation tracking refresh while animation keeps running', () => {
+    jest.useFakeTimers();
+    setMovementPerformanceDiagnosticsEnabled();
+
+    global.canvas.walls.placeables = [];
+    const observer = createMockToken({
+      id: 'observer',
+      controlled: true,
+      flags: visibilityV2Flags({ target: 'observed' }),
+      x: 0,
+      y: 0,
+    });
+    observer._animation = { active: true };
+    const target = createMockToken({ id: 'target', visible: true, x: 3, y: 0 });
+    target.refresh = jest.fn();
+    global.canvas = {
+      ...global.canvas,
+      effects: {
+        visionSources: new Map(),
+        lightSources: new Map(),
+      },
+      tokens: {
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        controlled: [observer],
+        placeables: [observer, target],
+      },
+      perception: {
+        update: jest.fn(),
+      },
+      visibility: {
+        initialized: true,
+        tokenVision: true,
+        refreshVisibility: jest.fn(),
+      },
+      masks: {
+        occlusion: {
+          _updateOcclusionMask: jest.fn(),
+        },
+      },
+    };
+
+    setPendingTokenMovementPosition(observer.document, { x: 100, y: 0 }, [observer], {
+      finalVisibilityStatesByTargetId: { target: 'undetected' },
+    });
+    schedulePendingTokenMovementCompletion(observer.document);
+
+    jest.advanceTimersByTime(260);
+
+    const source =
+      getPendingMovementPerformanceSnapshot().bySource['core-animation-render-hide-tracking'];
+    expect(source.refreshCalls).toBeLessThanOrEqual(2);
+    expect(target.refresh.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
   test('can refresh pending movement token visuals without refreshing perception', () => {
     global.canvas.walls.placeables = [];
     const observer = createMockToken({

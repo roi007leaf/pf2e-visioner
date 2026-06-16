@@ -45,6 +45,30 @@ import { ExclusionManager } from './ExclusionManager.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 import { TelemetryReporter } from './TelemetryReporter.js';
 
+const MOVING_TOKEN_ANIMATION_GUARD_TIMEOUT_MS = 2000;
+
+function movementAnimationIsRunning(animation) {
+  if (!animation || animation.state === 'completed') return false;
+  if (typeof animation === 'object' && Object.keys(animation).length === 0) return true;
+  return !!animation.promise || !!animation.active || animation.state !== undefined;
+}
+
+function tokenIsAnimating(token) {
+  return movementAnimationIsRunning(token?._animation) || movementAnimationIsRunning(token?.animation);
+}
+
+function normalizeTokenIds(tokenIds) {
+  const values =
+    tokenIds instanceof Set || Array.isArray(tokenIds)
+      ? Array.from(tokenIds)
+      : tokenIds
+        ? [tokenIds]
+        : [];
+  return values
+    .map((value) => value?.document?.id ?? value?.id ?? value)
+    .filter((value) => typeof value === 'string' && value.length > 0);
+}
+
 /**
  * BatchOrchestrator coordinates the complete batch processing pipeline:
  * - Telemetry management (start/stop)
@@ -158,6 +182,8 @@ export class BatchOrchestrator {
     this._isTokenMoving = false;
     this._movementStopTimer = null;
     this._movementStopDelayMs = 200; // Increased to allow canvas position to update after animation
+    this._movingTokenIds = new Set();
+    this._movingTokenAnimationStartedAt = new Map();
 
     // Movement session telemetry tracking
     this._movementSession = null;
@@ -185,12 +211,13 @@ export class BatchOrchestrator {
    * Notify orchestrator that a token has started moving.
    * This will delay batch processing until movement stops.
    */
-  notifyTokenMovementStart() {
+  notifyTokenMovementStart(tokenIds = []) {
+    const movingTokenIds = normalizeTokenIds(tokenIds);
     this._movementRevision++;
     // Start a new movement session if one is missing. The moving flag can outlive a
     // previous session after async batch cleanup, so session existence is the invariant.
     if (!this._movementSession) {
-      this._movementSession = this._createMovementSession();
+      this._movementSession = this._createMovementSession(movingTokenIds);
 
       // CRITICAL: Clear LOS cache when movement starts to prevent stale precomputed LOS
       // This ensures fresh LOS calculations when the batch processes after movement completes
@@ -204,6 +231,15 @@ export class BatchOrchestrator {
     this._isTokenMoving = true;
     if (this._movementSession) {
       this._movementSession.positionUpdates++;
+      for (const id of movingTokenIds) {
+        this._movementSession.tokensAccumulated.add(id);
+      }
+    }
+    for (const id of movingTokenIds) {
+      this._movingTokenIds.add(id);
+      if (!this._movingTokenAnimationStartedAt.has(id)) {
+        this._movingTokenAnimationStartedAt.set(id, Date.now());
+      }
     }
 
     // Clear existing stop timer and restart it
@@ -217,7 +253,13 @@ export class BatchOrchestrator {
     }, this._movementStopDelayMs);
   }
 
-  notifyTokenMovementComplete() {
+  notifyTokenMovementComplete(tokenIds = []) {
+    for (const id of normalizeTokenIds(tokenIds)) {
+      this._movingTokenIds.add(id);
+      if (!this._movingTokenAnimationStartedAt.has(id)) {
+        this._movingTokenAnimationStartedAt.set(id, Date.now());
+      }
+    }
     this._flushMovementStop();
   }
 
@@ -256,9 +298,18 @@ export class BatchOrchestrator {
       this._movementStopTimer = null;
     }
 
+    if (this._hasActiveMovingTokenAnimation()) {
+      this._movementStopTimer = setTimeout(() => {
+        this._flushMovementStop();
+      }, this._movementStopDelayMs);
+      return;
+    }
+
     if (!this._movementSession) {
       if (this._pendingTokens.size === 0) {
         this._isTokenMoving = false;
+        this._movingTokenIds.clear();
+        this._movingTokenAnimationStartedAt.clear();
         return;
       }
       this._movementSession = this._createMovementSession(this._pendingTokens);
@@ -293,7 +344,28 @@ export class BatchOrchestrator {
       Hooks.callAll('pf2e-visioner.tokenMovementComplete', toProcess);
     } else {
       this._movementSession = null;
+      this._movingTokenIds.clear();
+      this._movingTokenAnimationStartedAt.clear();
     }
+  }
+
+  _hasActiveMovingTokenAnimation() {
+    const now = Date.now();
+    for (const id of this._movingTokenIds) {
+      try {
+        const token =
+          canvas?.tokens?.get?.(id) ||
+          canvas?.tokens?.placeables?.find?.((placeable) => placeable?.document?.id === id) ||
+          null;
+        const startedAt = this._movingTokenAnimationStartedAt.get(id) ?? now;
+        if (tokenIsAnimating(token) && now - startedAt < MOVING_TOKEN_ANIMATION_GUARD_TIMEOUT_MS) {
+          return true;
+        }
+      } catch {
+        /* ignore token lookup failures */
+      }
+    }
+    return false;
   }
 
   _createMovementSession(initialTokenIds = []) {
@@ -461,7 +533,7 @@ export class BatchOrchestrator {
       }));
 
       if (animationPreflightPlan.shouldNotifyMovementStart) {
-        this.notifyTokenMovementStart();
+        this.notifyTokenMovementStart(animationPreflightPlan.animatingTokenIds);
       }
       return;
     }
@@ -629,6 +701,8 @@ export class BatchOrchestrator {
       // Clear movement session after successful batch
       if (movementSession) {
         this._movementSession = null;
+        this._movingTokenIds.clear();
+        this._movingTokenAnimationStartedAt.clear();
       }
 
       // Fire custom hook to notify other systems that AVS batch is complete
