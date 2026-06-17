@@ -66,6 +66,8 @@
 - **Door LOS visibility stays in sync with Foundry detection**: Door open/close recalculations now refresh explicit visible pairs and detection state so tokens revealed through a door remain actually visible to Foundry, instead of being kept hidden by stale core detection results.
 - **Door LOS recalculation is scoped to the changed door**: Door batches now only run expensive visibility work for token pairs whose sight rays cross the changed door segment, avoiding full-scene pair recalculation on crowded maps.
 - **Fast token movement no longer applies stale AVS batches**: Movement batches now discard results if another movement starts before the batch finishes, drop stale batched detection writes, and preserve pending movement tokens for the final post-move recalculation.
+- **AVS waits for live movement animation to settle**: Movement completion now tracks the actual Foundry token animation state, keeping AVS batches paused until the moving token has visually settled and preventing mid-walk hidden/observed commits that made kobold soundwaves flash.
+- **Movement soundwaves avoid render-hidden refresh storms**: Render-hidden tracking during core token animation is throttled per target set while live imprecise-sense soundwave probes still run every frame, reducing FPS drops without freezing the LOS polygon or delaying soundwave indicators.
 
 ## [8.2.11] - 2026-05-16
 
