@@ -4,24 +4,27 @@
 
 ### Added
 
-- **New Visioner perception engine**: 8.3.0 rebuilds visibility around a core-like perception profile that separates detection, concealment, cover, and encounter awareness. Manual overrides, automation, dialogs, APIs, and token rendering now speak the same rules language.
-- **Automatic migration to the new engine**: Existing visibility maps, AVS overrides, manual states, scene cleanup data, and deleted-token recovery data migrate into the new profile format while keeping existing string-facing API compatibility.
+- **New core-like perception engine**: Visioner now stores detection, concealment, cover, and encounter awareness separately, giving AVS, manual overrides, action previews, token rendering, and the public API one shared rules model.
+- **Automatic migration to the new engine**: Existing visibility maps, AVS overrides, manual states, scene cleanup data, and deleted-token recovery data migrate into the new profile format.
 - **Peek for corners and doors**: Tokens can peek around wall corners and through configured doors, with token-side origin handling, configurable slit/sweep/range behavior, optional blind-GM door Perception DCs, local peeker indicators, and GM mirror overlays.
-- **Live movement perception**: Movement now previews sight, hearing, scent, tremorsense, invisibility memory, darkness, doors, and walls while tokens move instead of waiting for final AVS resolution.
-- **Improved imprecise-sense soundwaves**: Hidden targets detected by hearing, scent, tremorsense, and similar senses keep responsive soundwave indicators through movement, darkness, wall transitions, and range changes.
 - **Expanded PF2E rule-element support**: Visioner rule elements can qualify Seek actions, change sense ranges, suppress off-guard from Blind-Fight-style features, provide or override cover, modify detection modes, and drive aura visibility.
-- **User-facing action dialog upgrades**: Seek, Hide, Sneak, Consequences, Point Out, Create a Diversion, and Take Cover previews share consistent row actions, timers, bulk overrides, visibility labels, and apply/revert behavior.
 
 ### Changed
 
 - **Concealed now behaves as Observed + Concealed**: Visioner Manager controls, hover badges, action previews, validation rows, and tooltips now show concealed visibility as an observed creature with concealment instead of treating it as a separate detection state.
 - **Unnoticed is now encounter awareness**: Unnoticed is reserved for encounter-start Avoid Notice and tracker awareness flows instead of being offered as a general manual visibility state.
-- **Manual visibility and AVS validation are more predictable**: Manual profile writes refresh token visuals, validation rows, override indicators, and detection state through the same engine used by automation.
-- **Movement feels closer to Foundry core**: AVS waits for Foundry token animation, avoids stale mid-move batches, keeps LOS and soundwaves synchronized during drags, and reduces movement-time refresh spikes without freezing the live polygon.
-- **Doors and walls update visibility more naturally**: Door open/close and wall interactions refresh only affected token pairs where possible while keeping Foundry detection, explicit visible pairs, and Visioner visibility in sync.
+- **Action previews use the new engine**: Seek, Hide, Sneak, Consequences, Point Out, Create a Diversion, and Take Cover previews share consistent row actions, timers, bulk overrides, visibility labels, and apply/revert behavior.
+- **Manual visibility writes update immediately**: Manual changes now refresh token visuals, validation rows, override indicators, and detection state through the same path used by automation.
+
+### Fixed
+
+- **Movement visibility is smoother and more accurate**: AVS now waits for Foundry token animation, avoids stale mid-move batches, keeps LOS and soundwaves synchronized during drags, and reduces movement-time refresh spikes without freezing the live polygon.
+- **Imprecise-sense soundwaves stay reliable**: Hidden targets detected by hearing, scent, tremorsense, and similar senses keep responsive soundwave indicators through movement, darkness, wall transitions, and range changes.
 - **Nonvisual senses follow PF2E expectations more closely**: Precise nonvisual senses reveal normally, imprecise senses use soundwaves, tremorsense respects ground/elevation, and deafened or scent-only observers still get appropriate nonvisual feedback.
-- **Invisibility uses remembered-position behavior more consistently**: Invisible creatures can remain represented by soundwaves while hidden, become undetected when blocked, and reappear through the movement preview as sight lines clear.
-- **Cover and action automation align better with PF2E data**: Aim-Aiding, Blind-Fight, Seek concealment qualifiers, range-qualified actions, Take Cover, and corner peeking now use the same perception and cover context as the rest of Visioner.
+- **Invisible creatures use remembered-position visibility correctly**: Invisible creatures can remain represented by soundwaves while hidden, become undetected when blocked, and reappear through the movement preview as sight lines clear.
+- **Doors and walls stay in sync with Foundry detection**: Door open/close and wall interactions refresh affected token pairs while keeping Foundry detection, explicit visible pairs, and Visioner visibility aligned.
+- **Cover and action automation use better PF2E context**: Aim-Aiding, Blind-Fight, Seek concealment qualifiers, range-qualified actions, Take Cover, and corner peeking now use the same perception and cover context as the rest of Visioner.
+- **Blinded player tokens remain targetable after deselecting**: A player-owned blinded PC no longer disappears from its own player when the token is deselected.
 
 ## [8.2.11] - 2026-05-16
 
