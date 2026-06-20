@@ -86,7 +86,7 @@
         "type": "system",
         "compatibility": {
           "minimum": "7.0.0",
-          "verified": "8.0.4"
+          "verified": "8.2.0"
         }
       },
       {
@@ -94,7 +94,7 @@
         "type": "system",
         "compatibility": {
           "minimum": "0.0.8",
-          "verified": "0.0.8"
+          "verified": "1.2.0"
         }
       }
     ],
