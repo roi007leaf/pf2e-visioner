@@ -2,12 +2,12 @@ import { COVER_STATES } from '../../../constants.js';
 import autoCoverSystem from '../../../cover/auto-cover/AutoCoverSystem.js';
 import { getCoverOverlayState } from '../../../cover/auto-cover/cover-state-query.js';
 import { appliedTakeCoverChangesByMessage } from '../data/message-cache.js';
-import { shouldFilterAlly } from '../infra/shared-utils.js';
 import {
   notifyTakeCoverAlreadyActive,
   tokenHasActiveTakeCoverState,
 } from '../take-cover-expiration-service.js';
 import { ActionHandlerBase } from './BaseAction.js';
+import { discoverTakeCoverSubjects } from './TakeCover/take-cover-subject-discovery.js';
 
 function getTakeCoverResultForBaselineCover(coverState) {
   return coverState === 'standard' || coverState === 'greater' ? 'greater' : 'standard';
@@ -64,6 +64,10 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
     return 'observer_to_target';
   }
 
+  isOutcomeActionable(_actionData, outcome) {
+    return outcome?.changed === true || outcome?.takeCoverProneRangedOnly === true;
+  }
+
   async apply(actionData, button) {
     const takingCoverToken = actionData?.actorToken || actionData?.actor;
     if (tokenHasActiveTakeCoverState(takingCoverToken)) {
@@ -74,17 +78,7 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
   }
 
   async discoverSubjects(actionData) {
-    const allTokens = canvas?.tokens?.placeables || [];
-    const actorId = actionData?.actor?.id || actionData?.actor?.document?.id || null;
-    const subjects = allTokens
-      .filter((t) => t && t.actor)
-      .filter((t) => (actorId ? t.id !== actorId : t !== actionData.actor))
-      // Respect Ignore Allies: when enabled, exclude allies from observers list
-      .filter((t) => !shouldFilterAlly(actionData.actor, t, 'enemies'))
-      // Exclude loot and hazards from observers for Take Cover
-      .filter((t) => t.actor?.type !== 'loot' && t.actor?.type !== 'hazard');
-
-    return subjects;
+    return discoverTakeCoverSubjects(actionData);
   }
 
   async analyzeOutcome(actionData, subject) {

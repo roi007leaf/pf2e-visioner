@@ -77,6 +77,20 @@ export async function reconcileCoverAggregatesAgainstMaps(effectReceiverToken) {
     const observers = (canvas?.tokens?.placeables ?? []).filter(
       (t) => t && t !== effectReceiverToken && t.actor,
     );
+    const observersBySignature = new Map();
+    const observersById = new Map();
+    const observerCoverMaps = new Map();
+
+    for (const observer of observers) {
+      observersById.set(observer.id, observer);
+      observerCoverMaps.set(observer.id, getCoverMap(observer));
+
+      const signature = observer.actor?.signature;
+      if (!signature) continue;
+      if (!observersBySignature.has(signature)) observersBySignature.set(signature, []);
+      observersBySignature.get(signature).push(observer);
+    }
+
     const aggregates = effectReceiverToken.actor.itemTypes.effect.filter(
       (e) => e.flags?.[MODULE_ID]?.aggregateCover === true,
     );
@@ -95,16 +109,17 @@ export async function reconcileCoverAggregatesAgainstMaps(effectReceiverToken) {
           seenAC.add(acKey);
           // If there is no signature recorded on this rule, consider it invalid and drop it
           if (!signature) return false;
-          const candidates = observers.filter((o) => o.actor?.signature === signature);
+          const candidates = observersBySignature.get(signature) || [];
           if (candidates.length === 0) return false;
           // If rule has a cover-against:<tokenId> predicate, verify it matches one of the candidate observer tokens
           const against = extractCoverAgainstFromPredicate(r.predicate);
           if (against.length > 0) {
-            const match = candidates.some((o) => against.includes(o.id));
+            const againstIds = new Set(against);
+            const match = candidates.some((o) => againstIds.has(o.id));
             if (!match) return false;
           }
           const stillValid = candidates.some(
-            (o) => (getCoverMap(o)?.[targetId] || 'none') === state,
+            (o) => (observerCoverMaps.get(o.id)?.[targetId] || 'none') === state,
           );
           return stillValid;
         }
@@ -117,9 +132,9 @@ export async function reconcileCoverAggregatesAgainstMaps(effectReceiverToken) {
           if (!tokenId) return false;
           if (seenRO.has(tokenId)) return false;
           seenRO.add(tokenId);
-          const token = observers.find((o) => o.id === tokenId);
+          const token = observersById.get(tokenId);
           if (!token) return false;
-          const s = getCoverMap(token)?.[targetId] || 'none';
+          const s = observerCoverMaps.get(tokenId)?.[targetId] || 'none';
           return s === state;
         }
         return true;
@@ -670,6 +685,8 @@ export function canonicalizeObserverRules(rules) {
   const acRules = new Map(); // signature -> rule
   const roRules = new Map(); // tokenId -> rule
   const otherRules = [];
+  const reflexStealthRuleKeys = new Set();
+  const otherRuleKeys = new Set();
 
   for (const r of rules) {
     if (
@@ -720,25 +737,18 @@ export function canonicalizeObserverRules(rules) {
       const normalizedSelector = Array.isArray(r.selector) ? r.selector[0] : r.selector;
       const ruleKey = `${normalizedSelector}:${r.type}:${r.value}:${JSON.stringify(r.predicate || [])}`;
 
-      // Check if we already have a rule for this selector/type/value/predicate combination
-      if (
-        !otherRules.some((existing) => {
-          if (existing?.key !== 'FlatModifier') return false;
-          const existingSelector = Array.isArray(existing.selector)
-            ? existing.selector[0]
-            : existing.selector;
-          const existingKey = `${existingSelector}:${existing.type}:${existing.value}:${JSON.stringify(existing.predicate || [])}`;
-          return existingKey === ruleKey;
-        })
-      ) {
+      if (!reflexStealthRuleKeys.has(ruleKey)) {
+        reflexStealthRuleKeys.add(ruleKey);
         // Normalize the selector to string format for consistency
         const normalizedRule = { ...r, selector: normalizedSelector };
         otherRules.push(normalizedRule);
+        otherRuleKeys.add(JSON.stringify(normalizedRule));
       }
     } else {
       // All other rules - use stringified rule as key to dedupe exact duplicates
       const ruleStr = JSON.stringify(r);
-      if (!otherRules.some((existing) => JSON.stringify(existing) === ruleStr)) {
+      if (!otherRuleKeys.has(ruleStr)) {
+        otherRuleKeys.add(ruleStr);
         otherRules.push(r);
       }
     }

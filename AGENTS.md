@@ -1,72 +1,75 @@
 <claude-mem-context>
 # Memory Context
 
-# [pf2e-visioner] recent context, 2026-05-11 4:13pm GMT+3
+# [pf2e-visioner] recent context, 2026-05-25 5:07pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (21,849t read) | 195,101t work | 89% savings
+Stats: 50 obs (23,431t read) | 134,660t work | 83% savings
 
-### May 3, 2026
-S245 Fix stealth cover bonus not appearing on stealth rolls — expanded to include third discovered bug in context routing (May 3 at 9:55 AM)
-S119 GM tracker dots design pivot — dots should only show users who CAN see the stealther, not users blocked by overrides (May 3 at 9:55 AM)
-### May 7, 2026
-S246 Fix stealth cover bonus not appearing on stealth rolls — three bugs found and fixed, Bug 3 fix verified in source but test not yet re-run (May 7 at 8:04 AM)
-S258 Debugging persistent token image flash bug in pf2e-visioner FoundryVTT module — user asked what debug log was added (May 7 at 8:07 AM)
-### May 11, 2026
-S262 Fix PF2E Visioner runtime SyntaxError — missing 'getVisibilityStateLabelKey' export from constants.js crashing token-hud.js visibility manager (May 11 at 2:48 PM)
-2203 2:54p 🔵 Hardcoded 'isProblematicRay' Debug Hook in VisionAnalyzer — Left-in Development Artifact
-2204 2:55p 🔄 Removed Debug Instrumentation and Simplified Return Values in VisionAnalyzer
-2205 2:56p 🔄 VisionAnalyzer Cleanup Confirmed — Net 78 Deletions, 2 Insertions
-2206 " 🔵 Foundry VTT Is Running on Port 30000 — IPv6 Binding Caused curl Failure
-2207 " 🔵 Foundry VTT Runs on HTTPS at Port 30000 — Browser Test Infrastructure Available
-2208 2:57p 🔵 Playwright Browser Testing Confirmed Working Against Live Foundry VTT /join Page
-2209 " 🔵 Foundry VTT Environment — Version 14 Build 361, Kingmaker World, Gamemaster User ID Confirmed
-2210 2:58p 🔴 Live Foundry Verification — Zero Errors on Module Load, SyntaxError Confirmed Fixed
-2211 " 🔵 Double "Registering movement cost hooks" Log Is Expected — Two Registration Paths in Codebase
-2212 " 🔴 Double Registration of Movement Cost Hooks — Pre-existing Bug in registration.js
-2213 2:59p 🔵 Double registerMovementCostHooks — Double Wrapping is Functionally Benign Due to Idempotent Logic
-2214 " 🟣 Added Failing Test for Double Movement Cost Hook Registration
-2215 3:15p 🔵 Test Fix Task Initiated for Hazard Loot Manager and Deafened Detection Wrapper
-2216 " 🔵 write_stdin Fails When exec_command Launched Without tty=true
-2217 3:16p 🔵 No Active pf2e-visioner or Playwright Processes Found After Session Timeout
-2218 " 🔵 No Node, Chromium, or Playwright Processes Running Despite Active Session
-2219 3:17p 🔵 Playwright Performance Benchmark Launched for pf2e-visioner Override Validity Checks
-2220 3:18p 🔵 Playwright Login Failed: Gamemaster Option Disabled in Foundry VTT Join Select
-2221 " 🔵 Workaround for Disabled Gamemaster Login: Force-Enable Option via page.evaluate()
-2222 3:19p 🔵 page.evaluate() Rejects Third Argument — checkOverrideValidity Benchmark Blocked
-2223 3:23p 🔵 Session 50601 Hanging With No Active Node, Chromium, or Foundry Processes Visible
-2227 3:32p 🔵 OverrideValidationManager.checkOverrideValidity Architecture
-2228 " 🟣 Performance Instrumentation Added to checkOverrideValidity
-2231 3:33p 🟣 Per-Step Real-Time Perf Logging Added to markPerf
-2232 " 🔵 OverrideValidationManager Test: Mover Cannot See Observer Edge Case
-2234 3:34p 🔵 Dynamic Import of VisibilityCalculator.js Takes ~2797ms on First Call
-2235 " 🔵 Full checkOverrideValidity Perf Profile: 5.69s Total, 99.8% Dynamic Import Cost
-2236 3:35p 🔴 Module Pre-Warm Fix Eliminates 5.7s Dynamic Import Cost in checkOverrideValidity
-2237 " 🔄 All Dynamic Import Call Sites Replaced with Singleton Loader Functions
-2238 3:36p 🔴 checkOverrideValidity Performance Confirmed: 5689ms → 12ms (470× Speedup)
-2247 3:38p 🔵 Per-Pair Validation Throughput: 100–450ms Per Pair After Pre-Warm Fix
-2248 3:39p 🔵 VisionAnalyzer.js Cold Import Costs ~650-695ms Per Pair Reaching manual_action Observed Branch
-2249 3:40p 🔴 VisionAnalyzer.js Pre-Warm Added to Eliminate 650ms Cold Import in state-compare Branch
-2250 " 🔴 VisionAnalyzer Pre-Warm Confirmed: Previously 650-695ms Pairs Now 1.8-2.8ms
-2255 3:41p 🔴 Complete Pre-Warm Fix Validated: 20 Pairs in 39ms vs 4306ms Before (110× Speedup)
-2257 3:42p 🔵 recalculateAllVisibility Integration Test Fails: Hook Payload Contains Circular FoundryVTT Object
-2259 3:43p 🔵 recalculateAllVisibility Full Scene: 11.4 Seconds, 28 Long Tasks (500-600ms Each) for 47 Tokens
-2260 3:44p 🔵 BatchProcessor.js Architecture: O(N²) LOS Precompute, Multi-Layer Caching, Remaining Dynamic Imports
-2261 " 🔵 BatchProcessor.js Eager LOS Precompute Removal Patch Failed to Apply
-2262 " 🔵 BatchProcessor.js Patch Failure Root Cause: Extra Closing Brace in Earlier sed Read
-2263 3:45p 🔄 BatchProcessor: O(N²) Eager LOS Precompute Removed, Replaced with Lazy Population
-2264 " 🔄 BatchProcessor: precomputedLOS Map Populated Inside getDirectionalLos for Calculator Use
-2265 " 🔵 BatchProcessor Test Fails After Eager LOS Removal: Test Asserted Old Precompute Behavior
-2266 3:46p 🔴 BatchProcessor hasLineOfSight Call Signature Fixed: Dropped 'sight' Argument to Match Test and Old Precompute Behavior
-2267 3:47p 🔴 Lazy LOS Refactor Cuts Full Scene Recalculation from 11.4s to 4.2s (2.7× Speedup)
-2268 " 🔵 Full Test Suite: 1 Remaining Failure in Observer Movement Test Expecting 'sight' Argument
-2269 " 🔵 Batch Processor Test Validates precomputedLOS Lazy Population via calculateVisibilityBetweenTokens Options
-2270 3:48p 🔴 hasLineOfSight Call Signature Settled: Restored 'sight' Arg, Updated Both Tests to Three-Arg Form
-2271 " ✅ Full Test Suite Green: 2647 Tests Passing Across 250 Suites After All Performance Fixes
-2272 3:49p ✅ Session Changes Committed as 4 Perf Commits; Additional Staged Files Include movement-cost.js and VisionAnalyzer.js
+### May 25, 2026
+S654 Bug fix: tokens in darkness without darkvision incorrectly revealed as black circles on move instead of showing soundwave indicator (May 25 at 7:53 AM)
+S655 Fix pf2e-visioner bug: tokens in darkness with no darkvision show as black circles when moving instead of keeping soundwave detection indicator (May 25 at 7:54 AM)
+S668 Soundwave visibility bug in pf2e-visioner: kobold soundwave (detectionFilter mesh) not visible until user hovers over the token (May 25 at 9:01 AM)
+S686 Fix token reveal firing only on movement end instead of when LOS actually detects the token during movement (pf2e-visioner FoundryVTT module) (May 25 at 10:36 AM)
+S690 FPS drop during token movement in pf2e-visioner (FoundryVTT module) — systematic debugging with Playwright as Ass Gm (May 25 at 1:25 PM)
+S691 Debug why Ezren only reveals kobolds at movement end instead of when LOS is first established mid-drag — investigate pending-token-movement LOS detection timing bug (May 25 at 1:49 PM)
+S698 Debug major FPS drop when moving tokens in Foundry VTT — investigating token lights vs. wall/visibility rendering as root cause, using Playwright as "Ass Gm" (May 25 at 2:06 PM)
+5785 3:33p 🔴 Syntax Error Identified: Duplicate `const originPoint` Declaration at Line 759 — Revert Left Both Old and New Declarations
+5786 3:39p 🔵 Pending Token Movement Fix Reverted Without Resolving Root Cause
+5787 3:41p 🔵 Playwright Drag-State Debugging Script for Pending Token Movement
+5788 3:42p 🔵 Drag State Captured as Inactive During Simulated Playwright Drag
+5789 3:43p 🔵 Pending Token Movement Bug — Revert Without Fix
+5790 3:44p 🔵 FPS Drop Investigation Initiated for Token Movement
+5791 3:45p 🔵 Token Drag State Captured Mid-Move via Playwright
+5792 3:47p 🟣 Added `controlledTokenDragDestinationPosition` Helper to Pending Movement
+5793 3:48p 🔴 Sight Line Origin Now Uses Live Drag Destination Instead of Current Token Position
+5794 3:49p 🟣 Unit Test Added for Drag-Destination-Based Sight Line Reveal
+5795 3:50p 🔵 New Drag Destination Test Fails at `refreshPendingControlledTokenDragIntent` Return Value
+5796 3:51p 🔵 `refreshPendingControlledTokenDragIntent` Requires Prior `primePendingControlledTokenDragIntent` Call
+5797 3:52p 🔴 All 155 Pending Movement Tests Pass — Drag Destination Sight Fix Verified
+5798 3:54p 🔵 Live Playwright Validation Confirms Drag Destination Visibility Logic Works End-to-End
+5799 3:55p 🔵 Two-Tier Final Visibility Prediction Architecture in pending-movement-final-visibility.js
+5800 3:56p 🔵 `getPendingMovementVisibilityState` Is the Central Visibility Resolver Called from 6+ Sites
+5801 3:58p ✅ Final Git Diff: Drag-Destination FPS Fix — Complete Changeset Confirmed
+5802 3:59p 🔵 Call Graph Mapped: `getPendingMovementVisibilityState` Calls `getPredictedFinalVisibilityState` First
+5803 " 🔵 Controller Wiring Confirms `currentPendingMovementSightLineSeesTarget` Fix Propagates to Soundwave Controller
+5804 4:00p 🔵 `activePreviewCanRevealStoredUndetectedTarget` Delegates Final Check to `currentPendingMovementSightLineSeesTarget`
+5805 4:01p 🔵 `controlledTokenDragIntentRefreshTargetIds` Also Uses `currentPendingMovementSightLineSeesTarget` to Filter Refresh Targets
+5806 4:02p 🔵 `currentPendingMovementSightLineSeesTarget` Lives in `pending-movement-sight-line.js`, Not `pending-token-movement.js`
+5807 4:05p 🟣 Drag Final Visibility Prediction Cache Added to Eliminate Per-Query Recomputation
+5808 " ✅ Test Updated to Reflect Cached Geometric Prediction as Primary Drag Visibility Driver
+5809 4:06p 🔴 All 155 Tests Pass After Drag Prediction Cache Added — Full FPS Fix Complete
+5810 4:48p 🔵 FPS Drop Identified When Moving Tokens in VTT App
+S699 Debug major FPS drop when moving tokens in Foundry VTT — investigating token lights vs. wall/visibility rendering as root cause, using Playwright as "Ass Gm" (May 25 at 4:48 PM)
+S700 Debug major FPS drop when moving tokens in Foundry VTT — investigating token lights vs. wall/visibility rendering as root cause, using Playwright as "Ass Gm" (May 25 at 4:48 PM)
+5811 4:54p 🔵 FPS Drop Identified During Token Movement in VTT Application
+5812 " 🔵 FPS Investigation is in the pf2e-visioner Foundry VTT Module
+5813 4:57p 🔵 FPS Drop During Token Movement — Investigation Initiated
+5814 " 🔵 Pending Movement Refresh Scheduler Controls Animation Cadence
+5815 " 🔵 pf2e-visioner Pending Movement System — Key Function Map
+5816 5:00p 🔵 FPS Drop Investigation Initiated for Token Movement
+5817 " 🔵 pf2e-visioner Pending Movement System Architecture Mapped
+5818 5:02p 🔵 scheduleAnimationRenderRefreshes Is the Per-Frame Performance Driver During Token Movement
+5819 " 🔵 LOS Reveal Delayed Until Animation End in pf2e-visioner
+5820 5:03p 🔵 Key Service Files Identified for Movement/Animation Investigation
+S701 FPS drop during token movement in pf2e-visioner FoundryVTT module — systematic debugging initiated (May 25 at 5:03 PM)
+5821 " 🔵 Auto-Visibility Core Layer Contains Animation References
+5822 5:04p 🔵 PendingMovement Service Structure and Animation Hook Locations Mapped
+5823 " 🔵 Hook Entry Points for Token Update Events Identified
+5824 " 🔵 scripts/hooks/lifecycle.js (40.8K) Is a Major Candidate for Animation Lifecycle Control
+5825 " 🔵 token-events.js Uses `animate: false` Flag and Calls updateTokenVisuals Post-Update
+5826 5:05p 🔵 Removed refreshToken Hook Is Likely Root Cause of Animation Reveal Delay Bug
+5827 " 🔵 Complete Hook Registration and Handler Chain Traced to token-render-lifecycle.js
+5828 " 🔵 Per-Frame Refresh Loop Calls Full Canvas Perception Update Every Cycle
+5829 5:06p 🔵 Full Reveal Pipeline Traced: schedulePendingTokenMovementCompletion → AVS Batch → refreshPendingMovementTokenVisibility
+5830 " 🔵 pf2e-visioner Pending Movement Module File Structure Mapped
+5831 " 🔵 pending-token-movement.js Has Animation Detection Logic but Doesn't Hook Mid-Animation Reveals
+5832 5:07p 🔵 Animation Refresh Scheduler Uses Wall-Clock Timeouts, Not Animation Frames; Requires Non-Empty targetTokenIds
+5833 " 🔵 createPositionedTokenProxy Uses JS Proxy to Virtualize Token Position for LOS Evaluation
+5834 " 🔵 centerForToken Accepts positionOverride — Enables Mid-Animation LOS Calculation at Arbitrary Route Points
 
-Access 195k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 135k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

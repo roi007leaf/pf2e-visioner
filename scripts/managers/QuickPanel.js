@@ -1,6 +1,6 @@
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { loadTokenManagerCSS, loadSharedUICSS } from '../css-loader.js';
-import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
+import { COVER_STATES, VISIBILITY_STATES, getVisibilityStateLabelKey } from '../constants.js';
 import { setCoverBetween, setVisibilityBetween } from '../utils.js';
 
 export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
@@ -49,13 +49,15 @@ export class VisionerQuickPanel extends foundry.applications.api.ApplicationV2 {
   }
 
   async _prepareContext(_options) {
-    const visList = Object.entries(VISIBILITY_STATES).map(([key, cfg]) => ({
-      key,
-      label: game.i18n.localize(cfg.label),
-      icon: cfg.icon,
-      color: cfg.color,
-      cssClass: cfg.cssClass,
-    }));
+    const visList = Object.entries(VISIBILITY_STATES)
+      .filter(([, cfg]) => cfg.manual !== false)
+      .map(([key, cfg]) => ({
+        key,
+        label: game.i18n.localize(getVisibilityStateLabelKey(key, { manual: true })),
+        icon: cfg.icon,
+        color: cfg.color,
+        cssClass: cfg.cssClass,
+      }));
     const coverList = Object.entries(COVER_STATES).map(([key, cfg]) => ({
       key,
       label: game.i18n.localize(cfg.label),

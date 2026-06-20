@@ -8,6 +8,7 @@
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { VISIBILITY_STATES } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getVisibility } from '../stores/visibility-map.js';
 import { isValidToken } from '../utils.js';
 import RegionHelper from '../utils/region.js';
@@ -49,7 +50,9 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       visibilityState: new fields.StringField({
         required: true,
         choices: Object.fromEntries(
-          Object.keys(VISIBILITY_STATES).map((k) => [k, `PF2E_VISIONER.VISIBILITY_STATES.${k}`]),
+          Object.entries(VISIBILITY_STATES)
+            .filter(([, config]) => config.manual !== false)
+            .map(([key]) => [key, `PF2E_VISIONER.VISIBILITY_STATES.${key}`]),
         ),
         initial: 'hidden',
         label: 'PF2E_VISIONER.REGION_BEHAVIOR.VISIBILITY_STATE.label',
@@ -73,6 +76,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _handleRegionEvent(event) {
+    if (!game.user?.isGM) return;
+
     const name = event?.name ?? event?.type;
     if (!name) return;
 
@@ -456,6 +461,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _applyVisibilityUpdates(updates) {
+    if (!game.user?.isGM) return;
+
     if (!updates || updates.length === 0) return;
     try {
       const updatesByObserver = new Map();
@@ -534,8 +541,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       }
 
       try {
-        if (typeof canvas !== 'undefined' && canvas?.perception?.update)
-          canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch (err) {
         console.error('PF2e Visioner | Error requesting canvas perception refresh:', err);
       }

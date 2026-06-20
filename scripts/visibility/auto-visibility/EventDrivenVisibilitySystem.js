@@ -5,7 +5,10 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { getPendingMovementPerformanceSnapshot } from '../../services/PendingMovement/pending-movement-render-lock.js';
 import { getLogger } from '../../utils/logger.js';
+import { profileToLegacyVisibility } from '../perception-profile.js';
+import { AvsInvalidationCoordinator } from './core/AvsInvalidationCoordinator.js';
 import { BatchOrchestrator } from './core/BatchOrchestrator.js';
 import { BatchProcessor } from './core/BatchProcessor.js';
 import { DependencyInjectionContainer } from './core/DependencyInjectionContainer.js';
@@ -70,6 +73,9 @@ export class EventDrivenVisibilitySystem {
   /** @type {VisibilityStateManager} - Manages visibility state changes and batch operations */
   #visibilityStateManager = null;
 
+  /** @type {AvsInvalidationCoordinator} - Coordinates cross-handler AVS invalidation policy */
+  #invalidationCoordinator = null;
+
   /** @type {CacheManagementService} */
   #cacheManagementService = null;
 
@@ -84,6 +90,10 @@ export class EventDrivenVisibilitySystem {
 
   /** @type {import('./core/OverrideValidationManager.js').OverrideValidationManager} */
   overrideValidationManager = null;
+
+  #initialized = false;
+
+  #initializePromise = null;
 
   constructor() {
     if (EventDrivenVisibilitySystem.#instance) {
@@ -103,6 +113,23 @@ export class EventDrivenVisibilitySystem {
    * Initialize the system using dependency injection - cleaner architecture
    */
   async initialize() {
+    if (this.#initialized) {
+      return this;
+    }
+
+    if (this.#initializePromise) {
+      return this.#initializePromise;
+    }
+
+    this.#initializePromise = this.#runInitialization().catch((error) => {
+      this.#initializePromise = null;
+      throw error;
+    });
+
+    return this.#initializePromise;
+  }
+
+  async #runInitialization() {
     const log = getLogger('AVS/Init');
     log.debug('initialize:start');
 
@@ -163,6 +190,16 @@ export class EventDrivenVisibilitySystem {
         systemStateProvider: this.#systemStateProvider
       });
 
+      this.#invalidationCoordinator = new AvsInvalidationCoordinator({
+        systemStateProvider: this.#systemStateProvider,
+        visibilityStateManager: this.#visibilityStateManager,
+        cacheManager: this.#cacheManagementService,
+        batchOrchestrator: this.#batchOrchestrator,
+        visionAnalyzer: coreServices.visionAnalyzer,
+        spatialAnalyzer: coreServices.spatialAnalysisService,
+        overrideValidationManager: coreServices.overrideValidationManager,
+      });
+
       // Initialize all event handlers using EventHandlerFactory
       // Handlers register themselves automatically and don't need to be stored
       await EventHandlerFactory.createHandlers(
@@ -175,7 +212,10 @@ export class EventDrivenVisibilitySystem {
           positionManager: coreServices.positionManager,
           cacheManager: this.#cacheManagementService
         },
-        { batchOrchestrator: this.#batchOrchestrator }
+        {
+          batchOrchestrator: this.#batchOrchestrator,
+          invalidationCoordinator: this.#invalidationCoordinator
+        }
       );
 
       // Initialize the optimized visibility calculator with the core components
@@ -200,6 +240,9 @@ export class EventDrivenVisibilitySystem {
     } catch {
       /* best-effort */
     }
+
+    this.#initialized = true;
+    return this;
   }
 
   /**
@@ -316,6 +359,18 @@ export class EventDrivenVisibilitySystem {
     this.#visibilityStateManager.recalculateForTokens(validIds);
   }
 
+  getMovementPerformanceSnapshot() {
+    const movementSnapshot = this.#batchOrchestrator?.getMovementPerformanceSnapshot?.() ?? {
+      active: false,
+      currentSession: null,
+      totals: { suppressedLightingRefreshes: 0 },
+    };
+    return {
+      ...movementSnapshot,
+      pendingMovement: getPendingMovementPerformanceSnapshot(),
+    };
+  }
+
   /**
    * Calculate visibility between two tokens using optimized calculator
    * @param {Token} observer - The observing token
@@ -363,9 +418,10 @@ export class EventDrivenVisibilitySystem {
 
       // 1) Check for active override (persisted flag)
       const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
-      const override = await AvsOverrideManager.getOverride(observer, target);
-      if (typeof override === 'string' && override) return override;
-      if (override?.state) return override.state;
+      const overrideProfile = await AvsOverrideManager.getOverrideProfile(observer, target);
+      if (overrideProfile) {
+        return profileToLegacyVisibility(overrideProfile, { preserveEncounterUnnoticed: true });
+      }
 
 
       // 2) Check current visibility map (observer -> target)

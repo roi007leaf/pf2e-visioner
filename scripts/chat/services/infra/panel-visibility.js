@@ -1,5 +1,4 @@
 import { checkForValidTargets } from '../infra/target-checker.js';
-import { hasActiveEncounter } from './shared-utils.js';
 
 /**
  * Decide whether to inject the automation panel for a given message/action
@@ -24,7 +23,6 @@ export function shouldInjectPanel(message, actionData) {
       // Allow players for Seek when template mode is enabled
       if (
         actionData.actionType === 'seek' &&
-        hasActiveEncounter() &&
         game.settings.get('pf2e-visioner', 'seekUseTemplate')
       ) {
         return true;

@@ -17,7 +17,7 @@ export class CoverUIManager {
     const ctx = dialog?.context ?? {};
     const options = Array.from(ctx.options || []);
 
-    if (ctx.type === 'attack-roll' || ctx.type === 'strike-attack-roll') return true;
+    if (ctx.type === 'attack-roll' || ctx.type === 'strike-attack-roll' || ctx.type === 'impulse-attack-roll') return true;
     if (ctx.type === 'action-check' && ctx.action === 'attack') return true;
 
     const domains = Array.isArray(ctx.domains) ? ctx.domains : [];

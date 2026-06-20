@@ -8,6 +8,10 @@ describe('SeekDialogAdapter', () => {
 
     beforeEach(async () => {
         jest.clearAllMocks();
+        global.canvas = {
+            grid: { size: 100 },
+            scene: { grid: { distance: 5 } },
+        };
 
         const { SeekDialogAdapter } = await import(
             '../../../scripts/visibility/auto-visibility/SeekDialogAdapter.js'
@@ -339,6 +343,35 @@ describe('SeekDialogAdapter', () => {
             expect(result.reason).toContain('10');
         });
 
+        test('caps explicit hearing by active scene hearing range', async () => {
+            global.canvas.scene.flags = { pf2e: { hearingRange: 10 } };
+            mockObserver.center = { x: 0, y: 0 };
+            mockTarget.center = { x: 300, y: 0 };
+            visionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: false,
+                isBlinded: true,
+                isDeafened: false,
+                precise: {},
+                imprecise: {},
+                sensingSummary: {
+                    precise: [],
+                    imprecise: [],
+                    hearing: { acuity: 'imprecise', range: Infinity },
+                },
+            });
+            visionAnalyzer.distanceFeet.mockReturnValue(15);
+            visionAnalyzer.hasPreciseNonVisualInRange.mockReturnValue(false);
+
+            const result = await adapter.determineSenseUsed(mockObserver, mockTarget);
+
+            expect(result.canDetect).toBe(false);
+            expect(result.outOfRange).toBe(true);
+            expect(result.senseType).toBe('hearing');
+            expect(result.range).toBe(10);
+            expect(result.reason).toContain('15');
+            expect(result.reason).toContain('10');
+        });
+
         test('returns cannot detect when no senses available', async () => {
             visionAnalyzer.getVisionCapabilities.mockReturnValue({
                 hasVision: false,
@@ -359,6 +392,32 @@ describe('SeekDialogAdapter', () => {
             expect(result.canDetect).toBe(false);
             expect(result.senseType).toBeNull();
             expect(result.reason).toContain('No senses available');
+        });
+    });
+
+    describe('getAllSensesForDisplay', () => {
+        test('caps explicit hearing display range by active scene hearing range', async () => {
+            global.canvas.scene.flags = { pf2e: { hearingRange: 10 } };
+            jest.spyOn(visionAnalyzer, 'getSensingCapabilities').mockReturnValue({
+                precise: {},
+                imprecise: {},
+            });
+            visionAnalyzer.getVisionCapabilities.mockReturnValue({
+                hasVision: false,
+                isBlinded: false,
+                isDeafened: false,
+                sensingSummary: {
+                    precise: [],
+                    imprecise: [],
+                    hearing: { acuity: 'imprecise', range: Infinity },
+                },
+            });
+
+            const senses = await adapter.getAllSensesForDisplay(mockObserver);
+            const hearing = senses.find((sense) => sense.type === 'hearing');
+
+            expect(hearing.range).toBe(10);
+            expect(hearing.displayRange).toBe('10');
         });
     });
 });

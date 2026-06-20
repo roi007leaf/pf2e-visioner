@@ -49,6 +49,71 @@ describe('API AVS cleanup integration', () => {
     expect(calls.some((c) => c?.[0] === 'pf2e-visioner' && c?.[1] === 'deletedEntryCache')).toBe(true);
   });
 
+  test('clearAllSceneData clears visibilityV2 for rule-element tokens without deleting registry', async () => {
+    const forcedDeletion = foundry.data.operators.ForcedDeletion;
+    const token = global.createMockToken({
+      id: 'rule-token',
+      flags: {
+        'pf2e-visioner': {
+          ruleElementRegistry: { one: true },
+          visibilityV2: { target: { detectionState: 'hidden' } },
+          detection: { target: { sense: 'vision', isPrecise: true } },
+        },
+      },
+    });
+
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    const update = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((entry) => entry._id === 'rule-token');
+
+    expect(update['flags.pf2e-visioner.visibilityV2']).toBe(forcedDeletion);
+    expect(update['flags.pf2e-visioner.detection']).toBe(forcedDeletion);
+    expect(Object.prototype.hasOwnProperty.call(update, 'flags.pf2e-visioner')).toBe(false);
+  });
+
+  test('clearAllSceneData clears stale hover indicators after purge', async () => {
+    const hideAllVisibilityIndicators = jest.fn();
+    const hideAllCoverIndicators = jest.fn();
+    jest.doMock('../../../scripts/services/HoverTooltips.js', () => ({
+      hideAllVisibilityIndicators,
+      hideAllCoverIndicators,
+    }));
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    expect(hideAllVisibilityIndicators).toHaveBeenCalledTimes(1);
+    expect(hideAllCoverIndicators).toHaveBeenCalledTimes(1);
+  });
+
+  test('clearAllSceneData synchronously unsets stubborn token flags before returning', async () => {
+    const token = global.createMockToken({
+      id: 'stubborn-token',
+      flags: {
+        'pf2e-visioner': {
+          visibilityV2: { target: { detectionState: 'undetected' } },
+          detection: { target: { sense: 'vision', isPrecise: true } },
+        },
+      },
+    });
+    canvas.tokens.placeables = [token];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllSceneData();
+
+    expect(ok).toBe(true);
+    expect(token.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'visibilityV2');
+    expect(token.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'detection');
+    expect(token.document.flags['pf2e-visioner']).toBeUndefined();
+  });
+
   test('clearAllSceneData explicitly removes manual cover flags from tokens without rule elements', async () => {
     const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const token = {
@@ -80,8 +145,7 @@ describe('API AVS cleanup integration', () => {
       .find((update) => update._id === 'A');
 
     expect(updateForToken).toEqual(expect.objectContaining({
-      'flags.pf2e-visioner.cover': forcedDeletion,
-      'flags.pf2e-visioner.visibility': forcedDeletion,
+      'flags.pf2e-visioner': forcedDeletion,
     }));
   });
 
@@ -185,6 +249,81 @@ describe('API AVS cleanup integration', () => {
     }
   });
 
+  test('clearAllDataForSelectedTokens clears visibilityV2 data for selected and observing tokens', async () => {
+    const mkToken = (id, flags = {}) => ({
+      id,
+      name: id,
+      actor: {},
+      document: {
+        id,
+        getFlag: jest.fn((moduleId, key) => flags[moduleId]?.[key] ?? null),
+        unsetFlag: jest.fn().mockResolvedValue(true),
+        flags,
+      },
+    });
+
+    const selected = mkToken('selected', {
+      'pf2e-visioner': {
+        visibility: { observer: 'hidden' },
+        visibilityV2: { observer: { detectionState: 'hidden', hasConcealment: true } },
+        detection: { observer: { sense: 'vision', isPrecise: true } },
+      },
+    });
+    const observer = mkToken('observer', {
+      'pf2e-visioner': {
+        visibility: { selected: 'hidden', keep: 'concealed' },
+        visibilityV2: {
+          selected: { detectionState: 'hidden', hasConcealment: true },
+          keep: { detectionState: 'observed', hasConcealment: true },
+        },
+        detection: {
+          selected: { sense: 'vision', isPrecise: true },
+          keep: { sense: 'hearing', isPrecise: false },
+        },
+      },
+    });
+
+    canvas.tokens.placeables = [selected, observer];
+
+    const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+    const ok = await Pf2eVisionerApi.clearAllDataForSelectedTokens([selected]);
+
+    expect(ok).toBe(true);
+
+    const selectedUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'selected');
+    expect(selectedUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.visibilityV2': expect.anything(),
+        'flags.pf2e-visioner.detection': expect.anything(),
+      }),
+    );
+    expect(selectedUpdate).not.toHaveProperty('flags.pf2e-visioner.visibility');
+
+    const observerUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.visibilityV2']);
+    expect(observerUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.visibilityV2': {
+          keep: { detectionState: 'observed', hasConcealment: true },
+        },
+      }),
+    );
+
+    const observerDetectionUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
+      .flatMap((call) => call[1] ?? [])
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.detection']);
+    expect(observerDetectionUpdate).toEqual(
+      expect.objectContaining({
+        'flags.pf2e-visioner.detection': {
+          keep: { sense: 'hearing', isPrecise: false },
+        },
+      }),
+    );
+  });
+
   test('clearAllDataForSelectedTokens unsets other tokens cover map when selected token was last entry', async () => {
     const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const mkToken = (id, flags = {}) => ({
@@ -205,7 +344,7 @@ describe('API AVS cleanup integration', () => {
     const selected = mkToken('A');
     const observer = mkToken('C', {
       cover: { A: 'standard' },
-      visibility: { A: 'hidden' },
+      visibilityV2: { A: { detectionState: 'hidden' } },
     });
     canvas.tokens.placeables = [selected, observer];
 
@@ -219,7 +358,8 @@ describe('API AVS cleanup integration', () => {
 
     expect(updateForObserver).toEqual(expect.objectContaining({
       'flags.pf2e-visioner.cover': forcedDeletion,
-      'flags.pf2e-visioner.visibility': forcedDeletion,
+      'flags.pf2e-visioner.visibilityV2': forcedDeletion,
     }));
+    expect(updateForObserver).not.toHaveProperty('flags.pf2e-visioner.visibility');
   });
 });

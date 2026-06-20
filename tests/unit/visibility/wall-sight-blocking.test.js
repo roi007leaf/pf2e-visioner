@@ -60,6 +60,21 @@ describe('Wall Sight Blocking Fix', () => {
     };
   }
 
+  function makeWall({ c, sight = CONST.WALL_SENSE_TYPES.NONE, sound = CONST.WALL_SENSE_TYPES.NONE }) {
+    return {
+      document: {
+        move: CONST.WALL_SENSE_TYPES.NORMAL,
+        sight,
+        sound,
+        light: CONST.WALL_SENSE_TYPES.NONE,
+        door: 0,
+        ds: 0,
+        threshold: {},
+        c,
+      },
+    };
+  }
+
   beforeEach(() => {
     // Setup mocks
     global.canvas = {
@@ -86,6 +101,10 @@ describe('Wall Sight Blocking Fix', () => {
         PROXIMITY: 30,
         DISTANCE: 40,
       },
+    };
+
+    global.PIXI = {
+      Circle: jest.fn((x, y, radius) => ({ x, y, radius })),
     };
 
     // Mock foundry utilities with proper geometric line-line intersection
@@ -133,6 +152,24 @@ describe('Wall Sight Blocking Fix', () => {
   });
 
   describe('hasLineOfSight - wall blocking logic', () => {
+    test('skips intersection checks for sight walls outside the ray bounds', () => {
+      const observer = makeZeroSizeToken({ id: 'los-prefilter-observer', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'los-prefilter-target', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = Array.from({ length: 100 }, (_, index) =>
+        makeWall({
+          sight: CONST.WALL_SENSE_TYPES.NORMAL,
+          c: [1000 + index * 20, 1000, 1000 + index * 20, 1100],
+        }),
+      );
+      global.foundry.utils.lineLineIntersection.mockClear();
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+
+      expect(result).toBe(true);
+      expect(global.foundry.utils.lineLineIntersection).not.toHaveBeenCalled();
+    });
+
     test('should detect no line of sight when wall blocks sight but not sound', () => {
       const observer = {
         center: { x: 0, y: 0 },
@@ -361,6 +398,26 @@ describe('Wall Sight Blocking Fix', () => {
       expect(result).toBe(true);
     });
 
+    test('should let Visioner proximity walls override a negative Foundry vision polygon', () => {
+      const observer = makeZeroSizeToken({ id: 'proximity-polygon-observer', x: 40, y: 0 });
+      const target = makeZeroSizeToken({ id: 'proximity-polygon-target', x: 100, y: 0 });
+      observer.vision = {
+        los: {
+          points: [0, -100, 50, -100, 50, 100, 0, 100],
+          intersectCircle: jest.fn(() => ({ points: [] })),
+        },
+      };
+
+      global.canvas.walls.placeables = [
+        makeVerticalSightWall(CONST.WALL_SENSE_TYPES.PROXIMITY, 1),
+      ];
+
+      const result = visionAnalyzer.hasLineOfSight(observer, target);
+
+      expect(observer.vision.los.intersectCircle).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+
     test('should attenuate proximity sight beyond the remaining threshold distance', () => {
       const observer = makeZeroSizeToken({ id: 'proximity-attenuated-observer', x: 40, y: 0 });
       const target = makeZeroSizeToken({ id: 'proximity-attenuated-target', x: 100, y: 0 });
@@ -557,6 +614,29 @@ describe('Wall Sight Blocking Fix', () => {
   });
 
   describe('isSoundBlocked - proximity wall logic', () => {
+    test('prefilters sound wall intersection checks to ray bounds', () => {
+      const observer = makeZeroSizeToken({ id: 'sound-prefilter-listener', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'sound-prefilter-source', x: 100, y: 0 });
+      const farWalls = Array.from({ length: 100 }, (_, index) =>
+        makeWall({
+          sound: CONST.WALL_SENSE_TYPES.NORMAL,
+          c: [1000 + index * 20, 1000, 1000 + index * 20, 1100],
+        }),
+      );
+      const blockingWall = makeWall({
+        sound: CONST.WALL_SENSE_TYPES.NORMAL,
+        c: [50, -10, 50, 10],
+      });
+
+      global.canvas.walls.placeables = [...farWalls, blockingWall];
+      global.foundry.utils.lineLineIntersection.mockClear();
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+
+      expect(result).toBe(true);
+      expect(global.foundry.utils.lineLineIntersection).toHaveBeenCalledTimes(1);
+    });
+
     test('should allow sound through proximity walls when sound source target is within threshold', () => {
       const observer = makeZeroSizeToken({ id: 'sound-proximity-listener-far', x: 0, y: 0 });
       const target = makeZeroSizeToken({ id: 'sound-proximity-source-near', x: 60, y: 0 });

@@ -4,6 +4,7 @@
 
 import { SPECIAL_SENSES } from '../../../../scripts/constants.js';
 import { VisionAnalyzer } from '../../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { TokenSenseSignatureCache } from '../../../../scripts/visibility/auto-visibility/core/TokenSenseSignatureCache.js';
 
 // Mock canvas and game globals
 global.canvas = {
@@ -16,6 +17,16 @@ global.game = {
     get: jest.fn(() => false),
   },
 };
+
+function preparedSense(type, { acuity = 'imprecise', range = 60 } = {}) {
+  const sense = { key: type };
+  Object.defineProperty(sense, 'value', {
+    configurable: true,
+    enumerable: false,
+    value: { type, acuity, range, source: null },
+  });
+  return sense;
+}
 
 describe('Special Senses Range Detection', () => {
   let visionAnalyzer;
@@ -257,6 +268,64 @@ describe('Special Senses Range Detection', () => {
       }
     });
 
+    test('handles PF2e prepared Sense.value acuity and range correctly', () => {
+      const freshVisionAnalyzer = new VisionAnalyzer();
+      freshVisionAnalyzer.clearVisionCache();
+      const tremorsense = preparedSense('tremorsense', { acuity: 'precise', range: 60 });
+      const observerToken = {
+        id: 'prepared-tremorsense-observer-' + Date.now(),
+        center: { x: 100, y: 100 },
+        document: { elevation: 0, detectionModes: [] },
+        actor: {
+          perception: {
+            senses: new Map([['tremorsense', tremorsense]]),
+          },
+          system: { perception: { senses: [] } },
+        },
+      };
+
+      let capabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+      expect(capabilities.precise.tremorsense).toBe(60);
+      expect(capabilities.imprecise.tremorsense).toBeUndefined();
+
+      tremorsense.value.acuity = 'imprecise';
+      tremorsense.value.range = 30;
+      freshVisionAnalyzer.clearVisionCache();
+      capabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+
+      expect(capabilities.precise.tremorsense).toBeUndefined();
+      expect(capabilities.imprecise.tremorsense).toBe(30);
+    });
+
+    test('uses cheap capability cache keys for repeated prepared-sense reads', () => {
+      const freshVisionAnalyzer = new VisionAnalyzer();
+      freshVisionAnalyzer.clearVisionCache();
+      const signatureSpy = jest.spyOn(TokenSenseSignatureCache.prototype, 'getEntry');
+      const tremorsense = { type: 'tremorsense', acuity: 'precise', range: 60 };
+      const observerToken = {
+        id: 'prepared-tremorsense-cache-observer-' + Date.now(),
+        center: { x: 100, y: 100 },
+        document: { id: 'prepared-tremorsense-cache-observer', elevation: 0, detectionModes: [] },
+        actor: {
+          perception: {
+            senses: new Map([['tremorsense', tremorsense]]),
+          },
+          system: { perception: { senses: [] } },
+        },
+      };
+
+      try {
+        const firstCapabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+        const cachedCapabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+
+        expect(firstCapabilities.precise.tremorsense).toBe(60);
+        expect(cachedCapabilities.precise.tremorsense).toBe(60);
+        expect(signatureSpy).not.toHaveBeenCalled();
+      } finally {
+        signatureSpy.mockRestore();
+      }
+    });
+
     test('handles missing special senses gracefully', () => {
       const token = {
         actor: {
@@ -305,6 +374,87 @@ describe('Special Senses Range Detection', () => {
       expect(summary.imprecise).toEqual(
         expect.arrayContaining([{ type: 'hearing', range: 30 }]),
       );
+    });
+
+    test('uses active PF2e scene hearing range for implicit hearing', () => {
+      const previousCanvas = global.canvas;
+      global.canvas = {
+        ...previousCanvas,
+        scene: {
+          id: 'active-scene',
+          grid: { distance: 5 },
+          flags: { pf2e: { hearingRange: 20 } },
+        },
+      };
+      visionAnalyzer.clearVisionCache();
+
+      const token = {
+        id: 'scene-hearing-observer',
+        actor: {
+          hasCondition: jest.fn(() => false),
+          system: {
+            perception: {
+              senses: [],
+            },
+          },
+        },
+        document: {
+          id: 'scene-hearing-observer',
+          detectionModes: [],
+        },
+      };
+
+      let summary;
+      try {
+        summary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+      } finally {
+        global.canvas = previousCanvas;
+      }
+
+      expect(summary.hearing).toEqual({ acuity: 'imprecise', range: 20 });
+      expect(summary.imprecise).toEqual(
+        expect.arrayContaining([{ type: 'hearing', range: 20 }]),
+      );
+    });
+
+    test('refreshes cached hearing when active scene hearing range changes', () => {
+      const previousCanvas = global.canvas;
+      global.canvas = {
+        ...previousCanvas,
+        scene: {
+          id: 'active-scene',
+          grid: { distance: 5 },
+          flags: { pf2e: { hearingRange: 20 } },
+        },
+      };
+      const token = {
+        id: 'cached-scene-hearing-observer',
+        actor: {
+          hasCondition: jest.fn(() => false),
+          system: {
+            perception: {
+              senses: [],
+            },
+          },
+        },
+        document: {
+          id: 'cached-scene-hearing-observer',
+          detectionModes: [],
+        },
+      };
+
+      let firstSummary;
+      let secondSummary;
+      try {
+        firstSummary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+        global.canvas.scene.flags.pf2e.hearingRange = 40;
+        secondSummary = visionAnalyzer.getVisionCapabilities(token).sensingSummary;
+      } finally {
+        global.canvas = previousCanvas;
+      }
+
+      expect(firstSummary.hearing).toEqual({ acuity: 'imprecise', range: 20 });
+      expect(secondSummary.hearing).toEqual({ acuity: 'imprecise', range: 40 });
     });
   });
 });

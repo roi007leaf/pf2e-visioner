@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { getVisibilityBetween } from '../../stores/visibility-map.js';
 
 export const SEARCH_EXPLORATION_FLAG = 'searchExploration';
 
@@ -106,6 +107,36 @@ function collectionHasSearchExplorationEffect(collection, requireEffectType = fa
   });
 }
 
+function resolveActorItem(actor, itemId) {
+  if (!actor || !itemId) return null;
+  try {
+    const direct = actor.items?.get?.(itemId);
+    if (direct) return direct;
+  } catch {}
+
+  return (
+    collectionValues(actor.items).find((item) => item?.id === itemId || item?._id === itemId) ||
+    null
+  );
+}
+
+function activeExplorationIdsIncludeSearchActivity(actor) {
+  const exploration = actor?.system?.exploration;
+  const activeIds = collectionValues(exploration).filter((entry) => typeof entry === 'string');
+  return activeIds.some((id) => objectLooksLikeSearchActivity(resolveActorItem(actor, id)));
+}
+
+function createActorSearchActivityReader() {
+  const cache = new WeakMap();
+  return (actor) => {
+    if (!actor || typeof actor !== 'object') return actorHasSearchExplorationActivity(actor);
+    if (!cache.has(actor)) {
+      cache.set(actor, actorHasSearchExplorationActivity(actor));
+    }
+    return cache.get(actor);
+  };
+}
+
 export function actorHasSearchExplorationActivity(actor) {
   try {
     if (!actor) return false;
@@ -118,7 +149,12 @@ export function actorHasSearchExplorationActivity(actor) {
       actor.flags?.pf2e?.party?.exploration,
     ];
 
-    if (candidates.some((candidate) => valueHasSearchActivity(candidate))) return true;
+    if (
+      candidates.some((candidate) => valueHasSearchActivity(candidate)) ||
+      activeExplorationIdsIncludeSearchActivity(actor)
+    ) {
+      return true;
+    }
 
     return (
       collectionHasSearchExplorationEffect(actor.itemTypes?.effect) ||
@@ -373,8 +409,9 @@ function makeActorSearchSeeker(actor, visibilityTarget = null) {
 }
 
 function getActorSearchExplorationSeekers() {
+  const hasSearchActivity = createActorSearchActivityReader();
   return getActorCollectionValues(game?.actors)
-    .filter((actor) => isPlayerCharacterActor(actor) && actorHasSearchExplorationActivity(actor))
+    .filter((actor) => isPlayerCharacterActor(actor) && hasSearchActivity(actor))
     .map((actor) => makeActorSearchSeeker(actor));
 }
 
@@ -403,8 +440,7 @@ function tokenIsHiddenByVisionerToAnyPC(token) {
   const tokens = canvas?.tokens?.placeables || [];
   return tokens.some((observer) => {
     if (!isPlayerCharacterToken(observer) || getTokenId(observer) === targetId) return false;
-    const visibilityMap = observer?.document?.getFlag?.(MODULE_ID, 'visibility') || {};
-    const visibility = visibilityMap?.[targetId];
+    const visibility = getVisibilityBetween(observer, token);
     return visibility === 'hidden' || visibility === 'undetected';
   });
 }
@@ -469,10 +505,11 @@ export function isSearchExplorationWallTarget(wall) {
 export function getSearchExplorationSeekers(targetToken, tokens = canvas?.tokens?.placeables || []) {
   const targetId = getTokenId(targetToken);
   const tokenList = tokens || [];
+  const hasSearchActivity = createActorSearchActivityReader();
   const tokenSeekers = tokenList.filter((token) => {
     if (!token?.actor) return false;
     if (getTokenId(token) === targetId) return false;
-    return isPlayerCharacterToken(token) && actorHasSearchExplorationActivity(token.actor);
+    return isPlayerCharacterToken(token) && hasSearchActivity(token.actor);
   });
 
   const hasPcTokensOnScene = tokenList.some(

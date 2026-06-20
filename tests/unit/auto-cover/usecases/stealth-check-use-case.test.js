@@ -151,7 +151,7 @@ describe('StealthCheckUseCase', () => {
       expect(getCoverBetween).toHaveBeenCalledWith(observerToken, hiderToken);
     });
 
-    test('should ignore observers with no line of sight and no detected cover', async () => {
+    test('should ignore observers with no detected cover without consulting PF2E LOS', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
       const blockedObserver = mockToken({ id: 'blocked', x: 10, y: 10, name: 'Blocked', alliance: 'opposition' });
       const visibleObserver = mockToken({ id: 'visible', x: 2, y: 2, name: 'Visible', alliance: 'opposition' });
@@ -183,9 +183,10 @@ describe('StealthCheckUseCase', () => {
         'none',
         expect.any(Function),
       );
+      expect(mockHasLineOfSight).not.toHaveBeenCalled();
     });
 
-    test('should use detected cover from hostile observers even when PF2E LOS is blocked', async () => {
+    test('should use detected cover from hostile observers without consulting PF2E LOS', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, alliance: 'party' });
       const wallCoveredObserver = mockToken({ id: 'covered', x: 10, y: 10, name: 'Covered', alliance: 'opposition' });
 
@@ -214,6 +215,7 @@ describe('StealthCheckUseCase', () => {
         'none',
         expect.any(Function),
       );
+      expect(mockHasLineOfSight).not.toHaveBeenCalled();
     });
 
     test('should apply selected cover modifier to the dialog check before rolling', async () => {
@@ -491,7 +493,7 @@ describe('StealthCheckUseCase', () => {
       expect(mockCheck.push).not.toHaveBeenCalled();
     });
 
-    test('should treat VisionAnalyzer returning undefined as having LOS', async () => {
+    test('should not require VisionAnalyzer when cover detector finds cover', async () => {
       const hiderToken = mockToken({ id: 'hider', isOwner: true, x: 0, y: 0, name: 'Hider', alliance: 'party' });
       const observerToken = mockToken({ id: 'observer', x: 5, y: 5, name: 'Observer', alliance: 'opposition' });
 
@@ -506,6 +508,7 @@ describe('StealthCheckUseCase', () => {
       await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
 
       expect(stealthCheckUseCase._detectCover).toHaveBeenCalledWith(observerToken, hiderToken);
+      expect(mockHasLineOfSight).not.toHaveBeenCalled();
     });
   });
 

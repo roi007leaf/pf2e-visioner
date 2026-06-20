@@ -240,4 +240,210 @@ describe('BatchProcessor - Observer Movement Override Fix', () => {
             ]),
         );
     });
+
+    test('moving observer updates an undetected target to observed', async () => {
+        getActiveOverride.mockImplementation(() => null);
+        getVisibilityMap.mockImplementation((token) => {
+            if (token.document.id === 'A') return { B: 'undetected' };
+            return {};
+        });
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+
+        const visionAnalyzer = {
+            hasLineOfSight: jest.fn(() => true),
+            getVisionCapabilities: jest.fn(() => ({
+                sensingSummary: { precise: [], imprecise: [] },
+                isDeafened: false,
+            })),
+        };
+
+        processor = new BatchProcessor({
+            spatialAnalyzer,
+            viewportFilterService,
+            optimizedVisibilityCalculator,
+            globalLosCache,
+            globalVisibilityCache,
+            positionManager,
+            overrideService: { getActiveOverrideForTokens: getActiveOverride },
+            visibilityMapService: { getVisibilityMap },
+            visionAnalyzer,
+            maxVisibilityDistance: 20
+        });
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {
+            isMovementBatch: true,
+            skipPrecomputedLOS: true,
+        });
+
+        expect(res.updates).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    visibility: 'observed',
+                    explicitVisiblePair: true,
+                }),
+            ]),
+        );
+    });
+
+    test('movement source-polygon LOS can reveal a hidden target when analyzer LOS is conservative', async () => {
+        getActiveOverride.mockImplementation(() => null);
+        getVisibilityMap.mockImplementation((token) => {
+            if (token.document.id === 'A') return { B: 'hidden' };
+            return {};
+        });
+
+        const visionAnalyzer = {
+            hasLineOfSight: jest.fn(() => false),
+            getVisionCapabilities: jest.fn(() => ({
+                sensingSummary: { precise: [], imprecise: [] },
+                isDeafened: false,
+            })),
+        };
+        const movementSightLineResolver = jest.fn((observer, target) =>
+            observer?.document?.id === 'A' && target?.document?.id === 'B'
+        );
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(
+            async (observer, target, _observerPosition, _targetPosition, options) => {
+                const key = `${observer.document.id}-${target.document.id}`;
+                return options?.precomputedLOS?.get(key) === true ? 'observed' : 'hidden';
+            },
+        );
+
+        processor = new BatchProcessor({
+            spatialAnalyzer,
+            viewportFilterService,
+            optimizedVisibilityCalculator,
+            globalLosCache,
+            globalVisibilityCache,
+            positionManager,
+            overrideService: { getActiveOverrideForTokens: getActiveOverride },
+            visibilityMapService: { getVisibilityMap },
+            visionAnalyzer,
+            movementSightLineResolver,
+            maxVisibilityDistance: 20
+        });
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {
+            isMovementBatch: true,
+            skipPrecomputedLOS: true,
+        });
+
+        expect(visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+            'sight',
+        );
+        expect(movementSightLineResolver).toHaveBeenCalledWith(
+            expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+            expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+        );
+        expect(res.updates).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    visibility: 'observed',
+                    explicitVisiblePair: true,
+                }),
+            ]),
+        );
+    });
+
+    test('movement batch falls back to all tokens when spatial index returns no candidates', async () => {
+        global.canvas.tokens.placeables = [
+            makeToken('A', 0, 0),
+            makeToken('B', 1000, 0),
+        ];
+        getActiveOverride.mockImplementation(() => null);
+        getVisibilityMap.mockImplementation((token) => {
+            if (token.document.id === 'A') return { B: 'undetected' };
+            return {};
+        });
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+
+        const visionAnalyzer = {
+            hasLineOfSight: jest.fn(() => true),
+            getVisionCapabilities: jest.fn(() => ({
+                sensingSummary: { precise: [], imprecise: [] },
+                isDeafened: false,
+            })),
+        };
+
+        processor = new BatchProcessor({
+            spatialAnalyzer,
+            viewportFilterService,
+            optimizedVisibilityCalculator,
+            globalLosCache,
+            globalVisibilityCache,
+            positionManager,
+            overrideService: { getActiveOverrideForTokens: getActiveOverride },
+            visibilityMapService: { getVisibilityMap },
+            visionAnalyzer,
+            maxVisibilityDistance: 0.01
+        });
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {
+            isMovementBatch: true,
+            skipPrecomputedLOS: true,
+        });
+
+        expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
+        expect(res.updates).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    visibility: 'observed',
+                }),
+            ]),
+        );
+    });
+
+    test('movement emits detection sync when visible state matches default observed', async () => {
+        getActiveOverride.mockImplementation(() => null);
+        getVisibilityMap.mockImplementation(() => ({}));
+        optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+
+        const visionAnalyzer = {
+            hasLineOfSight: jest.fn(() => true),
+            getVisionCapabilities: jest.fn(() => ({
+                sensingSummary: { precise: [], imprecise: [] },
+                isDeafened: false,
+            })),
+        };
+
+        processor = new BatchProcessor({
+            spatialAnalyzer,
+            viewportFilterService,
+            optimizedVisibilityCalculator,
+            globalLosCache,
+            globalVisibilityCache,
+            positionManager,
+            overrideService: { getActiveOverrideForTokens: getActiveOverride },
+            visibilityMapService: { getVisibilityMap },
+            visionAnalyzer,
+            maxVisibilityDistance: 20
+        });
+
+        const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {
+            movementSession: { sessionId: 'move-1' },
+            skipPrecomputedLOS: true,
+            isMovementBatch: true,
+        });
+
+        expect(res.updates).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    observer: expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+                    target: expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+                    visibility: 'observed',
+                    forceDetectionSyncOnly: true,
+                    explicitVisiblePair: true,
+                }),
+            ]),
+        );
+    });
+
 });

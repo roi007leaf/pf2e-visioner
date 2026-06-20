@@ -96,7 +96,11 @@ describe('Token HUD buttons', () => {
     const pc = createMockToken({
       id: 'searching-pc',
       actor: createMockActor({ type: 'character', hasPlayerOwner: true }),
-      flags: { [MODULE_ID]: { visibility: { 'visioner-hidden-npc': 'hidden' } } },
+      flags: {
+        [MODULE_ID]: {
+          visibilityV2: { 'visioner-hidden-npc': { detectionState: 'hidden' } },
+        },
+      },
     });
     canvas.tokens.placeables = [pc, hiddenNpc];
 

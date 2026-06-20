@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../../constants.js';
+import { ActionQualifier } from '../../../rule-elements/operations/ActionQualifier.js';
 import { getVisibilityBetween } from '../../../utils.js';
 // Debug logger removed
 import { isTokenWithinTemplate, shouldFilterAlly } from './shared-utils.js';
@@ -20,6 +21,67 @@ function getWallCenter(wall) {
   return null;
 }
 
+function memoize(fn) {
+  let hasValue = false;
+  let value;
+  return () => {
+    if (!hasValue) {
+      value = fn();
+      hasValue = true;
+    }
+    return value;
+  };
+}
+
+function getSubjectId(subject) {
+  return subject?.document?.id ?? subject?.id ?? subject?.actor?.id ?? null;
+}
+
+function createCachedVisibilityReader() {
+  const cache = new Map();
+  return (observer, target) => {
+    const observerId = getSubjectId(observer);
+    const targetId = getSubjectId(target);
+    if (!observerId || !targetId) return getVisibilityBetween(observer, target);
+
+    const key = `${observerId}->${targetId}`;
+    if (!cache.has(key)) {
+      cache.set(key, getVisibilityBetween(observer, target));
+    }
+    return cache.get(key);
+  };
+}
+
+function createTargetCheckContext(actionData) {
+  return {
+    getVisibilityBetween: createCachedVisibilityReader(),
+    getSeekerPerceptionRank: memoize(() => {
+      const stat = actionData.actor?.actor?.getStatistic?.('perception');
+      return Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
+    }),
+    getActorRollOptions: memoize(() => {
+      const rollOptions = actionData.actor?.actor?.getRollOptions?.();
+      return Array.isArray(rollOptions) ? rollOptions : [];
+    }),
+    actorIsConcealed: memoize(() => {
+      const itemTypeConditions = actionData.actor?.actor?.itemTypes?.condition || [];
+      const legacyConditions = actionData.actor?.actor?.conditions?.conditions || [];
+      return (
+        itemTypeConditions.some((c) => c?.slug === 'concealed') ||
+        legacyConditions.some((c) => c?.slug === 'concealed')
+      );
+    }),
+  };
+}
+
+function seekIgnoresConcealment(actionData, target) {
+  try {
+    return ActionQualifier.ignoreConcealment(actionData.actor, 'seek', target);
+  } catch {
+    return false;
+  }
+}
+
 export function checkForValidTargets(actionData) {
   // Guard: canvas or tokens not ready yet in early hook timings
   const tokenLayer = canvas?.tokens;
@@ -34,13 +96,14 @@ export function checkForValidTargets(actionData) {
     if (actorType !== 'character' && actorType !== 'npc' && actorType !== 'hazard') return false;
     return true;
   });
+  const checkContext = createTargetCheckContext(actionData);
 
   switch (actionData.actionType) {
     case 'consequences':
       if (potentialTargets.length === 0) return false;
-      return checkConsequencesTargets(actionData, potentialTargets);
+      return checkConsequencesTargets(actionData, potentialTargets, checkContext);
     case 'seek':
-      return checkSeekTargets(actionData, potentialTargets);
+      return checkSeekTargets(actionData, potentialTargets, checkContext);
     case 'point-out':
       if (potentialTargets.length === 0) return false;
       return checkPointOutTargets(actionData, potentialTargets);
@@ -58,20 +121,15 @@ export function checkForValidTargets(actionData) {
   }
 }
 
-function checkConsequencesTargets(actionData, potentialTargets) {
+function checkConsequencesTargets(actionData, potentialTargets, checkContext) {
   for (const target of potentialTargets) {
     if (shouldFilterAlly(actionData.actor, target, 'enemies', actionData?.ignoreAllies)) {
       continue;
     }
-    let visibility = getVisibilityBetween(target, actionData.actor);
+    let visibility = checkContext.getVisibilityBetween(target, actionData.actor);
 
     try {
-      const itemTypeConditions = actionData.actor?.actor?.itemTypes?.condition || [];
-      const legacyConditions = actionData.actor?.actor?.conditions?.conditions || [];
-      const actorIsConcealed =
-        itemTypeConditions.some((c) => c?.slug === 'concealed') ||
-        legacyConditions.some((c) => c?.slug === 'concealed');
-      if (visibility === 'observed' && actorIsConcealed) {
+      if (visibility === 'observed' && checkContext.actorIsConcealed()) {
         visibility = 'concealed';
       }
     } catch (error) {
@@ -85,7 +143,7 @@ function checkConsequencesTargets(actionData, potentialTargets) {
   return false;
 }
 
-function checkSeekTargets(actionData, potentialTargets) {
+function checkSeekTargets(actionData, potentialTargets, checkContext) {
   try {
     const scene = canvas?.scene;
     if (scene) {
@@ -146,8 +204,7 @@ function checkSeekTargets(actionData, potentialTargets) {
               lootToken.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0,
             );
             if (Number.isFinite(minRank) && minRank > 0) {
-              const stat = actionData.actor?.actor?.getStatistic?.('perception');
-              const seekerRank = Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
+              const seekerRank = checkContext.getSeekerPerceptionRank();
               if (Number.isFinite(seekerRank) && seekerRank >= minRank) {
                 return true;
               }
@@ -160,14 +217,18 @@ function checkSeekTargets(actionData, potentialTargets) {
     }
   } catch (_) {}
 
+  const hasHiddenOrUndetectedRollOption = memoize(() =>
+    checkContext
+      .getActorRollOptions()
+      .some((opt) => opt.includes('target:hidden') || opt.includes('target:undetected')),
+  );
   for (const target of potentialTargets) {
     // Check if target is a hazard/loot with a minimum perception rank
     try {
       if (target?.actor && (target.actor.type === 'hazard' || target.actor.type === 'loot')) {
         const minRank = Number(target.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0);
         if (Number.isFinite(minRank) && minRank > 0) {
-          const stat = actionData.actor?.actor?.getStatistic?.('perception');
-          const seekerRank = Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
+          const seekerRank = checkContext.getSeekerPerceptionRank();
           if (!(Number.isFinite(seekerRank) && seekerRank >= minRank)) {
             // Not enough proficiency: indicate special row action state and skip as a valid seek target
             actionData._visionerSeekProficiencyBlocked = true;
@@ -188,8 +249,7 @@ function checkSeekTargets(actionData, potentialTargets) {
           // Check perception rank requirement if set
           const minRank = Number(target.document?.getFlag?.(MODULE_ID, 'minPerceptionRank') ?? 0);
           if (Number.isFinite(minRank) && minRank > 0) {
-            const stat = actionData.actor?.actor?.getStatistic?.('perception');
-            const seekerRank = Number(stat?.proficiency?.rank ?? stat?.rank ?? 0);
+            const seekerRank = checkContext.getSeekerPerceptionRank();
             if (!(Number.isFinite(seekerRank) && seekerRank >= minRank)) {
               // Not enough proficiency: indicate special row action state and skip as a valid seek target
               actionData._visionerSeekProficiencyBlocked = true;
@@ -202,8 +262,9 @@ function checkSeekTargets(actionData, potentialTargets) {
       }
     } catch (_) {}
 
-    const visibility = getVisibilityBetween(actionData.actor, target);
+    const visibility = checkContext.getVisibilityBetween(actionData.actor, target);
     if (['hidden', 'undetected'].includes(visibility)) return true;
+    if (visibility === 'concealed' && seekIgnoresConcealment(actionData, target)) return true;
     if (target.actor) {
       const conditions = target.actor.conditions?.conditions || [];
       const isHiddenOrUndetected = conditions.some((c) =>
@@ -211,13 +272,7 @@ function checkSeekTargets(actionData, potentialTargets) {
       );
       if (isHiddenOrUndetected) return true;
     }
-    if (actionData.actor.actor?.getRollOptions) {
-      const rollOptions = actionData.actor.actor.getRollOptions();
-      const hasHiddenOrUndetected = rollOptions.some(
-        (opt) => opt.includes('target:hidden') || opt.includes('target:undetected'),
-      );
-      if (hasHiddenOrUndetected) return true;
-    }
+    if (hasHiddenOrUndetectedRollOption()) return true;
   }
   return false;
 }

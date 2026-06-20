@@ -7,34 +7,12 @@ import { COVER_STATES } from '../../../constants.js';
 import { getCoverLabel, getCoverStealthBonusByState } from '../../../helpers/cover-helpers.js';
 import { CoverModifierService } from '../../../services/CoverModifierService.js';
 import { getCoverBetween } from '../../../utils.js';
-import { VisionAnalyzer } from '../../../visibility/auto-visibility/VisionAnalyzer.js';
 import autoCoverSystem from '../AutoCoverSystem.js';
 import { BaseAutoCoverUseCase } from './BaseUseCase.js';
-
-const coverPrecedence = {
-  none: 0,
-  lesser: 1,
-  standard: 2,
-  greater: 4,
-};
-
-function _isHostile(token, hider) {
-  const hiderAlliance = hider.actor?.alliance;
-  const tokenAlliance = token.actor?.alliance;
-  if (!hiderAlliance || !tokenAlliance) return false;
-  if (tokenAlliance === 'neutral') return false;
-  return tokenAlliance !== hiderAlliance;
-}
-
-function _hasLineOfSight(observer, hider) {
-  try {
-    const result = VisionAnalyzer.getInstance().hasLineOfSight(observer, hider);
-    if (result === undefined) return true;
-    return result;
-  } catch {
-    return true;
-  }
-}
+import {
+  analyzeStealthObserverCover,
+  collectStealthObservers,
+} from './stealth-observer-analysis.js';
 
 class StealthCheckUseCase extends BaseAutoCoverUseCase {
   constructor() {
@@ -290,40 +268,16 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
       let detectedState = 'none';
       let highestFoundManualCover = 'none';
       try {
-        const observers = (canvas?.tokens?.placeables || []).filter(
-          (t) => t && t.actor && t.id !== hider.id &&
-            _isHostile(t, hider),
-        );
-        for (const obs of observers) {
-          const hasLineOfSight = _hasLineOfSight(obs, hider);
-          // First check for manual cover between tokens
-          let s = null;
-          try {
-            const manualCover = getCoverBetween(obs, hider);
-            if (manualCover && manualCover !== 'none') {
-              s = manualCover;
-              highestFoundManualCover =
-                coverPrecedence[manualCover] > coverPrecedence[highestFoundManualCover]
-                  ? manualCover
-                  : highestFoundManualCover;
-            }
-          } catch (_) { }
-
-          // Fallback to auto-detection if no manual cover
-          if (!s) {
-            s = this._detectCover(obs, hider);
-          }
-
-          if (!hasLineOfSight && (!s || s === 'none')) {
-            continue;
-          }
-
-          if (s && s !== 'none') {
-            target = obs;
-            detectedState = coverPrecedence[detectedState] < coverPrecedence[s] ? s : detectedState;
-          }
-        }
+        const analysis = analyzeStealthObserverCover({
+          hider,
+          detectCover: (observer, subject) => this._detectCover(observer, subject),
+        });
+        target = analysis.target;
+        detectedState = analysis.detectedState;
+        highestFoundManualCover = analysis.highestFoundManualCover;
       } catch (_) { }
+      const analyzedHider = hider;
+      const rollOverrideObservers = collectStealthObservers(hider, { mode: 'all-actors' });
 
       // Inject cover override UI, using a callback to apply stealth-specific behavior on chosen state
       try {
@@ -374,9 +328,10 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
 
                 // Additionally store roll-specific overrides for Hide/Sneak across all observers
                 if (chosen !== 'none') {
-                  const observers = (canvas?.tokens?.placeables || []).filter(
-                    (t) => t && t.actor && t.id !== hider?.id,
-                  );
+                  const observers =
+                    hider?.id === analyzedHider?.id
+                      ? rollOverrideObservers
+                      : collectStealthObservers(hider, { mode: 'all-actors' });
                   for (const obs of observers) {
                     this.autoCoverSystem.setRollOverride(hider, obs, rollId, detectedState, chosen);
                   }
@@ -513,47 +468,21 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
             } catch (_) { }
 
             // If not overridden, evaluate cover against all other tokens and pick the best (highest stealth bonus)
-            const observers = (canvas?.tokens?.placeables || []).filter(
-              (t) => t && t.actor && t.id !== hider.id
-                && (t.actor.alliance !== 'party' && t.actor?.alliance !== 'neutral'),
-            );
+            let observers = [];
             let highestFoundManualCover = 'none';
             if (!state) {
-              let detectedState = 'none';
               try {
-                for (const obs of observers) {
-                  try {
-                    const hasLineOfSight = _hasLineOfSight(obs, hider);
-                    // First check for manual cover between tokens
-                    let s = null;
-                    try {
-                      const manualCover = getCoverBetween(obs, hider);
-                      if (manualCover && manualCover !== 'none') {
-                        s = manualCover;
-                        highestFoundManualCover =
-                          coverPrecedence[manualCover] > coverPrecedence[highestFoundManualCover]
-                            ? manualCover
-                            : highestFoundManualCover;
-                      }
-                    } catch (_) { }
-
-                    // Fallback to auto-detection if no manual cover
-                    if (!s) {
-                      s = this._detectCover(obs, hider);
-                    }
-
-                    if (!hasLineOfSight && (!s || s === 'none')) {
-                      continue;
-                    }
-
-                    if (s) {
-                      detectedState =
-                        coverPrecedence[detectedState] < coverPrecedence[s] ? s : detectedState;
-                    }
-                  } catch (_) { }
-                }
+                const analysis = analyzeStealthObserverCover({
+                  hider,
+                  observerMode: 'non-party',
+                  detectCover: (observer, subject) => this._detectCover(observer, subject),
+                });
+                observers = analysis.observers;
+                highestFoundManualCover = analysis.highestFoundManualCover;
+                state = analysis.detectedState;
               } catch (_) { }
-              state = detectedState;
+            } else {
+              observers = collectStealthObservers(hider, { mode: 'non-party' });
             }
 
             // Store the original state before any popup changes
@@ -593,15 +522,15 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
                 // Only store as override if it actually changed
                 if (state !== originalDetectedState) {
                   // Store a roll-specific override so it won't leak into later dialogs
-                  observers.map((obs) =>
+                  for (const obs of observers) {
                     this.autoCoverSystem.setRollOverride(
                       hider,
                       obs,
                       rollId,
                       originalDetectedState,
                       state,
-                    ),
-                  );
+                    );
+                  }
                   isOverride = true;
                 }
               }

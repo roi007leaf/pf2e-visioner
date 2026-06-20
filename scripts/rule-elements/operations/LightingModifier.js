@@ -1,3 +1,4 @@
+import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { PredicateHelper } from '../PredicateHelper.js';
 
 export class LightingModifier {
@@ -36,7 +37,7 @@ export class LightingModifier {
     } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
     } else if (canvas?.perception) {
-      canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+      scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
     }
   }
 

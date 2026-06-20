@@ -560,9 +560,9 @@ describe('Wall Height Integration with Different Creature Sizes', () => {
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockAttacker, mockTarget);
 
-      // With 9-point sampling, a 3ft wall may not block all corner rays for tiny creatures
-      // This is physically accurate - tiny creatures can see around short walls
-      expect(hasLOS).toBe(true);
+      // Vision LOS uses conservative core-style target points when Foundry visibility
+      // points are unavailable, so a just-taller wall blocks ground-level sight.
+      expect(hasLOS).toBe(false);
     });
   });
 
@@ -597,9 +597,9 @@ describe('Wall Height Integration with Different Creature Sizes', () => {
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockAttacker, mockTarget);
 
-      // With 9-point sampling, an 11ft wall may not block all corner rays for large creatures (10ft tall)
-      // This is physically accurate - creatures can see around walls that don't fully cover their height
-      expect(hasLOS).toBe(true);
+      // Vision LOS uses conservative core-style target points when Foundry visibility
+      // points are unavailable, so a just-taller wall blocks ground-level sight.
+      expect(hasLOS).toBe(false);
     });
   });
 
@@ -634,9 +634,9 @@ describe('Wall Height Integration with Different Creature Sizes', () => {
 
       const hasLOS = visionAnalyzer.hasLineOfSight(mockAttacker, mockTarget);
 
-      // With 9-point sampling, a 21ft wall may not block all corner rays for gargantuan creatures (20ft tall)
-      // This is physically accurate - creatures can see around walls that don't fully cover their height
-      expect(hasLOS).toBe(true);
+      // Vision LOS uses conservative core-style target points when Foundry visibility
+      // points are unavailable, so a just-taller wall blocks ground-level sight.
+      expect(hasLOS).toBe(false);
     });
   });
 

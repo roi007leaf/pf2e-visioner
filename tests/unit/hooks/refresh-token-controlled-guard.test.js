@@ -1,6 +1,6 @@
 import '../../setup.js';
 
-import { getMatchingControlledTokenForRefresh } from '../../../scripts/hooks/registration.js';
+import { getMatchingControlledTokenForRefresh } from '../../../scripts/services/system-hidden-token-highlights.js';
 
 describe('refreshToken controlled-token guard', () => {
   test('matches by document id before importing visual effect helpers', () => {

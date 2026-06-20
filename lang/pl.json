@@ -76,6 +76,7 @@
       "avs": "AVS",
       "observed": "Obserwowany",
       "concealed": "Przysłonięty",
+      "observed_concealed": "Obserwowany + przysłonięty",
       "hidden": "Ukryty",
       "undetected": "Niewykryty",
       "unnoticed": "Niezauważony"
@@ -533,7 +534,9 @@
       "RANGE_LIMIT_ACTIVE": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości do 30 stóp.",
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Aktywne ograniczenie zasięgu: Wyświetlane są tylko cele znajdujące się w odległości {distance} stóp.",
       "NO_TARGETS_IN_RANGE": "Brak ważnych celów w zasięgu 30 stóp.",
-      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp."
+      "NO_TARGETS_IN_RANGE_CUSTOM": "Brak ważnych celów w zasięgu {distance} stóp.",
+      "INVISIBLE_CAP_LABEL": "Niewidzialny",
+      "INVISIBLE_CAP_TOOLTIP": "Cel jest niewidzialny. Wizualne Szukanie może ustalić jego położenie, ale nie może sprawić, że stanie się obserwowany; użyj precyzyjnego zmysłu innego niż wzrok."
     },
     "SEEK_TEMPLATE_CONFIG": {
       "TITLE": "Konfiguracja szablonu Szukania",
@@ -933,6 +936,22 @@
         "name": "Ignoruj martwe tokeny",
         "hint": "Martwe tokeny nie zapewniają automatycznej osłony."
       },
+      "PEEK_SLIT_ANGLE": {
+        "name": "Peek Slit Angle (°)",
+        "hint": "Width of the peek vision cone in degrees."
+      },
+      "PEEK_SWEEP_ANGLE": {
+        "name": "Peek Sweep Angle (°)",
+        "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
+      },
+      "PEEK_RANGE": {
+        "name": "Peek Range (ft)",
+        "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
+      },
+      "CORNER_PEEK_ENABLED": {
+        "name": "Enable Corner Peeking",
+        "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
+      },
       "AUTO_COVER_IGNORE_SMALLER_TOKENS": {
         "name": "Ignoruj mniejsze tokeny",
         "hint": "Tokeny mniejsze od atakującego nie zapewniają automatycznej osłony"
@@ -1235,6 +1254,10 @@
       "hidden": "Ukryty"
     },
     "KEYBINDINGS": {
+      "HOLD_PEEK": {
+        "name": "Toggle Peek (Corner)",
+        "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
+      },
       "OPEN_TOKEN_MANAGER": {
         "name": "Otwórz Menedżera Widoczności",
         "hint": "Otwórz menedżera tokenów dla wybranych tokenów"
@@ -1397,6 +1420,13 @@
     "SNEAK_ADEPT_FEAT": {
       "OUTCOME_UPGRADED": "Adept Podstępu",
       "TOOLTIP": "Porażka zamieniona w sukces dzięki atutowi Adept Podstępu. Niemal niemożliwe jest dostrzeżenie tej istoty."
+    },
+    "PEEK": {
+      "CHECK_LABEL": "Peek Through Door",
+      "DC_FIELD_LABEL": "Peek DC",
+      "ALLOW_FIELD_LABEL": "Allow Peeking",
+      "NOT_ALLOWED": "Peeking is not allowed through this door.",
+      "TOO_FAR": "You are too far from the door to peek through it."
     }
   }
 }

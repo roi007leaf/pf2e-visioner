@@ -119,8 +119,15 @@ export class ActionHandlerBase {
           // If old state matches new state, check if old state was AVS-controlled
           // If it was AVS-controlled, we should still apply the manual override
           const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome, actionData);
+          const forceApplyOverride =
+            Array.isArray(actionData?.forceApplyOverrideIds) &&
+            actionData.forceApplyOverrideIds.includes(id);
           // Also mark as changed if there's a timed override, even if the state is the same
-          outcome.changed = overrideState !== baseOld || isOldStateAvsControlled || !!timedOverride;
+          outcome.changed =
+            overrideState !== baseOld ||
+            isOldStateAvsControlled ||
+            !!timedOverride ||
+            forceApplyOverride;
         }
       }
       return outcomes;
@@ -162,6 +169,20 @@ export class ActionHandlerBase {
     }
   }
 
+  isOutcomeActionable(actionData, outcome) {
+    if (!outcome) return false;
+    if (outcome.changed === true) return true;
+
+    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
+    const baseOldState = outcome.oldVisibility ?? outcome.currentVisibility;
+    if (!effectiveNewState || effectiveNewState === 'avs' || baseOldState == null) return false;
+
+    return (
+      effectiveNewState === baseOldState &&
+      this.isOldStateAvsControlled(outcome, actionData) === true
+    );
+  }
+
   // Map outcomes to change objects { observer, target, newVisibility, oldVisibility, timedOverride }
   // Default: observer is actor, target is outcome.target
   outcomeToChange(actionData, outcome) {
@@ -200,7 +221,11 @@ export class ActionHandlerBase {
     try {
       await this.ensurePrerequisites(actionData);
 
-      const discovered = (await this.discoverSubjects(actionData)) || [];
+      const discoveryActionData =
+        this.actionType === 'hide' && Array.isArray(actionData?.forceApplyOverrideIds)
+          ? { ...actionData, ignoreAllies: false }
+          : actionData;
+      const discovered = (await this.discoverSubjects(discoveryActionData)) || [];
       // Skip Foundry-hidden tokens from subjects (keep walls)
       const subjects = discovered.filter((s) => {
         try {
@@ -217,7 +242,7 @@ export class ActionHandlerBase {
       // Apply overrides from the UI if provided
       this.applyOverrides(actionData, outcomes);
       // Start with all changed outcomes
-      let filtered = outcomes.filter((o) => o && o.changed);
+      let filtered = outcomes.filter((outcome) => this.isOutcomeActionable(actionData, outcome));
       // If overrides were provided, restrict application strictly to those ids
       try {
         const overrides = actionData?.overrides;
@@ -284,7 +309,7 @@ export class ActionHandlerBase {
       this.applyOverrides(actionData, outcomes);
 
       // Filter outcomes that need application
-      let filtered = outcomes.filter((o) => o && o.changed);
+      let filtered = outcomes.filter((outcome) => this.isOutcomeActionable(actionData, outcome));
 
       // If overrides were provided, restrict application strictly to those ids
       try {
@@ -421,6 +446,7 @@ export class ActionHandlerBase {
 
   async applyChangesInternal(changes) {
     const { applyVisibilityChanges } = await import('../infra/shared-utils.js');
+    const { default: AvsOverrideManager } = await import('../infra/AvsOverrideManager.js');
     const direction = this.getApplyDirection();
     const sourceTag = this.getSourceTag();
     // Group by observer and apply batched
@@ -429,9 +455,27 @@ export class ActionHandlerBase {
       try {
         if (group?.observer?.document?.hidden === true) continue; // Skip if observer is Foundry hidden
       } catch {}
+      const toApply = [];
+      for (const item of group.items) {
+        if (item.newVisibility === 'avs') {
+          try {
+            const observerId = group.observer?.document?.id || group.observer?.id;
+            const targetId = item.target?.document?.id || item.target?.id;
+            if (observerId && targetId) {
+              await AvsOverrideManager.removeOverride(observerId, targetId);
+            }
+          } catch (error) {
+            console.warn('PF2E Visioner | Failed to remove AVS override during revert:', error);
+          }
+          continue;
+        }
+        toApply.push(item);
+      }
+      if (toApply.length === 0) continue;
+
       await applyVisibilityChanges(
         group.observer,
-        group.items.map((i) => ({ target: i.target, newVisibility: i.newVisibility, timedOverride: i.timedOverride })),
+        toApply.map((i) => ({ target: i.target, newVisibility: i.newVisibility, timedOverride: i.timedOverride })),
         { direction, source: sourceTag },
       );
     }
@@ -519,7 +563,7 @@ export class ActionHandlerBase {
     const subjects = await this.discoverSubjects(actionData);
     const outcomes = [];
     for (const subject of subjects) outcomes.push(await this.analyzeOutcome(actionData, subject));
-    const filtered = outcomes.filter(Boolean).filter((o) => o.changed);
+    const filtered = outcomes.filter((outcome) => this.isOutcomeActionable(actionData, outcome));
     return filtered.map((o) => ({
       observer: actionData.actorToken || actionData.actor,
       target: o.target,

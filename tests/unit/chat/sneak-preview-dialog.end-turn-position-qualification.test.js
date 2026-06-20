@@ -1,56 +1,54 @@
 /**
- * Tests for the SneakPreviewDialog end-of-turn position qualification logic fix.
- * 
- * This test verifies the code changes that fix end-of-turn position qualification
- * by ensuring end-of-turn dialogs skip stale preserved position data and use live checks.
+ * @jest-environment jsdom
  */
 
-describe('SneakPreviewDialog End-of-Turn Position Qualification Fix', () => {
-    it('should verify that the code fix is implemented correctly', () => {
-        // This test verifies that the actual code changes are in place
-        // We can't easily unit test the dialog without extensive mocking,
-        // but we can verify the fix is present in the code
+import {
+  prepareSneakPositionDisplay,
+  sortSneakOutcomesByQualification,
+} from '../../../scripts/chat/dialogs/Sneak/sneak-position-display.js';
 
-        // Read the actual source file to verify our changes are there
-        const fs = require('fs');
-        const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
-        const sourceCode = fs.readFileSync(filePath, 'utf8');
+describe('Sneak end-of-turn position qualification', () => {
+  test('end-of-turn preserved position display recalculates live qualifications', () => {
+    const observer = { id: 'observer-1' };
+    const outcome = {
+      positionDisplay: {
+        startPosition: { qualifies: true },
+        endPosition: { qualifies: false },
+      },
+    };
+    const dialog = {
+      isEndOfTurnDialog: true,
+      _startPositionQualifiesForSneak: jest.fn(() => false),
+      _endPositionQualifiesForSneak: jest.fn(() => true),
+    };
 
-        // Verify that the preserved qualification check is now conditional on !this.isEndOfTurnDialog
-        expect(sourceCode).toContain('if (!this.isEndOfTurnDialog)');
-        expect(sourceCode).toContain('const positionDisplay = outcome?.positionDisplay?.endPosition;');
+    const display = prepareSneakPositionDisplay(dialog, null, observer, outcome);
 
-        // Verify that the position transition check is also wrapped in the conditional
-        expect(sourceCode).toContain('For end-of-turn dialogs, skip preserved position data and go directly to live checks');
+    expect(display.startPosition.qualifies).toBe(false);
+    expect(display.endPosition.qualifies).toBe(true);
+    expect(dialog._startPositionQualifiesForSneak).toHaveBeenCalledWith(observer, outcome);
+    expect(dialog._endPositionQualifiesForSneak).toHaveBeenCalledWith(observer, outcome);
+  });
 
-        // Verify the final fallback live check logic is still present
-        expect(sourceCode).toContain('getVisibilityBetween(observerToken, this.sneakingToken)');
-        expect(sourceCode).toContain('getCoverBetween(observerToken, this.sneakingToken)');
-    });
+  test('fallback position display is explicitly non-qualifying', () => {
+    const display = prepareSneakPositionDisplay({ isEndOfTurnDialog: false }, null, {}, {});
 
-    it('should ensure end-of-turn dialogs have isEndOfTurnDialog property', () => {
-        // Verify that the constructor properly sets the isEndOfTurnDialog property
-        const fs = require('fs');
-        const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
-        const sourceCode = fs.readFileSync(filePath, 'utf8');
+    expect(display.transitionType).toBe('unknown');
+    expect(display.startPosition.qualifies).toBe(false);
+    expect(display.endPosition.qualifies).toBe(false);
+  });
 
-        // Verify the constructor sets isEndOfTurnDialog property
-        expect(sourceCode).toContain('this.isEndOfTurnDialog = isEndOfTurnDialog');
-        expect(sourceCode).toContain('const isEndOfTurnDialog = options?.isEndOfTurnDialog || false');
-    });
+  test('sorts qualifying outcomes first without changing equal-order groups', () => {
+    const outcomes = [
+      { id: 'a', positionDisplay: { startPosition: { qualifies: true }, endPosition: { qualifies: false } } },
+      { id: 'b', positionDisplay: { startPosition: { qualifies: true }, endPosition: { qualifies: true } } },
+      { id: 'c', positionDisplay: { startPosition: { qualifies: false }, endPosition: { qualifies: true } } },
+    ];
 
-    it('should verify the _preparePositionDisplay function handles end-of-turn dialogs', () => {
-        // Verify that _preparePositionDisplay also respects end-of-turn dialog context
-        const fs = require('fs');
-        const path = require('path');
-        const filePath = path.join(__dirname, '../../../scripts/chat/dialogs/SneakPreviewDialog.js');
-        const sourceCode = fs.readFileSync(filePath, 'utf8');
-
-        // Verify the _preparePositionDisplay function has end-of-turn logic with live qualification recalculation
-        expect(sourceCode).toContain('if (this.isEndOfTurnDialog && outcome && outcome.positionDisplay)');
-        expect(sourceCode).toContain('Recalculate position qualifications with current live data');
-        expect(sourceCode).toContain('this._endPositionQualifiesForSneak(observerToken, outcome)');
-    });
+    expect(sortSneakOutcomesByQualification(outcomes).map((outcome) => outcome.id)).toEqual([
+      'b',
+      'a',
+      'c',
+    ]);
+  });
 });

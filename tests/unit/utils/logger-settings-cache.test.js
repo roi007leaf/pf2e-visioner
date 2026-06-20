@@ -68,4 +68,16 @@ describe('Logger settings cache', () => {
     );
     expect(debugSpy.mock.calls[0]).not.toContain(badPayload);
   });
+
+  test('does not evaluate lazy payloads when logger is disabled', () => {
+    game.settings.set('pf2e-visioner', 'autoVisibilityDebugMode', false);
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => { });
+    const payload = jest.fn(() => ({ msg: 'expensive-payload' }));
+
+    const log = getLogger('AVS');
+    log.debug(payload);
+
+    expect(payload).not.toHaveBeenCalled();
+    expect(debugSpy).not.toHaveBeenCalled();
+  });
 });

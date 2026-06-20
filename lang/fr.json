@@ -22,8 +22,9 @@
       "observed": "Observé",
       "hidden": "Caché",
       "undetected": "Non détecté",
-      "unnoticed": "(FR TODO) Unnoticed",
-      "concealed": "Masqué"
+      "unnoticed": "Inaperçu",
+      "concealed": "Masqué",
+      "observed_concealed": "Observé + Masqué"
     },
     "ENCOUNTER_STEALTH": {
       "STEALTH_INITIATIVE_TOOLTIP": "(FR TODO) Rolled Stealth for initiative"
@@ -198,6 +199,8 @@
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Limite de portée active : Montre seumement les cibles dans les {distance} pieds ",
       "NO_TARGETS_IN_RANGE": "PAs de cibles valides dans la portée de 9 mètres",
       "NO_TARGETS_IN_RANGE_CUSTOM": "Pas de cibles valides dans la portée de {distance} pieds",
+      "INVISIBLE_CAP_LABEL": "Invisible",
+      "INVISIBLE_CAP_TOOLTIP": "La cible est invisible. Chercher avec la vue peut trouver sa position, mais ne peut pas la rendre observée ; utilisez un sens précis non visuel pour l'observer.",
       "ECHOLOCATION_LABEL": "Écholocalisation",
       "ECHOLOCATION_TOOLTIP": "Ouïe précise active jusqu'au début de votre prochain tour",
       "PREVIEW_AVAILABLE_SENSES": "(FR TODO) Available Senses",
@@ -359,6 +362,22 @@
       "AUTO_COVER_IGNORE_DEAD": {
         "name": "(FR) Ignorer les jetons morts",
         "hint": "(FR) Les jetons à 0 PV ne bloquent pas l'abri"
+      },
+      "PEEK_SLIT_ANGLE": {
+        "name": "Peek Slit Angle (°)",
+        "hint": "Width of the peek vision cone in degrees."
+      },
+      "PEEK_SWEEP_ANGLE": {
+        "name": "Peek Sweep Angle (°)",
+        "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
+      },
+      "PEEK_RANGE": {
+        "name": "Peek Range (ft)",
+        "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
+      },
+      "CORNER_PEEK_ENABLED": {
+        "name": "Enable Corner Peeking",
+        "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
       },
       "AUTO_COVER_IGNORE_ALLIES": {
         "name": "(FR) Ignorer les alliés pour l'abri",
@@ -793,6 +812,10 @@
       "hidden": "Caché"
     },
     "KEYBINDINGS": {
+      "HOLD_PEEK": {
+        "name": "Toggle Peek (Corner)",
+        "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
+      },
       "OPEN_TOKEN_MANAGER": {
         "name": "Ouvrir le gestionnaire du jeton",
         "hint": "Ouvre le gestionnaire du jeton pour les jetons sélectionnés"
@@ -1124,6 +1147,13 @@
         "REQUIRES_INITIATIVE": "Requires Initiative (FR TODO)",
         "RANGE": "Range (feet) (FR TODO)"
       }
+    },
+    "PEEK": {
+      "CHECK_LABEL": "Peek Through Door",
+      "DC_FIELD_LABEL": "Peek DC",
+      "ALLOW_FIELD_LABEL": "Allow Peeking",
+      "NOT_ALLOWED": "Peeking is not allowed through this door.",
+      "TOO_FAR": "You are too far from the door to peek through it."
     }
   }
 }

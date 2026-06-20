@@ -6,12 +6,12 @@ import globals from 'globals';
 export default [
   // Top-level ignore for generated artifacts and large folders
   {
-    ignores: ['coverage/**'],
+    ignores: ['coverage/**', 'output/**'],
   },
   js.configs.recommended,
   prettier,
   {
-    ignores: ['packs/**', 'templates/**/compiled/**'],
+    ignores: ['packs/**', 'templates/**/compiled/**', 'output/**'],
     languageOptions: {
       globals: {
         ...globals.browser,
@@ -32,6 +32,8 @@ export default [
         Dialog: 'readonly',
         SettingsConfig: 'readonly',
         Item: 'readonly',
+        KeyboardManager: 'readonly',
+        DoorControl: 'readonly',
         // Module specific
         MODULE_ID: 'readonly',
         isStandard: 'readonly',

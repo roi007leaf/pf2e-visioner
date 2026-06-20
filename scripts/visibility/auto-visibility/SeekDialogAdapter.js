@@ -17,6 +17,12 @@
  */
 
 import { SenseSuppressionRegionBehavior } from '../../regions/SenseSuppressionRegionBehavior.js';
+import {
+    calculateHearingDistanceInFeet,
+    createDefaultHearingSense,
+    effectiveHearingRange,
+    hearingRangeCanReach,
+} from '../../services/sense-distance.js';
 
 export class SeekDialogAdapter {
     #visionAnalyzer;
@@ -95,6 +101,7 @@ export class SeekDialogAdapter {
 
         // Calculate distance for range checks
         const distance = this.#visionAnalyzer.distanceFeet(observer, target);
+        const hearingDistance = calculateHearingDistanceInFeet(observer, target);
 
         // PRIORITY 1: Check for precise senses (visual or non-visual)
         const preciseResult = await this.#checkPreciseSenses(observer, target, visCaps, sensingSummary, distance);
@@ -103,7 +110,14 @@ export class SeekDialogAdapter {
         }
 
         // PRIORITY 2: Fall back to imprecise senses
-        const impreciseResult = await this.#checkImpreciseSenses(observer, target, visCaps, sensingSummary, distance);
+        const impreciseResult = await this.#checkImpreciseSenses(
+            observer,
+            target,
+            visCaps,
+            sensingSummary,
+            distance,
+            hearingDistance,
+        );
         return impreciseResult;
     }
 
@@ -139,14 +153,12 @@ export class SeekDialogAdapter {
     }
 
     #withDefaultHearing(sensingSummary, visCaps) {
-        if (visCaps?.isDeafened !== false || sensingSummary?.hearing) return sensingSummary;
-        const hasListedHearing = Array.isArray(sensingSummary?.imprecise)
-            && sensingSummary.imprecise.some((sense) => sense?.type === 'hearing');
-        if (hasListedHearing) return sensingSummary;
+        const defaultHearing = createDefaultHearingSense(visCaps, sensingSummary);
+        if (!defaultHearing) return sensingSummary;
 
         return {
             ...sensingSummary,
-            hearing: { acuity: 'imprecise', range: Infinity },
+            hearing: defaultHearing,
         };
     }
 
@@ -211,12 +223,12 @@ export class SeekDialogAdapter {
      * Check if observer has imprecise senses that can detect target
      * @private
      */
-    async #checkImpreciseSenses(observer, target, visCaps, sensingSummary, distance) {
+    async #checkImpreciseSenses(observer, target, visCaps, sensingSummary, distance, hearingDistance = distance) {
         // Check hearing
         const hearing = sensingSummary.hearing;
         if (hearing && !visCaps.isDeafened) {
-            const hearingRange = Number(hearing.range);
-            const inRange = !Number.isFinite(hearingRange) || hearingRange >= distance;
+            const hearingRange = effectiveHearingRange(hearing.range ?? Infinity);
+            const inRange = hearingRangeCanReach(hearingRange, hearingDistance);
 
             if (inRange) {
                 return {
@@ -233,7 +245,7 @@ export class SeekDialogAdapter {
                     precision: 'imprecise',
                     range: hearingRange,
                     outOfRange: true,
-                    reason: `Out of hearing range (${distance}ft > ${hearingRange}ft)`,
+                    reason: `Out of hearing range (${hearingDistance}ft > ${hearingRange}ft)`,
                 };
             }
         }
@@ -488,11 +500,13 @@ export class SeekDialogAdapter {
         }
 
         const sensingSummary = caps?.sensingSummary || {};
-        const defaultHearing =
-            includeHearing && caps?.isDeafened === false && !sensingSummary.hearing
-                ? { acuity: 'imprecise', range: Infinity }
-                : null;
+        const defaultHearing = includeHearing
+            ? createDefaultHearingSense(caps, sensingSummary)
+            : null;
         const hearingForDisplay = sensingSummary.hearing || defaultHearing;
+        const hearingDisplayRange = hearingForDisplay
+            ? effectiveHearingRange(hearingForDisplay.range ?? Infinity)
+            : null;
         if (includeHearing && hearingForDisplay) {
             const existingHearing = allSenses.find(s => s.type === 'hearing');
             if (!existingHearing) {
@@ -503,10 +517,10 @@ export class SeekDialogAdapter {
                 };
                 allSenses.push({
                     type: 'hearing',
-                    range: hearingForDisplay.range,
+                    range: hearingDisplayRange,
                     isPrecise: hearingForDisplay.acuity === 'precise',
                     config: hearingConfig,
-                    displayRange: hearingForDisplay.range === Infinity ? '∞' : String(hearingForDisplay.range),
+                    displayRange: hearingDisplayRange === Infinity ? '∞' : String(hearingDisplayRange),
                     wasUsed: 'hearing' === usedSenseType,
                 });
             }

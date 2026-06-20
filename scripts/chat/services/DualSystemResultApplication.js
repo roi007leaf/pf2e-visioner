@@ -5,6 +5,10 @@
  */
 
 import autoCoverSystem from '../../cover/auto-cover/AutoCoverSystem.js';
+import {
+  isConcealed,
+  legacyVisibilityToProfile,
+} from '../../visibility/perception-profile.js';
 import AvsOverrideManager from './infra/AvsOverrideManager.js';
 import * as SharedUtils from './infra/shared-utils.js';
 
@@ -115,9 +119,7 @@ class DualSystemResultApplication {
               const hasCover =
                 (expectedCover || detectedCover) === 'standard' ||
                 (expectedCover || detectedCover) === 'greater';
-              const hasConcealment = ['concealed', 'hidden', 'undetected'].includes(
-                effectiveNewState,
-              );
+              const hasConcealment = isConcealed(legacyVisibilityToProfile(effectiveNewState));
 
               changesByTarget.set(targetToken.document.id, {
                 target: targetToken,

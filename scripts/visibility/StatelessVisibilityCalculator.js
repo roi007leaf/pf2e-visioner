@@ -9,7 +9,28 @@
 
 import { LightingLevel, SenseType, VisibilityState } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
+import { legacyVisibilityToProfile } from './perception-profile.js';
 const log = getLogger('AVS/StatelessCalculator');
+
+function withProfile(result, profileMetadata = {}) {
+  if (!result?.state) return result;
+  return {
+    ...result,
+    profile: legacyVisibilityToProfile(result.state, profileMetadata),
+  };
+}
+
+function profileMetadataForResult(result, target) {
+  const observedPath =
+    result?.state === VisibilityState.OBSERVED || result?.state === VisibilityState.CONCEALED;
+
+  return {
+    hasConcealment: result?.state === VisibilityState.CONCEALED ||
+      (observedPath && target.concealment === true),
+    coverState: target.coverLevel || 'none',
+    detectionSense: result?.detection?.sense ?? null,
+  };
+}
 
 /**
  * Calculate visibility state from standardized input
@@ -48,6 +69,7 @@ const log = getLogger('AVS/StatelessCalculator');
  * @returns {Object|null} result.detection - Detection info or null if undetected
  * @returns {boolean} result.detection.isPrecise - Whether detection is precise
  * @returns {string} result.detection.sense - Which sense detected: one of SenseType enum values (VISION, DARKVISION, LOW_LIGHT_VISION, GREATER_DARKVISION, HEARING, TREMORSENSE, LIFESENSE, SCENT, ECHOLOCATION, SEE_INVISIBILITY, LIGHT_PERCEPTION)
+ * @returns {Object} result.profile - Canonical perception metadata compatible with the legacy state
  */
 export function calculateVisibility(input) {
   log.debug(() => ({
@@ -77,7 +99,7 @@ export function calculateVisibility(input) {
     }));
     const result = handleBlindedObserver(observer, target, soundBlocked);
 
-    return result;
+    return withProfile(result, profileMetadataForResult(result, target));
   }
 
   // 2. Check all available senses and return the best detection result
@@ -98,7 +120,7 @@ export function calculateVisibility(input) {
 
   // 2b-2. Invisibility with previous state: degrade based on what observer knew before
   const isInvisible = target.auxiliary.includes('invisible');
-  if (!visualDetection.canDetect && isInvisible && previousState) {
+  if (!visualDetection.canDetect && isInvisible && previousState && hasLineOfSight !== false) {
     const invisibilityResult = resolveInvisibilityFromPreviousState(previousState);
     if (invisibilityResult) {
       allDetectionResults.push(invisibilityResult);
@@ -123,14 +145,18 @@ export function calculateVisibility(input) {
       sense: bestResult.detection?.sense,
       isPrecise: bestResult.detection?.isPrecise,
     }));
-    return bestResult;
+    return withProfile(bestResult, profileMetadataForResult(bestResult, target));
   }
 
   // 4. Default: undetected (no senses can detect)
-  return {
+  return withProfile({
     state: VisibilityState.UNDETECTED,
     detection: null,
-  };
+  }, {
+    hasConcealment: false,
+    coverState: target.coverLevel || 'none',
+    detectionSense: null,
+  });
 }
 
 /**
@@ -140,9 +166,11 @@ function normalizeTargetState(target) {
   return {
     lightingLevel: target.lightingLevel || LightingLevel.BRIGHT,
     concealment: target.concealment ?? false,
+    coverLevel: target.coverLevel || 'none',
     auxiliary: Array.isArray(target.auxiliary) ? target.auxiliary : [],
     traits: Array.isArray(target.traits) ? target.traits : [],
     movementAction: target.movementAction ?? 0,
+    elevation: Number(target.elevation ?? 0) || 0,
   };
 }
 
@@ -164,7 +192,30 @@ function normalizeObserverState(observer) {
     },
     lightingLevel: observer.lightingLevel || LightingLevel.BRIGHT, // Observer's own lighting level
     movementAction: observer.movementAction ?? 0, // Observer's movement action for tremorsense checks
+    elevation: Number(observer.elevation ?? 0) || 0,
   };
+}
+
+function tremorsenseGroundContactBroken(observer, target) {
+  const observerElevation = Number(observer.elevation ?? 0) || 0;
+  const targetElevation = Number(target.elevation ?? 0) || 0;
+  const broken =
+    observer.movementAction === 'fly' ||
+    target.movementAction === 'fly' ||
+    observerElevation !== targetElevation ||
+    observerElevation !== 0;
+  if (globalThis.pf2eVisionerDebugSenses) {
+    try {
+      console.warn('[visioner-debug] tremor gate', {
+        broken,
+        observerElevation,
+        targetElevation,
+        observerMove: observer.movementAction,
+        targetMove: target.movementAction,
+      });
+    } catch {}
+  }
+  return broken;
 }
 
 /**
@@ -200,13 +251,11 @@ function handleBlindedObserver(observer, target, soundBlocked) {
  * @returns {Object|null} Detection result or null
  */
 function checkNonAuditorySenses(observer, target) {
-  const { imprecise, movementAction: observerMovementAction } = observer;
-  const { movementAction: targetMovementAction } = target;
+  const { imprecise } = observer;
 
   // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
   if (imprecise.tremorsense) {
-    const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
-    if (!isTargetElevated) {
+    if (!tremorsenseGroundContactBroken(observer, target)) {
       return {
         state: VisibilityState.HIDDEN,
         detection: {
@@ -431,6 +480,19 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
           detection: {
             isPrecise: true,
             sense: SenseType.THOUGHTSENSE,
+          },
+        };
+      }
+      continue;
+    }
+
+    if (senseType === SenseType.TREMORSENSE) {
+      if (senseData && senseData.range > 0 && !tremorsenseGroundContactBroken(observer, target)) {
+        return {
+          state: VisibilityState.OBSERVED,
+          detection: {
+            isPrecise: true,
+            sense: SenseType.TREMORSENSE,
           },
         };
       }
@@ -675,8 +737,8 @@ function determineVisualDetection(
  * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
  */
 function checkImpreciseSenses(observer, target, soundBlocked = false) {
-  const { imprecise, conditions, movementAction: observerMovementAction } = observer;
-  const { auxiliary, movementAction: targetMovementAction } = target;
+  const { imprecise, conditions } = observer;
+  const { auxiliary } = target;
   const isInvisible = auxiliary.includes('invisible');
 
   // Collect all working senses with their priority
@@ -687,7 +749,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   // Priority: 1 (highest)
   if (imprecise.tremorsense) {
     // Check if target is elevated (not on the ground at observer's level)
-    const isTargetElevated = targetMovementAction === 'fly' || observerMovementAction === 'fly';
+    const isTargetElevated = tremorsenseGroundContactBroken(observer, target);
 
     // Check if target has Petal Step feat (immune to tremorsense)
     const hasPetalStep = target.auxiliary.includes('petal-step');
@@ -781,6 +843,16 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   workingSenses.sort((a, b) => a.priority - b.priority);
   const best = workingSenses[0];
 
+  if (globalThis.pf2eVisionerDebugSenses) {
+    try {
+      console.warn('[visioner-debug] imprecise pick', {
+        impreciseKeys: Object.keys(imprecise),
+        working: workingSenses.map((s) => `${s.priority}:${s.detection?.sense ?? 'null'}:${s.state}`),
+        best: `${best.detection?.sense ?? 'null'}:${best.state}`,
+      });
+    } catch {}
+  }
+
   return {
     state: best.state,
     detection: best.detection,
@@ -790,8 +862,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
 function resolveInvisibilityFromPreviousState(previousState) {
   if (
     previousState === VisibilityState.OBSERVED ||
-    previousState === VisibilityState.CONCEALED ||
-    previousState === VisibilityState.HIDDEN
+    previousState === VisibilityState.CONCEALED
   ) {
     return {
       state: VisibilityState.HIDDEN,
@@ -799,6 +870,12 @@ function resolveInvisibilityFromPreviousState(previousState) {
         isPrecise: false,
         sense: SenseType.VISION,
       },
+    };
+  }
+  if (previousState === VisibilityState.HIDDEN) {
+    return {
+      state: VisibilityState.UNDETECTED,
+      detection: null,
     };
   }
   return null;

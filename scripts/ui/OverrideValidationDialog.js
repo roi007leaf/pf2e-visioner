@@ -5,6 +5,14 @@
 
 import { COVER_STATES, VISIBILITY_STATES } from '../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../css-loader.js';
+import { getLastMovedTokenId } from '../services/runtime-state.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 const AUTO_COVER_DISPLAY = {
   icon: 'fas fa-arrows-rotate',
@@ -62,6 +70,35 @@ function localizeCoverLabel(config, key, fallback = 'No Cover') {
   return words.length ? `${words.join(' ')} Cover` : fallback;
 }
 
+function resolveTokenImage(token) {
+  return token?.document?.texture?.src ??
+    token?.actor?.img ??
+    token?.actor?.prototypeToken?.texture?.src ??
+    token?.texture?.src ??
+    token?.document?.img ??
+    null;
+}
+
+function createTokenLookup() {
+  const byId = new Map();
+  const byName = new Map();
+  const tokens = canvas?.tokens?.placeables || [];
+  for (const token of tokens) {
+    const id = token?.id || token?.document?.id;
+    const name = token?.document?.name || token?.name;
+    if (id && !byId.has(id)) byId.set(id, token);
+    if (name && !byName.has(name)) byName.set(name, token);
+  }
+  return {
+    get(id) {
+      return (id && byId.get(id)) || canvas?.tokens?.get?.(id) || null;
+    },
+    getByName(name) {
+      return (name && byName.get(name)) || null;
+    },
+  };
+}
+
 export class OverrideValidationDialog extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
 
   constructor(options = {}) {
@@ -107,6 +144,8 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
+    const tokenLookup = createTokenLookup();
+    const headerTokenByName = tokenLookup.getByName(this.tokenName);
 
     // Prepare invalid overrides data for display
     const overrides = this.invalidOverrides.map(override => {
@@ -157,11 +196,10 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         override.stealthPositionBypassTooltip || stealthPositionBypassLabel || null;
       // Resolve token images if available on the canvas
       // Use actor portrait for consistency with Token Manager
-      const observerToken = canvas.tokens?.get(override.observerId);
-      const targetToken = canvas.tokens?.get(override.targetId);
-      const resolveImg = (t) => t?.document?.texture?.src ?? t?.actor?.img ?? t?.actor?.prototypeToken?.texture?.src ?? t?.texture?.src ?? t?.document?.img ?? null;
-      const observerImg = resolveImg(observerToken) || 'icons/svg/book.svg';
-      const targetImg = resolveImg(targetToken) || 'icons/svg/book.svg';
+      const observerToken = tokenLookup.get(override.observerId);
+      const targetToken = tokenLookup.get(override.targetId);
+      const observerImg = resolveTokenImage(observerToken) || 'icons/svg/book.svg';
+      const targetImg = resolveTokenImage(targetToken) || 'icons/svg/book.svg';
 
       // Pick analysis icons from actual current state when provided by validator
       // Prefer current states provided by the validator/caller; fall back to safe defaults
@@ -173,7 +211,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const suppressCoverChange = shouldSuppressCoverChange(override);
       const prevVisibilityKey = coverOnly
         ? visibilityKey
-        : override.state || (override.hasConcealment ? 'concealed' : 'observed');
+        : overrideToDisplayVisibility(override);
 
       // Previous/original cover must reflect what the override expected at apply-time,
       // not what the currentCover is now. If we don't have a specific level, assume 'standard'.
@@ -183,11 +221,17 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       const coverCfg = getCoverDisplayConfig(coverKey, { icon: 'fas fa-shield-slash', color: '#4caf50', label: 'No Cover' });
       const prevVisCfg = (VISIBILITY_STATES && VISIBILITY_STATES[prevVisibilityKey]) || { icon: 'fas fa-eye', color: '#9e9e9e', label: 'Observed' };
       const prevCoverCfg = getCoverDisplayConfig(prevCoverKey, { icon: 'fas fa-shield', color: '#9e9e9e', label: game.i18n.localize('PF2E_VISIONER.TOKEN_MANAGER.COVER_STATE') });
+      const localizeVisibilityLabel = (key, fallback) => {
+        const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+        return game?.i18n?.localize?.(labelKey) || fallback;
+      };
+      const currentVisibilityLabel = localizeVisibilityLabel(visibilityKey, 'Observed');
+      const previousVisibilityLabel = localizeVisibilityLabel(prevVisibilityKey, 'Previous');
       const currentVisibilityDescription = controlReleaseOnly
         ? 'Return to AVS control'
         : (VISIBILITY_STATES && VISIBILITY_STATES[visibilityKey]?.label)
           ? (
-            game?.i18n?.localize?.(VISIBILITY_STATES[visibilityKey].label) +
+            currentVisibilityLabel +
             (!suppressCoverChange && coverKey && coverCfg?.label
               ? ` • ${game?.i18n?.localize?.(coverCfg.label)}`
               : '')
@@ -205,7 +249,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
         reason: override.reason,
         // Optionally surface a friendly description of current states
         currentVisibilityDescription,
-        state: override.state || 'undetected',
+        state: overrideToDisplayVisibility(override) || 'undetected',
         source: override.source || 'unknown',
         coverOnly,
         controlReleaseOnly,
@@ -221,13 +265,13 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
           key: prevVisibilityKey,
           icon: prevVisCfg.icon,
           color: prevVisCfg.color,
-          label: game?.i18n?.localize?.(prevVisCfg.label) || 'Previous'
+          label: previousVisibilityLabel
         },
         statusVisibility: {
           key: visibilityKey,
           icon: visCfg.icon,
           color: visCfg.color,
-          label: game?.i18n?.localize?.(visCfg.label) || 'Observed'
+          label: currentVisibilityLabel
         },
         prevCover: {
           key: prevCoverKey,
@@ -253,7 +297,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     const observerOrientedOverrides = [];
     const targetOrientedOverrides = [];
     let unifiedOverrides = [];
-    let refTokenId = this.movedTokenId || game?.pf2eVisioner?.lastMovedTokenId || null;
+    let refTokenId = this.movedTokenId || getLastMovedTokenId();
 
     // In turn change mode, deduplicate and use unified view
     if (this.isTurnChange) {
@@ -269,7 +313,6 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
       // Group relative to the actual mover when available; fallback to global, then header-by-name
       if (!refTokenId) {
         try {
-          const headerTokenByName = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName);
           refTokenId = headerTokenByName?.document?.id || headerTokenByName?.id || null;
         } catch { }
       }
@@ -287,14 +330,13 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     }
 
     // Determine header info for target table. Prefer the moved token if available.
-    let headerToken = null;
-    try { headerToken = canvas.tokens?.placeables?.find(t => t?.document?.name === this.tokenName) || null; } catch { }
+    let headerToken = refTokenId ? tokenLookup.get(refTokenId) : headerTokenByName;
     const headerStealthPositionBypass = refTokenId
       ? overrides.find((o) => o.targetId === refTokenId && o.stealthPositionBypassLabel)
       : null;
     const targetHeader = {
       name: this.tokenName,
-      img: headerToken?.document?.texture?.src ?? headerToken?.actor?.img ?? headerToken?.actor?.prototypeToken?.texture?.src ?? headerToken?.texture?.src ?? 'icons/svg/book.svg',
+      img: resolveTokenImage(headerToken) || 'icons/svg/book.svg',
       stealthPositionBypassFeat: headerStealthPositionBypass?.stealthPositionBypassFeat || null,
       stealthPositionBypassLabel: headerStealthPositionBypass?.stealthPositionBypassLabel || null,
       stealthPositionBypassIcon: headerStealthPositionBypass?.stealthPositionBypassIcon || null,
@@ -319,130 +361,90 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
   _onRender(context, options) {
     super._onRender(context, options);
+    this._boundDialogClick ??= (event) => this._onDialogClick(event);
+    this.element.addEventListener('click', this._boundDialogClick);
+  }
 
-    // Add event listeners for bulk action buttons
-    const clearAllBtn = this.element.querySelector('.btn-clear-all');
-    const keepAllBtn = this.element.querySelector('.btn-keep-all');
-    const clearObserverBtn = this.element.querySelector('.btn-clear-observer');
-    const clearTargetBtn = this.element.querySelector('.btn-clear-target');
+  async _onDialogClick(event) {
+    const target = event.target;
+    const within = (node) => node && this.element.contains(node);
+    const handle = async (callback) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await callback();
+    };
 
-    // Add event listeners for individual action buttons
-    const individualClearBtns = this.element.querySelectorAll('.btn-clear');
-    const individualKeepBtns = this.element.querySelectorAll('.btn-keep');
+    const clearAllBtn = target?.closest?.('.btn-clear-all');
+    if (within(clearAllBtn)) return handle(() => this._onAcceptAll());
 
-    if (clearAllBtn) {
-      clearAllBtn.addEventListener('click', () => this._onAcceptAll());
+    const keepAllBtn = target?.closest?.('.btn-keep-all');
+    if (within(keepAllBtn)) return handle(() => this._onRejectAll());
+
+    const clearObserverBtn = target?.closest?.('.btn-clear-observer');
+    if (within(clearObserverBtn)) return handle(() => this._onAcceptByGroup('observer'));
+
+    const clearTargetBtn = target?.closest?.('.btn-clear-target');
+    if (within(clearTargetBtn)) return handle(() => this._onAcceptByGroup('target'));
+
+    const clearBtn = target?.closest?.('.btn-clear[data-override-id]');
+    if (within(clearBtn)) {
+      return handle(() => this._onAcceptIndividual(clearBtn.dataset.overrideId));
     }
 
-    if (keepAllBtn) {
-      keepAllBtn.addEventListener('click', () => this._onRejectAll());
+    const keepBtn = target?.closest?.('.btn-keep[data-override-id]');
+    if (within(keepBtn)) {
+      return handle(() => this._onRejectIndividual(keepBtn.dataset.overrideId));
     }
 
-    if (clearObserverBtn) {
-      clearObserverBtn.addEventListener('click', () => this._onAcceptByGroup('observer'));
+    const panTarget = this._getPanTargetFromClick(target);
+    if (panTarget) {
+      return handle(() => this._panToTokenFromRow(panTarget.tokenId, panTarget.row));
     }
-    if (clearTargetBtn) {
-      clearTargetBtn.addEventListener('click', () => this._onAcceptByGroup('target'));
+  }
+
+  _getPanTargetFromClick(target) {
+    const tokenChip = target?.closest?.('.chip--token');
+    if (this.element.contains(tokenChip)) {
+      return { tokenId: tokenChip.dataset.tokenId, row: tokenChip.closest('tr.token-row') };
     }
 
-    // Add listeners for individual clear buttons
-    individualClearBtns.forEach(btn => {
-      btn.addEventListener('click', (event) => {
-        const overrideId = event.currentTarget.dataset.overrideId;
-        this._onAcceptIndividual(overrideId);
-      });
-    });
+    const imageCell = target?.closest?.('td.target-img, td.observer-img');
+    if (this.element.contains(imageCell)) {
+      return { tokenId: imageCell.dataset.tokenId, row: imageCell.closest('tr.token-row') };
+    }
 
-    // Add listeners for individual keep buttons
-    individualKeepBtns.forEach(btn => {
-      btn.addEventListener('click', (event) => {
-        const overrideId = event.currentTarget.dataset.overrideId;
-        this._onRejectIndividual(overrideId);
-      });
-    });
+    const unifiedImage = target?.closest?.('.unified-table .token-info img');
+    if (this.element.contains(unifiedImage)) {
+      const tokenInfo = unifiedImage.closest('.token-info');
+      return { tokenId: tokenInfo?.dataset?.tokenId, row: unifiedImage.closest('tr.token-row') };
+    }
 
-    // Click a token chip to pan/select that token and highlight the row
-    const tokenChips = this.element.querySelectorAll('.chip--token');
-    tokenChips.forEach(chip => {
-      chip.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const tokenId = chip.dataset.tokenId;
-        if (!tokenId) return;
-        try {
-          const token = canvas.tokens?.get(tokenId);
-          if (!token) return;
-          // Pan to token and select it
-          const center = token.center ?? { x: token.x + (token.w ?? token.width ?? 0) / 2, y: token.y + (token.h ?? token.height ?? 0) / 2 };
-          // Animate pan without altering scale
-          await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
-          // Select just this token
-          try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
+    return null;
+  }
 
-          // Highlight the corresponding row within the same table
-          const row = chip.closest('tr.token-row');
-          if (row) {
-            // Remove highlight from all rows in this dialog so only one is highlighted overall
-            this.element.querySelectorAll('tr.token-row.row-hover').forEach(r => r.classList.remove('row-hover'));
-            row.classList.add('row-hover');
-          }
-        } catch (err) {
-          console.warn('PF2E Visioner | Failed to pan/select token from override dialog:', err);
-        }
-      });
-    });
+  async _panToTokenFromRow(tokenId, row) {
+    if (!tokenId) return;
+    try {
+      const token = canvas.tokens?.get(tokenId);
+      if (!token) return;
+      const center = token.center ?? {
+        x: token.x + (token.w ?? token.width ?? 0) / 2,
+        y: token.y + (token.h ?? token.height ?? 0) / 2,
+      };
+      await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
+      try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
+      this._markRowHovered(row);
+    } catch (err) {
+      console.warn('PF2E Visioner | Failed to pan/select token from override dialog:', err);
+    }
+  }
 
-    // Click token image cells in normal mode tables to pan to token
-    const imageCells = this.element.querySelectorAll('td.target-img, td.observer-img');
-    imageCells.forEach(cell => {
-      cell.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const tokenId = cell.dataset.tokenId;
-        if (!tokenId) return;
-        try {
-          const token = canvas.tokens?.get(tokenId);
-          if (!token) return;
-          const center = token.center ?? { x: token.x + (token.w ?? token.width ?? 0) / 2, y: token.y + (token.h ?? token.height ?? 0) / 2 };
-          await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
-          try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
-          const row = cell.closest('tr.token-row');
-          if (row) {
-            this.element.querySelectorAll('tr.token-row.row-hover').forEach(r => r.classList.remove('row-hover'));
-            row.classList.add('row-hover');
-          }
-        } catch (err) {
-          console.warn('PF2E Visioner | Failed to pan to token from image cell:', err);
-        }
-      });
-    });
-
-    // Click token images in unified table to pan to token
-    const tokenImages = this.element.querySelectorAll('.unified-table .token-info img');
-    tokenImages.forEach(img => {
-      img.addEventListener('click', async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const tokenInfo = img.closest('.token-info');
-        const tokenId = tokenInfo?.dataset?.tokenId;
-        if (!tokenId) return;
-        try {
-          const token = canvas.tokens?.get(tokenId);
-          if (!token) return;
-          const center = token.center ?? { x: token.x + (token.w ?? token.width ?? 0) / 2, y: token.y + (token.h ?? token.height ?? 0) / 2 };
-          await canvas.animatePan({ x: center.x, y: center.y, duration: 400 });
-          try { canvas?.tokens?.selectObjects?.([token], { releaseOthers: true, control: true }); } catch { }
-          const row = img.closest('tr.token-row');
-          if (row) {
-            this.element.querySelectorAll('tr.token-row.row-hover').forEach(r => r.classList.remove('row-hover'));
-            row.classList.add('row-hover');
-          }
-        } catch (err) {
-          console.warn('PF2E Visioner | Failed to pan to token from unified table:', err);
-        }
-      });
-    });
-
+  _markRowHovered(row) {
+    if (!row) return;
+    this.element
+      .querySelectorAll('tr.token-row.row-hover')
+      .forEach((activeRow) => activeRow.classList.remove('row-hover'));
+    row.classList.add('row-hover');
   }
 
   _getAcceptOptions(override) {
@@ -470,7 +472,7 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
 
   async _onAcceptByGroup(group) {
     try {
-      const moved = game?.pf2eVisioner?.lastMovedTokenId || null;
+      const moved = getLastMovedTokenId();
       if (!moved) return this._onAcceptAll();
       const toRemove = this.invalidOverrides.filter(o => group === 'observer' ? o.observerId === moved : o.targetId === moved);
       for (const override of toRemove) {

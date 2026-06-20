@@ -9,6 +9,7 @@ import '../../setup.js';
 // Import all event handlers to test
 import { ActorEventHandler } from '../../../scripts/visibility/auto-visibility/core/ActorEventHandler.js';
 import { EffectEventHandler } from '../../../scripts/visibility/auto-visibility/core/EffectEventHandler.js';
+import { EventHandlerFactory } from '../../../scripts/visibility/auto-visibility/core/EventHandlerFactory.js';
 import { ItemEventHandler } from '../../../scripts/visibility/auto-visibility/core/ItemEventHandler.js';
 import { LightingEventHandler } from '../../../scripts/visibility/auto-visibility/core/LightingEventHandler.js';
 import { SceneEventHandler } from '../../../scripts/visibility/auto-visibility/core/SceneEventHandler.js';
@@ -61,6 +62,9 @@ const createMockExclusionManager = () => ({
 
 const createMockCacheManager = () => ({
   clearAllCaches: jest.fn(),
+  getGlobalVisibilityCache: jest.fn(() => ({ clear: jest.fn() })),
+  clearVisibilityCache: jest.fn(),
+  clearLosCache: jest.fn(),
 });
 
 const createMockSpatialAnalyzer = () => ({
@@ -187,7 +191,42 @@ describe('Event Handler Tests', () => {
 
       updateHandler(mockActor);
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should translate actor visibility updates into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockActor = {
+        id: 'actor1',
+        name: 'Test Actor',
+        system: { traits: { value: [] } },
+      };
+      const changes = { system: { traits: { value: ['undead'] } } };
+      actorHandler = new ActorEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockExclusionManager,
+        invalidationCoordinator,
+      );
+
+      mockCanvas.tokens.placeables = [{ actor: { id: 'actor1' }, document: { id: 'token1' } }];
+
+      actorHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateActor')[1];
+
+      updateHandler(mockActor, changes);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'actor-visibility-updated',
+        document: mockActor,
+        changeData: changes,
+        metadata: {
+          phase: 'update',
+          tokenIds: ['token1'],
+        },
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
     });
 
     test('should skip processing when system state says not to process events', () => {
@@ -217,7 +256,8 @@ describe('Event Handler Tests', () => {
 
       preUpdateHandler(mockActor, changes);
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
     });
   });
 
@@ -247,7 +287,7 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('deleteActiveEffect', expect.any(Function));
     });
 
-    test('should handle visibility-affecting effects', () => {
+    test('should handle visibility-affecting effects', async () => {
       const mockEffect = {
         name: 'Invisible',
         parent: {
@@ -263,9 +303,64 @@ describe('Event Handler Tests', () => {
         (call) => call[0] === 'createActiveEffect',
       )[1];
 
-      createHandler(mockEffect);
+      await createHandler(mockEffect);
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should record invisibility flags when effect create fires before actor condition helpers update', async () => {
+      const staleActor = {
+        id: 'actor1',
+        hasCondition: jest.fn(() => false),
+        system: { conditions: { invisible: { active: false } } },
+        conditions: { has: jest.fn(() => false) },
+        documentName: 'Actor',
+      };
+      const target = {
+        actor: staleActor,
+        document: {
+          id: 'token1',
+          flags: {},
+          setFlag: jest.fn().mockResolvedValue(undefined),
+          unsetFlag: jest.fn().mockResolvedValue(undefined),
+        },
+        destroyed: false,
+      };
+      const observer = {
+        actor: { id: 'observer-actor' },
+        document: { id: 'observer-token' },
+      };
+      const mockEffect = {
+        name: 'Invisible',
+        slug: 'invisible',
+        parent: staleActor,
+      };
+
+      global.game.modules.get.mockReturnValue({
+        api: {
+          getVisibility: jest.fn(() => 'observed'),
+        },
+      });
+      mockCanvas.tokens.placeables = [target, observer];
+      mockCanvas.tokens.controlled = [];
+
+      effectHandler.initialize();
+      const createHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createActiveEffect',
+      )[1];
+
+      await createHandler(mockEffect);
+
+      expect(target.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility', {
+        'observer-token': {
+          wasVisible: true,
+          previousState: 'observed',
+          establishedState: null,
+          establishedAt: null,
+        },
+      });
+      expect(target.document.unsetFlag).not.toHaveBeenCalledWith('pf2e-visioner', 'invisibility');
     });
 
     test('should handle light-emitting effects with global recalculation', () => {
@@ -287,6 +382,82 @@ describe('Event Handler Tests', () => {
       createHandler(mockEffect);
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+
+    test('should translate visibility-affecting effects into invalidation reasons', async () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      effectHandler = new EffectEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockExclusionManager,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+      const mockEffect = {
+        id: 'effect1',
+        name: 'Invisible',
+        parent: {
+          documentName: 'Actor',
+          id: 'actor1',
+        },
+      };
+      mockCanvas.tokens.placeables = [{ actor: { id: 'actor1' }, document: { id: 'token1' } }];
+
+      effectHandler.initialize();
+      const createHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createActiveEffect',
+      )[1];
+
+      await createHandler(mockEffect);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'effect-visibility-updated',
+        document: mockEffect,
+        metadata: {
+          action: 'created',
+          actorId: 'actor1',
+          tokenIds: ['token1'],
+        },
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should translate light-emitting effects into invalidation reasons', async () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      effectHandler = new EffectEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockExclusionManager,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+      const mockEffect = {
+        id: 'effect1',
+        name: 'Torch',
+        parent: {
+          documentName: 'Actor',
+          id: 'actor1',
+        },
+      };
+      mockCanvas.tokens.placeables = [{ actor: { id: 'actor1' }, document: { id: 'token1' } }];
+
+      effectHandler.initialize();
+      const createHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createActiveEffect',
+      )[1];
+
+      await createHandler(mockEffect);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'effect-light-emitter-updated',
+        document: mockEffect,
+        metadata: {
+          action: 'created',
+          actorId: 'actor1',
+          tokenIds: ['token1'],
+        },
+      });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
     });
 
     test('should ignore non-visibility effects', () => {
@@ -312,17 +483,19 @@ describe('Event Handler Tests', () => {
 
   describe('ItemEventHandler', () => {
     let itemHandler;
-    let mockSystemState, mockVisibilityState, mockExclusionManager;
+    let mockSystemState, mockVisibilityState, mockExclusionManager, mockCacheManager;
 
     beforeEach(() => {
       mockSystemState = createMockSystemStateProvider();
       mockVisibilityState = createMockVisibilityStateManager();
       mockExclusionManager = createMockExclusionManager();
+      mockCacheManager = createMockCacheManager();
 
       itemHandler = new ItemEventHandler(
         mockSystemState,
         mockVisibilityState,
         mockExclusionManager,
+        mockCacheManager,
       );
     });
 
@@ -359,7 +532,99 @@ describe('Event Handler Tests', () => {
       jest.useRealTimers();
     });
 
-    test('should handle equipment changes', () => {
+    test('should translate visibility-affecting items into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const token = { actor: { id: 'actor1' }, document: { id: 'token1' } };
+      const mockItem = {
+        name: 'See Invisibility',
+        type: 'spell',
+        parent: {
+          documentName: 'Actor',
+          id: 'actor1',
+        },
+      };
+      itemHandler = new ItemEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockExclusionManager,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+      mockCanvas.tokens.placeables = [token];
+
+      itemHandler.initialize();
+      const createHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'createItem')[1];
+
+      createHandler(mockItem);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'item-visibility-updated',
+        document: mockItem,
+        metadata: {
+          action: 'created',
+          actorId: 'actor1',
+          tokenIds: ['token1'],
+          tokens: [token],
+        },
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should record invisibility flags and recalculate all pairs for PF2E condition items', async () => {
+      const staleActor = {
+        id: 'actor1',
+        documentName: 'Actor',
+        hasCondition: jest.fn(() => false),
+        system: { conditions: { invisible: { active: false } } },
+        conditions: { has: jest.fn(() => false) },
+      };
+      const target = {
+        actor: staleActor,
+        document: {
+          id: 'token1',
+          flags: {},
+          setFlag: jest.fn().mockResolvedValue(undefined),
+          unsetFlag: jest.fn().mockResolvedValue(undefined),
+        },
+        destroyed: false,
+      };
+      const observer = {
+        actor: { id: 'observer-actor' },
+        document: { id: 'observer-token' },
+      };
+      const mockItem = {
+        name: 'Invisible',
+        type: 'condition',
+        slug: 'invisible',
+        parent: staleActor,
+      };
+
+      global.game.modules.get.mockReturnValue({
+        api: {
+          getVisibility: jest.fn(() => 'observed'),
+        },
+      });
+      mockCanvas.tokens.placeables = [target, observer];
+      mockCanvas.tokens.controlled = [];
+
+      itemHandler.initialize();
+      const createHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'createItem')[1];
+
+      await createHandler(mockItem);
+
+      expect(target.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'invisibility', {
+        'observer-token': {
+          wasVisible: true,
+          previousState: 'observed',
+          establishedState: null,
+          establishedAt: null,
+        },
+      });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should handle equipment changes', async () => {
       const mockItem = {
         name: 'Darkvision Goggles',
         type: 'equipment',
@@ -375,9 +640,48 @@ describe('Event Handler Tests', () => {
       itemHandler.initialize();
       const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateItem')[1];
 
-      updateHandler(mockItem, changes);
+      await updateHandler(mockItem, changes);
 
       expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+    });
+
+    test('should translate vision equipment changes into invalidation reasons', async () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const token = { actor: { id: 'actor1' }, document: { id: 'token1' } };
+      const mockItem = {
+        name: 'Darkvision Goggles',
+        type: 'equipment',
+        parent: {
+          documentName: 'Actor',
+          id: 'actor1',
+        },
+      };
+      const changes = { 'system.equipped': true };
+      itemHandler = new ItemEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockExclusionManager,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+      mockCanvas.tokens.placeables = [token];
+
+      itemHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateItem')[1];
+
+      await updateHandler(mockItem, changes);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'item-vision-equipment-updated',
+        document: mockItem,
+        changeData: changes,
+        metadata: {
+          actorId: 'actor1',
+          tokenIds: ['token1'],
+          tokens: [token],
+        },
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
     });
 
     test('should handle echolocation effect item', () => {
@@ -523,6 +827,58 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('deleteAmbientLight', expect.any(Function));
     });
 
+    test('should translate Foundry lighting hooks into invalidation reasons', async () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      lightingHandler = new LightingEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+
+      lightingHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateAmbientLight',
+      )[1];
+      const createHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createAmbientLight',
+      )[1];
+      const deleteHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'deleteAmbientLight',
+      )[1];
+      const lightingRefreshHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'lightingRefresh',
+      )[1];
+
+      await updateHandler({ id: 'light1' }, { config: { bright: 20 } }, {}, 'user1');
+      await createHandler({ id: 'light2' }, {}, 'user1');
+      await deleteHandler({ id: 'light3' }, {}, 'user1');
+      lightingRefreshHandler();
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'ambient-light-updated',
+        document: { id: 'light1' },
+        changeData: { config: { bright: 20 } },
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'ambient-light-created',
+        document: { id: 'light2' },
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'ambient-light-deleted',
+        document: { id: 'light3' },
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'lighting-refresh',
+      });
+    });
+
     test('should handle light updates after lighting refresh', async () => {
       const mockLight = { id: 'light1' };
       const changes = { config: { bright: 20 } };
@@ -616,6 +972,67 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('createRegionBehavior', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('updateRegionBehavior', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('deleteRegionBehavior', expect.any(Function));
+    });
+
+    test('should translate scene and region hooks into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      sceneHandler = new SceneEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockCacheManager,
+        invalidationCoordinator,
+      );
+      const mockScene = { id: 'scene1', name: 'Test Scene' };
+      const sceneChanges = { environment: { darknessLevel: 0.5 } };
+      const behavior = {
+        id: 'behavior-1',
+        type: 'defineSurface',
+        parent: { id: 'region-1', name: 'Floor Region', parent: global.canvas.scene },
+        scene: global.canvas.scene,
+      };
+      const behaviorChanges = { system: { types: ['sight'] } };
+
+      global.foundry.utils.hasProperty.mockImplementation((obj, path) => {
+        if (path === 'environment.darknessLevel') return obj?.environment?.darknessLevel !== undefined;
+        return false;
+      });
+
+      sceneHandler.initialize();
+      const sceneUpdateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateScene',
+      )[1];
+      const behaviorUpdateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateRegionBehavior',
+      )[1];
+      const closeConfigHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'closeSceneConfigPF2e',
+      )[1];
+
+      sceneUpdateHandler(mockScene, sceneChanges, {}, 'user1');
+      behaviorUpdateHandler(behavior, behaviorChanges, {}, 'user2');
+      mockSystemState.consumePendingLightingChange.mockReturnValueOnce(true);
+      closeConfigHandler();
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'scene-lighting-updated',
+        document: mockScene,
+        changeData: sceneChanges,
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'region-surface-updated',
+          document: behavior,
+          changeData: behaviorChanges,
+          options: {},
+          userId: 'user2',
+          metadata: expect.objectContaining({ triggerReason: 'region-behavior-update' }),
+        }),
+      );
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'scene-config-lighting-flushed',
+      });
     });
 
     test('should handle darkness level changes', () => {
@@ -824,6 +1241,35 @@ describe('Event Handler Tests', () => {
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
 
+    test('should translate light-affecting template creation into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTemplate = {
+        id: 'template1',
+        x: 100,
+        y: 100,
+        distance: 20,
+        flags: {
+          pf2e: {
+            item: { name: 'Light' },
+          },
+        },
+      };
+      templateHandler = new TemplateEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        invalidationCoordinator,
+      );
+
+      templateHandler.handleTemplateCreate(mockTemplate);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'template-light-updated',
+        document: mockTemplate,
+        metadata: { action: 'created' },
+      });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
     test('should handle darkness template creation', () => {
       const mockTemplate = {
         x: 100,
@@ -895,7 +1341,80 @@ describe('Event Handler Tests', () => {
 
       expect(mockHooks.on).toHaveBeenCalledWith('updateToken', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('createToken', expect.any(Function));
+      expect(mockHooks.on).toHaveBeenCalledWith('deleteToken', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('moveToken', expect.any(Function));
+    });
+
+    test('should translate token light updates into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        hidden: false,
+      };
+      const changes = { light: { enabled: true, bright: 20 } };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes, {}, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-light-updated',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: {},
+        userId: 'user1',
+      });
+    });
+
+    test('should translate light-emitter movement into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        hidden: false,
+        light: { enabled: true, bright: 20, dim: 0 },
+      };
+      const changes = { x: 150 };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes, { animate: false }, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-light-emitter-moved',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: { animate: false },
+        userId: 'user1',
+      });
+      expect(mockVisibilityState.markTokenChangedWithSpatialOptimization).not.toHaveBeenCalled();
     });
 
     test('should handle light changes after lighting refresh', () => {
@@ -916,7 +1435,7 @@ describe('Event Handler Tests', () => {
       )[1];
       lightingRefreshHandler();
 
-      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
+      expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
     });
 
     test('should defer token light recalculation until lighting refresh completes', () => {
@@ -956,6 +1475,84 @@ describe('Event Handler Tests', () => {
       expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
+    test('should translate movementAction changes into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        hidden: false,
+      };
+      const changes = { movementAction: 'fly' };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes, {}, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-movement-action-cache-invalidated',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-movement-action-updated',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: {},
+        userId: 'user1',
+      });
+    });
+
+    test('should translate generic visibility-affecting token updates into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+        x: 100,
+        y: 100,
+        width: 1,
+        height: 1,
+        hidden: false,
+      };
+      const changes = { vision: { enabled: true } };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes, {}, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-visibility-affecting-updated',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: {},
+        userId: 'user1',
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
     test('should handle hidden flag changes', () => {
       const mockTokenDoc = {
         id: 'token1',
@@ -968,6 +1565,37 @@ describe('Event Handler Tests', () => {
       tokenHandler.handleTokenUpdate(mockTokenDoc, changes);
 
       expect(mockVisibilityState.recalculateForTokens).toHaveBeenCalledWith(['token1']);
+    });
+
+    test('should translate hidden flag changes into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+      };
+      const changes = { hidden: true };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenUpdate(mockTokenDoc, changes, {}, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-hidden-toggled',
+        document: mockTokenDoc,
+        changeData: changes,
+        options: {},
+        userId: 'user1',
+      });
+      expect(mockVisibilityState.recalculateForTokens).not.toHaveBeenCalled();
     });
 
     test('should handle token creation', () => {
@@ -986,6 +1614,37 @@ describe('Event Handler Tests', () => {
       expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
+    test('should translate token creation into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+      };
+      mockCanvas.tokens.get = jest.fn(() => ({
+        document: { id: 'token1' },
+        actor: { id: 'actor1' },
+      }));
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenCreate(mockTokenDoc);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-created',
+        document: mockTokenDoc,
+      });
+      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    });
+
     test('should handle token deletion', () => {
       const mockTokenDoc = {
         id: 'token1',
@@ -995,6 +1654,33 @@ describe('Event Handler Tests', () => {
       tokenHandler.handleTokenDelete(mockTokenDoc);
 
       expect(mockVisibilityState.removeChangedToken).toHaveBeenCalledWith('token1');
+    });
+
+    test('should translate token deletion into an invalidation reason', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      const mockTokenDoc = {
+        id: 'token1',
+        name: 'Test Token',
+      };
+      tokenHandler = new TokenEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockSpatialAnalyzer,
+        mockExclusionManager,
+        mockOverrideValidationManager,
+        mockPositionManager,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      tokenHandler.handleTokenDelete(mockTokenDoc);
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'token-deleted',
+        document: mockTokenDoc,
+      });
+      expect(mockVisibilityState.removeChangedToken).not.toHaveBeenCalled();
     });
   });
 
@@ -1016,6 +1702,46 @@ describe('Event Handler Tests', () => {
       expect(mockHooks.on).toHaveBeenCalledWith('updateWall', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('createWall', expect.any(Function));
       expect(mockHooks.on).toHaveBeenCalledWith('deleteWall', expect.any(Function));
+    });
+
+    test('should translate Foundry wall hooks into invalidation reasons', () => {
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      wallHandler = new WallEventHandler(
+        mockSystemState,
+        mockVisibilityState,
+        mockCacheManager,
+        null,
+        invalidationCoordinator,
+      );
+
+      wallHandler.initialize();
+      const updateHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'updateWall')[1];
+      const createHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'createWall')[1];
+      const deleteHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'deleteWall')[1];
+
+      updateHandler({ id: 'wall1' }, { c: [0, 0, 100, 100] }, {}, 'user1');
+      createHandler({ id: 'wall2' }, {}, 'user1');
+      deleteHandler({ id: 'wall3' }, {}, 'user1');
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'wall-updated',
+        document: { id: 'wall1' },
+        changeData: { c: [0, 0, 100, 100] },
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'wall-created',
+        document: { id: 'wall2' },
+        options: {},
+        userId: 'user1',
+      });
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+        reason: 'wall-deleted',
+        document: { id: 'wall3' },
+        options: {},
+        userId: 'user1',
+      });
     });
 
     test('should handle wall updates that affect line of sight', () => {
@@ -1070,6 +1796,90 @@ describe('Event Handler Tests', () => {
       wallHandler.handleWallDelete(mockWall);
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+  });
+
+  describe('EventHandlerFactory invalidation coordinator sharing', () => {
+    test('passes one invalidation coordinator to migrated handlers', async () => {
+      const mockSystemState = createMockSystemStateProvider();
+      const mockVisibilityState = createMockVisibilityStateManager();
+      const mockCacheManager = createMockCacheManager();
+      const invalidationCoordinator = { invalidate: jest.fn() };
+      mockCanvas.tokens.placeables = [{ actor: { id: 'actor1' }, document: { id: 'token1' } }];
+
+      const handlers = await EventHandlerFactory.createHandlers(
+        mockSystemState,
+        mockVisibilityState,
+        {
+          spatialAnalysisService: createMockSpatialAnalyzer(),
+          exclusionManager: createMockExclusionManager(),
+          overrideValidationManager: createMockOverrideValidationManager(),
+          positionManager: createMockPositionManager(),
+          cacheManager: mockCacheManager,
+        },
+        { batchOrchestrator: { clearBurstLosMemo: jest.fn() }, invalidationCoordinator },
+      );
+
+      expect(handlers.lightingEventHandler.invalidation).toBe(invalidationCoordinator);
+      expect(handlers.wallEventHandler.invalidation).toBe(invalidationCoordinator);
+      expect(handlers.sceneEventHandler.invalidation).toBe(invalidationCoordinator);
+      expect(handlers.tokenEventHandler.invalidation).toBe(invalidationCoordinator);
+      expect(handlers.actorEventHandler.invalidation).toBe(invalidationCoordinator);
+
+      const createEffectHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createActiveEffect',
+      )[1];
+      await createEffectHandler({
+        id: 'effect1',
+        name: 'Invisible',
+        parent: { documentName: 'Actor', id: 'actor1' },
+      });
+      const createItemHandler = mockHooks.on.mock.calls.find((call) => call[0] === 'createItem')[1];
+      createItemHandler({
+        id: 'item1',
+        name: 'See Invisibility',
+        type: 'spell',
+        parent: { documentName: 'Actor', id: 'actor1' },
+      });
+      const updateActorHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'updateActor',
+      )[1];
+      updateActorHandler(
+        { id: 'actor1', system: { traits: { value: [] } } },
+        { system: { traits: { value: ['undead'] } } },
+      );
+      const createTemplateHandler = mockHooks.on.mock.calls.find(
+        (call) => call[0] === 'createMeasuredTemplate',
+      )[1];
+      createTemplateHandler({
+        id: 'template1',
+        flags: { pf2e: { item: { name: 'Light' } } },
+      });
+
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'effect-visibility-updated',
+          metadata: expect.objectContaining({ tokenIds: ['token1'] }),
+        }),
+      );
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'item-visibility-updated',
+          metadata: expect.objectContaining({ tokenIds: ['token1'] }),
+        }),
+      );
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'actor-visibility-updated',
+          metadata: expect.objectContaining({ tokenIds: ['token1'] }),
+        }),
+      );
+      expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: 'template-light-updated',
+          document: expect.objectContaining({ id: 'template1' }),
+        }),
+      );
     });
   });
 });

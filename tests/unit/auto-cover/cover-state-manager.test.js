@@ -8,9 +8,12 @@ import '../../setup.js';
 describe('CoverStateManager', () => {
   let coverStateManager;
   let sourceToken, targetToken;
+  let originalGameUser;
 
   beforeEach(async () => {
     jest.resetModules();
+    originalGameUser = global.game.user;
+    global.game.user = { isGM: true };
 
     // Import the manager
     const coverStateManagerInstance = (
@@ -45,6 +48,7 @@ describe('CoverStateManager', () => {
   });
 
   afterEach(() => {
+    global.game.user = originalGameUser;
     jest.restoreAllMocks();
   });
 
@@ -227,6 +231,67 @@ describe('CoverStateManager', () => {
           { or: ['item:ranged', 'item:trait:ranged', 'attack:ranged'] },
         ],
       });
+    });
+
+    test('does not mutate cover effects on a player client', async () => {
+      global.game.user = { isGM: false };
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          itemTypes: { effect: [] },
+          createEmbeddedDocuments: jest.fn(),
+          deleteEmbeddedDocuments: jest.fn(),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'standard');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+      expect(targetToken.actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    });
+
+    test('does not request duplicate stale cover effect deletes', async () => {
+      const existingEffect = {
+        id: 'cover-effect',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralCover: true,
+            observerActorSignature: 'source-signature',
+          },
+        },
+      };
+      sourceToken = global.createMockToken({
+        id: 'source-123',
+        name: 'Source Token',
+        actor: { id: 'source-actor', signature: 'source-signature' },
+      });
+      targetToken = global.createMockToken({
+        id: 'target-456',
+        name: 'Target Token',
+        actor: {
+          uuid: 'Actor.target',
+          itemTypes: { effect: [existingEffect] },
+          items: {
+            get: jest.fn((id) => (id === existingEffect.id ? existingEffect : null)),
+          },
+          createEmbeddedDocuments: jest.fn(),
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      });
+
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'none');
+      await coverStateManager._updateEphemeralEffects(sourceToken, targetToken, 'none');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledTimes(1);
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+        'cover-effect',
+      ]);
     });
   });
 

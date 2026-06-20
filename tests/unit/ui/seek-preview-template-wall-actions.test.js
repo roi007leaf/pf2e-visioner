@@ -27,4 +27,15 @@ describe('Seek preview template wall row actions', () => {
       '<small class="search-exploration-seeker">{{outcome.searchExplorationTargetName}}</small>',
     );
   });
+
+  test('invisible Seek capped rows render an explanation indicator', () => {
+    const template = fs.readFileSync(
+      path.resolve(process.cwd(), 'templates/seek-preview.hbs'),
+      'utf8',
+    );
+
+    expect(template).toContain('{{#if outcome.invisibleSeekCapApplied}}');
+    expect(template).toContain('seek-invisible-cap-indicator');
+    expect(template).toContain('PF2E_VISIONER.SEEK_AUTOMATION.INVISIBLE_CAP_TOOLTIP');
+  });
 });

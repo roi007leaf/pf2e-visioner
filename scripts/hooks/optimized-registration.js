@@ -4,14 +4,24 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import {
+  getControlledWallVisualObserverId,
+  refreshOptimizedWallVisualsForObserverId,
+} from '../services/Walls/wall-visual-refresh.js';
 import { scheduleTask } from '../utils/scheduler.js';
+
+function getControlledObserverId() {
+  return getControlledWallVisualObserverId(globalThis.canvas?.tokens?.controlled || []);
+}
+
+async function refreshOptimizedWallVisuals(observerId = getControlledObserverId()) {
+  await refreshOptimizedWallVisualsForObserverId(observerId);
+}
 
 /**
  * Register optimized hooks with no artificial delays
  */
 export function registerHooks() {
-
-
   // Removed controlToken hook - was causing excessive updateWallVisuals calls on token selection.
   // Wall visual updates should only occur when wall flags actually change, which is properly
   // handled by TokenEventHandler._handleWallFlagChanges method.
@@ -20,96 +30,42 @@ export function registerHooks() {
   // This was causing hundreds of calls during movement animation. Wall visual updates are now
   // properly handled by TokenEventHandler._handleWallFlagChanges only when wall flags actually change.
 
-  // Optimized createToken hook - IMMEDIATE
-  Hooks.on('createToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch { }
-  });
-
-  // Optimized deleteToken hook - IMMEDIATE
-  Hooks.on('deleteToken', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch { }
-  });
+  // Token lifecycle is owned by hooks/token-events.js. Avoid wall-visual refreshes on
+  // token create/delete; wall indicators are driven by wall flag changes and explicit UI refreshes.
 
   // Optimized renderTokenConfig hook - IMMEDIATE
   Hooks.on('renderTokenConfig', async (config) => {
     try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = config.token?.id || canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
+      await refreshOptimizedWallVisuals(config.token?.id || getControlledObserverId());
     } catch { }
   });
 
-  // Optimized updateWall hook - IMMEDIATE
-  Hooks.on('updateWall', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch { }
-  });
-
-  // Optimized createWall hook - IMMEDIATE
-  Hooks.on('createWall', async () => {
-    try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch { }
-  });
-
-  // Optimized deleteWall hook - IMMEDIATE + cleanup
-  Hooks.on('deleteWall', async (wallDocument) => {
-    try {
-      // Immediate cleanup of deleted wall visuals
-      const { cleanupDeletedWallVisuals } = await import('../services/optimized-visual-effects.js');
-      await cleanupDeletedWallVisuals(wallDocument);
-
-      // Immediate wall visuals update
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
-    } catch { }
-  });
+  // Wall document lifecycle is owned by hooks/registration.js so hidden-wall flag sync,
+  // door-state refresh, deleted-wall cleanup, and visual refresh stay ordered together.
 
   // Optimized renderWallConfig hook - IMMEDIATE
   Hooks.on('renderWallConfig', async () => {
     try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
+      await refreshOptimizedWallVisuals();
     } catch { }
   });
 
   // Optimized lighting update hooks - IMMEDIATE
   Hooks.on('updateAmbientLight', async () => {
     try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
+      await refreshOptimizedWallVisuals();
     } catch { }
   });
 
   Hooks.on('createAmbientLight', async () => {
     try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
+      await refreshOptimizedWallVisuals();
     } catch { }
   });
 
   Hooks.on('deleteAmbientLight', async () => {
     try {
-      const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-      const id = canvas.tokens.controlled?.[0]?.id || null;
-      await updateWallVisuals(id);
+      await refreshOptimizedWallVisuals();
     } catch { }
   });
 
@@ -120,9 +76,7 @@ export function registerHooks() {
       // Use setTimeout instead of requestAnimationFrame to work when window is unfocused
       scheduleTask(async () => {
         try {
-          const { updateWallVisuals } = await import('../services/optimized-visual-effects.js');
-          const id = canvas.tokens.controlled?.[0]?.id || null;
-          await updateWallVisuals(id);
+          await refreshOptimizedWallVisuals();
         } catch { }
       });
     } catch { }

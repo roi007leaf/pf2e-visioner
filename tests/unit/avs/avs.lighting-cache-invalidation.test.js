@@ -18,14 +18,7 @@ describe('BatchOrchestrator - Lighting Cache Invalidation', () => {
         jest.clearAllMocks();
 
         mockBatchProcessor = {
-            _persistentCaches: {
-                sensesCache: null,
-                sensesCacheTs: 0,
-                idToTokenMap: null,
-                idToTokenMapTs: 0,
-                spatialIndex: null,
-                spatialIndexTs: 0,
-            },
+            clearPersistentCaches: jest.fn(),
             globalLosCache: new Map(),
             globalVisibilityCache: new Map(),
         };
@@ -45,22 +38,10 @@ describe('BatchOrchestrator - Lighting Cache Invalidation', () => {
     });
 
     describe('clearPersistentCaches', () => {
-        it('should clear BatchProcessor persistent caches', () => {
-            mockBatchProcessor._persistentCaches.sensesCache = { some: 'data' };
-            mockBatchProcessor._persistentCaches.sensesCacheTs = 12345;
-            mockBatchProcessor._persistentCaches.idToTokenMap = new Map([['id1', {}]]);
-            mockBatchProcessor._persistentCaches.idToTokenMapTs = 67890;
-            mockBatchProcessor._persistentCaches.spatialIndex = { some: 'index' };
-            mockBatchProcessor._persistentCaches.spatialIndexTs = 11111;
-
+        it('should delegate BatchProcessor persistent cache clearing', () => {
             orchestrator.clearPersistentCaches();
 
-            expect(mockBatchProcessor._persistentCaches.sensesCache).toBeNull();
-            expect(mockBatchProcessor._persistentCaches.sensesCacheTs).toBe(0);
-            expect(mockBatchProcessor._persistentCaches.idToTokenMap).toBeNull();
-            expect(mockBatchProcessor._persistentCaches.idToTokenMapTs).toBe(0);
-            expect(mockBatchProcessor._persistentCaches.spatialIndex).toBeNull();
-            expect(mockBatchProcessor._persistentCaches.spatialIndexTs).toBe(0);
+            expect(mockBatchProcessor.clearPersistentCaches).toHaveBeenCalledTimes(1);
         });
 
         it('should clear global LOS and visibility caches', () => {

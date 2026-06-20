@@ -919,6 +919,12 @@ function getChatAutomationCSS() {
             font-size: 9px !important;
         }
 
+        .seek-invisible-cap-indicator {
+            background: rgba(255, 140, 0, 0.2) !important;
+            border-color: rgba(255, 140, 0, 0.55) !important;
+            color: #ffb347 !important;
+        }
+
         /* Colorblind support for Sneaky feat indicator */
         .colorblind .sneaky-feat-indicator {
             background: rgba(255, 165, 0, 0.2) !important; /* Orange background for colorblind */
@@ -1502,7 +1508,26 @@ function getChatAutomationCSS() {
             margin: 0 4px;
         }
         
-        /* Point Out state icon styles removed - now using unified styles */
+        /* State-specific colors for Point Out dialog icons */
+        .point-out-preview-dialog .state-icon[data-state='observed'] {
+            color: var(--visibility-observed) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='concealed'] {
+            color: var(--visibility-concealed) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='hidden'] {
+            color: var(--visibility-hidden) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='undetected'] {
+            color: var(--visibility-undetected) !important;
+        }
+        
+        .point-out-preview-dialog .state-icon[data-state='unnoticed'] {
+            color: var(--visibility-unnoticed) !important;
+        }
         
         .point-out-preview-dialog .no-change-indicator {
             color: var(--color-text-secondary, #b0b0b0);

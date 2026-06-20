@@ -4,6 +4,8 @@
 
 import { MODULE_ID } from './constants.js';
 import autoCoverSystem from './cover/auto-cover/AutoCoverSystem.js';
+import { scheduleCanvasPerceptionUpdate } from './helpers/perception-refresh.js';
+import { calculateRealDistanceInFeet } from './helpers/geometry-utils.js';
 import { getCoverMap } from './stores/cover-map.js';
 import { VisionerTokenManager } from './managers/token-manager/TokenManager.js';
 import {
@@ -15,18 +17,34 @@ import {
   unsetMapsForTokens,
 } from './services/api-internal.js';
 import { LevelsIntegration } from './services/LevelsIntegration.js';
+import { applyActiveSceneHearingRangeLimit } from './services/scene-hearing-range.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
+import {
+  setMovementPerformanceDiagnosticsEnabled,
+  setSuppressPendingMovementVisualRefresh,
+} from './services/runtime-state.js';
 import { refreshEveryonesPerception } from './services/socket.js';
 import { updateTokenVisuals } from './services/visual-effects.js';
+import { invalidateCaches, CACHE_INVALIDATION_REASONS } from './utils/cache-invalidation.js';
 import {
   cleanupDeletedToken,
   getCoverBetween,
+  getPerceptionProfileBetween as getPerceptionProfileBetweenStore,
+  getPerceptionProfileMap as getPerceptionProfileMapStore,
+  getVisibilityMap,
   getVisibility,
   setCoverBetween,
+  setPerceptionProfileBetween as setPerceptionProfileBetweenStore,
+  setPerceptionProfileMap as setPerceptionProfileMapStore,
   setVisibilityBetween,
   showNotification,
 } from './utils.js';
 import { autoVisibilitySystem, ConditionManager } from './visibility/auto-visibility/index.js';
+import {
+  normalizePerceptionProfile,
+  overrideToLegacyVisibility,
+  profileToLegacyVisibility,
+} from './visibility/perception-profile.js';
 
 function getForcedDeletion() {
   return foundry?.data?.operators?.ForcedDeletion ?? null;
@@ -58,6 +76,25 @@ function getStateFromSources(sources) {
     return currentPriority > bestPriority ? current : best;
   }, sources[0]);
   return source?.state;
+}
+
+function profileToManualOverrideChange(targetToken, profile, options = {}) {
+  const normalized = normalizePerceptionProfile(profile);
+  const state = profileToLegacyVisibility(normalized, {
+    preserveEncounterUnnoticed: !!options.preserveEncounterUnnoticed,
+  });
+  const expectedCover = normalized.coverState !== 'none' ? normalized.coverState : undefined;
+
+  return {
+    target: targetToken,
+    state,
+    hasConcealment: normalized.hasConcealment,
+    expectedCover,
+    detectionState: normalized.detectionState,
+    awarenessState: normalized.awarenessState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+  };
 }
 
 function scrubManualCoverSources(stateSource) {
@@ -121,12 +158,82 @@ function scrubManualCoverSources(stateSource) {
 }
 
 function setCommonSceneDataDeletion(update) {
-  setFlagDeletion(update, 'visibility');
+  setFlagDeletion(update, 'visibilityV2');
+  setFlagDeletion(update, 'detection');
   setFlagDeletion(update, 'cover');
   setFlagDeletion(update, 'autoCoverMap');
   setFlagDeletion(update, 'stateSource');
   setFlagDeletion(update, 'coverOverride');
   setFlagDeletion(update, 'providesCover');
+}
+
+function getModuleFlags(token) {
+  return token?.document?.flags?.[MODULE_ID] || {};
+}
+
+function remainingFlagKeys(token, allowedKeys = null) {
+  const flags = getModuleFlags(token);
+  const keys = Object.keys(flags);
+  if (!allowedKeys) return keys;
+  const allowed = new Set(allowedKeys);
+  return keys.filter((key) => allowed.has(key));
+}
+
+async function unsetTokenFlagsDirectly(token, flagKeys = []) {
+  const unsetFlag = token?.document?.unsetFlag;
+  if (typeof unsetFlag !== 'function') return;
+
+  for (const flagKey of flagKeys) {
+    try {
+      await unsetFlag.call(token.document, MODULE_ID, flagKey);
+    } catch {}
+  }
+}
+
+async function clearRemainingTokenFlags(tokens, getFlagKeys) {
+  const before = [];
+
+  for (const token of tokens) {
+    const flagKeys = getFlagKeys(token);
+    if (flagKeys.length === 0) continue;
+    before.push({
+      token,
+      flagKeys,
+    });
+    await unsetTokenFlagsDirectly(token, flagKeys);
+  }
+
+  const remaining = before
+    .map(({ token, flagKeys }) => ({
+      tokenName: token?.name,
+      remainingFlags: remainingFlagKeys(token, flagKeys),
+    }))
+    .filter((entry) => entry.remainingFlags.length > 0);
+
+  if (remaining.length > 0) {
+    console.warn(
+      'PF2E Visioner | Some flags were not removed after direct cleanup:',
+      remaining,
+    );
+  }
+
+  if (before.length > 0) {
+    invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+      reason: 'clear-remaining-token-flags',
+      tokenCount: before.length,
+    });
+  }
+}
+
+async function clearHoverIndicatorsAfterPurge() {
+  try {
+    const {
+      hideAllVisibilityIndicators,
+      hideAllCoverIndicators,
+    } = await import('./services/HoverTooltips.js');
+    hideAllVisibilityIndicators?.();
+    hideAllCoverIndicators?.();
+  } catch {}
 }
 
 /**
@@ -353,6 +460,29 @@ export class Pf2eVisionerApi {
     }
   }
 
+  static getPerceptionProfile(observerId, targetId) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      const targetToken = canvas.tokens.get(targetId);
+      if (!observerToken || !targetToken) return null;
+      return getPerceptionProfileBetweenStore(observerToken, targetToken);
+    } catch (error) {
+      console.error('Error getting perception profile:', error);
+      return null;
+    }
+  }
+
+  static getPerceptionProfileMap(observerId) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      if (!observerToken) return {};
+      return getPerceptionProfileMapStore(observerToken);
+    } catch (error) {
+      console.error('Error getting perception profile map:', error);
+      return {};
+    }
+  }
+
   /**
    * Get the primary factors affecting visibility between two tokens
    * Returns structured data about lighting, conditions, and special detection
@@ -383,7 +513,7 @@ export class Pf2eVisionerApi {
       );
 
       // Check for manual overrides
-      const visibilityMap = observerToken.document.getFlag('pf2e-visioner', 'visibility') || {};
+      const visibilityMap = getVisibilityMap(observerToken) || {};
       const manualState = visibilityMap[targetToken.id];
 
       // Get lighting at target
@@ -547,6 +677,7 @@ export class Pf2eVisionerApi {
 
       // Calculate distance for sense range checks
       const distance = visionAnalyzer.distanceFeet(observerToken, targetToken);
+      const hearingDistance = calculateRealDistanceInFeet(observerToken, targetToken);
 
       // Check special detection
       const detection = {
@@ -581,6 +712,8 @@ export class Pf2eVisionerApi {
 
       // Build comprehensive senses object from sensingSummary
       const sensingSummary = visionCaps.sensingSummary || {};
+      const hearingRange =
+        applyActiveSceneHearingRangeLimit(sensingSummary.hearing?.range ?? null) ?? Infinity;
       const senses = {
         darkvision: {
           has: visionCaps.hasDarkvision,
@@ -619,8 +752,8 @@ export class Pf2eVisionerApi {
         },
         hearing: {
           has: (sensingSummary.hearing?.range || 0) > 0 || !observerConditions.includes('deafened'),
-          range: sensingSummary.hearing?.range || Infinity,
-          inRange: distance <= (sensingSummary.hearing?.range || Infinity),
+          range: hearingRange,
+          inRange: hearingDistance <= hearingRange,
           type: 'imprecise',
         },
       };
@@ -1144,10 +1277,12 @@ export class Pf2eVisionerApi {
       // Imprecise senses (provide hidden state, not observed)
       if (visibility === 'hidden') {
         // Check if detection is via imprecise senses
+        const hearingDistance = calculateRealDistanceInFeet(observerToken, targetToken);
         const hasHearing =
           sensingSummary.hearing &&
           !isDeafened &&
-          distance <= (sensingSummary.hearing.range || Infinity);
+          hearingDistance <=
+            (applyActiveSceneHearingRangeLimit(sensingSummary.hearing.range ?? null) ?? Infinity);
         const hasScent = sensingSummary.scent && distance <= (sensingSummary.scent?.range || 0);
 
         if (hasHearing && targetConditions.includes('invisible')) {
@@ -1372,6 +1507,95 @@ export class Pf2eVisionerApi {
       return true;
     } catch (error) {
       console.error('Error setting visibility:', error);
+      return false;
+    }
+  }
+
+  static async setPerceptionProfile(observerId, targetId, profile, options = {}) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      const targetToken = canvas.tokens.get(targetId);
+
+      if (!observerToken) {
+        console.error(`Observer token not found with ID: ${observerId}`);
+        return false;
+      }
+
+      if (!targetToken) {
+        console.error(`Target token not found with ID: ${targetId}`);
+        return false;
+      }
+
+      try {
+        if (!options?.isAutomatic) {
+          const AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
+            .default;
+          await AvsOverrideManager.applyOverrides(
+            observerToken,
+            profileToManualOverrideChange(targetToken, profile, options),
+            { source: 'manual_action' },
+          );
+        }
+      } catch (e) {
+        console.warn(
+          'PF2E Visioner API: Failed to set AVS overrides for manual perception profile',
+          e,
+        );
+      }
+
+      await setPerceptionProfileBetweenStore(observerToken, targetToken, profile, options);
+      try {
+        await updateTokenVisuals();
+      } catch (refreshError) {
+        console.warn('PF2E Visioner | perception profile visual refresh failed:', refreshError);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error setting perception profile:', error);
+      return false;
+    }
+  }
+
+  static async setPerceptionProfileMap(observerId, profileMap, options = {}) {
+    try {
+      const observerToken = canvas.tokens.get(observerId);
+      if (!observerToken) {
+        console.error(`Observer token not found with ID: ${observerId}`);
+        return false;
+      }
+
+      try {
+        if (!options?.isAutomatic) {
+          const AvsOverrideManager = (await import('./chat/services/infra/AvsOverrideManager.js'))
+            .default;
+          const changes = [];
+          for (const [targetId, profile] of Object.entries(profileMap ?? {})) {
+            const targetToken = canvas.tokens.get(targetId);
+            if (!targetToken) continue;
+            changes.push(profileToManualOverrideChange(targetToken, profile, options));
+          }
+          if (changes.length) {
+            await AvsOverrideManager.applyOverrides(observerToken, changes, {
+              source: 'manual_action',
+            });
+          }
+        }
+      } catch (e) {
+        console.warn(
+          'PF2E Visioner API: Failed to set AVS overrides for manual perception profile map',
+          e,
+        );
+      }
+
+      await setPerceptionProfileMapStore(observerToken, profileMap, options);
+      try {
+        await updateTokenVisuals();
+      } catch (refreshError) {
+        console.warn('PF2E Visioner | perception profile map visual refresh failed:', refreshError);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error setting perception profile map:', error);
       return false;
     }
   }
@@ -1976,7 +2200,8 @@ export class Pf2eVisionerApi {
 
         // Clear visibility/cover maps (these get recalculated by AVS). Use deletion, not
         // empty objects, because Foundry can merge `{}` and leave old manual entries.
-        setFlagDeletion(update, 'visibility');
+        setFlagDeletion(update, 'visibilityV2');
+        setFlagDeletion(update, 'detection');
         setFlagDeletion(update, 'cover');
         setFlagDeletion(update, 'autoCoverMap');
         const stateSource = t.document.getFlag(MODULE_ID, 'stateSource') || {};
@@ -1997,45 +2222,29 @@ export class Pf2eVisionerApi {
       if (allUpdates.length && scene.updateEmbeddedDocuments) {
         try {
           await scene.updateEmbeddedDocuments('Token', allUpdates, { diff: false });
-
-          // Additional verification and cleanup: check if flags are actually gone
-          setTimeout(async () => {
-            const remainingFlags = [];
-            const explicitUpdates = [];
-
-            tokensWithoutRuleElements.forEach((t) => {
-              const flags = t.document.flags?.[MODULE_ID] || {};
-              if (Object.keys(flags).length > 0) {
-                remainingFlags.push({
-                  tokenName: t.name,
-                  remainingFlags: Object.keys(flags),
-                });
-
-                // Build explicit removal updates for stubborn flags
-                const explicitUpdate = { _id: t.id };
-                Object.keys(flags).forEach((flagKey) => {
-                  setFlagDeletion(explicitUpdate, flagKey);
-                });
-                explicitUpdates.push(explicitUpdate);
-              }
-            });
-
-            if (remainingFlags.length > 0) {
-              console.warn(
-                'PF2E Visioner | ⚠️ Some flags were not removed, attempting explicit removal:',
-                remainingFlags,
-              );
-
-              // Try explicit flag removal
-              if (explicitUpdates.length > 0) {
-                try {
-                  await scene.updateEmbeddedDocuments('Token', explicitUpdates, { diff: false });
-                } catch (error) {
-                  console.error('PF2E Visioner | Error in explicit flag removal:', error);
-                }
-              }
-            }
-          }, 100);
+          invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+            reason: 'clear-all-scene-data-token-flags',
+            updateCount: allUpdates.length,
+          });
+          await clearRemainingTokenFlags(
+            tokensWithoutRuleElements,
+            (token) => remainingFlagKeys(token),
+          );
+          await clearRemainingTokenFlags(
+            tokensWithRuleElements,
+            (token) => remainingFlagKeys(token, [
+              'coverOverride',
+              'waitingSneak',
+              'sneak-speed-effect-id',
+              'invisibility',
+              'visibilityV2',
+              'visibility',
+              'detection',
+              'cover',
+              'autoCoverMap',
+              'stateSource',
+            ]),
+          );
         } catch (error) {
           console.error('PF2E Visioner | Error updating tokens:', error);
         }
@@ -2163,6 +2372,7 @@ export class Pf2eVisionerApi {
       } catch {}
 
       // 6) Rebuild effects and refresh visuals/perception
+      await clearHoverIndicatorsAfterPurge();
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
@@ -2171,7 +2381,7 @@ export class Pf2eVisionerApi {
         refreshEveryonesPerception();
       } catch {}
       try {
-        canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch {}
 
       ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_DATA_CLEARED'));
@@ -2290,7 +2500,8 @@ export class Pf2eVisionerApi {
           setFlagDeletion(update, 'waitingSneak');
           setFlagDeletion(update, 'invisibility');
           setFlagDeletion(update, 'coverOverride');
-          setFlagDeletion(update, 'visibility');
+          setFlagDeletion(update, 'visibilityV2');
+          setFlagDeletion(update, 'detection');
           setFlagDeletion(update, 'cover');
           setFlagDeletion(update, 'autoCoverMap');
           setFlagDeletion(update, 'stateSource');
@@ -2324,6 +2535,10 @@ export class Pf2eVisionerApi {
 
         if (flagUpdates.length && scene.updateEmbeddedDocuments) {
           await scene.updateEmbeddedDocuments('Token', flagUpdates, { diff: false });
+          invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+            reason: 'clear-selected-token-flags',
+            updateCount: flagUpdates.length,
+          });
         }
       } catch {}
 
@@ -2397,20 +2612,39 @@ export class Pf2eVisionerApi {
             const update = { _id: token.id };
             let hasChanges = false;
 
-            // Remove selected tokens from this token's visibility map
-            const visibilityMap = token.document.getFlag(MODULE_ID, 'visibility') || {};
-            const cleanedVisibilityMap = { ...visibilityMap };
+            // Remove selected tokens from this token's canonical visibility profile map
+            const visibilityProfileMap = token.document.getFlag(MODULE_ID, 'visibilityV2') || {};
+            const cleanedVisibilityProfileMap = { ...visibilityProfileMap };
+            hasChanges = false;
             for (const selectedId of selectedTokenIds) {
-              if (cleanedVisibilityMap[selectedId]) {
-                delete cleanedVisibilityMap[selectedId];
+              if (cleanedVisibilityProfileMap[selectedId]) {
+                delete cleanedVisibilityProfileMap[selectedId];
                 hasChanges = true;
               }
             }
             if (hasChanges) {
-              if (Object.keys(cleanedVisibilityMap).length > 0) {
-                update[`flags.${MODULE_ID}.visibility`] = cleanedVisibilityMap;
+              if (Object.keys(cleanedVisibilityProfileMap).length > 0) {
+                update[`flags.${MODULE_ID}.visibilityV2`] = cleanedVisibilityProfileMap;
               } else {
-                setFlagDeletion(update, 'visibility');
+                setFlagDeletion(update, 'visibilityV2');
+              }
+            }
+
+            // Remove selected tokens from this token's detection map
+            const detectionMap = token.document.getFlag(MODULE_ID, 'detection') || {};
+            const cleanedDetectionMap = { ...detectionMap };
+            hasChanges = false;
+            for (const selectedId of selectedTokenIds) {
+              if (cleanedDetectionMap[selectedId]) {
+                delete cleanedDetectionMap[selectedId];
+                hasChanges = true;
+              }
+            }
+            if (hasChanges) {
+              if (Object.keys(cleanedDetectionMap).length > 0) {
+                update[`flags.${MODULE_ID}.detection`] = cleanedDetectionMap;
+              } else {
+                setFlagDeletion(update, 'detection');
               }
             }
 
@@ -2440,6 +2674,10 @@ export class Pf2eVisionerApi {
 
           if (updates.length > 0 && scene.updateEmbeddedDocuments) {
             await scene.updateEmbeddedDocuments('Token', updates, { diff: false });
+            invalidateCaches(CACHE_INVALIDATION_REASONS.manualClear, {
+              reason: 'clear-selected-token-references',
+              updateCount: updates.length,
+            });
           }
         }
       } catch {}
@@ -2536,6 +2774,7 @@ export class Pf2eVisionerApi {
       } catch {}
 
       // 8) Rebuild effects and refresh visuals/perception
+      await clearHoverIndicatorsAfterPurge();
       try {
         await updateTokenVisuals();
       } catch {}
@@ -2543,7 +2782,7 @@ export class Pf2eVisionerApi {
         refreshEveryonesPerception();
       } catch {}
       try {
-        canvas.perception.update({ refreshVision: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
       } catch {}
 
       ui.notifications.info(
@@ -2658,7 +2897,7 @@ export class Pf2eVisionerApi {
               targetName: flagData.targetName,
               observerImg: observerToken?.document?.texture?.src || null,
               targetImg: targetToken?.document?.texture?.src || null,
-              state: flagData.state,
+              state: overrideToLegacyVisibility(flagData),
               source: flagData.source,
               hasCover: flagData.hasCover,
               hasConcealment: flagData.hasConcealment,
@@ -2683,7 +2922,7 @@ export class Pf2eVisionerApi {
             targetName: flagData.targetName,
             observerImg: observerToken?.document?.texture?.src || null,
             targetImg: t?.document?.texture?.src || null,
-            state: flagData.state,
+            state: overrideToLegacyVisibility(flagData),
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
@@ -2754,11 +2993,36 @@ export const autoVisibility = {
   enable: () => autoVisibilitySystem.enable(),
   disable: () => autoVisibilitySystem.disable(),
   recalculateAll: (force = false) => autoVisibilitySystem.recalculateAllVisibility(force),
-  updateTokens: (tokens) =>
-    autoVisibilitySystem.updateVisibilityForTokens?.(tokens) ||
-    console.warn('updateTokens method not available in refactored system'),
+  updateTokens: (tokens) => {
+    const ids = (Array.isArray(tokens) ? tokens : [tokens])
+      .map((t) => (typeof t === 'string' ? t : (t?.id ?? t?.document?.id)))
+      .filter(Boolean);
+    return autoVisibilitySystem.recalculateForTokens?.(ids);
+  },
   calculateVisibility: (observer, target) =>
     autoVisibilitySystem.calculateVisibility(observer, target),
+  getPerceptionProfile: (observerId, targetId) =>
+    Pf2eVisionerApi.getPerceptionProfile(observerId, targetId),
+  getPerceptionProfileMap: (observerId) =>
+    Pf2eVisionerApi.getPerceptionProfileMap(observerId),
+  setPerceptionProfile: (observerId, targetId, profile, options = {}) =>
+    Pf2eVisionerApi.setPerceptionProfile(observerId, targetId, profile, options),
+  setPerceptionProfileMap: (observerId, profileMap, options = {}) =>
+    Pf2eVisionerApi.setPerceptionProfileMap(observerId, profileMap, options),
+  getMovementPerformanceSnapshot: () =>
+    autoVisibilitySystem.getMovementPerformanceSnapshot?.() ?? {
+      active: false,
+      currentSession: null,
+      totals: { suppressedLightingRefreshes: 0 },
+    },
+  debugPendingMovementVisualRefresh: (enabled = true) => {
+    setSuppressPendingMovementVisualRefresh(!enabled);
+    return enabled;
+  },
+  debugMovementPerformanceDiagnostics: (enabled = true) => {
+    setMovementPerformanceDiagnosticsEnabled(!!enabled);
+    return !!enabled;
+  },
 
   // Clear light cache (for performance troubleshooting)
   clearLightCache: () => {
@@ -2845,6 +3109,7 @@ export const autoVisibility = {
 
       // Use standardized distance calculation (now that distanceFeet is public)
       const distance = visionAnalyzer.distanceFeet(observer, target);
+      const hearingDistance = calculateRealDistanceInFeet(observer, target);
 
       return {
         observer: observer.name,
@@ -2855,6 +3120,7 @@ export const autoVisibility = {
         canDetectCreatureType: canDetectType,
         canDetectInRange: canDetectInRange,
         distance: Math.round(distance * 10) / 10, // Round to 1 decimal
+        hearingDistance: Math.round(hearingDistance * 10) / 10,
         sensingSummary: sensingSummary,
       };
     } catch (error) {

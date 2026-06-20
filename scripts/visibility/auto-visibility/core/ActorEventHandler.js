@@ -4,11 +4,25 @@
  *
  * Follows SOLID principles by depending on abstractions rather than concrete implementations.
  */
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import { actorVisibilityUpdated } from './InvalidationIntents.js';
+
 export class ActorEventHandler {
-  constructor(systemStateProvider, visibilityStateManager, exclusionManager) {
+  constructor(
+    systemStateProvider,
+    visibilityStateManager,
+    exclusionManager,
+    invalidationCoordinator = null,
+  ) {
     this.systemState = systemStateProvider;
     this.visibilityState = visibilityStateManager;
     this.exclusionManager = exclusionManager;
+    this.invalidation =
+      invalidationCoordinator ??
+      new AvsInvalidationCoordinator({
+        systemStateProvider,
+        visibilityStateManager,
+      });
   }
 
   /**
@@ -93,8 +107,8 @@ export class ActorEventHandler {
       }));
 
       if (tokens.length > 0) {
-        tokens.forEach((token) =>
-          this.visibilityState.markTokenChangedImmediate(token.document.id),
+        this.invalidation.invalidate(
+          actorVisibilityUpdated(actor, changes, { phase: 'preUpdate', tokens }),
         );
       }
     }
@@ -160,7 +174,7 @@ export class ActorEventHandler {
       ) || [];
 
     if (tokens.length > 0) {
-      tokens.forEach((token) => this.visibilityState.markTokenChangedImmediate(token.document.id));
+      this.invalidation.invalidate(actorVisibilityUpdated(actor, changes, { phase: 'update', tokens }));
     }
   }
 
@@ -251,7 +265,7 @@ export class ActorEventHandler {
     // Check if this is the invisible condition
     if (statusId === 'invisible') {
       if (token.actor) {
-        this._handleInvisibilityConditionChange(token.actor);
+        this._handleInvisibilityConditionChange(token.actor, null, active);
       }
     }
   }
@@ -262,7 +276,7 @@ export class ActorEventHandler {
    * @param {Object} changes - Optional changes object from preUpdateActor
    * @private
    */
-  async _handleInvisibilityConditionChange(actor, changes = null) {
+  async _handleInvisibilityConditionChange(actor, changes = null, hasInvisibility = null) {
     try {
       // Check if the system is ready to process condition changes
       if (!canvas?.tokens?.placeables) {
@@ -274,7 +288,9 @@ export class ActorEventHandler {
       const conditionManager = ConditionManager.getInstance();
 
       // Call the condition manager to handle invisibility flags
-      await conditionManager.handleInvisibilityChange(actor);
+      await conditionManager.handleInvisibilityChange(actor, {
+        hasInvisibility,
+      });
     } catch (error) {
       console.error('PF2E Visioner | Failed to handle invisibility condition change:', error);
     }

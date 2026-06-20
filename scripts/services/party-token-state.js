@@ -5,7 +5,13 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getCoverMap, setCoverMap } from '../stores/cover-map.js';
-import { getVisibilityMap, normalizeVisibilityMap, setVisibilityMap } from '../stores/visibility-map.js';
+import {
+  getPerceptionProfileMap,
+  getVisibilityMap,
+  normalizeVisibilityMap,
+  setVisibilityMap,
+} from '../stores/visibility-map.js';
+import { legacyVisibilityToProfile } from '../visibility/perception-profile.js';
 
 const PARTY_RESTORE_MARKER_FLAG = 'partyStateRestoredAt';
 const activePartyRestorations = new Set();
@@ -20,6 +26,14 @@ function normalizeCoverMap(map = {}) {
   }
 
   return normalized;
+}
+
+function profileMapWithVisibilityState(observer, targetId, visibilityState) {
+  const currentProfiles = getPerceptionProfileMap(observer) || {};
+  return {
+    ...currentProfiles,
+    [targetId]: legacyVisibilityToProfile(visibilityState),
+  };
 }
 
 function getPartyRestoreMarker(tokenDoc) {
@@ -251,9 +265,11 @@ export async function restoreTokenStateFromParty(tokenDoc) {
 
       // Restore visibility state
       if (states.visibility && states.visibility !== 'observed') {
-        const currentVisMap = getVisibilityMap(observer);
-        const newVisMap = { ...currentVisMap, [tokenDoc.id]: states.visibility };
-        patch[`flags.${MODULE_ID}.visibility`] = newVisMap;
+        patch[`flags.${MODULE_ID}.visibilityV2`] = profileMapWithVisibilityState(
+          observer,
+          tokenDoc.id,
+          states.visibility,
+        );
         hasChanges = true;
       }
 
@@ -421,12 +437,11 @@ async function processDeferredPartyUpdates(tokenDoc, scene) {
 
           // Apply the deferred visibility state
           if (deferredUpdate.states.visibility && deferredUpdate.states.visibility !== 'observed') {
-            const currentVisMap = getVisibilityMap({ document: tokenDoc }) || {};
-            const newVisMap = {
-              ...currentVisMap,
-              [targetTokenId]: deferredUpdate.states.visibility,
-            };
-            patch[`flags.${MODULE_ID}.visibility`] = newVisMap;
+            patch[`flags.${MODULE_ID}.visibilityV2`] = profileMapWithVisibilityState(
+              { document: tokenDoc },
+              targetTokenId,
+              deferredUpdate.states.visibility,
+            );
             hasChanges = true;
           }
 

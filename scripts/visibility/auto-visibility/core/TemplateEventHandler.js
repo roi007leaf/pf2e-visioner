@@ -1,4 +1,6 @@
 import { MODULE_ID } from '../../../constants.js';
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import { templateLightUpdated } from './InvalidationIntents.js';
 
 /**
  * TemplateEventHandler handles template-related events and their effects on visibility.
@@ -9,12 +11,17 @@ import { MODULE_ID } from '../../../constants.js';
 export class TemplateEventHandler {
     /** @type {SystemStateProvider} */
     #systemState;
-    /** @type {VisibilityStateManager} */
-    #visibilityState;
+    /** @type {AvsInvalidationCoordinator} */
+    #invalidation;
 
-    constructor(systemStateProvider, visibilityStateManager) {
+    constructor(systemStateProvider, visibilityStateManager, invalidationCoordinator = null) {
         this.#systemState = systemStateProvider;
-        this.#visibilityState = visibilityStateManager;
+        this.#invalidation =
+            invalidationCoordinator ??
+            new AvsInvalidationCoordinator({
+                systemStateProvider,
+                visibilityStateManager,
+            });
     }
 
     /**
@@ -51,7 +58,7 @@ export class TemplateEventHandler {
         }
 
         if (looksLikeLight) {
-            this.#visibilityState.markAllTokensChangedImmediate();
+            this.#invalidation.invalidate(templateLightUpdated(template, { action: 'created' }));
         }
     }
 
@@ -82,7 +89,9 @@ export class TemplateEventHandler {
             }
 
             if (looksLikeLight) {
-                this.#visibilityState.markAllTokensChangedImmediate();
+                this.#invalidation.invalidate(
+                    templateLightUpdated(template, { action: 'updated', changes }),
+                );
             }
         }
     }
@@ -106,7 +115,7 @@ export class TemplateEventHandler {
         }
 
         if (looksLikeLight) {
-            this.#visibilityState.markAllTokensChangedImmediate();
+            this.#invalidation.invalidate(templateLightUpdated(template, { action: 'deleted' }));
         }
     }
 

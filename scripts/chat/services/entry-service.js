@@ -1,7 +1,35 @@
 import { extractActionData } from './action-extractor.js';
 import { processedMessages } from './data/message-cache.js';
 
+export function hasInjectedAutomationPanel(html) {
+  try {
+    return !!(html?.find && html.find('.pf2e-visioner-automation-panel').length > 0);
+  } catch {
+    return false;
+  }
+}
+
+export function shouldSkipProcessedMessageRender(message, html) {
+  if (!message?.id || !processedMessages.has(message.id)) return false;
+
+  const visionerFlags = message.flags?.['pf2e-visioner'] || {};
+  const currentUserId = game.user?.id || game.userId;
+  const authorId = message.author?.id || message.user;
+  const shouldReprocessForPendingFlag =
+    (visionerFlags.seekTemplate && (game.user?.isGM || authorId === currentUserId)) ||
+    (visionerFlags.pointOut && game.user?.isGM);
+
+  if (shouldReprocessForPendingFlag || !hasInjectedAutomationPanel(html)) {
+    processedMessages.delete(message.id);
+    return false;
+  }
+
+  return true;
+}
+
 export async function handleRenderChatMessage(message, html) {
+  if (shouldSkipProcessedMessageRender(message, html)) return;
+
   // Always check for cover override indicators first, regardless of action data
   // Use singleton CoverUIManager instance
   const actionData = await extractActionData(message);

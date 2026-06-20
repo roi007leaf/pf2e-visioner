@@ -95,6 +95,70 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     expect(graphicsCreated[1].destroy).toHaveBeenCalled();
   });
 
+  test('explains grouped sections and hover border colors in tooltip', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'hidden',
+          currentVisibility: 'observed',
+        },
+      ],
+      observer.name,
+      observer.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const observerHeader = document.querySelector(
+      '.pf2e-visioner-override-tooltip .tip-group[data-group="observer"] .tip-subheader',
+    );
+    expect(observerHeader?.dataset.tooltip).toContain('how this token sees other tokens');
+
+    const legend = document.querySelector('.pf2e-visioner-override-tooltip .hover-border-legend');
+    expect(legend?.textContent).toContain('Blue border');
+    expect(legend?.textContent).toContain('observer');
+    expect(legend?.textContent).toContain('Yellow border');
+    expect(legend?.textContent).toContain('target');
+  });
+
+  test('explains target grouped section in tooltip', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'hidden',
+          currentVisibility: 'observed',
+        },
+      ],
+      target.name,
+      target.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const targetHeader = document.querySelector(
+      '.pf2e-visioner-override-tooltip .tip-group[data-group="target"] .tip-subheader',
+    );
+    expect(targetHeader?.dataset.tooltip).toContain('how other tokens see this token');
+  });
+
   test('clears active row highlights when tooltip hides', () => {
     const observer = global.canvas.tokens.get('observer-1');
     const target = global.canvas.tokens.get('target-1');
@@ -154,6 +218,37 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     expect(unnoticedIcon).toBeTruthy();
     expect(unnoticedIcon.className).toContain('fa-user-secret');
     expect(unnoticedIcon.getAttribute('style')).toContain('156, 39, 176');
+  });
+
+  test('labels concealed override tooltip icons as observed plus concealed', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const target = global.canvas.tokens.get('target-1');
+
+    indicator.show(
+      [
+        {
+          observerId: observer.id,
+          targetId: target.id,
+          observerName: observer.name,
+          targetName: target.name,
+          state: 'concealed',
+          currentVisibility: 'observed',
+        },
+      ],
+      'Observer',
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    const concealedIcon = document.querySelector(
+      '.pf2e-visioner-override-tooltip .state-indicator.visibility-concealed',
+    );
+    expect(concealedIcon).toBeTruthy();
+    expect(concealedIcon.dataset.tooltip).toBe(
+      'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed',
+    );
   });
 
   test('renders Take Cover cover-only changes as standard to auto instead of current cover level', () => {

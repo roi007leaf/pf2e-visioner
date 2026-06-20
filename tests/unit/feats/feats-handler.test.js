@@ -35,6 +35,59 @@ describe('FeatsHandler - all feats coverage', () => {
       expect(FeatsHandler.hasFeat(actor, ['not-a-feat', 'keen-eyes'])).toBe(true);
       expect(FeatsHandler.hasFeat(actor, 'missing')).toBe(false);
     });
+
+    test('Blind-Fight treats adjacent undetected creatures of same level as hidden', () => {
+      const observer = {
+        actor: {
+          ...createActorWithFeats(['blind-fight']),
+          system: { details: { level: { value: 8 } } },
+        },
+        distanceTo: jest.fn(() => 5),
+      };
+      const target = {
+        actor: {
+          system: { details: { level: { value: 8 } } },
+        },
+      };
+
+      const replacement = FeatsHandler.getBlindFightAdjacentVisibilityReplacement(
+        observer,
+        target,
+        'undetected',
+      );
+
+      expect(replacement).toEqual({
+        state: 'hidden',
+        source: 'blind-fight-adjacent',
+        priority: 120,
+        type: 'visibilityReplacement',
+        fromState: 'undetected',
+      });
+    });
+
+    test('Blind-Fight uses token-square adjacency when distanceTo is center-biased', () => {
+      const observer = {
+        actor: {
+          ...createActorWithFeats(['blind-fight']),
+          system: { details: { level: { value: 8 } } },
+        },
+        bounds: { x: 0, y: 0, width: 50, height: 50 },
+        distanceTo: jest.fn(() => 10),
+      };
+      const target = {
+        actor: {
+          system: { details: { level: { value: 8 } } },
+        },
+        bounds: { x: 50, y: 0, width: 50, height: 50 },
+      };
+
+      expect(
+        FeatsHandler.getBlindFightAdjacentVisibilityReplacement(observer, target, 'undetected'),
+      ).toMatchObject({
+        state: 'hidden',
+        source: 'blind-fight-adjacent',
+      });
+    });
   });
 
   describe('sneak feat adjusters', () => {

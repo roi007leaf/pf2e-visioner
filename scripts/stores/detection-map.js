@@ -1,9 +1,9 @@
 /**
  * Detection map store and helpers
- * 
+ *
  * Stores which sense was used to detect each target, alongside the visibility state.
  * This allows tooltips and UI to show players/GMs which sense is being used.
- * 
+ *
  * Detection info format:
  * {
  *   sense: "tremorsense" | "darkvision" | "hearing" | etc.,
@@ -15,52 +15,59 @@ import { MODULE_ID } from '../constants.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getVisibilityBetween } from './visibility-map.js';
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
+import {
+  applyTokenFlagMapUpdates,
+  areTokenFlagValuesEqual,
+  setTokenFlagMap,
+} from './token-flag-map-persistence.js';
 
 let batchMode = false;
 const batchedUpdates = new Map();
+const DETECTION_FLAG_UPDATE_OPTIONS = { render: false, animate: false };
 
 export function startDetectionBatch() {
   batchMode = true;
   batchedUpdates.clear();
 }
 
+export function discardDetectionBatch() {
+  batchMode = false;
+  batchedUpdates.clear();
+}
+
 export async function flushDetectionBatch() {
   if (!batchMode) return;
 
-  const updates = [];
-  let skipped = 0;
-  let written = 0;
-
-  for (const [tokenId, detectionMap] of batchedUpdates.entries()) {
-    const token = canvas.tokens.get(tokenId);
-    if (token?.document && game.user.isGM) {
-      const currentMap = token.document.getFlag(MODULE_ID, 'detection') ?? {};
-      const hasChanged = JSON.stringify(currentMap) !== JSON.stringify(detectionMap);
-
-      if (hasChanged) {
-        const path = `flags.${MODULE_ID}.detection`;
-        updates.push(
-          (async () => {
-            await waitForTokenDocumentUpdateSafe(token);
-            return token.document.update(
-              { [path]: detectionMap },
-              { diff: false, render: false, animate: false },
-            );
-          })(),
-        );
-        written++;
-      } else {
-        skipped++;
-      }
-    }
-  }
-
-  if (updates.length > 0) {
-    await Promise.all(updates);
+  if (game.user.isGM) {
+    await applyTokenFlagMapUpdates({
+      entries: Array.from(batchedUpdates.entries(), ([tokenId, detectionMap]) => ({
+        tokenId,
+        map: detectionMap,
+      })),
+      moduleId: MODULE_ID,
+      flagKey: 'detection',
+      waitForToken: waitForTokenDocumentUpdateSafe,
+      updateOptions: DETECTION_FLAG_UPDATE_OPTIONS,
+    });
   }
 
   batchMode = false;
   batchedUpdates.clear();
+}
+
+function isDetectionChanged(currentDetection, detection) {
+  return !areTokenFlagValuesEqual(currentDetection ?? null, detection ?? null);
+}
+
+async function persistDetectionMap(token, detectionMap) {
+  return setTokenFlagMap({
+    token,
+    map: detectionMap,
+    moduleId: MODULE_ID,
+    flagKey: 'detection',
+    waitForToken: waitForTokenDocumentUpdateSafe,
+    updateOptions: DETECTION_FLAG_UPDATE_OPTIONS,
+  });
 }
 
 /**
@@ -87,13 +94,7 @@ export async function setDetectionMap(token, detectionMap) {
     return;
   }
 
-  const path = `flags.${MODULE_ID}.detection`;
-  await waitForTokenDocumentUpdateSafe(token);
-  const result = await token.document.update(
-    { [path]: detectionMap },
-    { diff: false, render: false, animate: false },
-  );
-  return result;
+  return persistDetectionMap(token, detectionMap);
 }
 
 /**
@@ -118,27 +119,27 @@ export async function setDetectionBetween(observer, target, detection) {
 
   let detectionMap;
   let currentDetection;
+  const observerId = observer.document.id;
+  const targetId = target.document.id;
 
   if (batchMode) {
-    detectionMap = batchedUpdates.get(observer.document.id);
+    detectionMap = batchedUpdates.get(observerId);
     if (!detectionMap) {
       detectionMap = { ...getDetectionMap(observer) };
-    } else {
-      detectionMap = { ...detectionMap };
     }
-    currentDetection = detectionMap[target.document.id];
+    currentDetection = detectionMap[targetId];
   } else {
-    detectionMap = getDetectionMap(observer);
-    currentDetection = detectionMap[target.document.id];
+    detectionMap = { ...getDetectionMap(observer) };
+    currentDetection = detectionMap[targetId];
   }
 
-  const hasChanged = JSON.stringify(currentDetection) !== JSON.stringify(detection);
+  const hasChanged = isDetectionChanged(currentDetection, detection);
 
   if (hasChanged) {
     if (detection === null) {
-      delete detectionMap[target.document.id];
+      delete detectionMap[targetId];
     } else {
-      detectionMap[target.document.id] = detection;
+      detectionMap[targetId] = detection;
     }
     await setDetectionMap(observer, detectionMap);
   }
@@ -219,18 +220,18 @@ function getDetectionBetweenWithAggregation(observer, target) {
   // Multiple observer tokens - get detection from the observer with best visibility
   // First, get all visibility states from all observer tokens
   const visibilityStates = observerTokens
-    .map(observerToken => ({
+    .map((observerToken) => ({
       token: observerToken,
       visibility: getVisibilityBetween(observerToken, target),
     }))
-    .filter(item => item.visibility !== undefined && item.visibility !== null);
+    .filter((item) => item.visibility !== undefined && item.visibility !== null);
 
   if (visibilityStates.length === 0) {
     return null;
   }
 
   // Find which observer has the best visibility
-  const visibilities = visibilityStates.map(item => item.visibility);
+  const visibilities = visibilityStates.map((item) => item.visibility);
   const bestVisibility = getBestVisibilityState(visibilities);
 
   // Find the first observer with that best visibility and return their detection

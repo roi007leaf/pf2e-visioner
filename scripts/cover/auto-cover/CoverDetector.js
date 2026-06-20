@@ -23,7 +23,10 @@ import { RuleElementCoverService } from '../../rule-elements/RuleElementCoverSer
 import { LevelsIntegration } from '../../services/LevelsIntegration.js';
 
 import { getVisibilityBetween } from '../../utils.js';
+import { normalizeSlug } from '../../utils/actor-features.js';
 import { getLogger } from '../../utils/logger.js';
+import { peekRegistry } from '../../services/Peek/PeekRegistry.js';
+import { tokenHasActiveTakeCoverState } from '../../chat/services/take-cover-expiration-service.js';
 
 export class CoverDetector {
   constructor() {
@@ -77,6 +80,26 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
+    const cover = this._detectBetweenTokensCore(attacker, target, options);
+    return this._applyPeekCoverCap(target, cover);
+  }
+
+  _applyPeekCoverCap(defender, cover) {
+    try {
+      const peek = peekRegistry.get(defender?.document?.id);
+      if (
+        peek &&
+        peek.fov == null &&
+        (cover === 'standard' || cover === 'greater') &&
+        !tokenHasActiveTakeCoverState(defender)
+      ) {
+        return 'lesser';
+      }
+    } catch (_) {}
+    return cover;
+  }
+
+  _detectBetweenTokensCore(attacker, target, options = {}) {
     try {
       if (!attacker || !target) return 'none';
 
@@ -1403,6 +1426,159 @@ export class CoverDetector {
     }
   }
 
+  _shouldIgnoreBlockerForAimAidingRune(attacker, blocker, attackContext = null) {
+    try {
+      if (!attacker?.actor || !blocker?.actor) return false;
+      if (!this._isRangedAttackContext(attackContext)) return false;
+      if (!this._areTokensAllies(attacker, blocker)) return false;
+      return this._actorHasAimAidingArmorRune(blocker.actor);
+    } catch {
+      return false;
+    }
+  }
+
+  _actorHasAimAidingArmorRune(actor) {
+    try {
+      for (const item of this._getActorItems(actor)) {
+        if (this._itemHasAimAidingArmorRune(item)) return true;
+      }
+
+      return this._actorRollOptionsIncludeAimAidingRune(actor);
+    } catch {
+      return false;
+    }
+  }
+
+  _getActorItems(actor) {
+    const items = [];
+    const addItems = (collection) => {
+      if (!collection) return;
+      if (Array.isArray(collection)) {
+        items.push(...collection);
+      } else if (Array.isArray(collection.contents)) {
+        items.push(...collection.contents);
+      } else if (typeof collection.values === 'function') {
+        items.push(...Array.from(collection.values()));
+      } else if (typeof collection[Symbol.iterator] === 'function') {
+        items.push(...Array.from(collection));
+      }
+    };
+
+    addItems(actor?.items);
+    const itemTypes = actor?.itemTypes;
+    if (itemTypes && typeof itemTypes === 'object') {
+      for (const typedItems of Object.values(itemTypes)) {
+        addItems(typedItems);
+      }
+    }
+
+    return items;
+  }
+
+  _itemHasAimAidingArmorRune(item) {
+    try {
+      if (!item) return false;
+
+      const itemType = item.type ?? item.document?.type ?? item.system?.type?.value;
+      if (itemType && itemType !== 'armor') return false;
+      if (item.isEquipped === false || item.system?.equipped?.inSlot === false) return false;
+      if (item.isInvested === false) return false;
+
+      const carryType = this._normalizeCamelSlug(
+        item.system?.equipped?.carryType ?? item.system?.usage?.value ?? '',
+      );
+      if (['held', 'stowed', 'dropped'].includes(carryType)) return false;
+
+      const propertyRunes =
+        item.system?.runes?.property ??
+        item._source?.system?.runes?.property ??
+        item.source?.system?.runes?.property ??
+        [];
+      return Array.isArray(propertyRunes)
+        ? propertyRunes.some((rune) => this._isAimAidingRuneSlug(rune))
+        : this._isAimAidingRuneSlug(propertyRunes);
+    } catch {
+      return false;
+    }
+  }
+
+  _actorRollOptionsIncludeAimAidingRune(actor) {
+    try {
+      const optionSets = [];
+      const allOptions = actor?.getRollOptions?.(['all']);
+      const defaultOptions = actor?.getRollOptions?.();
+      optionSets.push(allOptions, defaultOptions);
+
+      return optionSets.some((options) => {
+        const array = Array.isArray(options)
+          ? options
+          : options instanceof Set
+            ? Array.from(options)
+            : [];
+        return array.some((option) => this._isAimAidingRuneRollOption(option));
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  _isAimAidingRuneRollOption(option) {
+    try {
+      const parts = String(option ?? '')
+        .split(':')
+        .map((part) => this._normalizeCamelSlug(part))
+        .filter(Boolean);
+      return (
+        parts.includes('rune') &&
+        parts.includes('property') &&
+        parts[parts.length - 1] === 'aim-aiding'
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  _isAimAidingRuneSlug(value) {
+    return this._normalizeCamelSlug(value) === 'aim-aiding';
+  }
+
+  _normalizeCamelSlug(value) {
+    try {
+      const withCamelBreaks = String(value ?? '').replace(/([a-z0-9])([A-Z])/g, '$1-$2');
+      return normalizeSlug(withCamelBreaks);
+    } catch {
+      return '';
+    }
+  }
+
+  _areTokensAllies(tokenA, tokenB) {
+    try {
+      const actorA = tokenA?.actor;
+      const actorB = tokenB?.actor;
+      if (!actorA || !actorB) return false;
+
+      const allianceA = this._normalizeCamelSlug(actorA.alliance ?? actorA.system?.details?.alliance ?? '');
+      const allianceB = this._normalizeCamelSlug(actorB.alliance ?? actorB.system?.details?.alliance ?? '');
+      if (allianceA && allianceB && allianceA === allianceB && allianceA !== 'neutral') {
+        return true;
+      }
+
+      if (actorA.hasPlayerOwner && actorB.hasPlayerOwner) return true;
+
+      const dispositionA = tokenA?.document?.disposition ?? actorA.token?.disposition;
+      const dispositionB = tokenB?.document?.disposition ?? actorB.token?.disposition;
+      if (dispositionA != null && dispositionB != null) {
+        const a = Number(dispositionA);
+        const b = Number(dispositionB);
+        if (Number.isFinite(a) && a !== 0 && a === b) return true;
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   _recordSnipingDuoIgnoredBlocker(attacker, target, blocker) {
     const log = getLogger('AutoCover');
     try {
@@ -1746,6 +1922,10 @@ export class CoverDetector {
         )
           continue;
 
+        if (this._shouldIgnoreBlockerForAimAidingRune(attacker, blocker, attackContext)) {
+          continue;
+        }
+
         if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
           this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);
           continue;
@@ -1925,6 +2105,10 @@ export class CoverDetector {
               blockerRect,
             );
             if (intersectionLength > 0) {
+              if (this._shouldIgnoreBlockerForAimAidingRune(attacker, blocker, attackContext)) {
+                continue;
+              }
+
               if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
                 this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);
                 continue;
@@ -1989,6 +2173,10 @@ export class CoverDetector {
       for (const blocker of blockers) {
         const perBlocker = this._calculateCoverageByBlocker(p1, p2, [blocker]);
         if (!perBlocker || perBlocker === 'none') continue;
+
+        if (this._shouldIgnoreBlockerForAimAidingRune(attacker, blocker, attackContext)) {
+          continue;
+        }
 
         if (this._shouldIgnoreBlockerForSnipingDuo(attacker, blocker, attackContext)) {
           this._recordSnipingDuoIgnoredBlocker(attacker, target, blocker);

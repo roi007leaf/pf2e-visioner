@@ -17,7 +17,7 @@ describe('EnhancedSneakOutcome', () => {
 
   describe('doesPositionQualifyForSneak', () => {
     test('start position requires hidden or undetected', async () => {
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('hidden', true)).toBe(true);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('undetected', true)).toBe(true);
@@ -26,7 +26,7 @@ describe('EnhancedSneakOutcome', () => {
     });
 
     test('end position qualifies with concealed', async () => {
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('concealed', false, 'none')).toBe(true);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('concealed', false, 'lesser')).toBe(true);
@@ -34,7 +34,7 @@ describe('EnhancedSneakOutcome', () => {
 
     test('end position qualifies with concealed even when setting is disabled', async () => {
       game.settings.set('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition', false);
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('concealed', false, 'none')).toBe(true);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('concealed', false, 'lesser')).toBe(true);
@@ -43,7 +43,7 @@ describe('EnhancedSneakOutcome', () => {
     });
 
     test('end position qualifies with standard or greater cover', async () => {
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('observed', false, 'standard')).toBe(true);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('observed', false, 'greater')).toBe(true);
@@ -53,7 +53,7 @@ describe('EnhancedSneakOutcome', () => {
 
     test('end position qualifies with hidden/undetected when setting enabled', async () => {
       game.settings.set('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition', true);
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('hidden', false, 'none')).toBe(true);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('undetected', false, 'none')).toBe(true);
@@ -63,7 +63,7 @@ describe('EnhancedSneakOutcome', () => {
 
     test('end position does not qualify with hidden/undetected when setting disabled', async () => {
       game.settings.set('pf2e-visioner', 'sneakAllowHiddenUndetectedEndPosition', false);
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('hidden', false, 'none')).toBe(false);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('undetected', false, 'none')).toBe(false);
@@ -72,14 +72,14 @@ describe('EnhancedSneakOutcome', () => {
     });
 
     test('end position does not qualify with observed and no cover', async () => {
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('observed', false, 'none')).toBe(false);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak('observed', false, 'lesser')).toBe(false);
     });
 
     test('end position handles null/undefined visibility state', async () => {
-      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/EnhancedSneakOutcome.js');
+      const { EnhancedSneakOutcome } = await import('../../../scripts/chat/services/actions/Sneak/EnhancedSneakOutcome.js');
 
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak(null, false, 'none')).toBe(false);
       expect(EnhancedSneakOutcome.doesPositionQualifyForSneak(undefined, false, 'none')).toBe(false);

@@ -746,6 +746,68 @@ describe('VisionerTokenManager', () => {
         expect(manager._savedModeData[manager.mode]).toBeDefined();
       });
 
+      test('apply current on visibility tab ignores cover inputs', async () => {
+        const visibilityInputs = [{ name: `visibility.${pcToken1.id}`, value: 'concealed' }];
+        const coverInputs = [{ name: `cover.${pcToken1.id}`, value: 'greater' }];
+
+        manager.element = {
+          querySelectorAll: jest.fn((selector) => {
+            if (selector.includes('visibility.')) return visibilityInputs;
+            if (selector.includes('cover.')) return coverInputs;
+            if (selector.includes('walls.')) return [];
+            return [];
+          }),
+        };
+
+        manager._savedModeData = {};
+        manager.mode = 'observer';
+        manager.activeTab = 'visibility';
+        manager.ignoreAllies = false;
+        manager.encounterOnly = false;
+        manager.close = jest.fn();
+
+        const { VisionerTokenManager } = await import(
+          '../../../scripts/managers/token-manager/TokenManager.js'
+        );
+
+        await VisionerTokenManager.applyCurrent.call(manager, {}, {});
+
+        expect(manager._savedModeData.observer.visibility[pcToken1.id]).toBe('concealed');
+        expect(manager._savedModeData.observer.cover).toEqual({});
+      });
+
+      test('apply current on cover tab ignores visibility and wall inputs', async () => {
+        const visibilityInputs = [{ name: `visibility.${pcToken1.id}`, value: 'concealed' }];
+        const coverInputs = [{ name: `cover.${pcToken1.id}`, value: 'greater' }];
+        const wallInputs = [{ name: 'walls.wall-1', value: 'hidden' }];
+
+        manager.element = {
+          querySelectorAll: jest.fn((selector) => {
+            if (selector.includes('visibility.')) return visibilityInputs;
+            if (selector.includes('cover.')) return coverInputs;
+            if (selector.includes('walls.')) return wallInputs;
+            return [];
+          }),
+        };
+
+        manager._savedModeData = {};
+        manager.mode = 'observer';
+        manager.activeTab = 'cover';
+        manager.ignoreAllies = false;
+        manager.encounterOnly = false;
+        manager.close = jest.fn();
+
+        const { VisionerTokenManager } = await import(
+          '../../../scripts/managers/token-manager/TokenManager.js'
+        );
+
+        await VisionerTokenManager.applyCurrent.call(manager, {}, {});
+
+        expect(manager._savedModeData.observer.cover[pcToken1.id]).toBe('greater');
+        expect(manager._savedModeData.observer.visibility).toEqual({});
+        expect(manager._savedModeData.observer.walls).toEqual({});
+      });
+
       test('should simulate apply both button press', async () => {
         // Mock form inputs for both visibility and cover
         const visibilityInputs = [{ name: `visibility.${pcToken1.id}`, value: 'hidden' }];

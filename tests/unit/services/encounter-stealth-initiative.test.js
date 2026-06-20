@@ -222,11 +222,17 @@ describe('EncounterStealthInitiativeService', () => {
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'unnoticed',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      hasConcealment: false,
+      coverState: 'none',
     });
     const equalChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerEqual)[1];
     expect(equalChangesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'observed',
+      detectionState: 'observed',
+      awarenessState: 'noticed',
     });
     const highChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerHigh)[1];
     expect(highChangesByTarget.get(stealther.id)).toMatchObject({
@@ -237,6 +243,54 @@ describe('EncounterStealthInitiativeService', () => {
     expect(perceptionChangesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'observed',
+    });
+  });
+
+  test('writes unnoticed as encounter awareness metadata over undetected detection', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 18;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'unnoticed',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      hasConcealment: false,
+      coverState: 'none',
+      detectionSense: null,
+    });
+  });
+
+  test('writes undetected without unnoticed awareness when observer initiative is equal or higher', async () => {
+    setSetting(true);
+    observerEqual.actor.system.perception.dc = 20;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('equal', observerEqual, 20),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides).toHaveBeenCalledTimes(1);
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      target: stealther,
+      state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'noticed',
+      hasConcealment: false,
+      coverState: 'none',
+      detectionSense: null,
     });
   });
 
@@ -276,6 +330,11 @@ describe('EncounterStealthInitiativeService', () => {
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'hidden',
+      detectionState: 'hidden',
+      awarenessState: 'noticed',
+      hasCover: true,
+      hasConcealment: false,
+      coverState: 'standard',
     });
   });
 
@@ -296,6 +355,10 @@ describe('EncounterStealthInitiativeService', () => {
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'hidden',
+      detectionState: 'hidden',
+      awarenessState: 'noticed',
+      hasConcealment: true,
+      coverState: 'none',
     });
   });
 
@@ -414,6 +477,29 @@ describe('EncounterStealthInitiativeService', () => {
     expect(encounterStealthInitiativeService.shouldHideCombatantFromCurrentUser(stealthCombatant, combat)).toBe(false);
   });
 
+  test('active tracker hiding keys off encounter unnoticed awareness metadata', async () => {
+    setSetting(true);
+    global.game.user.isGM = false;
+    observerLow.isOwner = true;
+    observerLow.actor.isOwner = true;
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      source: 'encounter_stealth_initiative',
+      observerId: observerLow.id,
+      targetId: stealther.id,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const lowCombatant = makeCombatant('low', observerLow, 10, 'perception', { isOwner: true });
+    const stealthCombatant = makeCombatant('stealth', stealther, 30, 'stealth');
+    const combat = makeCombat([lowCombatant, stealthCombatant], {
+      id: 'metadata-unnoticed-hides-tracker',
+    });
+
+    expect(encounterStealthInitiativeService.shouldHideCombatantFromCurrentUser(stealthCombatant, combat)).toBe(true);
+  });
+
   test('masks undetected stealth initiative combatant details until the encounter override is removed', async () => {
     setSetting(true);
     global.game.user.isGM = false;
@@ -461,6 +547,79 @@ describe('EncounterStealthInitiativeService', () => {
     expect(name.dataset.pf2eVisionerOriginalHtml).toBeUndefined();
   });
 
+  test('metadata-shaped undetected unnoticed is hidden rather than masked', async () => {
+    setSetting(true);
+    global.game.user.isGM = false;
+    observerLow.isOwner = true;
+    observerLow.actor.isOwner = true;
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      source: 'encounter_stealth_initiative',
+      observerId: observerLow.id,
+      targetId: stealther.id,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const lowCombatant = makeCombatant('low', observerLow, 10, 'perception', { isOwner: true });
+    const stealthCombatant = makeCombatant('stealth', stealther, 30, 'stealth');
+    const combat = makeCombat([lowCombatant, stealthCombatant], {
+      id: 'metadata-unnoticed-hidden-not-masked',
+    });
+
+    expect(encounterStealthInitiativeService.shouldHideCombatantFromCurrentUser(stealthCombatant, combat)).toBe(true);
+    expect(encounterStealthInitiativeService.shouldMaskCombatantDetailsFromCurrentUser(stealthCombatant, combat)).toBe(false);
+  });
+
+  test('mixed owned unnoticed and noticed undetected observers show masked tracker details', async () => {
+    setSetting(true);
+    global.game.user.isGM = false;
+    observerLow.isOwner = true;
+    observerLow.actor.isOwner = true;
+    observerEqual.isOwner = true;
+    observerEqual.actor.isOwner = true;
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      source: 'encounter_stealth_initiative',
+      observerId: observerLow.id,
+      targetId: stealther.id,
+    };
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerEqual.id}`] = {
+      state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'noticed',
+      source: 'encounter_stealth_initiative',
+      observerId: observerEqual.id,
+      targetId: stealther.id,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const lowCombatant = makeCombatant('low', observerLow, 10, 'perception', { isOwner: true });
+    const equalCombatant = makeCombatant('equal', observerEqual, 20, 'perception', { isOwner: true });
+    const stealthCombatant = makeCombatant('stealth', stealther, 30, 'stealth');
+    const combat = makeCombat([lowCombatant, equalCombatant, stealthCombatant], {
+      id: 'mixed-owned-unnoticed-undetected-mask',
+    });
+    document.body.innerHTML = `
+      <ol id="combat-tracker">
+        <li class="combatant" data-combatant-id="stealth">
+          <div class="token-name"><h4>Kobold Warrior</h4></div>
+        </li>
+      </ol>
+    `;
+
+    expect(encounterStealthInitiativeService.shouldHideCombatantFromCurrentUser(stealthCombatant, combat)).toBe(false);
+    expect(encounterStealthInitiativeService.shouldMaskCombatantDetailsFromCurrentUser(stealthCombatant, combat)).toBe(true);
+
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    const row = document.querySelector('[data-combatant-id="stealth"]');
+    expect(row.hidden).toBe(false);
+    expect(row.dataset.pf2eVisionerStealthMasked).toBe('true');
+    expect(row.querySelector('.token-name h4').textContent).toBe('Undetected Combatant');
+  });
+
   test('restores a pre-existing AVS override when the encounter stealth override is removed', async () => {
     setSetting(true);
     global.game.user.isGM = true;
@@ -486,7 +645,7 @@ describe('EncounterStealthInitiativeService', () => {
       'pf2e-visioner',
       `encounter-stealth-previous-from-${observerLow.id}`,
     )).toMatchObject({
-      state: 'hidden',
+      detectionState: 'hidden',
       source: 'manual_action',
       observerId: observerLow.id,
       targetId: stealther.id,
@@ -538,6 +697,8 @@ describe('EncounterStealthInitiativeService', () => {
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
       state: 'undetected',
+      detectionState: 'undetected',
+      awarenessState: 'noticed',
     });
   });
 

@@ -52,6 +52,9 @@ export const VISIBILITY_STATES = {
   avs: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.avs',
     pf2eCondition: null,
+    scope: 'generic',
+    manual: true,
+    mode: 'automatic',
     visible: true,
     icon: 'fas fa-bolt-auto',
     color: 'var(--visibility-avs, #9c27b0)', // Purple - AVS control
@@ -60,6 +63,8 @@ export const VISIBILITY_STATES = {
   observed: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.observed',
     pf2eCondition: null,
+    scope: 'generic',
+    manual: true,
     visible: true,
     icon: 'fas fa-eye',
     color: 'var(--visibility-observed, #4caf50)', // Green - safe/visible
@@ -67,7 +72,10 @@ export const VISIBILITY_STATES = {
   },
   concealed: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.concealed',
+    manualLabel: 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed',
     pf2eCondition: 'concealed',
+    scope: 'generic',
+    manual: true,
     visible: true,
     icon: 'fas fa-cloud',
     color: 'var(--visibility-concealed, #ffc107)', // Yellow - caution
@@ -76,6 +84,8 @@ export const VISIBILITY_STATES = {
   hidden: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.hidden',
     pf2eCondition: 'hidden',
+    scope: 'generic',
+    manual: true,
     visible: true,
     icon: 'fas fa-eye-slash',
     color: 'var(--visibility-hidden, #ff6600)', // Bright orange - warning
@@ -84,6 +94,8 @@ export const VISIBILITY_STATES = {
   undetected: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.undetected',
     pf2eCondition: 'undetected',
+    scope: 'generic',
+    manual: true,
     visible: false, // Hide completely like invisible used to
     icon: 'fas fa-ghost',
     color: 'var(--visibility-undetected, #f44336)', // Red - danger
@@ -92,12 +104,24 @@ export const VISIBILITY_STATES = {
   unnoticed: {
     label: 'PF2E_VISIONER.VISIBILITY_STATES.unnoticed',
     pf2eCondition: null,
+    scope: 'encounter',
+    manual: false,
     visible: false,
     icon: 'fas fa-user-secret',
     color: 'var(--visibility-unnoticed, #9c27b0)', // Purple - unknown presence
     cssClass: 'visibility-unnoticed',
   },
 };
+
+export function getManualVisibilityStateEntries() {
+  return Object.entries(VISIBILITY_STATES).filter(([, config]) => config.manual !== false);
+}
+
+export function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 /**
  * Cover states supported by the module - aligned with PF2E cover rules
@@ -481,6 +505,16 @@ export const SNEAK_FLAGS = {
  * Default module settings
  */
 export const DEFAULT_SETTINGS = {
+  visibilityV2MigrationVersion: {
+    name: 'PF2E Visioner Visibility V2 Migration Version',
+    hint: 'Internal migration marker for canonical perception profile storage.',
+    scope: 'world',
+    config: false,
+    restricted: true,
+    type: Number,
+    default: 0,
+  },
+
   // Visibility Indicators
   hiddenWallsEnabled: {
     name: 'PF2E_VISIONER.SETTINGS.HIDDEN_WALLS.name',
@@ -981,6 +1015,42 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  peekSlitAngle: {
+    name: 'PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    default: 10,
+  },
+  peekSweepAngle: {
+    name: 'PF2E_VISIONER.SETTINGS.PEEK_SWEEP_ANGLE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.PEEK_SWEEP_ANGLE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    default: 20,
+  },
+  peekRange: {
+    name: 'PF2E_VISIONER.SETTINGS.PEEK_RANGE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.PEEK_RANGE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    default: 0,
+  },
+  cornerPeekEnabled: {
+    name: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.name',
+    hint: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
   autoCoverIgnoreSmallerTokens: {
     name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_SMALLER_TOKENS.name',
     hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER_IGNORE_SMALLER_TOKENS.hint',
@@ -1145,6 +1215,12 @@ export const KEYBINDINGS = {
     name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_COVER_VISUALIZATION.name',
     hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_COVER_VISUALIZATION.hint',
     editable: [{ key: 'KeyY', modifiers: [] }],
+    restricted: false,
+  },
+  holdPeek: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_PEEK.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_PEEK.hint',
+    editable: [],
     restricted: false,
   },
   showWallCoverLabels: {

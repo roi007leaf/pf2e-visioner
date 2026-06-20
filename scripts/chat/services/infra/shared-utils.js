@@ -289,24 +289,14 @@ export async function applyVisibilityChanges(observer, changes, options = {}) {
       );
     }
 
-    // Update token visuals if requested
     try {
-      // Update observer visuals once
-      await updateTokenVisuals(observer);
-
-      // Update target visuals in batches
-      const uniqueTargets = new Set();
+      const visualRefreshTargets = new Set([observer]);
       for (const change of changes) {
         if (change?.target?.id) {
-          uniqueTargets.add(change.target);
+          visualRefreshTargets.add(change.target);
         }
       }
-
-      const targetsArray = Array.from(uniqueTargets);
-      for (let i = 0; i < targetsArray.length; i += batchSize) {
-        const batchTargets = targetsArray.slice(i, i + batchSize);
-        await Promise.all(batchTargets.map((target) => updateTokenVisuals(target)));
-      }
+      await updateTokenVisuals(visualRefreshTargets);
     } catch (error) {
       console.warn(`${MODULE_TITLE}: Error updating token visuals:`, error);
     }

@@ -1,10 +1,37 @@
 # Changelog
 
+## [8.3.0] - 2026-05-06
+
+### Added
+
+- **New core-like perception engine**: Visioner now stores detection, concealment, cover, and encounter awareness separately, giving AVS, manual overrides, action previews, token rendering, and the public API one shared rules model.
+- **Automatic migration to the new engine**: Existing visibility maps, AVS overrides, manual states, scene cleanup data, and deleted-token recovery data migrate into the new profile format.
+- **Peek for corners and doors**: Tokens can peek around wall corners and through configured doors, with token-side origin handling, configurable slit/sweep/range behavior, optional blind-GM door Perception DCs, local peeker indicators, and GM mirror overlays.
+- **Expanded PF2E rule-element support**: Visioner rule elements can qualify Seek actions, change sense ranges, suppress off-guard from Blind-Fight-style features, provide or override cover, modify detection modes, and drive aura visibility.
+
+### Changed
+
+- **Concealed now behaves as Observed + Concealed**: Visioner Manager controls, hover badges, action previews, validation rows, and tooltips now show concealed visibility as an observed creature with concealment instead of treating it as a separate detection state.
+- **Unnoticed is now encounter awareness**: Unnoticed is reserved for encounter-start Avoid Notice and tracker awareness flows instead of being offered as a general manual visibility state.
+- **Action previews use the new engine**: Seek, Hide, Sneak, Consequences, Point Out, Create a Diversion, and Take Cover previews share consistent row actions, timers, bulk overrides, visibility labels, and apply/revert behavior.
+- **Manual visibility writes update immediately**: Manual changes now refresh token visuals, validation rows, override indicators, and detection state through the same path used by automation.
+
+### Fixed
+
+- **Movement visibility is smoother and more accurate**: AVS now waits for Foundry token animation, avoids stale mid-move batches, keeps LOS and soundwaves synchronized during drags, and reduces movement-time refresh spikes without freezing the live polygon.
+- **Imprecise-sense soundwaves stay reliable**: Hidden targets detected by hearing, scent, tremorsense, and similar senses keep responsive soundwave indicators through movement, darkness, wall transitions, and range changes.
+- **Nonvisual senses follow PF2E expectations more closely**: Precise nonvisual senses reveal normally, imprecise senses use soundwaves, tremorsense respects ground/elevation, and deafened or scent-only observers still get appropriate nonvisual feedback.
+- **Invisible creatures use remembered-position visibility correctly**: Invisible creatures can remain represented by soundwaves while hidden, become undetected when blocked, and reappear through the movement preview as sight lines clear.
+- **Doors and walls stay in sync with Foundry detection**: Door open/close and wall interactions refresh affected token pairs while keeping Foundry detection, explicit visible pairs, and Visioner visibility aligned.
+- **Cover and action automation use better PF2E context**: Aim-Aiding, Blind-Fight, Seek concealment qualifiers, range-qualified actions, Take Cover, and corner peeking now use the same perception and cover context as the rest of Visioner.
+- **Blinded player tokens remain targetable after deselecting**: A player-owned blinded PC no longer disappears from its own player when the token is deselected.
+
 ## [8.2.11] - 2026-05-16
 
 ### Added
 
 - **PF2E HUD Take Cover can route player requests to the GM**: Non-GM Take Cover clicks from PF2E HUD now request the GM to open the Visioner Take Cover preview for the active canvas token, while GM-side preview resolution prefers the real scene token over actor prototype token data.
+
 ### Fixed
 
 - **Visioner Manager manual visibility choices hide Unnoticed**: The Visioner Manager no longer offers Unnoticed in per-row visibility action buttons or bulk visibility buttons, keeping Unnoticed reserved for encounter-driven awareness flows.
@@ -2545,4 +2572,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Compatibility
 
 - FoundryVTT v12 and earlier
+- Basic ApplicationV1 framework
 - Basic ApplicationV1 framework

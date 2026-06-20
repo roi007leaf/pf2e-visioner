@@ -96,6 +96,10 @@ function makeActor(id, options = {}) {
   };
 }
 
+function hiddenVisibilityV2Map(ids) {
+  return Object.fromEntries(ids.map((id) => [id, { detectionState: 'hidden' }]));
+}
+
 describe('initial scene hidden setup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -308,7 +312,7 @@ describe('initial scene hidden setup', () => {
       hasPlayerOwner: true,
       flags: {
         [MODULE_ID]: {
-          visibility: { loot: 'hidden', hazard: 'hidden', npc: 'hidden' },
+          visibilityV2: hiddenVisibilityV2Map(['loot', 'hazard', 'npc']),
           walls: { existing: 'observed', 'wall-a': 'hidden', 'wall-b': 'hidden' },
         },
       },
@@ -429,7 +433,7 @@ describe('initial scene hidden setup', () => {
     game.user.isGM = false;
     const pc = makeToken('pc', 'character', {
       hasPlayerOwner: true,
-      flags: { [MODULE_ID]: { visibility: { loot: 'hidden' } } },
+      flags: { [MODULE_ID]: { visibilityV2: hiddenVisibilityV2Map(['loot']) } },
     });
     const loot = makeToken('loot', 'loot', {
       flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },

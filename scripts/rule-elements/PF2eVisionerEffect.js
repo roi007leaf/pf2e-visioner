@@ -1,3 +1,4 @@
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { AuraVisibility } from './operations/AuraVisibility.js';
@@ -10,6 +11,10 @@ import { SenseModifier } from './operations/SenseModifier.js';
 import { ShareVision } from './operations/ShareVision.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
 import { SourceTracker } from './SourceTracker.js';
+
+function isGMClient() {
+  return !!globalThis.game?.user?.isGM;
+}
 
 export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields) {
   if (!baseRuleElementClass || !fields) {
@@ -261,12 +266,14 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async onCreate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onCreate', item: this.item?.name, actor: this.actor?.name }));
+      if (!isGMClient()) return;
       await this.applyOperations({ triggerRecalculation: true });
     }
 
     async onUpdate(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
       log.debug(() => ({ msg: 'onUpdate', item: this.item?.name, actor: this.actor?.name }));
+      if (!isGMClient()) return;
 
       await this.removeAllFlagsForRuleElement();
       await this.applyOperations({ triggerRecalculation: true });
@@ -274,6 +281,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
     async onDelete(actorUpdates) {
       const log = getLogger('RuleElements/Effect');
+      if (!isGMClient()) return;
       const tokens = this.actor?.getActiveTokens?.() || [];
       const tokenIds = tokens.map((t) => t.id);
       log.debug(() => ({
@@ -331,7 +339,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
           await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
         } else if (canvas?.perception) {
-          canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+          scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
         }
       }
     }
@@ -519,6 +527,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     async applyOperations(options = {}) {
       const { triggerRecalculation = false } = options;
       const log = getLogger('RuleElements/Effect');
+      if (!isGMClient()) return;
       const token = this.getSubjectToken();
 
       if (!token) {
@@ -997,6 +1006,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'offGuardSuppression':
           await OffGuardSuppression.removeOffGuardSuppression(operation, token);
+          break;
+
+        case 'auraVisibility':
+          await AuraVisibility.removeAuraVisibility(operation, token);
           break;
 
         case 'shareVision':

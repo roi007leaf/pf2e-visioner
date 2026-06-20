@@ -9,7 +9,25 @@
 
 
 import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { addTokenBorder, removeTokenBorder } from '../managers/token-manager/borders.js';
+import { getLastMovedTokenId, setLastMovedTokenId } from '../services/runtime-state.js';
+import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+
+function hasOverrideVisibilityData(override) {
+  return (
+    typeof override?.state === 'string' ||
+    typeof override?.detectionState === 'string' ||
+    typeof override?.hasConcealment === 'boolean' ||
+    typeof override?.awarenessState === 'string'
+  );
+}
+
+function getVisibilityStateLabelKey(state, { manual = false } = {}) {
+  const config = VISIBILITY_STATES?.[state];
+  if (!config) return String(state ?? '');
+  return manual && config.manualLabel ? config.manualLabel : config.label;
+}
 
 const AUTO_COVER_DISPLAY = {
   icon: 'fas fa-arrows-rotate',
@@ -65,14 +83,13 @@ class OverrideValidationIndicator {
     this._rawOverrides = [];
     this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
     this._currentTokenId = null;
-    this._overrideStack = new Map(); // tokenId -> { overrides, tokenName, timestamp }
-    this._currentTokenId = null;
     this._drag = { active: false, start: { x: 0, y: 0 }, offset: { x: 0, y: 0 }, moved: false };
     this._rowHighlightTokens = [];
     // Guard against rapid show->hide flicker when recomputations settle to 0
     this._lastShowAt = 0; // ms timestamp of last show() with non-empty items
     this._lastCount = 0; // last shown count
     this._minVisibleMs = 800; // minimum time to keep visible after a non-empty show
+    this._lastStyleSize = null;
   }
 
   // Determine whether an override item represents a meaningful change to display
@@ -84,13 +101,15 @@ class OverrideValidationIndicator {
     if (!o) return false;
     if (o.controlReleaseOnly === true) return true;
     const coverOnly = o.coverOnly === true;
+    if (!coverOnly && !hasOverrideVisibilityData(o)) return false;
 
-    // Filter out overrides with no state or 'avs' state
-    if ((!o.state || o.state === 'avs') && !coverOnly) {
+    const prevVis = coverOnly ? null : overrideToDisplayVisibility(o);
+
+    // Filter out overrides with no meaningful state or 'avs' state
+    if (!coverOnly && (!prevVis || prevVis === 'avs')) {
       return false;
     }
 
-    const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
     const prevCover = getExpectedCover(o);
     const curVis = o.currentVisibility || 'observed';
     const curCover = getDisplayCurrentCover(o);
@@ -108,19 +127,38 @@ class OverrideValidationIndicator {
   // Determine whether an override should be shown based on sneak status
   // For tokens with active sneak flag, only show observer changes (where the sneaking token is observing others)
   // and filter out target changes (where others are observing the sneaking token)
-  #shouldShowOverride(o, movedTokenId = null) {
+  #createDisplayFilterContext(movedTokenId = null) {
+    return {
+      movedTokenId,
+      sneakingByTokenId: new Map(),
+    };
+  }
+
+  #isSneakingToken(tokenId, context) {
+    if (!tokenId) return false;
+    const cache = context?.sneakingByTokenId;
+    if (cache?.has(tokenId)) return cache.get(tokenId);
+    const token = canvas?.tokens?.get?.(tokenId);
+    const sneaking = !!token?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+    cache?.set(tokenId, sneaking);
+    return sneaking;
+  }
+
+  #getDisplayOverrides(overrides, movedTokenId = null) {
+    const all = Array.isArray(overrides) ? overrides : [];
+    const context = this.#createDisplayFilterContext(movedTokenId);
+    return all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId, context));
+  }
+
+  #shouldShowOverride(o, movedTokenId = null, context = null) {
     if (!o || !o.observerId || !o.targetId) return true; // If missing data, show by default
 
     try {
-      // Get the observer and target tokens
-      const observerToken = canvas?.tokens?.get?.(o.observerId);
-      const targetToken = canvas?.tokens?.get?.(o.targetId);
-
       // Check if observer is sneaking
-      const observerIsSneaking = !!observerToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+      const observerIsSneaking = this.#isSneakingToken(o.observerId, context);
 
       // Check if target is sneaking  
-      const targetIsSneaking = !!targetToken?.document?.getFlag?.('pf2e-visioner', 'sneak-active');
+      const targetIsSneaking = this.#isSneakingToken(o.targetId, context);
 
       // If observer is sneaking, only show overrides where they are the observer (what they can see)
       if (observerIsSneaking) {
@@ -169,7 +207,7 @@ class OverrideValidationIndicator {
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
     // Filter for display: show only entries that actually changed (visibility or cover) and handle sneak filtering
-    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, movedTokenId));
+    const overrides = this.#getDisplayOverrides(all, movedTokenId);
 
     if (movedTokenId && overrides.length > 0) {
       this._overrideStack.set(movedTokenId, {
@@ -208,27 +246,22 @@ class OverrideValidationIndicator {
 
   #showStackedIndicator() {
     // First, clean up entries with no valid overrides
+    const entries = [];
     for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
-      const filtered = data.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, tokenId));
+      const filtered = this.#getDisplayOverrides(data.overrides, tokenId);
       if (filtered.length === 0) {
         this._overrideStack.delete(tokenId);
+      } else {
+        entries.push([tokenId, data, filtered]);
       }
     }
 
-    const entries = Array.from(this._overrideStack.entries());
     if (entries.length === 0) {
       this.hide(true);
       return;
     }
 
-    const [currentTokenId, currentData] = entries[entries.length - 1];
-    const filtered = currentData.overrides.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o, currentTokenId));
-
-    if (filtered.length === 0) {
-      this._overrideStack.delete(currentTokenId);
-      this.#showStackedIndicator();
-      return;
-    }
+    const [currentTokenId, currentData, filtered] = entries[entries.length - 1];
 
     this._rawOverrides = currentData.overrides;
     this._currentTokenId = currentTokenId;
@@ -257,10 +290,7 @@ class OverrideValidationIndicator {
   #updateBadge() {
     const badge = this._el?.querySelector('.indicator-badge');
     if (!badge) return;
-    const raw = this._rawOverrides || [];
-    const movedTokenId = this._data?.movedTokenId || this._currentTokenId || null;
-    const count = raw.filter((o) => this.#shouldShowOverride(o, movedTokenId) && o.state && o.state !== 'avs').length
-      || this._data?.overrides?.length || 0;
+    const count = this._data?.overrides?.length || 0;
     badge.textContent = count > 0 ? String(count) : '';
   }
 
@@ -323,7 +353,7 @@ class OverrideValidationIndicator {
           targetId: tokenId,
           observerName: flagData.observerName || observerToken?.name || 'Unknown',
           targetName: token.name,
-          state: flagData.state,
+          state: overrideToDisplayVisibility(flagData),
           hasCover: flagData.hasCover,
           hasConcealment: flagData.hasConcealment,
           expectedCover: flagData.expectedCover,
@@ -343,7 +373,7 @@ class OverrideValidationIndicator {
             targetId: t.id,
             observerName: token.name,
             targetName: t.name,
-            state: fd.state,
+            state: overrideToDisplayVisibility(fd),
             hasCover: fd.hasCover,
             hasConcealment: fd.hasConcealment,
             expectedCover: fd.expectedCover,
@@ -393,7 +423,7 @@ class OverrideValidationIndicator {
     const all = Array.isArray(overrideData) ? overrideData : [];
     this._rawOverrides = all;
     // Maintain the same filtering rule for display - including sneak filtering
-    const overrides = all.filter((o) => this.#hasDisplayChange(o) && this.#shouldShowOverride(o));
+    const overrides = this.#getDisplayOverrides(all);
     this._data = { overrides, tokenName };
     this.#updateBadge();
     if (this._tooltipEl?.isConnected) this.#renderTooltipContents();
@@ -405,7 +435,9 @@ class OverrideValidationIndicator {
     try {
       const { OverrideValidationDialog } = await import('./OverrideValidationDialog.js');
       // Expose moved token id for grouping via a global scratch, then show dialog
-      try { game.pf2eVisioner = game.pf2eVisioner || {}; game.pf2eVisioner.lastMovedTokenId = this._data.movedTokenId || null; } catch { }
+      try {
+        setLastMovedTokenId(this._data?.movedTokenId || null);
+      } catch { }
 
       const dialog = new OverrideValidationDialog({
         invalidOverrides: this._rawOverrides,
@@ -485,7 +517,7 @@ class OverrideValidationIndicator {
         // Refresh token visuals and client perception
         try { await apiModule.api.updateTokenVisuals(); } catch { /* noop */ }
         try { apiModule.api.refreshEveryonesPerception(); } catch { /* noop */ }
-        try { canvas?.perception?.update?.({ refreshVision: true }); } catch { /* noop */ }
+        try { scheduleCanvasPerceptionUpdate({ refreshVision: true }); } catch { /* noop */ }
       } catch (e) {
         console.warn('PF2E Visioner | Post-clear AVS refresh failed:', e);
       }
@@ -747,13 +779,15 @@ class OverrideValidationIndicator {
     // Render the already-filtered display items to keep counts and grouping consistent
     // The _data.overrides should already be filtered by both #hasDisplayChange and #shouldShowOverride
     const all = this._data?.overrides || [];
-    const movedId = this._data?.movedTokenId ?? (globalThis?.game?.pf2eVisioner?.lastMovedTokenId ?? null);
+    const movedId = this._data?.movedTokenId ?? getLastMovedTokenId();
 
     const mkVis = (key) => {
       if (key === 'avs') return '';
       const cfg = VISIBILITY_STATES?.[key];
+      if (!cfg) return '';
       // Filter out 'avs' state from visibility display
-      const label = game?.i18n?.localize?.(cfg.label) || cfg.label || '';
+      const labelKey = getVisibilityStateLabelKey(key, { manual: true });
+      const label = game?.i18n?.localize?.(labelKey) || labelKey || '';
       const cls = cfg.cssClass || `visibility-${key}`;
       return `<i class="${cfg.icon} state-indicator ${cls}" data-kind="visibility" data-state="${key}" data-tooltip="${label}"></i>`;
     };
@@ -788,13 +822,17 @@ class OverrideValidationIndicator {
     const buildStealthPositionBypassBadge = (o) => o?.stealthPositionBypassLabel
       ? `<span class="stealth-position-bypass-badge" data-tooltip="${escapeAttr(o.stealthPositionBypassTooltip || o.stealthPositionBypassLabel)}"><i class="${escapeAttr(o.stealthPositionBypassIcon || 'fas fa-user-ninja')}"></i><span>${escapeText(o.stealthPositionBypassLabel)}</span></span>`
       : '';
+    const groupTooltip = (groupKey) =>
+      groupKey === 'observer'
+        ? 'Changes where this token is the observer: how this token sees other tokens.'
+        : 'Changes where this token is the target: how other tokens see this token.';
 
     const buildRow = (o, { showStealthPositionBypass = true } = {}) => {
       // Items that reach here have already been filtered by #hasDisplayChange() and #shouldShowOverride()
       // So we should always display them, even if they don't show state changes
       if (!o) return '';
 
-      const prevVis = o.state || (o.hasConcealment ? 'concealed' : 'observed');
+      const prevVis = overrideToDisplayVisibility(o);
       const prevCover = getExpectedCover(o);
       const curVis = o.currentVisibility || 'observed';
       const curCover = getDisplayCurrentCover(o);
@@ -840,7 +878,7 @@ class OverrideValidationIndicator {
         return `
           <div class="tip-group" data-group="${groupKey}">
             <div class="tip-group-header">
-              <div class="tip-subheader">${title}${movingTokenIndicator}</div>
+              <div class="tip-subheader" data-tooltip="${escapeAttr(groupTooltip(groupKey))}">${title}${movingTokenIndicator}</div>
             </div>
             <div class="tip-group-body">${arr.map((o) => buildRow(o, { showStealthPositionBypass: !headerBypassBadge })).join('')}</div>
           </div>
@@ -860,6 +898,7 @@ class OverrideValidationIndicator {
       </div>
       <div class="tip-footer">
         ${this._data?.nextTokenName ? `<div class="footer-row"><div class="footer-left" style="color: #4a9eff; font-style: italic;"><i class="fas fa-arrow-right"></i> ${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_NEXT')} ${this._data.nextTokenName}</div></div>` : ''}
+        <div class="hover-border-legend"><span><i class="border-swatch observer"></i> Blue border = observer</span><span><i class="border-swatch target"></i> Yellow border = target</span></div>
         <div class="footer-row">
           <div class="footer-left">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_LEFT_CLICK')}</div>
           <div class="footer-right">${game.i18n.localize('PF2E_VISIONER.OVERRIDE_INDICATOR.TOOLTIP_RIGHT_CLICK')}</div>
@@ -1001,6 +1040,7 @@ class OverrideValidationIndicator {
     try {
       size = game.settings.get('pf2e-visioner', 'avsChangesIndicatorSize') || 'medium';
     } catch { /* setting might not exist yet during early loads */ }
+    if (existing && this._lastStyleSize === size) return;
 
     const presets = {
       small: { box: 34, radius: 8, font: 15, badgeFont: 10, badgePadX: 5, badgePadY: 2, badgeOffset: 5, pulseInset: -5, pulseRadius: 10, pulseBorder: 2, border: 2, tipFont: 11, tipPad: 6 },
@@ -1036,6 +1076,11 @@ class OverrideValidationIndicator {
       .pf2e-visioner-override-tooltip .footer-row { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; }
       .pf2e-visioner-override-tooltip .footer-left { flex: 0 0 auto; }
       .pf2e-visioner-override-tooltip .footer-right { flex: 0 0 auto; text-align: right; }
+      .pf2e-visioner-override-tooltip .hover-border-legend { display: flex; justify-content: space-between; gap: 10px; color: var(--color-text-light-secondary, #ccc); font-size: 0.86em; line-height: 1.2; }
+      .pf2e-visioner-override-tooltip .hover-border-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+      .pf2e-visioner-override-tooltip .border-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; box-sizing: border-box; }
+      .pf2e-visioner-override-tooltip .border-swatch.observer { border: 2px solid #2196f3; }
+      .pf2e-visioner-override-tooltip .border-swatch.target { border: 2px solid #ffd54f; }
       .pf2e-visioner-override-tooltip .moving-token-indicator { color: var(--pf2e-visioner-success, #4caf50); font-weight: 600; font-size: 0.9em; margin-left: 8px; }
       .pf2e-visioner-override-tooltip .moving-token-indicator i { margin-right: 4px; }
       /* Force per-state colors inside tooltip (override any external .state-indicator !important rules) */
@@ -1090,6 +1135,7 @@ class OverrideValidationIndicator {
       style.textContent = css;
       document.head.appendChild(style);
     }
+    this._lastStyleSize = size;
   }
 }
 

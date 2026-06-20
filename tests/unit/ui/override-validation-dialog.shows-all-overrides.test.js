@@ -110,6 +110,59 @@ describe('OverrideValidationDialog - shows all overrides', () => {
         expect(indicator._rawOverrides).toEqual(rawOverrides);
     });
 
+    it('should label concealed override states as observed plus concealed', async () => {
+        const dialog = new OverrideValidationDialog({
+            invalidOverrides: [
+                {
+                    observerId: 'obs1',
+                    targetId: 'tgt1',
+                    observerName: 'Observer1',
+                    targetName: 'Target1',
+                    state: 'concealed',
+                    currentVisibility: 'concealed',
+                    currentCover: 'none',
+                    expectedCover: 'none',
+                    source: 'manual_action',
+                    reason: 'Position changed'
+                }
+            ],
+            tokenName: 'TestToken'
+        });
+
+        const context = await dialog._prepareContext({});
+        const override = context.overrides[0];
+
+        expect(override.prevVisibility).toMatchObject({
+            key: 'concealed',
+            label: 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        });
+        expect(override.statusVisibility).toMatchObject({
+            key: 'concealed',
+            label: 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        });
+        expect(override.currentVisibilityDescription).toContain(
+            'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'
+        );
+    });
+
+    it('should not statically import the visibility label helper from validation UI files', async () => {
+        const fs = await import('node:fs/promises');
+        const path = await import('node:path');
+        const files = [
+            'scripts/ui/OverrideValidationDialog.js',
+            'scripts/ui/OverrideValidationIndicator.js'
+        ];
+
+        for (const file of files) {
+            const source = await fs.readFile(path.join(process.cwd(), file), 'utf8');
+            const importLine = source
+                .split('\n')
+                .find((line) => line.includes("from '../constants.js'"));
+
+            expect(importLine).not.toContain('getVisibilityStateLabelKey');
+        }
+    });
+
     it('should render Take Cover cover-only current cover as auto cover', async () => {
         const dialog = new OverrideValidationDialog({
             invalidOverrides: [

@@ -21,6 +21,7 @@
             "hidden": "藏匿",
             "undetected": "无踪",
             "concealed": "隐蔽",
+            "observed_concealed": "可见 + 隐蔽",
             "avs": "自动能见度",
             "unnoticed": "未发现"
         },
@@ -141,6 +142,8 @@
             "RANGE_LIMIT_ACTIVE_CUSTOM": "激活射程限制：仅显示{distance}尺内的目标",
             "NO_TARGETS_IN_RANGE": "30尺射程内无有效目标存在",
             "NO_TARGETS_IN_RANGE_CUSTOM": "{distance}尺射程内无有效目标",
+            "INVISIBLE_CAP_LABEL": "隐形",
+            "INVISIBLE_CAP_TOOLTIP": "目标处于隐形状态。使用视觉进行搜索可以确定其位置，但不能使其变为可见；需要使用精确的非视觉感官才能观察到它。",
             "BUTTON_PROCESSED": "结果已应用",
             "NO_UNDETECTED_TOKENS": "{name}的搜索行动未发现藏匿或无踪指示物",
             "NO_CHANGES": "{name}的搜索行动未发生能见度变化",
@@ -462,6 +465,22 @@
             "AUTO_COVER_IGNORE_DEAD": {
                 "name": "忽略死亡指示物",
                 "hint": "死亡指示物将不提供自动掩蔽"
+            },
+            "PEEK_SLIT_ANGLE": {
+                "name": "Peek Slit Angle (°)",
+                "hint": "Width of the peek vision cone in degrees."
+            },
+            "PEEK_SWEEP_ANGLE": {
+                "name": "Peek Sweep Angle (°)",
+                "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
+            },
+            "PEEK_RANGE": {
+                "name": "Peek Range (ft)",
+                "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
+            },
+            "CORNER_PEEK_ENABLED": {
+                "name": "Enable Corner Peeking",
+                "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
             },
             "TOKEN_INTERSECTION_MODE": {
                 "hint": "如何基于指示物遮挡计算掩蔽",
@@ -843,6 +862,10 @@
             "hidden": "隐藏"
         },
         "KEYBINDINGS": {
+            "HOLD_PEEK": {
+                "name": "Toggle Peek (Corner)",
+                "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
+            },
             "OPEN_TOKEN_MANAGER": {
                 "hint": "打开所选指示物的指示物管理器",
                 "name": "打开视野管理器"
@@ -1483,6 +1506,13 @@
             "SOUND_LABEL": "层级地面与声音",
             "SIGHT_HINT": "选择该层级边界是采用原生V14视线碰撞，始终阻挡视线还是从不阻挡视线的模式。",
             "SOUND_HINT": "选择该层级边界是采用原生V14声音碰撞，始终阻挡声音还是从不阻挡声音的模式。"
+        },
+        "PEEK": {
+            "CHECK_LABEL": "Peek Through Door",
+            "DC_FIELD_LABEL": "Peek DC",
+            "ALLOW_FIELD_LABEL": "Allow Peeking",
+            "NOT_ALLOWED": "Peeking is not allowed through this door.",
+            "TOO_FAR": "You are too far from the door to peek through it."
         }
     }
 }

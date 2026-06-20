@@ -10,6 +10,10 @@ describe('BaseActionDialog generic handlers', () => {
     jest.clearAllMocks();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('onApplyChange warns when no change', async () => {
     const { BaseActionDialog } = await import(
       '../../../scripts/chat/dialogs/base-action-dialog.js'
@@ -99,5 +103,204 @@ describe('BaseActionDialog generic handlers', () => {
     });
 
     expect(app.updateRowButtonsToReverted).toHaveBeenCalled();
+  });
+
+  test('dropdown document click handler is bound once across rerenders', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
+    const app = Object.create(BaseActionDialog.prototype);
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <div class="row-action-dropdown">
+        <button class="dropdown-toggle"></button>
+        <div class="dropdown-menu"></div>
+      </div>
+    `;
+
+    app._attachDropdownHandlers();
+    app._attachDropdownHandlers();
+
+    const documentClickBindings = addEventListenerSpy.mock.calls.filter(
+      ([eventName]) => eventName === 'click',
+    );
+    expect(documentClickBindings).toHaveLength(1);
+  });
+
+  test('dropdown toggles use one delegated element listener', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const app = Object.create(BaseActionDialog.prototype);
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <div class="row-action-dropdown">
+        <button class="dropdown-toggle"></button>
+        <div class="dropdown-menu" style="display: none"></div>
+      </div>
+    `;
+    const addEventListenerSpy = jest.spyOn(app.element, 'addEventListener');
+
+    app._attachDropdownHandlers();
+    app._attachDropdownHandlers();
+    app.element.querySelector('.dropdown-toggle').click();
+
+    const clickBindings = addEventListenerSpy.mock.calls.filter(([eventName]) => eventName === 'click');
+    expect(clickBindings).toHaveLength(1);
+    expect(app.element.querySelector('.dropdown-menu').style.display).toBe('block');
+  });
+
+  test('dropdown document click handler can be detached on dialog close', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const addEventListenerSpy = jest.spyOn(document, 'addEventListener');
+    const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+    const app = Object.create(BaseActionDialog.prototype);
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <div class="row-action-dropdown">
+        <button class="dropdown-toggle"></button>
+        <div class="dropdown-menu"></div>
+      </div>
+    `;
+
+    app._attachDropdownHandlers();
+    const handler = addEventListenerSpy.mock.calls.find(([eventName]) => eventName === 'click')?.[1];
+
+    app._detachDropdownDocumentHandler();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('click', handler);
+    expect(app._dropdownDocumentClickHandler).toBeNull();
+  });
+
+  test('updateChangesCount updates dialog counter synchronously', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const app = Object.create(BaseActionDialog.prototype);
+    app.getChangesCounterClass = () => 'changes-count';
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <span class="changes-count"></span>
+      <table>
+        <tbody>
+          <tr data-token-id="t1">
+            <td>
+              <button class="row-action-btn apply-change"></button>
+              <button class="row-action-btn revert-change" disabled></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const count = app.updateChangesCount();
+
+    expect(count).toBe(1);
+    expect(app.element.querySelector('.changes-count').textContent).toBe('1');
+  });
+
+  test('row timer handlers use one delegated click listener', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const app = new BaseActionDialog();
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <table>
+        <tbody>
+          <tr data-token-id="t1">
+            <td class="actions">
+              <button class="row-timer-toggle" data-token-id="t1"></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    const addEventListenerSpy = jest.spyOn(app.element, 'addEventListener');
+    app.rowTimers.set('t1', { type: 'rounds', rounds: 1 });
+
+    app._attachRowTimerHandlers();
+    app._attachRowTimerHandlers();
+    app.element.querySelector('.row-timer-toggle').click();
+
+    const clickBindings = addEventListenerSpy.mock.calls.filter(([eventName]) => eventName === 'click');
+    expect(clickBindings).toHaveLength(1);
+    expect(app.rowTimers.has('t1')).toBe(false);
+  });
+
+  test('state icon handlers are delegated once and handle icon clicks', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const app = Object.create(BaseActionDialog.prototype);
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <table>
+        <tbody>
+          <tr data-token-id="t1">
+            <td>
+              <div class="override-icons">
+                <span class="state-icon selected" data-state="observed"></span>
+                <span class="state-icon" data-state="hidden"></span>
+                <input type="hidden" value="observed" />
+              </div>
+            </td>
+            <td class="actions"><span class="no-action">No change</span></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    app.outcomes = [{ target: { id: 't1' }, oldVisibility: 'observed', newVisibility: 'observed' }];
+    app.getOutcomeTokenId = BaseActionDialog.prototype.getOutcomeTokenId;
+    app.isOldStateAvsControlled = jest.fn(() => false);
+    app.updateActionButtonsForToken = jest.fn();
+    app.updateChangesCount = jest.fn();
+    const addEventListenerSpy = jest.spyOn(app.element, 'addEventListener');
+
+    app.addIconClickHandlers();
+    app.addIconClickHandlers();
+    const clickBindings = addEventListenerSpy.mock.calls.filter(([eventName]) => eventName === 'click');
+    expect(clickBindings).toHaveLength(1);
+
+    app.element.querySelector('.state-icon[data-state="hidden"]').click();
+
+    expect(app.outcomes[0].overrideState).toBe('hidden');
+    expect(app.outcomes[0].hasActionableChange).toBe(true);
+    expect(app.updateChangesCount).toHaveBeenCalledTimes(1);
+  });
+
+  test('bulk override handlers use one delegated listener', async () => {
+    const { BaseActionDialog } = await import(
+      '../../../scripts/chat/dialogs/base-action-dialog.js'
+    );
+    const app = Object.create(BaseActionDialog.prototype);
+    app.element = document.createElement('section');
+    app.element.innerHTML = `
+      <div class="bulk-override-bar">
+        <button data-action="bulkOverrideSet" data-state="hidden"></button>
+        <button data-action="bulkOverrideClear"></button>
+      </div>
+    `;
+    app.outcomes = [{ target: { id: 't1' }, oldVisibility: 'observed', newVisibility: 'observed' }];
+    app.getOutcomeTokenId = BaseActionDialog.prototype.getOutcomeTokenId;
+    app.isOldStateAvsControlled = jest.fn(() => false);
+    app.markInitialSelections = jest.fn();
+    app.refreshRowActionButtons = jest.fn();
+    app.updateChangesCount = jest.fn();
+    app.updateBulkActionButtons = jest.fn();
+    const root = app.element.querySelector('.bulk-override-bar');
+    const addEventListenerSpy = jest.spyOn(root, 'addEventListener');
+
+    app._attachBulkOverrideHandlers();
+    app._attachBulkOverrideHandlers();
+    root.querySelector('[data-action="bulkOverrideSet"]').click();
+
+    const clickBindings = addEventListenerSpy.mock.calls.filter(([eventName]) => eventName === 'click');
+    expect(clickBindings).toHaveLength(1);
+    expect(app.outcomes[0].overrideState).toBe('hidden');
+    expect(app.updateChangesCount).toHaveBeenCalledTimes(1);
   });
 });

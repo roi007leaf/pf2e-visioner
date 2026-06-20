@@ -4,7 +4,12 @@
 
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
+import {
+  clearSuppressLightingRefresh,
+  setSuppressLightingRefresh,
+} from '../services/runtime-state.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
 
 export function registerUIHooks() {
@@ -739,9 +744,7 @@ export function registerUIHooks() {
   Hooks.on('controlToken', (token, controlled) => {
     // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
     try {
-      globalThis.game = globalThis.game || {};
-      globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
-      globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+      setSuppressLightingRefresh(true);
 
       // Track this controlToken event to prevent AVS from responding to related lighting refreshes
       import('../visibility/auto-visibility/core/LightingEventHandler.js').then(
@@ -753,9 +756,7 @@ export function registerUIHooks() {
       // Clear the suppression flag after a short delay
       setTimeout(() => {
         try {
-          if (globalThis.game?.pf2eVisioner) {
-            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
-          }
+          clearSuppressLightingRefresh();
         } catch {
           // Best effort
         }
@@ -1527,7 +1528,7 @@ export function registerUIHooks() {
                   LightingPrecomputer.clearLightingCaches();
                 } catch {}
 
-                canvas.perception.update({
+                scheduleCanvasPerceptionUpdate({
                   refreshVision: true,
                   initializeVision: true,
                   refreshLighting: true,
@@ -2301,6 +2302,26 @@ function onRenderWallConfig(app, html) {
         <p class="notes">Configure cover settings, hidden walls, and other advanced options.</p>
       </div>
     `;
+
+    const isDoor = Number(app.document?.door) > 0;
+    if (isDoor) {
+      const allowed = app.document?.getFlag?.(MODULE_ID, 'peekAllowed') === true;
+      const allowRow = document.createElement('div');
+      allowRow.className = 'form-group';
+      allowRow.innerHTML = `
+        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.ALLOW_FIELD_LABEL')}</label>
+        <input type="checkbox" name="flags.${MODULE_ID}.peekAllowed" ${allowed ? 'checked' : ''} data-dtype="Boolean" />
+      `;
+      fs.appendChild(allowRow);
+      const current = app.document?.getFlag?.(MODULE_ID, 'peekDC');
+      const row = document.createElement('div');
+      row.className = 'form-group';
+      row.innerHTML = `
+        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.DC_FIELD_LABEL')}</label>
+        <input type="number" name="flags.${MODULE_ID}.peekDC" value="${current ?? ''}" step="1" min="0" data-dtype="Number" />
+      `;
+      fs.appendChild(row);
+    }
 
     // Append near Door Configuration or at form end
     const doorHeader = Array.from(form.querySelectorAll('label, h3, header, legend')).find((el) =>

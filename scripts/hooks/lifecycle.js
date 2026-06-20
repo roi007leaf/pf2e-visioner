@@ -4,12 +4,41 @@
 
 import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
-import { restorePendingMovementTokenRendering } from '../services/pending-token-movement.js';
+import {
+  clearNoObserverDetectionFilterVisuals,
+  getControlledObserverDetectionVisualTargetIds,
+  getPendingMovementRefreshTargetIds,
+  hasPendingMovementRenderWork,
+  primePendingControlledTokenDragIntent,
+  refreshPendingControlledTokenDragIntent,
+  refreshPendingMovementTokenVisibility,
+  releasePendingControlledTokenDragIntent,
+  restorePendingMovementTokenRendering,
+} from '../services/PendingMovement/pending-movement-render-lock.js';
+import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
+import {
+  clearSuppressLightingRefresh,
+  setSuppressLightingRefresh,
+} from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
+import {
+  forcePendingMovementTokenInvisible,
+  installOcclusionOnlyPerceptionSuppression,
+  targetMustStayHiddenDuringPendingMovement,
+} from '../services/PendingMovement/pending-token-movement.js';
+import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
+import { getPendingRenderState } from '../services/PendingMovement/pending-movement-render-state.js';
+import {
+  isSelectAllTokenVisibilityBypassActive,
+  primeSelectAllTokenVisibilityBypassFromKeyboard,
+} from '../services/Detection/select-all-token-visibility-bypass.js';
 import { getLogger } from '../utils/logger.js';
 import { logControlTokenVisibilitySnapshot } from '../helpers/visibility-debug.js';
+import { getCacheInvalidationRevision } from '../utils/cache-invalidation.js';
+import { buildTokenSensesCacheKey } from '../visibility/auto-visibility/core/TokenSenseSignatureCache.js';
 
 const lifecycleBindingState = (globalThis.__pf2eVisionerLifecycleBindings ??= {
   hookKeys: new Set(),
@@ -19,6 +48,21 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   sequence: 0,
   tokenId: null,
   timers: new Set(),
+});
+const controlTokenSelectionRecalcState = {
+  signatures: new Map(),
+};
+const CONTROL_TOKEN_RECALC_DELAY_MS = 180;
+const CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS = 700;
+const CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS = 180;
+const CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS = 180;
+const CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([75, 250]);
+const NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS = Object.freeze([0, 75, 250]);
+const CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS = 50;
+const controlledDragPointerMoveRefreshState = (globalThis.__pf2eVisionerDragPointerMoveRefresh ??= {
+  lastRefreshAt: 0,
+  refreshFrameId: null,
+  timeoutId: null,
 });
 const fallbackHudButtonState = (globalThis.__pf2eVisionerFallbackHudButton ??= {
   styleInstalled: false,
@@ -117,9 +161,99 @@ function scheduleControlTokenSessionTimer(sequence, tokenId, delayMs, callback) 
   return timer;
 }
 
+function refreshPendingVisibilityForActiveControlTokenSession(sequence, tokenId, fallbackToken) {
+  if (!isActiveControlTokenSession(sequence, tokenId)) {
+    return;
+  }
+
+  const currentToken =
+    canvas?.tokens?.controlled?.find?.((token) => token?.document?.id === tokenId) || fallbackToken;
+  refreshPendingVisibilityAfterControlToken(currentToken);
+}
+
+function settleControlTokenSelectionRefreshes(session, token, { schedulePostRecalc = false } = {}) {
+  refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token);
+  const currentToken =
+    canvas?.tokens?.controlled?.find?.(
+      (controlledToken) => controlledToken?.document?.id === session.tokenId,
+    ) || token;
+  void refreshSystemHiddenHighlightsForControlToken(currentToken);
+  if (!schedulePostRecalc) return;
+
+  for (const delayMs of CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS) {
+    scheduleControlTokenSessionTimer(session.sequence, session.tokenId, delayMs, () =>
+      refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+    );
+  }
+}
+
+function tokenDataSignature(value) {
+  try {
+    return JSON.stringify(value?.toObject?.() ?? value ?? null);
+  } catch {
+    return String(value);
+  }
+}
+
+function controlTokenSelectionSignature(token) {
+  const tokenDoc = token?.document;
+  const tokenId = tokenDoc?.id;
+  if (!tokenId) return null;
+  return [
+    getCacheInvalidationRevision(),
+    canvas?.scene?.id ?? canvas?.scene?._id ?? tokenDoc?.parent?.id ?? '',
+    tokenId,
+    tokenDoc.x ?? '',
+    tokenDoc.y ?? '',
+    tokenDoc.elevation ?? '',
+    tokenDoc.width ?? '',
+    tokenDoc.height ?? '',
+    tokenDoc.hidden === true ? 1 : 0,
+    tokenDataSignature(tokenDoc.vision ?? tokenDoc.sight),
+    tokenDataSignature(tokenDoc.light),
+    buildTokenSensesCacheKey([token]),
+  ].join('|');
+}
+
+function shouldRunControlTokenSelectionAvsRecalc(token) {
+  const tokenId = token?.document?.id;
+  if (!tokenId) return true;
+
+  const signature = controlTokenSelectionSignature(token);
+  if (!signature) return true;
+
+  if (controlTokenSelectionRecalcState.signatures.get(tokenId) === signature) {
+    return false;
+  }
+
+  controlTokenSelectionRecalcState.signatures.set(tokenId, signature);
+  return true;
+}
+
+function clearControlTokenSelectionRecalcCache() {
+  controlTokenSelectionRecalcState.signatures.clear();
+}
+
+function scheduleRefreshPendingVisibilityAfterControlToken(token) {
+  const session = getControlTokenSession(token);
+  if (!session) {
+    refreshPendingVisibilityAfterControlToken(token);
+    return;
+  }
+
+  scheduleControlTokenSessionTimer(
+    session.sequence,
+    session.tokenId,
+    CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS,
+    () => refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+  );
+}
+
 function scheduleNoObserverVisibilityRefresh() {
-  setTimeout(() => {
+  let completed = false;
+  const run = () => {
     try {
+      if (completed) return;
       if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
       for (const token of canvas?.tokens?.placeables || []) {
         restorePendingMovementTokenRendering(token, {
@@ -127,15 +261,185 @@ function scheduleNoObserverVisibilityRefresh() {
           ignoreObserverLocks: true,
         });
       }
-      canvas?.perception?.update?.({ initializeVision: true, refreshVision: true });
+      clearNoObserverDetectionFilterVisuals();
+      scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
+      completed = true;
     } catch {
       /* best effort */
     }
-  }, 75);
+  };
+
+  for (const delayMs of NO_OBSERVER_VISIBILITY_REFRESH_DELAYS_MS) {
+    setTimeout(run, delayMs);
+  }
+}
+
+function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
+  try {
+    if (isSelectAllTokenVisibilityBypassActive()) {
+      restoreVisionerHiddenTokensForSelectAll();
+      return;
+    }
+
+    const hasRenderWork = hasPendingMovementRenderWork();
+    const targetTokenIds = [
+      ...new Set([
+        ...(hasRenderWork ? getPendingMovementRefreshTargetIds() : []),
+        ...getControlledObserverDetectionVisualTargetIds(token),
+      ]),
+    ];
+    refreshPendingMovementTokenVisibility(
+      [],
+      targetTokenIds.length
+        ? {
+          ignoreObservedGrace: true,
+          source: 'control-token-session',
+          targetTokenIds,
+          skipPerceptionRefresh: true,
+        }
+        : {
+          ignoreObservedGrace: true,
+          skipTokenRefresh: true,
+          skipPerceptionRefresh: true,
+        },
+    );
+  } catch {
+    /* best effort */
+  }
+}
+
+async function refreshSystemHiddenHighlightsForControlToken(token) {
+  if (!token?.document?.id) return;
+
+  try {
+    const { updateSystemHiddenTokenHighlights } = await import('../services/visual-effects.js');
+    await updateSystemHiddenTokenHighlights(token.document.id);
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
+  }
+}
+
+function eventTargetsCanvasView(event) {
+  const canvasView = canvas?.app?.view || canvas?.app?.renderer?.view || null;
+  return !!canvasView && event?.target === canvasView;
+}
+
+function primeControlledTokenDragIntentFromCanvasPointer(event) {
+  if (event?.button !== 0) return;
+  if (!eventTargetsCanvasView(event)) return;
+
+  for (const token of canvas?.tokens?.controlled || []) {
+    primePendingControlledTokenDragIntent(token);
+  }
+}
+
+function releaseControlledTokenDragIntentFromCanvasPointer() {
+  releasePendingControlledTokenDragIntent();
+  controlledDragPointerMoveRefreshState.lastRefreshAt = 0;
+  if (controlledDragPointerMoveRefreshState.timeoutId) {
+    clearTimeout(controlledDragPointerMoveRefreshState.timeoutId);
+    controlledDragPointerMoveRefreshState.timeoutId = null;
+  }
+  controlledDragPointerMoveRefreshState.refreshFrameId = null;
+}
+
+function refreshControlledTokenDragIntentFromCanvasPointer() {
+  const controlledTokens = canvas?.tokens?.controlled || [];
+  if (!controlledTokens.length) return;
+
+  const refreshNow = () => {
+    controlledDragPointerMoveRefreshState.timeoutId = null;
+    controlledDragPointerMoveRefreshState.lastRefreshAt = Date.now();
+    if (controlledDragPointerMoveRefreshState.refreshFrameId) return;
+    const scheduleFrame =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback) => setTimeout(callback, 0);
+    controlledDragPointerMoveRefreshState.refreshFrameId = scheduleFrame(() => {
+      controlledDragPointerMoveRefreshState.refreshFrameId = null;
+      const currentControlledTokens = canvas?.tokens?.controlled || controlledTokens;
+      if (!currentControlledTokens.length) return;
+      for (const token of currentControlledTokens) {
+        refreshPendingControlledTokenDragIntent(token, {
+          coalesceFrame: true,
+          includeRenderHiddenTargets: true,
+        });
+      }
+    });
+  };
+
+  const elapsedMs = Date.now() - controlledDragPointerMoveRefreshState.lastRefreshAt;
+  if (elapsedMs >= CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS) {
+    refreshNow();
+    return;
+  }
+
+  if (controlledDragPointerMoveRefreshState.timeoutId) return;
+  controlledDragPointerMoveRefreshState.timeoutId = setTimeout(
+    refreshNow,
+    CONTROLLED_DRAG_POINTER_MOVE_REFRESH_MS - elapsedMs,
+  );
+}
+
+function registerPendingMovementPointerIntentListeners() {
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerDown',
+    'pointerdown',
+    primeControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerUp',
+    'pointerup',
+    releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerMove',
+    'pointermove',
+    refreshControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+  bindWindowListenerOnce(
+    'pendingMovementControlledDragIntentPointerCancel',
+    'pointercancel',
+    releaseControlledTokenDragIntentFromCanvasPointer,
+    { capture: true },
+  );
+}
+
+function registerSelectAllTokenVisibilityBypassListener() {
+  bindWindowListenerOnce(
+    'selectAllTokenVisibilityBypass',
+    'keydown',
+    handleSelectAllTokenVisibilityBypassKeydown,
+    { capture: true },
+  );
+}
+
+function restoreVisionerHiddenTokensForSelectAll() {
+  for (const token of canvas?.tokens?.placeables || []) {
+    const hiddenContext = getPendingRenderState(token)?.lastHiddenContext;
+    if (!hiddenContext?.renderHiddenByVisioner || hiddenContext.foundryHidden) continue;
+
+    restorePendingMovementTokenRendering(token, {
+      ignoreObservedGrace: true,
+      ignoreObserverLocks: true,
+    });
+  }
+}
+
+function handleSelectAllTokenVisibilityBypassKeydown(event) {
+  if (!primeSelectAllTokenVisibilityBypassFromKeyboard(event)) return;
+  restoreVisionerHiddenTokensForSelectAll();
 }
 
 async function refreshVisionSharingTokenIds() {
   const log = getLogger('VisionSharing/SceneChange');
+
+  if (!game.user?.isGM) {
+    return;
+  }
 
   if (!canvas?.tokens?.placeables) {
     return;
@@ -196,12 +500,17 @@ async function refreshVisionSharingTokenIds() {
   }
 
   if (hasVisionSharingTokenIdChanges) {
-    canvas.perception.update({ initializeVision: true, refreshLighting: true });
+    scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshLighting: true });
   }
 }
 
 async function reapplyRuleElementsOnLoad() {
   const log = getLogger('RuleElements/Lifecycle');
+
+  if (!game.user?.isGM) {
+    log.debug('Non-GM client, skipping rule element reapplication');
+    return;
+  }
 
   if (!canvas?.tokens?.placeables) {
     log.debug('No tokens on canvas, skipping rule element reapplication');
@@ -348,7 +657,7 @@ async function reapplyRuleElementsOnLoad() {
       } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
         await window.pf2eVisioner.services.autoVisibilitySystem.recalculateAll();
       } else if (canvas?.perception) {
-        canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
+        scheduleCanvasPerceptionUpdate({ refreshVision: true, refreshOcclusion: true });
       }
     } catch (error) {
       log.warn(() => ({
@@ -487,12 +796,46 @@ export function onReady() {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => {});
+      enableVisionForAllTokensAndPrototypes().catch(() => { });
     }, 25);
+    setTimeout(() => {
+      runVisibilityV2MigrationIfNeeded().catch((error) => {
+        console.warn('PF2E Visioner | Failed to migrate visibility profiles:', error);
+      });
+    }, 50);
   }
 }
 
+function enforceHiddenTokensPerFrame() {
+  const tokens = globalThis.canvas?.tokens?.placeables;
+  if (!tokens?.length) return;
+  for (const token of tokens) {
+    if (!token?.actor?.itemTypes?.condition?.length) continue;
+    try {
+      if (targetMustStayHiddenDuringPendingMovement(token)) {
+        if (token.renderable !== false || (token.mesh?.alpha ?? 0) > 0 || token.detectionFilter) {
+          forcePendingMovementTokenInvisible(token);
+          clearDetectionFilterVisuals(token);
+        }
+      }
+    } catch {
+      /* best-effort per-frame enforcement */
+    }
+  }
+}
+
+let _hiddenTokenTickerRegistered = false;
+function registerHiddenTokenTicker() {
+  if (_hiddenTokenTickerRegistered) return;
+  void enforceHiddenTokensPerFrame;
+  _hiddenTokenTickerRegistered = true;
+}
+
 export async function onCanvasReady() {
+  registerPendingMovementPointerIntentListeners();
+  registerSelectAllTokenVisibilityBypassListener();
+  registerHiddenTokenTicker();
+
   try {
     await refreshVisionSharingTokenIds();
   } catch (error) {
@@ -512,6 +855,7 @@ export async function onCanvasReady() {
     if (controlledTokens.length > 0) {
       // Process each controlled token to restore their indicators
       for (const token of controlledTokens) {
+        refreshPendingVisibilityAfterControlToken(token);
         const wallFlags = token?.document?.getFlag?.(MODULE_ID, 'walls') || {};
         // Only restore if this token has wall flags
         if (Object.keys(wallFlags).length > 0) {
@@ -520,14 +864,24 @@ export async function onCanvasReady() {
       }
     }
 
+    bindHookOnce('controlTokenSessionTracker', 'controlToken', (token, controlled) => {
+      trackControlTokenSession(token, controlled);
+    });
+
     // Also set up a hook to restore indicators when tokens are controlled after canvas ready
     // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
     bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
+      if (controlled) {
+        installOcclusionOnlyPerceptionSuppression(CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS, {
+          coalesceSelectionRefresh: true,
+          selectionFlushDelayMs: CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS,
+        });
+        scheduleRefreshPendingVisibilityAfterControlToken(token);
+      }
+
       // CRITICAL: Set global flag to suppress lighting refreshes during token control operations
       try {
-        globalThis.game = globalThis.game || {};
-        globalThis.game.pf2eVisioner = globalThis.game.pf2eVisioner || {};
-        globalThis.game.pf2eVisioner.suppressLightingRefresh = true;
+        setSuppressLightingRefresh(true);
 
         // Track this controlToken event to prevent AVS from responding to related lighting refreshes
         const { LightingEventHandler } = await import(
@@ -555,45 +909,37 @@ export async function onCanvasReady() {
           }
         }
 
-        try {
-          const { updateSystemHiddenTokenHighlights } = await import(
-            '../services/visual-effects.js'
-          );
-          await updateSystemHiddenTokenHighlights(token.document.id);
-        } catch (error) {
-          console.warn('PF2E Visioner | Failed to update system-hidden token highlights:', error);
-        }
+        // System-hidden highlights depend on freshly recalculated AVS state.
+        // They are refreshed after recalculation settles.
       } else {
         try {
           const { updateSystemHiddenTokenHighlights } = await import(
             '../services/visual-effects.js'
           );
           await updateSystemHiddenTokenHighlights(null, null, { allowControlledFallback: false });
-          scheduleNoObserverVisibilityRefresh();
         } catch (error) {
           console.warn('PF2E Visioner | Failed to clear system-hidden token highlights:', error);
         }
+        scheduleNoObserverVisibilityRefresh();
       }
 
       // Clear the suppression flag after a short delay
       setTimeout(() => {
         try {
-          if (globalThis.game?.pf2eVisioner) {
-            globalThis.game.pf2eVisioner.suppressLightingRefresh = false;
-          }
+          clearSuppressLightingRefresh();
         } catch {
           // Best effort
         }
       }, 50);
     });
-  } catch (_) {}
+  } catch (_) { }
 
   initializeHoverTooltips();
 
   try {
     const { registerAvsGmVisionWarning } = await import('../ui/AvsGmVisionWarning.js');
     registerAvsGmVisionWarning();
-  } catch (_) {}
+  } catch (_) { }
 
   // Listen for condition changes to update lifesense highlights
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
@@ -619,7 +965,7 @@ export async function onCanvasReady() {
 
       // Trigger perception refresh to recalculate visibility based on new conditions
       if (canvas?.perception) {
-        canvas.perception.update({
+        scheduleCanvasPerceptionUpdate({
           refreshVision: true,
           refreshOcclusion: true,
         });
@@ -659,7 +1005,7 @@ export async function onCanvasReady() {
 
       // Trigger perception refresh to recalculate visibility based on removed conditions
       if (canvas?.perception) {
-        canvas.perception.update({
+        scheduleCanvasPerceptionUpdate({
           refreshVision: true,
           refreshOcclusion: true,
         });
@@ -735,10 +1081,10 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) {}
+        } catch (_) { }
       }, 50);
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Hide override validation indicator when scene changes
   bindHookOnce('hideOverrideIndicatorOnCanvasTearDown', 'canvasTearDown', async () => {
@@ -771,7 +1117,7 @@ export async function onCanvasReady() {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
       if (!controlled || !indicator?.hasQueuedTokens?.()) return;
       indicator.show([], '', null);
-    } catch (error) {}
+    } catch (error) { }
   });
 
   // Update shared vision indicator when controlled token changes
@@ -790,29 +1136,40 @@ export async function onCanvasReady() {
     }
   });
 
-  bindHookOnce('controlTokenSessionTracker', 'controlToken', (token, controlled) => {
-    trackControlTokenSession(token, controlled);
-  });
-
   bindHookOnce('resetControlTokenSessionOnCanvasTearDown', 'canvasTearDown', () => {
     resetControlTokenSession();
+    clearControlTokenSelectionRecalcCache();
   });
 
   bindHookOnce('avsRecalculateOnControlToken', 'controlToken', (token, controlled) => {
     try {
       if (!controlled || !game.user?.isGM || !token?.document?.id) return;
+      if (isSelectAllTokenVisibilityBypassActive()) return;
       const session = getControlTokenSession(token);
       if (!session) return;
 
-      scheduleControlTokenSessionTimer(session.sequence, session.tokenId, 75, () => {
-        try {
-          window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
-            session.tokenId,
-          ]);
-        } catch {
-          /* best effort */
-        }
-      });
+      scheduleControlTokenSessionTimer(
+        session.sequence,
+        session.tokenId,
+        CONTROL_TOKEN_RECALC_DELAY_MS,
+        () => {
+          try {
+            const shouldRecalculate = shouldRunControlTokenSelectionAvsRecalc(token);
+            const result = shouldRecalculate
+              ? window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
+                session.tokenId,
+              ])
+              : undefined;
+            void Promise.resolve(result).finally(() => {
+              settleControlTokenSelectionRefreshes(session, token, {
+                schedulePostRecalc: shouldRecalculate,
+              });
+            });
+          } catch {
+            /* best effort */
+          }
+        },
+      );
     } catch {
       /* best effort */
     }
@@ -858,7 +1215,7 @@ async function enableVisionForAllTokensAndPrototypes() {
   try {
     const enabled = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
     await applyEnableAllTokensVisionSetting(enabled);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function getTokenVisionEnabled(doc) {
@@ -899,7 +1256,7 @@ async function syncNpcVisionInScenes(enabled) {
       if (updates.length) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -915,7 +1272,7 @@ async function syncNpcPrototypeVision(enabled) {
           { diff: false },
         );
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 }
 
@@ -925,7 +1282,7 @@ export async function applyEnableAllTokensVisionSetting(enabled) {
     const desired = !!enabled;
     await syncNpcVisionInScenes(desired);
     await syncNpcPrototypeVision(desired);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export function setupFallbackHUDButton() {
@@ -1013,7 +1370,7 @@ export function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) {}
+        } catch (_) { }
       }
 
       button.addEventListener('click', async (event) => {

@@ -3,15 +3,46 @@
  */
 
 import { extractPerceptionDC, extractStealthDC } from '../../chat/services/infra/shared-utils.js';
-import { COVER_STATES, MODULE_ID, VISIBILITY_STATES } from '../../constants.js';
+import {
+  COVER_STATES,
+  MODULE_ID,
+  VISIBILITY_STATES,
+  getVisibilityStateLabelKey,
+} from '../../constants.js';
 import {
   getCoverMap,
   getLastRollTotalForActor,
   getSceneTargets,
+  getVisibilityBetween,
   getVisibilityMap,
   hasActiveEncounter,
 } from '../../utils.js';
 import { TimedOverrideManager } from '../../services/TimedOverrideManager.js';
+import { overrideToDisplayVisibility } from '../../visibility/perception-profile.js';
+
+function buildVisibilityStateContext(key, { selected = false, manual = true } = {}) {
+  const config = VISIBILITY_STATES[key];
+  return {
+    value: key,
+    label: game.i18n.localize(getVisibilityStateLabelKey(key, { manual })),
+    selected,
+    icon: config.icon,
+    color: config.color,
+    cssClass: config.cssClass,
+  };
+}
+
+function getOverrideDisplayState(overrideFlag) {
+  return overrideToDisplayVisibility(overrideFlag) || 'observed';
+}
+
+function getEffectiveVisibilityState(observerToken, targetToken, fallback = 'observed') {
+  try {
+    return getVisibilityBetween(observerToken, targetToken) || fallback || 'observed';
+  } catch {
+    return fallback || 'observed';
+  }
+}
 
 function getTokenImage(token) {
   if (token.actor?.img) return token.actor.img;
@@ -23,13 +54,15 @@ const MANUAL_VISIBILITY_STATE_EXCLUSIONS = new Set(['unnoticed']);
 function isVisibilityOverrideFlag(flagData) {
   if (!flagData) return false;
   if (flagData.coverOnly === true) return false;
-  if (!flagData.state || flagData.state === 'avs') return false;
+  const displayState = overrideToDisplayVisibility(flagData);
+  if (!displayState || displayState === 'avs') return false;
   return true;
 }
 
 function getManualVisibilityStateKeys({ isNonAvsToken = false, avsEnabled = false } = {}) {
   const keys = isNonAvsToken ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
   return keys.filter((key) => {
+    if (VISIBILITY_STATES[key]?.manual === false) return false;
     if (MANUAL_VISIBILITY_STATE_EXCLUSIONS.has(key)) return false;
     if (key === 'avs' && !avsEnabled) return false;
     return true;
@@ -131,6 +164,28 @@ export async function buildContext(app, options) {
   } catch (_) {
     context.hideFoundryHidden = false;
   }
+  const tokenManagerSettings = {
+    integrateRollOutcome: !!game.settings.get(MODULE_ID, 'integrateRollOutcome'),
+    autoVisibilityEnabled: !!game.settings.get(MODULE_ID, 'autoVisibilityEnabled'),
+    hiddenWallsEnabled: !!game.settings.get(MODULE_ID, 'hiddenWallsEnabled'),
+    wallStealthDC: Number(game.settings.get(MODULE_ID, 'wallStealthDC')) || 15,
+  };
+  const coverStateBase = Object.entries(COVER_STATES).map(([key, config]) => ({
+    value: key,
+    label: game.i18n.localize(config.label),
+    icon: config.icon,
+    color: config.color,
+    cssClass: config.cssClass,
+    bonusAC: config.bonusAC,
+    bonusReflex: config.bonusReflex,
+    bonusStealth: config.bonusStealth,
+    canHide: config.canHide,
+  }));
+  const buildCoverStateList = (currentCoverState) =>
+    coverStateBase.map((state) => ({
+      ...state,
+      selected: currentCoverState === state.value,
+    }));
 
   const sceneTokens = getSceneTargets(app.observer, app.encounterOnly, app.ignoreAllies);
 
@@ -179,11 +234,10 @@ export async function buildContext(app, options) {
 
         const perceptionDC = extractPerceptionDC(token);
         const stealthDC = extractStealthDC(token);
-        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
-        if (showOutcomeSetting) {
+        if (tokenManagerSettings.integrateRollOutcome) {
           const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
           if (typeof lastRoll === 'number' && typeof stealthDC === 'number') {
             const diff = lastRoll - stealthDC;
@@ -208,7 +262,7 @@ export async function buildContext(app, options) {
         const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
-        const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+        const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
 
         const allowedVisKeys = getManualVisibilityStateKeys({ isNonAvsToken, avsEnabled });
 
@@ -219,14 +273,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // Determine current state and selection logic
@@ -236,7 +283,7 @@ export async function buildContext(app, options) {
 
         try {
           // Check if AVS is enabled first
-          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
           if (avsEnabled) {
             // Check for AVS override flag
             const avsOverrideFlag = token.document.getFlag(
@@ -247,30 +294,36 @@ export async function buildContext(app, options) {
             if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
               hasAvsOverride = false;
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
-              // Get the actual current state from the visibility map
-              try {
-                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
-                const visibilityMap = getVisibilityMap(app.observer);
-                actualCurrentState = visibilityMap[token.document.id] || 'observed';
-              } catch {
-                actualCurrentState = 'observed'; // Fallback if map access fails
-              }
+              // Get the effective state so native feat replacements display in the manager.
+              actualCurrentState = getEffectiveVisibilityState(
+                app.observer,
+                token,
+                app.visibilityData?.[token.document.id] || 'observed',
+              );
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
             isAvsControlled = false;
-            actualCurrentState = currentVisibilityState || 'observed';
+            actualCurrentState = getEffectiveVisibilityState(
+              app.observer,
+              token,
+              currentVisibilityState || 'observed',
+            );
           }
         } catch {
           isAvsControlled = false;
-          actualCurrentState = currentVisibilityState || 'observed';
+          actualCurrentState = getEffectiveVisibilityState(
+            app.observer,
+            token,
+            currentVisibilityState || 'observed',
+          );
         }
 
         // Update selection based on override/AVS logic
@@ -324,18 +377,7 @@ export async function buildContext(app, options) {
           isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
-          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-            value: key,
-            label: game.i18n.localize(config.label),
-            selected: currentCoverState === key,
-            icon: config.icon,
-            color: config.color,
-            cssClass: config.cssClass,
-            bonusAC: config.bonusAC,
-            bonusReflex: config.bonusReflex,
-            bonusStealth: config.bonusStealth,
-            canHide: config.canHide,
-          })),
+          coverStates: buildCoverStateList(currentCoverState),
           perceptionDC,
           stealthDC,
           showOutcome,
@@ -374,11 +416,10 @@ export async function buildContext(app, options) {
 
         const perceptionDC = extractPerceptionDC(observerToken);
         const stealthDC = extractPerceptionDC(observerToken);
-        const showOutcomeSetting = game.settings.get(MODULE_ID, 'integrateRollOutcome');
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
-        if (showOutcomeSetting) {
+        if (tokenManagerSettings.integrateRollOutcome) {
           const lastRoll = getLastRollTotalForActor(app.observer?.actor, null);
           if (typeof lastRoll === 'number' && typeof perceptionDC === 'number') {
             const diff = lastRoll - perceptionDC;
@@ -403,7 +444,7 @@ export async function buildContext(app, options) {
         const isNonAvsToken = isRowLoot || isRowHazard;
 
         // Check if AVS is enabled to determine if 'avs' button should be available
-        const avsEnabledForTarget = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+        const avsEnabledForTarget = tokenManagerSettings.autoVisibilityEnabled;
 
         const allowedVisKeys = getManualVisibilityStateKeys({
           isNonAvsToken,
@@ -417,14 +458,7 @@ export async function buildContext(app, options) {
             let selected = false;
 
             // This will be set after we determine the override/AVS logic
-            return {
-              value: key,
-              label: game.i18n.localize(VISIBILITY_STATES[key].label),
-              selected, // Will be updated below
-              icon: VISIBILITY_STATES[key].icon,
-              color: VISIBILITY_STATES[key].color,
-              cssClass: VISIBILITY_STATES[key].cssClass,
-            };
+            return buildVisibilityStateContext(key, { selected });
           });
 
         // In target mode, determine current state and selection logic
@@ -434,7 +468,7 @@ export async function buildContext(app, options) {
 
         try {
           // Check if AVS is enabled first
-          const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+          const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
           if (avsEnabled) {
             // Check for AVS override flag
             const avsOverrideFlag = app.observer.document.getFlag(
@@ -445,30 +479,36 @@ export async function buildContext(app, options) {
             if (isVisibilityOverrideFlag(avsOverrideFlag)) {
               // There's an override - use the override state
               hasAvsOverride = true;
-              actualCurrentState = avsOverrideFlag.state || 'observed';
+              actualCurrentState = getOverrideDisplayState(avsOverrideFlag);
               isAvsControlled = false; // Override is controlling, not AVS
             } else {
               // No override - AVS is controlling (unless it's a hazard/loot token)
               hasAvsOverride = false;
               isAvsControlled = !isNonAvsToken; // AVS is controlling only if NOT hazard/loot
 
-              // Get the actual current state from the visibility map
-              try {
-                const { getVisibilityMap } = await import('../../stores/visibility-map.js');
-                const visibilityMap = getVisibilityMap(observerToken);
-                actualCurrentState = visibilityMap[app.observer.document.id] || 'observed';
-              } catch {
-                actualCurrentState = 'observed'; // Fallback if map access fails
-              }
+              // Get the effective state so native feat replacements display in the manager.
+              actualCurrentState = getEffectiveVisibilityState(
+                observerToken,
+                app.observer,
+                observerVisibilityData?.[app.observer.document.id] || 'observed',
+              );
             }
           } else {
             // If AVS is disabled, nothing is AVS controlled
             isAvsControlled = false;
-            actualCurrentState = currentVisibilityState || 'observed';
+            actualCurrentState = getEffectiveVisibilityState(
+              observerToken,
+              app.observer,
+              currentVisibilityState || 'observed',
+            );
           }
         } catch {
           isAvsControlled = false;
-          actualCurrentState = currentVisibilityState || 'observed';
+          actualCurrentState = getEffectiveVisibilityState(
+            observerToken,
+            app.observer,
+            currentVisibilityState || 'observed',
+          );
         }
 
         // Update selection based on override/AVS logic
@@ -522,18 +562,7 @@ export async function buildContext(app, options) {
           isAvsControlled: isNonAvsToken ? false : isAvsControlled,
           hasAvsOverride,
           visibilityStates,
-          coverStates: Object.entries(COVER_STATES).map(([key, config]) => ({
-            value: key,
-            label: game.i18n.localize(config.label),
-            selected: currentCoverState === key,
-            icon: config.icon,
-            color: config.color,
-            cssClass: config.cssClass,
-            bonusAC: config.bonusAC,
-            bonusReflex: config.bonusReflex,
-            bonusStealth: config.bonusStealth,
-            canHide: config.canHide,
-          })),
+          coverStates: buildCoverStateList(currentCoverState),
           perceptionDC,
           stealthDC,
           showOutcome,
@@ -588,7 +617,7 @@ export async function buildContext(app, options) {
   context.wallTargets = [];
   context.includeWalls = false;
   try {
-    if (context.isObserverMode && game.settings.get(MODULE_ID, 'hiddenWallsEnabled')) {
+    if (context.isObserverMode && tokenManagerSettings.hiddenWallsEnabled) {
       const walls = canvas?.walls?.placeables || [];
       // Respect UI filter: Ignore walls (visibility tab only)
       const ignoreWalls = !!app.ignoreWalls && context.isVisibilityTab === true;
@@ -603,25 +632,20 @@ export async function buildContext(app, options) {
         const doorType = Number(d?.door) || 0;
         const fallback = `${game.i18n?.localize?.('PF2E_VISIONER.WALL.VISIBLE_TO_YOU') || isDoor ? 'Hidden Door' : 'Hidden Wall'} ${++autoIndex}`;
         const currentState = wallMap?.[d.id] || 'hidden';
-        const states = ['hidden', 'observed'].map((key) => ({
-          value: key,
-          label: game.i18n.localize(VISIBILITY_STATES[key].label),
-          selected: currentState === key,
-          icon: VISIBILITY_STATES[key].icon,
-          color: VISIBILITY_STATES[key].color,
-          cssClass: VISIBILITY_STATES[key].cssClass,
-        }));
+        const states = ['hidden', 'observed'].map((key) =>
+          buildVisibilityStateContext(key, { selected: currentState === key }),
+        );
         const img = getWallImage(doorType);
         // DC: per-wall override else global default
         const overrideDC = Number(d?.getFlag?.(MODULE_ID, 'stealthDC'));
-        const defaultWallDC = Number(game.settings.get(MODULE_ID, 'wallStealthDC')) || 15;
+        const defaultWallDC = tokenManagerSettings.wallStealthDC;
         const dc = Number.isFinite(overrideDC) && overrideDC > 0 ? overrideDC : defaultWallDC;
         // Outcome (optional): compare last Perception roll of observer vs dc
         let showOutcome = false;
         let outcomeLabel = '';
         let outcomeClass = '';
         try {
-          if (game.settings.get(MODULE_ID, 'integrateRollOutcome')) {
+          if (tokenManagerSettings.integrateRollOutcome) {
             const lastRoll = getLastRollTotalForActor(app.observer?.actor, 'perception');
             if (typeof lastRoll === 'number') {
               const diff = lastRoll - dc;
@@ -660,37 +684,19 @@ export async function buildContext(app, options) {
   } catch {}
 
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
-  const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
+  const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
 
   const allowedLegendKeys = getManualVisibilityStateKeys({
     isNonAvsToken: isLootObserver || context.hazardObserver,
     avsEnabled,
   });
 
-  context.visibilityStates = allowedLegendKeys.map((key) => {
-    const config = VISIBILITY_STATES[key];
-    return {
-      key,
-      value: key,
-      label: game.i18n.localize(config.label),
-      icon: config.icon,
-      color: config.color,
-      cssClass: config.cssClass,
-    };
-  });
-
-  context.coverStates = Object.entries(COVER_STATES).map(([key, config]) => ({
+  context.visibilityStates = allowedLegendKeys.map((key) => ({
     key,
-    value: key,
-    label: game.i18n.localize(config.label),
-    icon: config.icon,
-    color: config.color,
-    cssClass: config.cssClass,
-    bonusAC: config.bonusAC,
-    bonusReflex: config.bonusReflex,
-    bonusStealth: config.bonusStealth,
-    canHide: config.canHide,
+    ...buildVisibilityStateContext(key, { selected: false }),
   }));
+
+  context.coverStates = coverStateBase.map((state) => ({ key: state.value, ...state }));
 
   context.hasTargets = allTargets.length > 0;
   context.hasPCs = context.pcTargets.length > 0;
@@ -699,7 +705,7 @@ export async function buildContext(app, options) {
   context.hasLoots = app.mode === 'observer' && context.lootTargets.length > 0;
   context.includeWalls = context.includeWalls || false;
   try {
-    context.showOutcomeColumn = game.settings.get(MODULE_ID, 'integrateRollOutcome');
+    context.showOutcomeColumn = tokenManagerSettings.integrateRollOutcome;
   } catch {
     context.showOutcomeColumn = false;
   }

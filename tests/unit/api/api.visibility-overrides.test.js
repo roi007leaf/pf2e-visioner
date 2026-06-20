@@ -31,9 +31,26 @@ describe('API AVS override persistence', () => {
       const override1 = getOverride(observer, target);
       const override2 = getOverride(observer, extra);
       expect(override1).toBeTruthy();
-      expect(override1.state).toBe('hidden');
+      expect(override1.detectionState).toBe('hidden');
       expect(override2).toBeTruthy();
-      expect(override2.state).toBe('concealed');
+      expect(override2.detectionState).toBe('observed');
+      expect(override2.hasConcealment).toBe(true);
+
+      const publicOverrides = VisionerAPI.getAVSOverrides(observer);
+      expect(publicOverrides).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            observerId: observer.id,
+            targetId: target.id,
+            state: 'hidden',
+          }),
+          expect.objectContaining({
+            observerId: observer.id,
+            targetId: extra.id,
+            state: 'concealed',
+          }),
+        ]),
+      );
     });
 
     test('does NOT create overrides for automatic bulk updates', async () => {
@@ -43,6 +60,39 @@ describe('API AVS override persistence', () => {
 
       const override = getOverride(observer, target);
       expect(override).toBeFalsy();
+    });
+  });
+
+  describe('setPerceptionProfile', () => {
+    test('creates AVS override for manual v2 profile updates', async () => {
+      await VisionerAPI.setPerceptionProfile(observer.id, target.id, {
+        detectionState: 'hidden',
+        hasConcealment: true,
+        coverState: 'standard',
+      });
+
+      const override = getOverride(observer, target);
+      expect(override).toEqual(
+        expect.objectContaining({
+          detectionState: 'hidden',
+          hasConcealment: true,
+          coverState: 'standard',
+          expectedCover: 'standard',
+          state: 'hidden',
+          source: 'manual_action',
+        }),
+      );
+    });
+
+    test('does NOT create AVS override for automatic v2 profile updates', async () => {
+      await VisionerAPI.setPerceptionProfile(
+        observer.id,
+        target.id,
+        { detectionState: 'hidden' },
+        { isAutomatic: true },
+      );
+
+      expect(getOverride(observer, target)).toBeFalsy();
     });
   });
 
@@ -61,7 +111,7 @@ describe('API AVS override persistence', () => {
       await VisionerAPI.setCover(observer.id, target.id, 'standard');
       const after = getOverride(observer, target);
       expect(after).toBeTruthy();
-      expect(after.state).toBe('hidden');
+      expect(after.detectionState).toBe('hidden');
       expect(after.hasCover).toBe(false); // unchanged
       expect(after.expectedCover).toBeUndefined();
       // Optionally ensure timestamp unchanged (no re-write)

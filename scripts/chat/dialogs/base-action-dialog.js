@@ -1,8 +1,48 @@
-import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
+import { MODULE_ID } from '../../constants.js';
 import { getVisibilityStateConfig } from '../services/data/visibility-states.js';
 import '../services/hbs-helpers.js';
-import { notify } from '../services/infra/notifications.js';
 import { filterOutcomesByEncounter, hasActiveEncounter } from '../services/infra/shared-utils.js';
+import {
+  updateBulkActionButtons as updateBulkActionButtonsInDom,
+  updateChangesCount as updateChangesCountInDom,
+  updateRowButtonsToApplied as updateRowButtonsToAppliedInDom,
+  updateRowButtonsToReverted as updateRowButtonsToRevertedInDom,
+} from '../services/ui/dialog-utils.js';
+import {
+  attachBulkOverrideHandlers,
+  buildBulkOverrideStates,
+  clearBulkOverrideState,
+  deriveBulkStatesFromOutcomes,
+  setBulkOverrideState,
+} from './BaseAction/base-action-bulk-overrides.js';
+import {
+  applyAllBaseActionChanges,
+  applyBaseActionChange,
+  applyBaseActionTimedChange,
+  revertAllBaseActionChanges,
+  revertBaseActionChange,
+} from './BaseAction/base-action-apply-revert.js';
+import {
+  attachDropdownHandlers,
+  closeAllDropdowns,
+  detachDropdownDocumentHandler,
+  onDropdownToggle,
+} from './BaseAction/base-action-dropdowns.js';
+import {
+  attachDelegatedRowTimerHandler,
+  attachRowTimerHandlers,
+  getRowTimer,
+  injectTimerButtonsIfMissing,
+  refreshRowTimerButtons,
+  toggleRowTimer,
+  updateRowTimerButton,
+} from './BaseAction/base-action-row-timers.js';
+import {
+  addIconClickHandlers as addIconClickHandlersToRows,
+  onStateIconClick,
+  refreshRowActionButtons as refreshRowActionButtonsInDom,
+  updateActionButtonsForToken as updateActionButtonsForTokenInDom,
+} from './BaseAction/base-action-row-actions.js';
 import { BasePreviewDialog } from './BasePreviewDialog.js';
 
 export class BaseActionDialog extends BasePreviewDialog {
@@ -10,6 +50,7 @@ export class BaseActionDialog extends BasePreviewDialog {
     super(options);
     this.bulkActionState = this.bulkActionState ?? 'initial';
     this.rowTimers = new Map();
+    this._dropdownDocumentClickHandler = null;
     // Per-dialog visual filter: show only rows with actionable changes
     if (typeof this.showOnlyChanges === 'undefined') this.showOnlyChanges = false;
     // LOS filter: enabled out of combat by default, disabled in combat (UI disabled while in combat)
@@ -35,8 +76,10 @@ export class BaseActionDialog extends BasePreviewDialog {
   }
 
   // Shared UI helpers
-  visibilityConfig(state) {
-    return getVisibilityStateConfig(state) || { icon: '', color: '', label: String(state ?? '') };
+  visibilityConfig(state, options = {}) {
+    return (
+      getVisibilityStateConfig(state, options) || { icon: '', color: '', label: String(state ?? '') }
+    );
   }
 
   resolveTokenImage(token) {
@@ -169,149 +212,52 @@ export class BaseActionDialog extends BasePreviewDialog {
   }
 
   _attachRowTimerHandlers() {
-    if (!this.element) return;
+    attachRowTimerHandlers(this);
+  }
 
-    this._injectTimerButtonsIfMissing();
+  _attachDelegatedRowTimerHandler() {
+    attachDelegatedRowTimerHandler(this);
+  }
 
-    const timerButtons = this.element.querySelectorAll('.row-timer-toggle');
-    timerButtons.forEach((btn) => {
-      if (btn.dataset.timerBound) return;
-      btn.dataset.timerBound = 'true';
-      btn.addEventListener('click', (ev) => this._onToggleRowTimer(ev));
-    });
-
-    try {
-      const all = this.element.querySelectorAll('.row-timer-toggle[data-token-id]');
-      all.forEach((btn) => {
-        const tokenId = btn.dataset.tokenId;
-        if (tokenId) this._updateRowTimerButton(tokenId);
-      });
-    } catch { }
+  _refreshRowTimerButtons() {
+    refreshRowTimerButtons(this);
   }
 
   _injectTimerButtonsIfMissing() {
-    const actionsCells = this.element.querySelectorAll('td.actions');
-    actionsCells.forEach((cell) => {
-      if (cell.querySelector('.row-timer-toggle')) return;
-
-      const applyBtn = cell.querySelector('.row-action-btn.apply-change');
-      if (!applyBtn) return;
-
-      const tokenId = applyBtn.dataset.tokenId;
-      if (!tokenId) return;
-
-      const timerBtn = document.createElement('button');
-      timerBtn.type = 'button';
-      timerBtn.className = 'row-timer-toggle';
-      timerBtn.dataset.tokenId = tokenId;
-      timerBtn.dataset.tooltip = game.i18n.localize(
-        'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
-      );
-      timerBtn.innerHTML = '<i class="fas fa-clock"></i>';
-
-      const timerConfig = this.rowTimers?.get(tokenId);
-      if (timerConfig) {
-        timerBtn.classList.add('active');
-      }
-
-      cell.insertBefore(timerBtn, applyBtn);
-    });
+    injectTimerButtonsIfMissing(this);
   }
 
-  async _onToggleRowTimer(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const btn = event.currentTarget;
-    const tokenId = btn.dataset.tokenId;
-    if (!tokenId) return;
-
-    if (this.rowTimers.has(tokenId)) {
-      this.rowTimers.delete(tokenId);
-      this._updateRowTimerButton(tokenId);
-      return;
-    }
-
-    try {
-      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
-      const app = this;
-      const defaultActorId = app.actorToken?.actor?.id || app.actor?.id || null;
-      await TimerDurationDialog.show({
-        defaultActorId,
-        onApply: (timerConfig) => {
-          if (timerConfig) {
-            app.rowTimers.set(tokenId, timerConfig);
-            app._updateRowTimerButton(tokenId);
-          }
-        },
-      });
-    } catch (error) {
-      console.error('PF2E Visioner | Error opening timer duration dialog:', error);
-    }
+  async _onToggleRowTimer(event, button = null) {
+    await toggleRowTimer(this, event, button);
   }
 
   _updateRowTimerButton(tokenId) {
-    if (!this.element) return;
-    const btn = this.element.querySelector(`.row-timer-toggle[data-token-id="${tokenId}"]`);
-    if (!btn) return;
-
-    const timerConfig = this.rowTimers.get(tokenId);
-    if (timerConfig) {
-      btn.classList.add('active');
-      let label = '';
-      if (timerConfig.type === 'rounds') {
-        label = `${timerConfig.rounds}r`;
-      } else if (timerConfig.type === 'realtime') {
-        label = `${timerConfig.minutes}m`;
-      }
-      let labelSpan = btn.querySelector('.row-timer-label');
-      if (!labelSpan) {
-        labelSpan = document.createElement('span');
-        labelSpan.className = 'row-timer-label';
-        btn.appendChild(labelSpan);
-      }
-      labelSpan.textContent = label;
-      btn.dataset.tooltip = `${label} - Click to clear`;
-    } else {
-      btn.classList.remove('active');
-      const labelSpan = btn.querySelector('.row-timer-label');
-      if (labelSpan) labelSpan.remove();
-      btn.dataset.tooltip = game.i18n.localize('PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW');
-    }
+    updateRowTimerButton(this, tokenId);
   }
 
   getRowTimer(tokenId) {
-    return this.rowTimers.get(tokenId) || null;
+    return getRowTimer(this, tokenId);
   }
 
   _attachDropdownHandlers() {
-    if (!this.element) return;
-    const dropdownToggles = this.element.querySelectorAll('.dropdown-toggle');
-    dropdownToggles.forEach((toggle) => {
-      if (toggle.dataset.dropdownBound) return;
-      toggle.dataset.dropdownBound = 'true';
-      toggle.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const dropdown = toggle.closest('.row-action-dropdown');
-        if (!dropdown) return;
-        const menu = dropdown.querySelector('.dropdown-menu');
-        if (!menu) return;
-        const wasOpen = menu.style.display !== 'none';
-        this._closeAllDropdowns();
-        if (!wasOpen) {
-          menu.style.display = 'block';
-        }
-      });
-    });
+    attachDropdownHandlers(this);
+  }
 
-    document.addEventListener('click', () => this._closeAllDropdowns(), { once: true });
+  _onDropdownToggle(event, toggle) {
+    onDropdownToggle(this, event, toggle);
+  }
+
+  _detachDropdownDocumentHandler() {
+    detachDropdownDocumentHandler(this);
   }
 
   _closeAllDropdowns() {
-    if (!this.element) return;
-    this.element.querySelectorAll('.dropdown-menu').forEach((menu) => {
-      menu.style.display = 'none';
-    });
+    closeAllDropdowns(this);
+  }
+
+  async close(options) {
+    this._detachDropdownDocumentHandler();
+    return super.close(options);
   }
 
   buildCommonContext(outcomes) {
@@ -336,123 +282,23 @@ export class BaseActionDialog extends BasePreviewDialog {
 
   // ===== Bulk Override Helpers =====
   _buildBulkOverrideStates() {
-    try {
-      if (this._cachedBulkStates && Array.isArray(this._cachedBulkStates))
-        return this._cachedBulkStates;
-
-      // Check if AVS is enabled to filter out 'avs' state
-      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
-      let states = ['avs', 'observed', 'concealed', 'hidden', 'undetected'];
-
-      // Remove 'avs' if AVS is disabled
-      if (!avsEnabled) {
-        states = states.filter((s) => s !== 'avs');
-      }
-
-      this._cachedBulkStates = states.map((s) => ({ value: s, ...this.visibilityConfig(s) }));
-      return this._cachedBulkStates;
-    } catch {
-      return [];
-    }
+    return buildBulkOverrideStates(this);
   }
 
   _deriveBulkStatesFromOutcomes(outcomes) {
-    try {
-      if (!Array.isArray(outcomes) || outcomes.length === 0) return [];
-
-      // Check if AVS is enabled to filter out 'avs' state
-      const avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
-
-      const set = new Set();
-      for (const o of outcomes) {
-        if (Array.isArray(o.availableStates)) {
-          for (const st of o.availableStates) {
-            const value = st?.value ?? st?.key;
-            if (typeof value === 'string') {
-              // Skip 'avs' if AVS is disabled
-              if (value === 'avs' && !avsEnabled) continue;
-              set.add(value);
-            }
-          }
-        }
-      }
-      return Array.from(set).map((v) => ({ value: v, ...this.visibilityConfig(v) }));
-    } catch {
-      return [];
-    }
+    return deriveBulkStatesFromOutcomes(this, outcomes);
   }
 
   _attachBulkOverrideHandlers() {
-    try {
-      if (!this.element) return;
-      const root = this.element.querySelector('.bulk-override-bar');
-      if (!root) return;
-      if (root.dataset.bound === 'true') return;
-      root.dataset.bound = 'true';
-      root.querySelectorAll('button[data-action="bulkOverrideSet"]').forEach((btn) => {
-        btn.addEventListener('click', (ev) => this._onBulkOverrideSet(ev));
-      });
-      const clearBtn = root.querySelector('button[data-action="bulkOverrideClear"]');
-      if (clearBtn) clearBtn.addEventListener('click', (ev) => this._onBulkOverrideClear(ev));
-    } catch { }
+    attachBulkOverrideHandlers(this);
   }
 
-  _onBulkOverrideSet(event) {
-    try {
-      const state = event.currentTarget?.dataset?.state;
-      if (!state || !Array.isArray(this.outcomes)) return;
-      for (const o of this.outcomes) {
-        const tokenId = this.getOutcomeTokenId(o);
-        if (!tokenId && !o._isWall) continue;
-        const oldState = o.oldVisibility ?? o.currentVisibility ?? null;
-        o.overrideState = state;
-
-        const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
-        const statesMatch = state === oldState;
-        o.hasActionableChange =
-          (oldState != null && state !== null && !statesMatch) ||
-          (statesMatch && isOldStateAvsControlled);
-
-        if (o.hasActionableChange) o.hasRevertableChange = true;
-      }
-      // Update UI to reflect new actionable states
-      this.markInitialSelections();
-      this.refreshRowActionButtons();
-      this.updateChangesCount();
-      this.updateBulkActionButtons();
-      // If filtering to show only changes, re-render so rows reflect new effective states
-      if (this.showOnlyChanges) this.render({ force: true });
-    } catch (e) {
-      console.warn('PF2E Visioner | Bulk override set failed', e);
-    }
+  _onBulkOverrideSet(event, button = null) {
+    setBulkOverrideState(this, event, button);
   }
 
   _onBulkOverrideClear() {
-    try {
-      if (!Array.isArray(this.outcomes)) return;
-      for (const o of this.outcomes) {
-        o.overrideState = null;
-        const effective = o.newVisibility;
-        const oldState = o.oldVisibility ?? o.currentVisibility ?? null;
-
-        const isOldStateAvsControlled = this.isOldStateAvsControlled(o);
-        const statesMatch = effective === oldState;
-        o.hasActionableChange =
-          (oldState != null && effective != null && !statesMatch) ||
-          (statesMatch && isOldStateAvsControlled);
-
-        if (!o.hasActionableChange) o.hasRevertableChange = false;
-      }
-      // Update UI to reflect recalculated actionable states
-      this.markInitialSelections();
-      this.refreshRowActionButtons();
-      this.updateChangesCount();
-      this.updateBulkActionButtons();
-      // If filtering to show only changes, re-render so rows reflect recalculated actionability
-      if (this.showOnlyChanges) this.render({ force: true });
-    } catch (e) {
-      console.warn('PF2E Visioner | Bulk override clear failed', e);
-    }
+    clearBulkOverrideState(this);
   }
 
   applyEncounterFilter(outcomes, tokenProperty, emptyNotice) {
@@ -484,11 +330,9 @@ export class BaseActionDialog extends BasePreviewDialog {
               : o,
       )
       : outcomes;
-    import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToApplied }) => {
-      try {
-        updateRowButtonsToApplied(this.element, normalized);
-      } catch { }
-    });
+    try {
+      updateRowButtonsToAppliedInDom(this.element, normalized);
+    } catch { }
   }
 
   updateRowButtonsToReverted(outcomes) {
@@ -504,61 +348,57 @@ export class BaseActionDialog extends BasePreviewDialog {
               : o,
       )
       : outcomes;
-    import('../services/ui/dialog-utils.js').then(({ updateRowButtonsToReverted }) => {
-      try {
-        updateRowButtonsToReverted(this.element, normalized);
-      } catch { }
-      try {
-        // After reverting, reset each row's selection to its initial calculated outcome
-        if (!Array.isArray(outcomes)) return;
-        for (const o of outcomes) {
-          const tokenId = o?.target?.id;
-          if (!tokenId) continue;
-          const row = this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
-          if (!row) continue;
-          const container = row.querySelector('.override-icons');
-          if (!container) continue;
-          // Clear current selection
-          container.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
-          // Prefer icon marked as calculated outcome; fallback to the hidden input's value
-          let selectedIcon = container.querySelector('.state-icon.calculated-outcome');
-          if (!selectedIcon) {
-            const hidden = container.querySelector('input[type="hidden"]');
-            if (hidden)
-              selectedIcon = container.querySelector(`.state-icon[data-state="${hidden.value}"]`);
-          }
-          if (selectedIcon) {
-            selectedIcon.classList.add('selected');
-            const state = selectedIcon.dataset.state;
-            const hidden = container.querySelector('input[type="hidden"]');
-            if (hidden) hidden.value = state;
-          }
-          // Clear any explicit override so selection reflects initial calculated state
-          try {
-            const outcome = this.outcomes?.find?.(
-              (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
-            );
-            if (outcome) outcome.overrideState = null;
-          } catch { }
+    try {
+      updateRowButtonsToRevertedInDom(this.element, normalized);
+    } catch { }
+    try {
+      // After reverting, reset each row's selection to its initial calculated outcome
+      if (!Array.isArray(outcomes)) return;
+      for (const o of outcomes) {
+        const tokenId = o?.target?.id;
+        if (!tokenId) continue;
+        const row = this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
+        if (!row) continue;
+        const container = row.querySelector('.override-icons');
+        if (!container) continue;
+        // Clear current selection
+        container.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
+        // Prefer icon marked as calculated outcome; fallback to the hidden input's value
+        let selectedIcon = container.querySelector('.state-icon.calculated-outcome');
+        if (!selectedIcon) {
+          const hidden = container.querySelector('input[type="hidden"]');
+          if (hidden)
+            selectedIcon = container.querySelector(`.state-icon[data-state="${hidden.value}"]`);
         }
-      } catch { }
-    });
+        if (selectedIcon) {
+          selectedIcon.classList.add('selected');
+          const state = selectedIcon.dataset.state;
+          const hidden = container.querySelector('input[type="hidden"]');
+          if (hidden) hidden.value = state;
+        }
+        // Clear any explicit override so selection reflects initial calculated state
+        try {
+          const outcome = this.outcomes?.find?.(
+            (x) => String(this.getOutcomeTokenId(x)) === String(tokenId),
+          );
+          if (outcome) outcome.overrideState = null;
+        } catch { }
+      }
+    } catch { }
   }
 
   updateBulkActionButtons() {
-    import('../services/ui/dialog-utils.js').then(({ updateBulkActionButtons }) => {
-      try {
-        updateBulkActionButtons(this.element, this.bulkActionState);
-      } catch { }
-    });
+    try {
+      updateBulkActionButtonsInDom(this.element, this.bulkActionState);
+    } catch { }
   }
 
   updateChangesCount() {
-    import('../services/ui/dialog-utils.js').then(({ updateChangesCount }) => {
-      try {
-        updateChangesCount(this.element, this.getChangesCounterClass());
-      } catch { }
-    });
+    try {
+      return updateChangesCountInDom(this.element, this.getChangesCounterClass());
+    } catch {
+      return 0;
+    }
   }
 
   // Default token id resolver for outcomes; subclasses can override
@@ -625,185 +465,21 @@ export class BaseActionDialog extends BasePreviewDialog {
 
   // Default per-row buttons rendering. Subclasses may override for custom layouts.
   updateActionButtonsForToken(tokenId, hasActionableChange, opts = {}) {
-    try {
-      // Support wall rows by allowing caller to pass row or using wallId
-      let row = opts.row || this.element?.querySelector?.(`tr[data-token-id="${tokenId}"]`);
-      if (!row && opts.wallId)
-        row = this.element?.querySelector?.(`tr[data-wall-id="${opts.wallId}"]`);
-      if (!row) return;
-
-      // Try common containers in priority order
-      let container = row.querySelector('td.actions');
-      if (!container) container = row.querySelector('.actions');
-      if (!container) container = row.querySelector('.row-actions');
-      if (!container) container = row.querySelector('.action-buttons');
-      if (!container) return;
-
-      if (hasActionableChange) {
-        const idAttr = opts.wallId ? `data-wall-id="${opts.wallId}"` : `data-token-id="${tokenId}"`;
-        const timerBtn =
-          opts.wallId || !tokenId
-            ? ''
-            : `
-          <button type="button" class="row-timer-toggle" data-token-id="${tokenId}" data-tooltip="${game.i18n.localize(
-              'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
-            )}">
-            <i class="fas fa-clock"></i>
-          </button>
-        `;
-        container.innerHTML = `${timerBtn}
-          <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
-            <i class="fas fa-check"></i>
-          </button>
-          <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
-            <i class="fas fa-undo"></i>
-          </button>
-        `;
-
-        if (!opts.wallId && tokenId) {
-          try {
-            this._attachRowTimerHandlers();
-            this._updateRowTimerButton(tokenId);
-          } catch { }
-        }
-      } else {
-        container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
-      }
-    } catch { }
+    updateActionButtonsForTokenInDom(this, tokenId, hasActionableChange, opts);
   }
 
   addIconClickHandlers() {
-    const stateIcons = this.element.querySelectorAll('.state-icon');
-    stateIcons.forEach((icon) => {
-      icon.addEventListener('click', (event) => {
-        // Only handle clicks within override selection container
-        const overrideIcons = event.currentTarget.closest('.override-icons');
-        if (!overrideIcons) return;
+    addIconClickHandlersToRows(this);
+  }
 
-        // Robustly resolve target id from data attributes or row
-        let targetId = event.currentTarget.dataset.target || event.currentTarget.dataset.tokenId;
-        const wallId =
-          overrideIcons?.dataset?.wallId ||
-          event.currentTarget.dataset.wallId ||
-          event.currentTarget.closest('tr')?.dataset?.wallId ||
-          null;
-        if (!targetId) {
-          const row = event.currentTarget.closest('tr[data-token-id]');
-          targetId = row?.dataset?.tokenId;
-        }
-        const newState = event.currentTarget.dataset.state;
-        overrideIcons
-          .querySelectorAll('.state-icon')
-          .forEach((i) => i.classList.remove('selected'));
-        event.currentTarget.classList.add('selected');
-        const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
-        if (hiddenInput) hiddenInput.value = newState;
-        let outcome = this.outcomes?.find?.(
-          (o) => String(this.getOutcomeTokenId(o)) === String(targetId),
-        );
-        if (!outcome && wallId) outcome = this.outcomes?.find?.((o) => o?.wallId === wallId);
-        if (outcome) {
-          outcome.overrideState = newState;
-          const oldState = outcome.oldVisibility ?? outcome.currentVisibility ?? null;
-
-          const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-          const statesMatch = newState === oldState;
-          const hasActionableChange =
-            (oldState != null && newState != null && !statesMatch) ||
-            (statesMatch && isOldStateAvsControlled);
-
-          // Persist actionable state on outcome so templates and bulk ops reflect immediately
-          outcome.hasActionableChange = hasActionableChange;
-          try {
-            this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
-              wallId,
-              row: event.currentTarget.closest('tr'),
-            });
-          } catch { }
-          // Direct DOM fallback to ensure row shows buttons immediately
-          try {
-            const rowEl = event.currentTarget.closest('tr');
-            if (rowEl) {
-              let container = rowEl.querySelector('td.actions') || rowEl.querySelector('.actions');
-              if (container) {
-                if (hasActionableChange) {
-                  const idAttr = wallId
-                    ? `data-wall-id="${wallId}"`
-                    : targetId
-                      ? `data-token-id="${targetId}"`
-                      : '';
-                  const timerBtn =
-                    wallId || !targetId
-                      ? ''
-                      : `
-                    <button type="button" class="row-timer-toggle" data-token-id="${targetId}" data-tooltip="${game.i18n.localize(
-                        'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW',
-                      )}">
-                      <i class="fas fa-clock"></i>
-                    </button>
-                  `;
-                  container.innerHTML = `
-                    ${timerBtn}
-                    <button type="button" class="row-action-btn apply-change" data-action="applyChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.APPLY_VISIBILITY_CHANGE')}">
-                      <i class="fas fa-check"></i>
-                    </button>
-                    <button type="button" class="row-action-btn revert-change" data-action="revertChange" ${idAttr} data-tooltip="${game.i18n.localize('PF2E_VISIONER.UI.REVERT_TO_ORIGINAL')}">
-                      <i class="fas fa-undo"></i>
-                    </button>
-                  `;
-                  if (!wallId && targetId) {
-                    try {
-                      this._attachRowTimerHandlers();
-                      this._updateRowTimerButton(targetId);
-                    } catch { }
-                  }
-                } else {
-                  container.innerHTML = `<span class="no-action">${game.i18n.localize('PF2E_VISIONER.UI.NO_CHANGE_LABEL')}</span>`;
-                }
-              }
-            }
-          } catch { }
-          try {
-            // Maintain a lightweight list of changed outcomes for convenience
-            this.changes = Array.isArray(this.outcomes)
-              ? this.outcomes.filter((o) => {
-                const baseOld = o.oldVisibility ?? o.currentVisibility ?? null;
-                const baseNew = o.overrideState ?? o.newVisibility ?? null;
-                return baseOld != null && baseNew != null && baseOld !== baseNew;
-              })
-              : [];
-          } catch { }
-        }
-        this.updateChangesCount();
-        // If "Show only changes" is active, re-render so filtering reflects override adjustments
-        try {
-          if (this.showOnlyChanges) this.render({ force: true });
-        } catch { }
-      });
-    });
+  _onStateIconClick(event) {
+    onStateIconClick(this, event);
   }
 
   // Refresh per-row Actions column to show Apply/Revert buttons only when the state changes from old
   refreshRowActionButtons() {
-    try {
-      if (!Array.isArray(this.outcomes)) return;
-      for (const o of this.outcomes) {
-        const tokenId = this.getOutcomeTokenId(o);
-        const wallId = o?._isWall ? o.wallId : null;
-        // Only attempt to update rows that exist in the current DOM
-        const rowSelector = wallId
-          ? `tr[data-wall-id="${String(wallId)}"]`
-          : tokenId
-            ? `tr[data-token-id="${String(tokenId)}"]`
-            : null;
-        if (!rowSelector) continue;
-        const row = this.element?.querySelector?.(rowSelector);
-        if (!row) continue;
-        this.updateActionButtonsForToken(tokenId || null, !!o.hasActionableChange, { wallId, row });
-      }
-    } catch { }
+    refreshRowActionButtonsInDom(this);
   }
-
   /**
    * Generic apply change handler that can be used by all action dialogs
    * @param {Event} event - Click event
@@ -811,205 +487,11 @@ export class BaseActionDialog extends BasePreviewDialog {
    * @param {Object} context - Dialog context with app instance and apply function
    */
   static async onApplyChange(event, target, context) {
-    const { app, applyFunction, actionType } = context;
-    if (!app) {
-      console.error(`[${actionType} Dialog] Could not find application instance`);
-      return;
-    }
-
-    const tokenId = target.dataset.tokenId;
-    const wallId = target.dataset.wallId;
-    let outcome = null;
-
-    if (wallId) {
-      outcome = app.outcomes.find((o) => o._isWall && o.wallId === wallId);
-    } else {
-      outcome = app.outcomes.find((o) => o.token?.id === tokenId || o.target?.id === tokenId);
-    }
-
-    if (!outcome) {
-      notify.warn(`${MODULE_TITLE}: No outcome found for this ${wallId ? 'wall' : 'token'}`);
-      return;
-    }
-
-    // Check if there's actually a change to apply
-    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-
-    // If AVS is selected, remove any existing override
-    if (effectiveNewState === 'avs') {
-      try {
-        const { default: AvsOverrideManager } = await import(
-          '../services/infra/AvsOverrideManager.js'
-        );
-        const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        const targetId = outcome.target?.id || outcome.token?.id || tokenId;
-        if (actorId && targetId) {
-          // Determine the correct direction based on the action semantics
-          const direction = app.getApplyDirection?.() || 'observer_to_target';
-          const observerId = direction === 'observer_to_target' ? actorId : targetId;
-          const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
-          await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
-          // Refresh UI to update override indicators
-          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-          await updateTokenVisuals();
-          const targetName = outcome.target?.name || outcome.token?.name || 'token';
-          notify.info(`${MODULE_TITLE}: Accepted AVS change for ${targetName}`);
-        }
-      } catch (e) {
-        console.warn('Failed to remove AVS override:', e);
-        const targetName = outcome.target?.name || outcome.token?.name || 'token';
-      }
-      app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
-      app.updateChangesCount();
-      return;
-    }
-
-    // Use AVS-aware logic: allow manual override of AVS-controlled states even if same value
-    const isOldStateAvsControlled =
-      typeof app.isOldStateAvsControlled === 'function'
-        ? app.isOldStateAvsControlled(outcome)
-        : false;
-    const statesMatch = effectiveNewState === outcome.oldVisibility;
-    const hasChange =
-      effectiveNewState !== outcome.oldVisibility || (statesMatch && isOldStateAvsControlled);
-
-    if (!hasChange) {
-      notify.warn(`${MODULE_TITLE}: No changes to apply for this ${wallId ? 'wall' : 'token'}`);
-      return;
-    }
-
-    try {
-      const actionData = {
-        ...app.actionData,
-        ignoreAllies: app.ignoreAllies,
-        encounterOnly: app.encounterOnly,
-      };
-
-      // Create overrides based on wall vs token
-      if (outcome._isWall && outcome.wallId) {
-        const overrides = {
-          __wall__: { [outcome.wallId]: effectiveNewState },
-        };
-        await applyFunction({ ...actionData, overrides }, target);
-        app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
-      } else {
-        // Check for row timer configuration
-        const rowTimerConfig = app.rowTimers?.get(tokenId);
-        let timedOverride = null;
-        if (rowTimerConfig) {
-          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
-          timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
-        }
-
-        // Apply visibility changes - this sets AVS pair overrides which will
-        // prevent future AVS calculations for this token pair until reverted
-        const overrides = { [tokenId]: { state: effectiveNewState, timedOverride } };
-        await applyFunction({ ...actionData, overrides }, target);
-
-        // Update the outcome to reflect the applied state
-        outcome.oldVisibility = effectiveNewState;
-        outcome.overrideState = null;
-        outcome.hasActionableChange = false;
-        outcome.hasRevertableChange = false;
-
-        // Clear row timer after applying
-        if (rowTimerConfig) {
-          app.rowTimers.delete(tokenId);
-          app._updateRowTimerButton?.(tokenId);
-        }
-
-        // Update the UI if method exists
-        if (app._updateOutcomeDisplayForToken) {
-          app._updateOutcomeDisplayForToken(tokenId, outcome);
-        }
-        if (app.updateRowButtonsToApplied) {
-          app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
-        }
-      }
-
-      // Clear sneak-active flag for sneak actions
-      if (actionType === 'Sneak' && app.sneakingToken) {
-        await app._clearSneakActiveFlag();
-      }
-
-      if (app.updateChangesCount) {
-        app.updateChangesCount();
-      }
-    } catch (error) {
-      console.error(`[${actionType} Dialog] Error applying change:`, error);
-      notify.error(`${MODULE_TITLE}: Failed to apply change - see console for details`);
-    }
+    return applyBaseActionChange(event, target, context);
   }
 
   static async onApplyChangeTimed(event, target, context) {
-    const { app, applyFunction, actionType } = context;
-    if (!app) {
-      console.error(`[${actionType} Dialog] Could not find application instance`);
-      return;
-    }
-
-    const tokenId = target.dataset.tokenId;
-    if (!tokenId) {
-      notify.warn(`${MODULE_TITLE}: No token found for timed apply`);
-      return;
-    }
-
-    const outcome = app.outcomes?.find?.(
-      (o) => o.token?.id === tokenId || o.target?.id === tokenId,
-    );
-    if (!outcome) {
-      notify.warn(`${MODULE_TITLE}: No outcome found for this token`);
-      return;
-    }
-
-    const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-    if (!effectiveNewState || effectiveNewState === 'avs') {
-      notify.warn(`${MODULE_TITLE}: Cannot apply timed override for AVS state`);
-      return;
-    }
-
-    const observer = app.actionData?.actor;
-    const targetToken = outcome.target || outcome.token;
-    if (!observer || !targetToken) {
-      notify.warn(`${MODULE_TITLE}: Missing observer or target`);
-      return;
-    }
-
-    try {
-      const { TimerDurationDialog } = await import('../../ui/TimerDurationDialog.js');
-      const timerConfig = await TimerDurationDialog.prompt();
-      if (!timerConfig) return;
-
-      const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
-      const success = await TimedOverrideManager.createTimedOverride(
-        observer,
-        targetToken,
-        effectiveNewState,
-        timerConfig,
-        { source: `${actionType.toLowerCase()}_action` },
-      );
-
-      if (success) {
-        outcome.oldVisibility = effectiveNewState;
-        outcome.overrideState = null;
-        outcome.hasActionableChange = false;
-        outcome.hasRevertableChange = false;
-
-        if (app.updateRowButtonsToApplied) {
-          app.updateRowButtonsToApplied([{ target: { id: tokenId } }]);
-        }
-        if (app.updateChangesCount) {
-          app.updateChangesCount();
-        }
-
-        notify.info(
-          `${MODULE_TITLE}: Applied timed visibility override for ${targetToken.name || 'token'}`,
-        );
-      }
-    } catch (error) {
-      console.error(`[${actionType} Dialog] Error applying timed change:`, error);
-      notify.error(`${MODULE_TITLE}: Failed to apply timed change - see console for details`);
-    }
+    return applyBaseActionTimedChange(event, target, context);
   }
 
   /**
@@ -1019,85 +501,7 @@ export class BaseActionDialog extends BasePreviewDialog {
    * @param {Object} context - Dialog context with app instance
    */
   static async onRevertChange(event, target, context) {
-    const { app, actionType } = context;
-    if (!app) {
-      console.error(`[${actionType} Dialog] Could not find application instance`);
-      return;
-    }
-
-    const tokenId = target.dataset.tokenId;
-    const wallId = target.dataset.wallId;
-    let outcome = null;
-
-    if (wallId) {
-      outcome = app.outcomes.find((o) => o._isWall && o.wallId === wallId);
-    } else {
-      outcome = app.outcomes.find((o) => o.token?.id === tokenId || o.target?.id === tokenId);
-    }
-
-    if (!outcome) {
-      notify.warn(`${MODULE_TITLE}: No outcome found for this ${wallId ? 'wall' : 'token'}`);
-      return;
-    }
-
-    // Check if there's actually a change to revert
-    const hasChange = outcome.oldVisibility !== outcome.newVisibility;
-    if (!hasChange) {
-      notify.warn(`${MODULE_TITLE}: No changes to revert for this ${wallId ? 'wall' : 'token'}`);
-      return;
-    }
-
-    try {
-      // Remove AVS override if one was created during apply
-      // This handles the case where user applied an override (even with same state as AVS calculated)
-      // We check if an override exists rather than checking state differences
-      if (!wallId) {
-        try {
-          const { default: AvsOverrideManager } = await import(
-            '../../services/infra/AvsOverrideManager.js'
-          );
-          const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-          const targetId = outcome.target?.id || outcome.token?.id || tokenId;
-
-          if (actorId && targetId) {
-            // Determine the correct direction based on the action semantics
-            const direction = app.getApplyDirection?.() || 'observer_to_target';
-            const observerId = direction === 'observer_to_target' ? actorId : targetId;
-            const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
-            const hasOverride = await AvsOverrideManager.getOverride(observerId, overrideTargetId);
-            if (hasOverride) {
-              await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
-              // Refresh UI to update override indicators
-              const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-              await updateTokenVisuals();
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to remove AVS override during revert:', e);
-        }
-      }
-
-      // Revert to original visibility
-      outcome.oldVisibility = outcome.currentVisibility; // Reset to original visibility
-      outcome.overrideState = null;
-      outcome.hasActionableChange = false;
-      outcome.hasRevertableChange = false;
-
-      // Update the UI if method exists
-      if (app._updateOutcomeDisplayForToken) {
-        app._updateOutcomeDisplayForToken(tokenId, outcome);
-      }
-      if (app.updateRowButtonsToReverted) {
-        app.updateRowButtonsToReverted([outcome]);
-      }
-
-      if (app.updateChangesCount) {
-        app.updateChangesCount();
-      }
-    } catch (error) {
-      console.error(`[${actionType} Dialog] Error reverting change:`, error);
-      notify.error(`${MODULE_TITLE}: Failed to revert change - see console for details`);
-    }
+    return revertBaseActionChange(event, target, context);
   }
 
   /**
@@ -1107,167 +511,7 @@ export class BaseActionDialog extends BasePreviewDialog {
    * @param {Object} context - Dialog context with app instance and apply function
    */
   static async onApplyAll(event, target, context) {
-    const { app, applyFunction, actionType } = context;
-    if (!app) {
-      console.error(`[${actionType} Dialog] Could not find application instance`);
-      return;
-    }
-
-    // Check if already applied
-    if (app.bulkActionState === 'applied') {
-      notify.warn(
-        `${MODULE_TITLE}: Apply All has already been used. Use Revert All to undo changes.`,
-      );
-      return;
-    }
-
-    // Prefer dialog-provided filtered outcomes (respects encounter/ally/visual filters)
-    let sourceOutcomes = [];
-    try {
-      if (typeof app.getFilteredOutcomes === 'function') {
-        sourceOutcomes = await app.getFilteredOutcomes();
-      } else {
-        sourceOutcomes = Array.isArray(app.outcomes) ? app.outcomes : [];
-      }
-    } catch {
-      sourceOutcomes = Array.isArray(app.outcomes) ? app.outcomes : [];
-    }
-
-    // Get all outcomes that have actionable changes
-    const outcomesWithChanges = sourceOutcomes.filter((o) => o.hasActionableChange);
-
-    if (outcomesWithChanges.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No changes to apply`);
-      return;
-    }
-
-    try {
-      // Create overrides object for all tokens with changes
-      // This sets AVS pair overrides which will prevent future AVS calculations
-      // for these token pairs until reverted
-      const overrides = {};
-      const avsRemovals = [];
-
-      // Import TimedOverrideManager once if needed
-      let TimedOverrideManager = null;
-      if (app.rowTimers?.size > 0) {
-        try {
-          const module = await import('../../services/TimedOverrideManager.js');
-          TimedOverrideManager = module.TimedOverrideManager;
-        } catch (e) {
-          console.error('PF2E Visioner | Failed to import TimedOverrideManager:', e);
-        }
-      }
-
-      for (const outcome of outcomesWithChanges) {
-        const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-        const tokenId = outcome.token?.id || outcome.target?.id;
-        if (tokenId) {
-          if (effectiveNewState === 'avs') {
-            // AVS selections - remove any existing overrides
-            const tokenName = outcome.token?.name || outcome.target?.name || 'token';
-            avsRemovals.push({ id: tokenId, name: tokenName });
-          } else {
-            // Check for row timer configuration
-            const rowTimerConfig = app.rowTimers?.get(tokenId);
-            if (rowTimerConfig && TimedOverrideManager) {
-              // Build the timed override data from the config
-              try {
-                const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
-                overrides[tokenId] = { state: effectiveNewState, timedOverride };
-              } catch (e) {
-                console.error('PF2E Visioner | Apply All: Failed to build timer:', e);
-                overrides[tokenId] = effectiveNewState;
-              }
-            } else {
-              overrides[tokenId] = effectiveNewState;
-            }
-          }
-        }
-      }
-
-      // Remove AVS overrides if any
-      if (avsRemovals.length > 0) {
-        try {
-          const { default: AvsOverrideManager } = await import(
-            '../services/infra/AvsOverrideManager.js'
-          );
-          const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-          if (actorId) {
-            // Determine the correct direction based on the action semantics
-            const direction = app.getApplyDirection?.() || 'observer_to_target';
-            for (const removal of avsRemovals) {
-              const targetId = removal.id;
-              const observerId = direction === 'observer_to_target' ? actorId : targetId;
-              const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
-              await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
-            }
-            // Refresh UI to update override indicators
-            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-            await updateTokenVisuals();
-            notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
-          }
-        } catch (e) {
-          console.warn('Failed to remove AVS overrides:', e);
-        }
-      }
-
-      // Apply overrides only if there are any
-      if (Object.keys(overrides).length > 0) {
-        const actionData = {
-          ...app.actionData,
-          ignoreAllies: app.ignoreAllies,
-          encounterOnly: app.encounterOnly,
-          overrides,
-        };
-
-        await applyFunction(actionData, target);
-
-        // Clear row timers after applying
-        outcomesWithChanges.forEach((outcome) => {
-          const tokenId = outcome.token?.id || outcome.target?.id;
-          if (tokenId && app.rowTimers?.has(tokenId)) {
-            app.rowTimers.delete(tokenId);
-            app._updateRowTimerButton?.(tokenId);
-          }
-        });
-      }
-
-      // Update all outcomes to reflect applied state
-      outcomesWithChanges.forEach((outcome) => {
-        const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-        outcome.oldVisibility = effectiveNewState;
-        outcome.overrideState = null;
-        outcome.hasActionableChange = false;
-        outcome.hasRevertableChange = false;
-      });
-
-      // Update bulk state
-      app.bulkActionState = 'applied';
-
-      // Update UI
-      if (app.updateRowButtonsToApplied) {
-        app.updateRowButtonsToApplied(outcomesWithChanges);
-      }
-      if (app.updateChangesCount) {
-        app.updateChangesCount();
-      }
-      if (app.updateBulkActionButtons) {
-        app.updateBulkActionButtons();
-      }
-
-      // Clear sneak-active flag for sneak actions
-      if (actionType === 'Sneak' && app.sneakingToken) {
-        await app._clearSneakActiveFlag();
-      }
-
-      notify.info(
-        `${MODULE_TITLE}: Applied ${actionType.toLowerCase()} results for ${outcomesWithChanges.length} tokens`,
-      );
-    } catch (error) {
-      console.error(`[${actionType} Dialog] Error applying all changes:`, error);
-      notify.error(`${MODULE_TITLE}: Failed to apply changes - see console for details`);
-    }
+    return applyAllBaseActionChanges(event, target, context);
   }
 
   /**
@@ -1277,94 +521,6 @@ export class BaseActionDialog extends BasePreviewDialog {
    * @param {Object} context - Dialog context with app instance
    */
   static async onRevertAll(event, target, context) {
-    const { app, actionType } = context;
-    if (!app) {
-      console.error(`[${actionType} Dialog] Could not find application instance`);
-      return;
-    }
-
-    // Check if there are changes to revert
-    if (app.bulkActionState !== 'applied') {
-      notify.warn(`${MODULE_TITLE}: No changes to revert. Apply changes first.`);
-      return;
-    }
-
-    try {
-      // Get all outcomes that were applied (where oldVisibility was changed from original)
-      const appliedOutcomes = app.outcomes.filter((o) => o.oldVisibility !== o.currentVisibility);
-
-      if (appliedOutcomes.length === 0) {
-        notify.warn(`${MODULE_TITLE}: No applied changes found to revert`);
-        return;
-      }
-
-      // Remove AVS overrides for all outcomes that have non-AVS states
-      const actorId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-      let removedOverrides = 0;
-
-      if (actorId) {
-        try {
-          const { default: AvsOverrideManager } = await import(
-            '../../services/infra/AvsOverrideManager.js'
-          );
-          // Determine the correct direction based on the action semantics
-          const direction = app.getApplyDirection?.() || 'observer_to_target';
-
-          for (const outcome of appliedOutcomes) {
-            const effectiveOldState = outcome.oldVisibility;
-            if (
-              effectiveOldState &&
-              effectiveOldState !== 'avs' &&
-              effectiveOldState !== outcome.currentVisibility
-            ) {
-              const targetId = outcome.target?.id || outcome.token?.id;
-              if (targetId) {
-                try {
-                  const observerId = direction === 'observer_to_target' ? actorId : targetId;
-                  const overrideTargetId = direction === 'observer_to_target' ? targetId : actorId;
-                  await AvsOverrideManager.removeOverride(observerId, overrideTargetId);
-                  removedOverrides++;
-                } catch (e) {
-                  console.warn(`Failed to remove AVS override for ${targetId}:`, e);
-                }
-              }
-            }
-          }
-
-          // Refresh UI to update override indicators if any were removed
-          if (removedOverrides > 0) {
-            const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-            await updateTokenVisuals();
-          }
-        } catch (e) {
-          console.warn('Failed to remove AVS overrides during revert all:', e);
-        }
-      }
-
-      // Revert all outcomes to their original state
-      appliedOutcomes.forEach((outcome) => {
-        outcome.oldVisibility = outcome.currentVisibility; // Reset to original visibility
-        outcome.overrideState = null;
-        outcome.hasActionableChange = false;
-        outcome.hasRevertableChange = false;
-      });
-
-      // Update bulk state
-      app.bulkActionState = 'initial';
-
-      // Update UI
-      if (app.updateRowButtonsToReverted) {
-        app.updateRowButtonsToReverted(appliedOutcomes);
-      }
-      if (app.updateChangesCount) {
-        app.updateChangesCount();
-      }
-      if (app.updateBulkActionButtons) {
-        app.updateBulkActionButtons();
-      }
-    } catch (error) {
-      console.error(`[${actionType} Dialog] Error reverting all changes:`, error);
-      notify.error(`${MODULE_TITLE}: Failed to revert changes - see console for details`);
-    }
+    return revertAllBaseActionChanges(event, target, context);
   }
 }

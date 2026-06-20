@@ -76,6 +76,7 @@
       "avs": "AVS",
       "observed": "Observed",
       "concealed": "Concealed",
+      "observed_concealed": "Observed + Concealed",
       "hidden": "Hidden",
       "undetected": "Undetected",
       "unnoticed": "Unnoticed"
@@ -553,6 +554,8 @@
       "RANGE_LIMIT_ACTIVE_CUSTOM": "Range limit active: Only showing targets within {distance} feet",
       "NO_TARGETS_IN_RANGE": "No valid targets within 30 feet range",
       "NO_TARGETS_IN_RANGE_CUSTOM": "No valid targets within {distance} feet range",
+      "INVISIBLE_CAP_LABEL": "Invisible",
+      "INVISIBLE_CAP_TOOLTIP": "Target is invisible. Visual Seek can find its location, but cannot make it observed; use a precise non-visual sense to observe it.",
       "SEARCH_EXPLORATION_ROLL": "Search Exploration: Secret Seek"
     },
     "SEEK_TEMPLATE_CONFIG": {
@@ -967,6 +970,22 @@
         "name": "Ignore Dead Tokens",
         "hint": "Dead tokens will not provide Auto-Cover"
       },
+      "PEEK_SLIT_ANGLE": {
+        "name": "Peek Slit Angle (°)",
+        "hint": "Width of the peek vision cone in degrees."
+      },
+      "PEEK_SWEEP_ANGLE": {
+        "name": "Peek Sweep Angle (°)",
+        "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
+      },
+      "PEEK_RANGE": {
+        "name": "Peek Range (ft)",
+        "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
+      },
+      "CORNER_PEEK_ENABLED": {
+        "name": "Enable Corner Peeking",
+        "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
+      },
       "AUTO_COVER_IGNORE_SMALLER_TOKENS": {
         "name": "Ignore Smaller Tokens",
         "hint": "Tokens smaller than the attacker will not provide Auto-Cover"
@@ -1299,6 +1318,10 @@
         "name": "Hold for Cover Visualization",
         "hint": "Hold this key while hovering over tokens to visualize cover fields. Shows optimal positioning for attacks."
       },
+      "HOLD_PEEK": {
+        "name": "Toggle Peek (Corner)",
+        "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
+      },
       "SHOW_WALL_COVER_LABELS": {
         "name": "Show Wall Cover Labels",
         "hint": "Hold this key while the walls tool is active to show cover status labels on walls (AUTO, NONE, LESSER, STANDARD, GREATER)."
@@ -1458,6 +1481,13 @@
     "SNEAK_ADEPT_FEAT": {
       "OUTCOME_UPGRADED": "Sneak Adept",
       "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
+    },
+    "PEEK": {
+      "CHECK_LABEL": "Peek Through Door",
+      "DC_FIELD_LABEL": "Peek DC",
+      "ALLOW_FIELD_LABEL": "Allow Peeking",
+      "NOT_ALLOWED": "Peeking is not allowed through this door.",
+      "TOO_FAR": "You are too far from the door to peek through it."
     }
   }
 }

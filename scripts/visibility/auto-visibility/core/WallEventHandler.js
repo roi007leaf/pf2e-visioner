@@ -5,16 +5,28 @@
  * Follows SOLID principles by depending on abstractions rather than concrete implementations.
  */
 
-import { VisionAnalyzer } from '../VisionAnalyzer.js';
+import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
+import { wallCreated, wallDeleted, wallUpdated } from './InvalidationIntents.js';
 
 export class WallEventHandler {
-    constructor(systemStateProvider, visibilityStateManager, cacheManager = null, batchOrchestrator = null) {
+    constructor(
+        systemStateProvider,
+        visibilityStateManager,
+        cacheManager = null,
+        batchOrchestrator = null,
+        invalidationCoordinator = null,
+    ) {
         this.systemState = systemStateProvider;
         this.visibilityState = visibilityStateManager;
         this.cacheManager = cacheManager;
         this.batchOrchestrator = batchOrchestrator;
+        this.invalidation = invalidationCoordinator ?? new AvsInvalidationCoordinator({
+            systemStateProvider,
+            visibilityStateManager,
+            cacheManager,
+            batchOrchestrator,
+        });
         this.visualUpdateTimeout = null;
-        this.visionAnalyzer = VisionAnalyzer.getInstance();
     }
 
     /**
@@ -24,36 +36,6 @@ export class WallEventHandler {
         Hooks.on('updateWall', this.handleWallUpdate.bind(this));
         Hooks.on('createWall', this.handleWallCreate.bind(this));
         Hooks.on('deleteWall', this.handleWallDelete.bind(this));
-    }
-
-    /**
-     * Check if a wall change affects line of sight calculations
-     * @param {Object} changeData - The change data from the update
-     * @returns {boolean} Whether this change affects line of sight
-     */
-    #affectsLineOfSight(changeData) {
-        if (!changeData) return true; // Safe default - assume it affects LOS
-
-        // Check for geometry changes that affect line of sight
-        const geometryFields = [
-            'c',                             // Wall coordinates [x1, y1, x2, y2]
-            'ds',                            // Door state (open/closed/locked)
-            'door',                          // Door type (affects LOS when open)
-            'sense',                         // Wall sense restrictions
-            'dir',                           // Wall direction restrictions
-            'sight',                         // Sight restriction
-            'sound',                         // Sound restriction (affects some LOS calculations)
-            'threshold',                     // Proximity/reverse proximity thresholds
-            'threshold.sight',               // Vision proximity threshold
-            'threshold.sound',               // Sound proximity threshold
-            'threshold.attenuation'          // Vision/light proximity attenuation
-        ];
-
-        const affectedFields = geometryFields.filter(field =>
-            foundry.utils.hasProperty(changeData, field)
-        );
-
-        return affectedFields.length > 0;
     }
 
     /**
@@ -105,28 +87,9 @@ export class WallEventHandler {
     handleWallUpdate(document, changeData, options, userId) {
         if (!this.systemState.shouldProcessEvents()) return;
 
-        const affectsLOS = this.#affectsLineOfSight(changeData);
         const affectsVisuals = this.#affectsHiddenWallVisuals(changeData);
 
-        // Only clear caches if the change actually affects line of sight
-        if (affectsLOS) {
-            if (this.cacheManager?.clearLosCache) {
-                this.cacheManager.clearLosCache();
-            }
-            // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
-            if (this.visionAnalyzer?.clearCache) {
-                this.visionAnalyzer.clearCache();
-            }
-            // Clear global visibility cache to invalidate stale visibility states
-            if (this.cacheManager?.clearGlobalVisibilityCache) {
-                this.cacheManager.clearGlobalVisibilityCache();
-            }
-            // Clear burst LOS memo to force fresh calculations
-            if (this.batchOrchestrator?.clearBurstLosMemo) {
-                this.batchOrchestrator.clearBurstLosMemo();
-            }
-            this.visibilityState.markAllTokensChangedImmediate();
-        }
+        this.invalidation.invalidate(wallUpdated(document, changeData, { options, userId }));
 
         // Update wall visuals if visual properties changed
         if (affectsVisuals) {
@@ -137,26 +100,10 @@ export class WallEventHandler {
     /**
      * Handle wall creation - affects line of sight for all tokens
      */
-    handleWallCreate() {
+    handleWallCreate(document, options, userId) {
         if (!this.systemState.shouldProcessEvents()) return;
 
-        // New walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearLosCache) {
-            this.cacheManager.clearLosCache();
-        }
-        // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
-        if (this.visionAnalyzer?.clearCache) {
-            this.visionAnalyzer.clearCache();
-        }
-        // Clear global visibility cache to invalidate stale visibility states
-        if (this.cacheManager?.clearGlobalVisibilityCache) {
-            this.cacheManager.clearGlobalVisibilityCache();
-        }
-        // Clear burst LOS memo to force fresh calculations
-        if (this.batchOrchestrator?.clearBurstLosMemo) {
-            this.batchOrchestrator.clearBurstLosMemo();
-        }
-        this.visibilityState.markAllTokensChangedImmediate();
+        this.invalidation.invalidate(wallCreated(document, { options, userId }));
 
         // New walls might be hidden walls, so update visuals
         this.#scheduleWallVisualUpdate();
@@ -165,26 +112,10 @@ export class WallEventHandler {
     /**
      * Handle wall deletion - affects line of sight for all tokens
      */
-    handleWallDelete(document) {
+    handleWallDelete(document, options, userId) {
         if (!this.systemState.shouldProcessEvents()) return;
 
-        // Deleted walls always affect LOS, so clear caches
-        if (this.cacheManager?.clearLosCache) {
-            this.cacheManager.clearLosCache();
-        }
-        // Clear VisionAnalyzer cache for all tokens since wall changes affect everyone
-        if (this.visionAnalyzer?.clearCache) {
-            this.visionAnalyzer.clearCache();
-        }
-        // Clear global visibility cache to invalidate stale visibility states
-        if (this.cacheManager?.clearGlobalVisibilityCache) {
-            this.cacheManager.clearGlobalVisibilityCache();
-        }
-        // Clear burst LOS memo to force fresh calculations
-        if (this.batchOrchestrator?.clearBurstLosMemo) {
-            this.batchOrchestrator.clearBurstLosMemo();
-        }
-        this.visibilityState.markAllTokensChangedImmediate();
+        this.invalidation.invalidate(wallDeleted(document, { options, userId }));
 
         // Clean up any hidden wall graphics for the deleted wall
         this.#cleanupDeletedWallVisuals(document);

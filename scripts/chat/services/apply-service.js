@@ -27,6 +27,19 @@ function resolveSneakingToken(handler, actionData) {
   return null;
 }
 
+export function getDirectSneakOutcomesToApply(allOutcomes, actionData = {}) {
+  let outcomesToApply = (allOutcomes || []).filter((outcome) => !!outcome?.changed);
+
+  if (actionData.overrides && Object.keys(actionData.overrides).length > 0) {
+    const overrideTokenIds = Object.keys(actionData.overrides).filter((key) => key !== '__wall__');
+    outcomesToApply = outcomesToApply.filter((outcome) =>
+      overrideTokenIds.includes(outcome.token?.id),
+    );
+  }
+
+  return outcomesToApply;
+}
+
 export async function applyNowSeek(actionData, button) {
   const handler = new SeekActionHandler();
   return handler.apply(actionData, button);
@@ -55,13 +68,7 @@ export async function applyNowSneak(actionData, button) {
     } catch { }
 
     if (allOutcomes.length > 0) {
-      let outcomesToApply = allOutcomes;
-      if (actionData.overrides && Object.keys(actionData.overrides).length > 0) {
-        const overrideTokenIds = Object.keys(actionData.overrides).filter(key => key !== '__wall__');
-        outcomesToApply = allOutcomes.filter(outcome =>
-          overrideTokenIds.includes(outcome.token?.id)
-        );
-      }
+      const outcomesToApply = getDirectSneakOutcomesToApply(allOutcomes, actionData);
 
       if (outcomesToApply.length > 0) {
         const sneakResults = outcomesToApply.map(outcome => ({
@@ -90,7 +97,7 @@ export async function applyNowSneak(actionData, button) {
     console.error('PF2E Visioner | Error in applyNowSneak:', error);
   }
 
-  await cleanupSneakState(actionData);
+  if (appliedCount > 0) await cleanupSneakState(actionData);
   return appliedCount;
 }
 

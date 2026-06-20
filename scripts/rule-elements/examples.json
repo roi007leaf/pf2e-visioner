@@ -132,11 +132,13 @@
         "key": "PF2eVisionerEffect",
         "operations": [
           {
-            "type": "overrideVisibility",
-            "fromStates": ["concealed"],
-            "toState": "observed",
-            "direction": "to",
-            "observers": "all",
+            "type": "modifyActionQualification",
+            "qualifications": {
+              "seek": {
+                "ignoreConcealment": true,
+                "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.THOUSAND_VISIONS_ACTIVE"
+              }
+            },
             "range": 30,
             "source": "thousand-visions"
           },
@@ -162,16 +164,6 @@
       {
         "key": "PF2eVisionerEffect",
         "operations": [
-          {
-            "type": "modifyActionQualification",
-            "qualifications": {
-              "attack": {
-                "ignoreThisConcealment": true,
-                "customMessage": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.MESSAGES.BLIND_FIGHT_ACTIVE"
-              }
-            },
-            "source": "blind-fight-concealment"
-          },
           {
             "type": "offGuardSuppression",
             "suppressedStates": ["hidden"],

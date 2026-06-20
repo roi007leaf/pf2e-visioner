@@ -156,7 +156,7 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             expect(result).toBe(false);
         });
 
-        test('should trust agreeing vision polygon and geometry when point visibility is false', () => {
+        test('should trust Foundry point visibility when LOS polygon includes the target', () => {
             global.canvas.walls.placeables = [];
             global.canvas.visibility = { testVisibility: jest.fn(() => false) };
             mockObserver.vision = {
@@ -169,8 +169,8 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
 
             expect(mockObserver.vision.los.intersectCircle).toHaveBeenCalled();
-            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
-            expect(result).toBe(true);
+            expect(global.canvas.visibility.testVisibility).toHaveBeenCalled();
+            expect(result).toBe(false);
         });
 
         test('should call Foundry canvas visibility with individual points when polygon is unavailable', () => {
@@ -217,6 +217,81 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
         });
     });
 
+    describe('hasLineOfSight - Positioned movement proxy', () => {
+        test('positioned token proxy hides the live vision polygon and flags itself', () => {
+            const { createPositionedTokenProxy } = require('../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
+            mockObserver.vision = {
+                los: {
+                    points: [0, 0, 500, 0, 500, 500, 0, 500],
+                    intersectCircle: jest.fn(() => ({ points: [{ x: 300, y: 300 }] })),
+                },
+            };
+
+            const proxy = createPositionedTokenProxy(mockObserver, { x: 1000, y: 1000 });
+
+            expect(proxy.vision).toBeUndefined();
+            expect(proxy.isPendingMovementPositionProxy).toBe(true);
+            expect(proxy.center).toEqual({ x: 1025, y: 1025, elevation: 0 });
+        });
+
+        test('hasLineOfSight uses positioned proxy coordinates, not the live vision polygon', () => {
+            const { createPositionedTokenProxy } = require('../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
+            mockObserver.vision = {
+                los: {
+                    points: [0, 0, 500, 0, 500, 500, 0, 500],
+                    intersectCircle: jest.fn(() => ({ points: [{ x: 300, y: 300 }] })),
+                },
+            };
+            global.canvas.visibility = { testVisibility: jest.fn(() => true) };
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [600, 0, 600, 1500],
+                        door: 0,
+                        ds: 0,
+                    },
+                },
+            ];
+
+            const proxy = createPositionedTokenProxy(mockObserver, { x: 1000, y: 1000 });
+
+            expect(visionAnalyzer.hasLineOfSight(proxy, mockTarget)).toBe(false);
+            expect(mockObserver.vision.los.intersectCircle).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('positioned movement proxy distance', () => {
+        test('repositioned proxy exposes positioned mechanical bounds to native distanceTo', () => {
+            const { createPositionedTokenProxy } = require('../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
+            global.canvas.scene = { grid: { distance: 5 } };
+            mockObserver.mechanicalBounds = { x: 75, y: 75, width: 50, height: 50 };
+            mockObserver.bounds = { x: 75, y: 75, width: 50, height: 50 };
+            mockObserver.distanceTo = jest.fn(function () {
+                return this.mechanicalBounds.x;
+            });
+
+            const proxy = createPositionedTokenProxy(mockObserver, { x: 575, y: 175 });
+
+            expect(proxy.distanceTo(mockTarget)).toBe(575);
+            expect(proxy.bounds).toMatchObject({ x: 575, y: 175, width: 50, height: 50 });
+            expect(mockObserver.distanceTo).toHaveBeenCalled();
+        });
+
+        test('proxy at the document position keeps native distanceTo result', () => {
+            const { createPositionedTokenProxy } = require('../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
+            global.canvas.scene = { grid: { distance: 5 } };
+            mockObserver.distanceTo = jest.fn(() => 30);
+
+            const proxy = createPositionedTokenProxy(mockObserver, { x: 75, y: 75 });
+
+            expect(proxy.distanceTo(mockTarget)).toBe(30);
+            expect(mockObserver.distanceTo).toHaveBeenCalled();
+        });
+    });
+
     describe('hasLineOfSight - Blocking Walls', () => {
         test('should return false when sight-blocking wall intersects ray', () => {
             // Vertical wall at x=200, between observer (100,100) and target (300,300)
@@ -247,6 +322,26 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
                         sight: CONST.WALL_SENSE_TYPES.NORMAL,
                         sound: CONST.WALL_SENSE_TYPES.NONE,
                         c: [0, 200, 400, 200],
+                        door: 0,
+                        ds: 0
+                    }
+                }
+            ];
+
+            const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+
+            expect(result).toBe(false);
+        });
+
+        test('should not use token edge samples when core visibility point is blocked', () => {
+            mockTarget.document.getVisibilityTestPoints = jest.fn(() => [mockTarget.center]);
+            global.canvas.walls.placeables = [
+                {
+                    document: {
+                        move: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sight: CONST.WALL_SENSE_TYPES.NORMAL,
+                        sound: CONST.WALL_SENSE_TYPES.NONE,
+                        c: [200, 190, 200, 210],
                         door: 0,
                         ds: 0
                     }
@@ -524,7 +619,9 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
             });
             global.canvas.walls.placeables = [];
 
+            const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => { });
             const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
+            warnSpy.mockRestore();
 
             expect(get3DCollisionDetails).toHaveBeenCalledWith(mockObserver, mockTarget, 'sight');
             expect(result).toBe(true);

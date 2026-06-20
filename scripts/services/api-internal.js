@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { cleanupCoverEffectsForObserver } from '../cover/ephemeral.js';
+import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import {
     batchUpdateVisibilityEffects,
     cleanupEphemeralEffectsForTarget,
@@ -131,6 +132,6 @@ export async function rebuildAndRefresh() {
     refreshEveryonesPerception();
   } catch (_) {}
   try {
-    canvas.perception.update({ refreshVision: true });
+    scheduleCanvasPerceptionUpdate({ refreshVision: true });
   } catch (_) {}
 }

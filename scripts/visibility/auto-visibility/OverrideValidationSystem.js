@@ -5,16 +5,42 @@
  */
 
 import { VisibilityCalculator } from './VisibilityCalculator.js';
+import { normalizePerceptionProfile } from '../perception-profile.js';
 import { FeatsHandler } from '../../chat/services/FeatsHandler.js';
+import { getLastMovedTokenId } from '../../services/runtime-state.js';
 
 const STEALTH_OVERRIDE_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 
+function profileToDisplayState(profile = {}) {
+  if (profile.detectionState === 'observed' && profile.hasConcealment) return 'concealed';
+  if (profile.detectionState === 'undetected' && profile.awarenessState === 'unnoticed') {
+    return 'unnoticed';
+  }
+  return profile.detectionState || 'observed';
+}
+
+function normalizeOverrideForValidation(override = {}) {
+  const normalized = normalizePerceptionProfile(override);
+  return {
+    ...normalized,
+    ...override,
+    detectionState: normalized.detectionState,
+    coverState: normalized.coverState,
+    detectionSense: normalized.detectionSense,
+    awarenessState: normalized.awarenessState,
+    hasConcealment:
+      typeof override.hasConcealment === 'boolean'
+        ? override.hasConcealment
+        : normalized.hasConcealment,
+    state: override.state ?? profileToDisplayState(normalized),
+  };
+}
+
 function targetIgnoresStealthPositionValidation(target, override = {}) {
   const source = override.source || 'manual_action';
-  if (!['manual_action', 'sneak_action', 'hide_action'].includes(source)) return false;
+  if (!['sneak_action', 'hide_action'].includes(source)) return false;
   if (!STEALTH_OVERRIDE_STATES.has(override.state)) return false;
   if (FeatsHandler.hasFeat(target, 'legendary-sneak')) return true;
-
   return false;
 }
 
@@ -184,10 +210,10 @@ export class OverrideValidationSystem {
           override: {
             observer: canvas.tokens?.get(observerId),
             target: token,
-            state: flagData.state,
             source: flagData.source,
             hasCover: flagData.hasCover,
             hasConcealment: flagData.hasConcealment,
+            ...normalizeOverrideForValidation(flagData),
             expectedCover: flagData.expectedCover,
             coverOnly: flagData.coverOnly,
             coverOverrideSource: flagData.coverOverrideSource,
@@ -195,17 +221,16 @@ export class OverrideValidationSystem {
             observerId,
             targetId,
             observerName: flagData.observerName,
-            targetName: flagData.targetName || token.name
+            targetName: flagData.targetName || token.name,
           },
           observerId,
           targetId,
           type: 'flag',
           flagKey,
-          token: token
+          token: token,
         });
       }
     }
-
 
     // Check each override for validity and collect invalid ones
     const invalidOverrides = [];
@@ -216,10 +241,14 @@ export class OverrideValidationSystem {
       if (shouldRemove) {
         // Attach current visibility/cover to the override for dialog rendering
         try {
-          if (shouldRemove.currentVisibility) override.currentVisibility = shouldRemove.currentVisibility;
+          if (shouldRemove.currentVisibility)
+            override.currentVisibility = shouldRemove.currentVisibility;
           if (shouldRemove.currentCover) override.currentCover = shouldRemove.currentCover;
-          if (shouldRemove.coverChangeSource) override.coverChangeSource = shouldRemove.coverChangeSource;
-        } catch { /* ignore */ }
+          if (shouldRemove.coverChangeSource)
+            override.coverChangeSource = shouldRemove.coverChangeSource;
+        } catch {
+          /* ignore */
+        }
         invalidOverrides.push({
           observerId,
           targetId,
@@ -227,11 +256,10 @@ export class OverrideValidationSystem {
           reason: shouldRemove.reason,
           type,
           flagKey,
-          token
+          token,
         });
       }
     }
-
 
     // If we found invalid overrides, show the validation dialog
     if (invalidOverrides.length > 0) {
@@ -242,7 +270,7 @@ export class OverrideValidationSystem {
   /**
    * Check if an override is still valid based on current visibility/cover state
    * @param {string} observerId - Observer token ID
-   * @param {string} targetId - Target token ID  
+   * @param {string} targetId - Target token ID
    * @param {Object} override - Override object with hasCover/hasConcealment flags
    * @returns {Promise<{shouldRemove: boolean, reason: string}|null>}
    */
@@ -253,7 +281,6 @@ export class OverrideValidationSystem {
     if (!observer || !target) return null;
 
     try {
-
       // Calculate current visibility and cover using the auto-visibility system
       const visibility = await this.#visibilityCalculator.calculateVisibility(observer, target);
 
@@ -265,15 +292,17 @@ export class OverrideValidationSystem {
             shouldRemove: true,
             reason: 'validation requested after movement (insufficient data)',
             currentVisibility: null,
-            currentCover: null
+            currentCover: null,
           };
         }
         return null;
       }
 
       const currentlyHasCover = visibility.cover !== 'none';
-      const currentlyConcealed = visibility.visibility === 'concealed' || visibility.visibility === 'hidden';
-      const currentlyVisible = visibility.visibility === 'observed' || visibility.visibility === 'concealed';
+      const currentlyConcealed =
+        visibility.visibility === 'concealed' || visibility.visibility === 'hidden';
+      const currentlyVisible =
+        visibility.visibility === 'observed' || visibility.visibility === 'concealed';
       const ignoresStealthPositionValidation = targetIgnoresStealthPositionValidation(
         target,
         override,
@@ -356,7 +385,7 @@ export class OverrideValidationSystem {
         shouldValidateObscuredVisibility &&
         STEALTH_OVERRIDE_STATES.has(override.state)
       ) {
-        // If target is now clearly observed (in bright light with no concealment), 
+        // If target is now clearly observed (in bright light with no concealment),
         // "undetected" may be too strong
         if (visibility.visibility === 'observed' && !currentlyHasCover && !currentlyConcealed) {
           // Only flag if the observer has normal vision capabilities
@@ -383,7 +412,11 @@ export class OverrideValidationSystem {
         }
 
         // Additional check for sneak actions: if moved from concealing terrain to open bright light
-        if (override.source === 'sneak_action' && visibility.lighting === 'bright' && !currentlyHasCover) {
+        if (
+          override.source === 'sneak_action' &&
+          visibility.lighting === 'bright' &&
+          !currentlyHasCover
+        ) {
           reasons.push('stealth broken: moved to bright open area');
         }
       }
@@ -394,7 +427,7 @@ export class OverrideValidationSystem {
           reason: reasons.join(' and '),
           currentVisibility: visibility?.visibility || null,
           currentCover: visibility?.cover || null,
-          coverChangeSource: hasAutoCalculatedCoverChange ? 'auto' : undefined
+          coverChangeSource: hasAutoCalculatedCoverChange ? 'auto' : undefined,
         };
       }
 
@@ -423,7 +456,7 @@ export class OverrideValidationSystem {
         targetId,
         observerName: observer?.document?.name || 'Unknown',
         targetName: target?.document?.name || 'Unknown',
-        state: override.state || 'undetected',
+        ...normalizeOverrideForValidation(override),
         source: override.source || 'unknown',
         reason,
         hasCover: override.hasCover || false,
@@ -436,7 +469,7 @@ export class OverrideValidationSystem {
         currentVisibility: override.currentVisibility || null,
         currentCover: override.currentCover || null,
         coverChangeSource: override.coverChangeSource,
-        isManual: override.source === 'manual_action'
+        isManual: override.source === 'manual_action',
       };
     });
 
@@ -449,12 +482,16 @@ export class OverrideValidationSystem {
       let movedTokenId = null;
       let movedTokenName = 'Token Movement';
       try {
-        movedTokenId = globalThis?.game?.pf2eVisioner?.lastMovedTokenId || null;
+        movedTokenId = getLastMovedTokenId();
         if (movedTokenId) {
           movedTokenName = canvas.tokens?.get(movedTokenId)?.document?.name || movedTokenName;
         }
-      } catch { }
-      const result = await OverrideValidationDialog.show(overrideData, movedTokenName, movedTokenId);
+      } catch {}
+      const result = await OverrideValidationDialog.show(
+        overrideData,
+        movedTokenName,
+        movedTokenId,
+      );
 
       // Handle the user's choice
       if (result) {
@@ -462,19 +499,28 @@ export class OverrideValidationSystem {
           case 'clear-all':
             // Remove all overrides
             {
-              const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
+              const { default: AvsOverrideManager } = await import(
+                '../../chat/services/infra/AvsOverrideManager.js'
+              );
               for (const { observerId, targetId, override } of invalidOverrides) {
                 await removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override);
               }
             }
-            ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_PLURAL', { count: invalidOverrides.length, plural: invalidOverrides.length > 1 ? 's' : '' }));
+            ui.notifications.info(
+              game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_PLURAL', {
+                count: invalidOverrides.length,
+                plural: invalidOverrides.length > 1 ? 's' : '',
+              }),
+            );
             break;
 
           case 'clear-manual': {
             // Remove only manual overrides
             let clearedCount = 0;
             {
-              const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
+              const { default: AvsOverrideManager } = await import(
+                '../../chat/services/infra/AvsOverrideManager.js'
+              );
               for (const { observerId, targetId, override } of invalidOverrides) {
                 if (override.source === 'manual_action') {
                   await removeAcceptedOverride(AvsOverrideManager, observerId, targetId, override);
@@ -483,7 +529,12 @@ export class OverrideValidationSystem {
               }
             }
             if (clearedCount > 0) {
-              ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_CLEARED_PLURAL', { count: clearedCount, plural: clearedCount > 1 ? 's' : '' }));
+              ui.notifications.info(
+                game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_CLEARED_PLURAL', {
+                  count: clearedCount,
+                  plural: clearedCount > 1 ? 's' : '',
+                }),
+              );
             }
             break;
           }
@@ -510,12 +561,14 @@ export class OverrideValidationSystem {
           content: `<p>The visibility override <strong>${observer.document.name} → ${target.document.name}</strong> may no longer be valid.</p><p><strong>Reason:</strong> ${first.reason}</p><p>Would you like to remove this override?</p>`,
           yes: () => true,
           no: () => false,
-          defaultYes: true
+          defaultYes: true,
         });
 
         if (result) {
           {
-            const { default: AvsOverrideManager } = await import('../../chat/services/infra/AvsOverrideManager.js');
+            const { default: AvsOverrideManager } = await import(
+              '../../chat/services/infra/AvsOverrideManager.js'
+            );
             await removeAcceptedOverride(
               AvsOverrideManager,
               first.observerId,

@@ -3,23 +3,20 @@
  * Shows consequences of attack rolls from hidden/undetected tokens with GM override capability
  */
 
-import { MODULE_ID, MODULE_TITLE } from '../../constants.js';
-import { getDesiredOverrideStatesForAction } from '../services/data/action-state-config.js';
-import { getVisibilityStateConfig } from '../services/data/visibility-states.js';
-import { notify } from '../services/infra/notifications.js';
-import { filterOutcomesByEncounter } from '../services/infra/shared-utils.js';
+import { MODULE_ID } from '../../constants.js';
 import { BaseActionDialog } from './base-action-dialog.js';
+import {
+  prepareConsequencesDialogContext,
+} from './Consequences/consequences-dialog-context.js';
+import {
+  applyAllConsequencesChanges,
+  applyConsequencesChange,
+  revertAllConsequencesChanges,
+  revertConsequencesChange,
+} from './Consequences/consequences-dialog-actions.js';
 
 // Store reference to current consequences dialog
 let currentConsequencesDialog = null;
-
-function getDefaultConsequencesVisibility() {
-  try {
-    return game.settings.get(MODULE_ID, 'autoVisibilityEnabled') === true ? 'avs' : 'observed';
-  } catch {
-    return 'observed';
-  }
-}
 
 export class ConsequencesPreviewDialog extends BaseActionDialog {
   constructor(attackingToken, outcomes, changes, attackData, options = {}) {
@@ -90,160 +87,7 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-
-    // Filter outcomes with base helper
-    let processedOutcomes = this.applyEncounterFilter(
-      this.outcomes,
-      'target',
-      'No encounter targets found, showing all',
-    );
-
-    // Apply ignore-allies filtering for display (walls are not part of consequences)
-    try {
-      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      processedOutcomes = filterOutcomesByAllies(
-        processedOutcomes,
-        this.attackingToken,
-        this.ignoreAllies,
-        'target',
-      );
-    } catch { }
-
-    // Apply viewport filtering if enabled
-    if (this.filterByDetection && this.attackingToken) {
-      try {
-        const { filterOutcomesByDetection } = await import('../services/infra/shared-utils.js');
-        // Await the async filter to avoid turning processedOutcomes into a Promise
-        processedOutcomes = await filterOutcomesByDetection(
-          processedOutcomes,
-          this.attackingToken,
-          'target',
-          false,
-          true,
-          'observer_to_target',
-        );
-      } catch {
-        /* LOS filtering is non-critical */
-      }
-    }
-
-    // Apply defeated token filtering (exclude dead/unconscious tokens)
-    try {
-      const { filterOutcomesByDefeated } = await import('../services/infra/shared-utils.js');
-      processedOutcomes = filterOutcomesByDefeated(processedOutcomes, 'target');
-    } catch {
-      /* Defeated filtering is non-critical */
-    }
-
-    // Prepare outcomes with additional UI data (and normalize shape)
-    processedOutcomes = processedOutcomes.map((outcome) => {
-      const effectiveNewState =
-        outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
-      const baseOldState = outcome.currentVisibility;
-      // Use the centralized logic that handles AVS cases
-      const hasActionableChange = this.calculateHasActionableChange({
-        ...outcome,
-        newVisibility: effectiveNewState,
-        currentVisibility: baseOldState,
-        overrideState: outcome.overrideState,
-      });
-
-      // Build override icon states for the row
-      const desired = getDesiredOverrideStatesForAction('consequences');
-      const availableStates = this.buildOverrideStates(
-        desired,
-        { ...outcome, newVisibility: effectiveNewState },
-        { selectFrom: 'overrideState', calcFrom: 'newVisibility' },
-      );
-      // Check if the old visibility state is AVS-controlled
-      const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-
-      return {
-        ...outcome,
-        // Normalize to match BaseActionDialog helpers
-        newVisibility: effectiveNewState,
-        hasActionableChange,
-        overrideState: outcome.overrideState || null,
-        tokenImage: this.resolveTokenImage(outcome.target),
-        oldVisibilityState: getVisibilityStateConfig(baseOldState),
-        newVisibilityState: getVisibilityStateConfig(effectiveNewState),
-        availableStates,
-        isOldStateAvsControlled,
-      };
-    });
-
-    // Visual filtering: hide Foundry-hidden tokens from display if enabled
-    try {
-      if (this.hideFoundryHidden) {
-        processedOutcomes = processedOutcomes.filter((o) => o?.target?.document?.hidden !== true);
-      }
-    } catch { }
-
-    // Prepare attacking token with proper image path
-    context.attackingToken = {
-      ...this.attackingToken,
-      image: this.resolveTokenImage(this.attackingToken),
-    };
-    context.outcomes = processedOutcomes;
-    context.ignoreAllies = !!this.ignoreAllies;
-    context.hideFoundryHidden = !!this.hideFoundryHidden; // Added context for hideFoundryHidden
-
-    // Keep internal outcomes annotated where relevant (e.g., hasActionableChange)
-    try {
-      // Map by token id for safe synchronization
-      const byId = new Map(processedOutcomes.map((o) => [o?.target?.id, o]));
-      for (const o of this.outcomes) {
-        const pid = o?.target?.id;
-        if (!pid) continue;
-        const po = byId.get(pid);
-        if (po) {
-          o.hasActionableChange = po.hasActionableChange;
-          // Provide a default newVisibility so Base markInitialSelections works
-          o.newVisibility = po.newVisibility;
-        }
-      }
-    } catch { }
-
-    // Log the number of changes for debugging
-    Object.assign(context, this.buildCommonContext(processedOutcomes));
-
-    // Check if Auto-Visibility System is enabled for conditional UI elements
-    context.avsEnabled = game.settings.get(MODULE_ID, 'autoVisibilityEnabled');
-
-    // Check if there are existing overrides between attacker and observers for Remove Overrides button
-    context.hasExistingOverrides = false;
-    if (context.avsEnabled && this.attackingToken) {
-      try {
-        for (const outcome of processedOutcomes) {
-          const observer = outcome?.target;
-          if (!observer?.document?.id) continue;
-
-          // Check for overrides in both directions: observer->attacker and attacker->observer
-          const attackerId = this.attackingToken.document.id;
-          const observerId = observer.document.id;
-
-          // Check observer->attacker override (flag on attacker)
-          const forwardOverride = this.attackingToken.document.getFlag(
-            MODULE_ID,
-            `avs-override-from-${observerId}`,
-          );
-          // Check attacker->observer override (flag on observer)
-          const reverseOverride = observer.document.getFlag(
-            MODULE_ID,
-            `avs-override-from-${attackerId}`,
-          );
-
-          if (forwardOverride || reverseOverride) {
-            context.hasExistingOverrides = true;
-            break;
-          }
-        }
-      } catch (err) {
-        console.warn('PF2E Visioner | Error checking for existing overrides:', err);
-      }
-    }
-
-    return context;
+    return prepareConsequencesDialogContext(this, context);
   }
 
   /**
@@ -384,284 +228,28 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
    * Handle individual apply change
    */
   static async _onApplyChange(event, button) {
-    const app = currentConsequencesDialog;
-    if (!app) return;
-    const tokenId = button?.dataset.tokenId;
-    const outcome = app.outcomes.find((o) => o.target.id === tokenId);
-    if (!outcome) return;
-
-    const effectiveNewState =
-      outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
-
-    // If AVS is selected, remove any existing override
-    if (effectiveNewState === 'avs') {
-      try {
-        const { default: AvsOverrideManager } = await import(
-          '../services/infra/AvsOverrideManager.js'
-        );
-        const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        const observerId = outcome.target.id;
-        if (attackerId && observerId) {
-          await AvsOverrideManager.removeOverride(observerId, attackerId);
-          // Refresh UI to update override indicators
-          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-          await updateTokenVisuals();
-          notify.info(
-            `${MODULE_TITLE}: Accepted AVS changes for ${outcome.target.name}`,
-          );
-        }
-      } catch (e) {
-        console.warn('Failed to remove AVS override:', e);
-        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
-      }
-      app.updateRowButtonsToApplied([
-        { target: { id: outcome.target.id }, hasActionableChange: false },
-      ]);
-      app.updateChangesCount();
-      return;
-    }
-
-    try {
-      const { applyNowConsequences } = await import('../services/index.js');
-
-      // Check for row timer configuration
-      const rowTimerConfig = app.rowTimers?.get(tokenId);
-      let overrideValue = effectiveNewState;
-
-      if (rowTimerConfig) {
-        try {
-          const { TimedOverrideManager } = await import('../../services/TimedOverrideManager.js');
-          const timedOverride = TimedOverrideManager._buildTimedOverrideData(rowTimerConfig);
-          overrideValue = { state: effectiveNewState, timedOverride };
-        } catch (e) {
-          console.error('PF2E Visioner | Consequences row apply: Failed to build timer:', e);
-        }
-      }
-
-      const overrides = { [outcome.target.id]: overrideValue };
-      await applyNowConsequences(
-        {
-          ...app.actionData,
-          overrides,
-          ignoreAllies: app.ignoreAllies,
-          encounterOnly: app.encounterOnly,
-        },
-        { html: () => { }, attr: () => { } },
-      );
-
-      // Clear row timer after applying
-      if (rowTimerConfig) {
-        app.rowTimers.delete(tokenId);
-        app._updateRowTimerButton?.(tokenId);
-      }
-    } catch { }
-
-    // Update button states
-    app.updateRowButtonsToApplied([{ target: { id: tokenId }, hasActionableChange: true }]);
-    app.updateChangesCount();
+    await applyConsequencesChange(currentConsequencesDialog, button);
   }
 
   /**
    * Handle individual revert change
    */
   static async _onRevertChange(event, button) {
-    const app = currentConsequencesDialog;
-    if (!app) return;
-    const tokenId = button?.dataset.tokenId;
-    const outcome = app.outcomes.find((o) => o.target.id === tokenId);
-    if (!outcome) return;
-
-    try {
-      const { revertNowConsequences } = await import('../services/index.js');
-      // Pass the specific tokenId for per-row revert
-      const actionDataWithTarget = { ...app.actionData, targetTokenId: tokenId };
-      await revertNowConsequences(actionDataWithTarget, { html: () => { }, attr: () => { } });
-    } catch { }
-
-    // Update button states
-    app.updateRowButtonsToReverted([{ target: { id: tokenId }, hasActionableChange: true }]);
-    app.updateChangesCount();
+    await revertConsequencesChange(currentConsequencesDialog, button);
   }
 
   /**
    * Handle apply all changes
    */
   static async _onApplyAll() {
-    // Get the dialog instance
-    const app = currentConsequencesDialog;
-    if (!app) {
-      console.error('Consequences Dialog not found');
-      return;
-    }
-
-    if (app.bulkActionState === 'applied') {
-      notify.warn(
-        `${MODULE_TITLE}: Apply All has already been used. Use Revert All to undo changes.`,
-      );
-      return;
-    }
-
-    // Filter outcomes based on encounter filter
-    let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
-
-    // Apply ally filtering if ignore allies is enabled
-    try {
-      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      filteredOutcomes = filterOutcomesByAllies(
-        filteredOutcomes,
-        app.attackingToken,
-        app.ignoreAllies,
-        'target',
-      );
-    } catch { }
-
-    // Respect Hide Foundry-hidden toggle for Revert All
-    try {
-      if (app.hideFoundryHidden) {
-        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
-      }
-    } catch { }
-
-    // Only apply changes to filtered outcomes that have actionable changes
-    const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return outcome.hasActionableChange;
-    });
-
-    if (changedOutcomes.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No visibility changes to apply.`);
-      return;
-    }
-
-    const overrides = {};
-    const avsRemovals = [];
-    for (const o of changedOutcomes) {
-      const id = o?.target?.id;
-      const state = o?.overrideState || o?.newVisibility || getDefaultConsequencesVisibility();
-      if (id && state) {
-        if (state === 'avs') {
-          // AVS selections - remove any existing overrides
-          avsRemovals.push({ id, name: o.target.name });
-        } else {
-          overrides[id] = state;
-        }
-      }
-    }
-
-    // Remove AVS overrides if any
-    if (avsRemovals.length > 0) {
-      try {
-        const { default: AvsOverrideManager } = await import(
-          '../services/infra/AvsOverrideManager.js'
-        );
-        const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-        if (attackerId) {
-          for (const removal of avsRemovals) {
-            const observerId = removal.id;
-            await AvsOverrideManager.removeOverride(observerId, attackerId);
-          }
-          // Refresh UI to update override indicators
-          const { updateTokenVisuals } = await import('../../services/visual-effects.js');
-          await updateTokenVisuals();
-          const names = avsRemovals.map((r) => r.name).join(', ');
-          notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
-        }
-      } catch (e) {
-        console.warn('Failed to remove AVS overrides:', e);
-        const names = avsRemovals.map((r) => r.name).join(', ');
-        notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
-      }
-    }
-
-    // Apply overrides only if there are any
-    if (Object.keys(overrides).length > 0) {
-      const { applyNowConsequences } = await import('../services/index.js');
-      await applyNowConsequences(
-        {
-          ...app.actionData,
-          overrides,
-          ignoreAllies: app.ignoreAllies,
-          encounterOnly: app.encounterOnly,
-        },
-        { html: () => { }, attr: () => { } },
-      );
-    }
-
-    // Update UI for each row
-    for (const outcome of changedOutcomes) {
-      app.updateRowButtonsToApplied([
-        { target: { id: outcome.target.id }, hasActionableChange: true },
-      ]);
-    }
-
-    app.bulkActionState = 'applied';
-    app.updateBulkActionButtons();
-    app.updateChangesCount();
-
-    notify.info(
-      `${MODULE_TITLE}: Applied all visibility changes. Dialog remains open for further adjustments.`,
-    );
+    await applyAllConsequencesChanges(currentConsequencesDialog);
   }
 
   /**
    * Handle revert all changes
    */
   static async _onRevertAll() {
-    // Get the dialog instance
-    const app = currentConsequencesDialog;
-    if (!app) {
-      console.error('Consequences Dialog not found');
-      return;
-    }
-
-    if (app.bulkActionState === 'reverted') {
-      notify.warn(
-        `${MODULE_TITLE}: Revert All has already been used. Use Apply All to reapply changes.`,
-      );
-      return;
-    }
-
-    // Filter outcomes based on encounter filter
-    let filteredOutcomes = filterOutcomesByEncounter(app.outcomes, app.encounterOnly, 'target');
-
-    // Apply ally filtering if ignore allies is enabled
-    try {
-      const { filterOutcomesByAllies } = await import('../services/infra/shared-utils.js');
-      filteredOutcomes = filterOutcomesByAllies(
-        filteredOutcomes,
-        app.attackingToken,
-        app.ignoreAllies,
-        'target',
-      );
-    } catch { }
-
-    // Respect Hide Foundry-hidden toggle for Revert All (UI only)
-    try {
-      if (app.hideFoundryHidden) {
-        filteredOutcomes = filteredOutcomes.filter((o) => o?.target?.document?.hidden !== true);
-      }
-    } catch { }
-
-    // Only revert changes to filtered outcomes that have actionable changes
-    const changedOutcomes = filteredOutcomes.filter((outcome) => {
-      return outcome.hasActionableChange;
-    });
-
-    if (changedOutcomes.length === 0) {
-      notify.warn(`${MODULE_TITLE}: No visibility changes to revert.`);
-      return;
-    }
-
-    const { revertNowConsequences } = await import('../services/index.js');
-    await revertNowConsequences(app.actionData, { html: () => { }, attr: () => { } });
-    for (const outcome of changedOutcomes) {
-      app.updateRowButtonsToReverted([
-        { target: { id: outcome.target.id }, hasActionableChange: true },
-      ]);
-    }
-
-    app.bulkActionState = 'reverted';
-    app.updateBulkActionButtons();
-    app.updateChangesCount();
+    await revertAllConsequencesChanges(currentConsequencesDialog);
   }
 
   /**
@@ -697,26 +285,29 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
 
   // Override icon click handlers to use consequences-specific logic
   addIconClickHandlers() {
-    const stateIcons = this.element.querySelectorAll('.state-icon');
-    stateIcons.forEach((icon) => {
-      icon.addEventListener('click', (event) => {
+    if (!this.element || this.element.dataset.consequencesStateIconDelegated === 'true') return;
+    this.element.dataset.consequencesStateIconDelegated = 'true';
+    this.element.addEventListener('click', (event) => {
+      const icon = event.target?.closest?.('.state-icon');
+      if (!icon || !this.element?.contains?.(icon)) return;
+
         // Only handle clicks within override selection container
-        const overrideIcons = event.currentTarget.closest('.override-icons');
+        const overrideIcons = icon.closest('.override-icons');
         if (!overrideIcons) return;
 
         // Robustly resolve target id from data attributes or row
-        let targetId = event.currentTarget.dataset.target || event.currentTarget.dataset.tokenId;
+        let targetId = icon.dataset.target || icon.dataset.tokenId;
         if (!targetId) {
-          const row = event.currentTarget.closest('tr[data-token-id]');
+          const row = icon.closest('tr[data-token-id]');
           targetId = row?.dataset?.tokenId;
         }
-        const newState = event.currentTarget.dataset.state;
+        const newState = icon.dataset.state;
 
         // Update UI
         overrideIcons
           .querySelectorAll('.state-icon')
           .forEach((i) => i.classList.remove('selected'));
-        event.currentTarget.classList.add('selected');
+        icon.classList.add('selected');
         const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
         if (hiddenInput) hiddenInput.value = newState;
 
@@ -733,7 +324,6 @@ export class ConsequencesPreviewDialog extends BaseActionDialog {
           this.updateActionButtonsForToken(targetId, hasActionableChange);
           this.updateChangesCount();
         }
-      });
     });
   }
 

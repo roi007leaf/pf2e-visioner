@@ -7,6 +7,8 @@ import { MODULE_ID } from '../../constants.js';
 import { getCoverBonusByState } from '../../helpers/cover-helpers.js';
 import { getCoverLevelRollOptions, getProneRangedStandardCoverUpgradeRule } from '../batch.js';
 import { systemIconPath } from '../../system-adapter.js';
+import { deleteExistingEmbeddedItems } from '../../visibility/utils.js';
+import { runWithCoverEffectLock } from '../utils.js';
 
 export class CoverStateManager {
   /**
@@ -152,27 +154,29 @@ export class CoverStateManager {
    */
   async _updateEphemeralEffects(attacker, target, state, options = {}) {
     try {
+      if (!game.user?.isGM) return;
       const actor = target.actor;
       if (!actor) return;
 
-      // Check if effect already exists for this attacker
-      const existingEffect = actor.itemTypes.effect.find(
-        (e) =>
-          e.flags?.[MODULE_ID]?.isEphemeralCover &&
-          e.flags?.[MODULE_ID]?.observerActorSignature === attacker.actor.signature,
-      );
+      await runWithCoverEffectLock(actor, async () => {
+        // Check if effect already exists for this attacker
+        const existingEffect = actor.itemTypes.effect.find(
+          (e) =>
+            e.flags?.[MODULE_ID]?.isEphemeralCover &&
+            e.flags?.[MODULE_ID]?.observerActorSignature === attacker.actor.signature,
+        );
 
-      // Remove existing effect if found
-      if (existingEffect) {
-        await actor.deleteEmbeddedDocuments('Item', [existingEffect.id]);
-      }
+        // Remove existing effect if found
+        if (existingEffect) {
+          await deleteExistingEmbeddedItems(actor, [existingEffect.id]);
+        }
 
-      // If no cover or removing cover, just return after cleaning up
-      if (state === 'none') return;
+        // If no cover or removing cover, just return after cleaning up
+        if (state === 'none') return;
 
-      // Get the bonus for the current cover state
-      const bonus = getCoverBonusByState(state);
-      if (bonus <= 0) return;
+        // Get the bonus for the current cover state
+        const bonus = getCoverBonusByState(state);
+        if (bonus <= 0) return;
 
       // Pick a representative image per cover level
       const coverEffectImageByState = {
@@ -279,8 +283,9 @@ export class CoverStateManager {
         );
       }
 
-      // Create the effect on the actor
-      await actor.createEmbeddedDocuments('Item', [ephemeralEffect]);
+        // Create the effect on the actor
+        await actor.createEmbeddedDocuments('Item', [ephemeralEffect]);
+      });
     } catch (error) {
       console.error('PF2E Visioner | Error updating ephemeral effects:', error);
     }

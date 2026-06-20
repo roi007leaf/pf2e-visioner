@@ -18,6 +18,7 @@ describe('Visibility State Management Core Logic', () => {
     originalCanvas = global.canvas;
 
     global.game = {
+      user: { isGM: true },
       settings: {
         get: jest.fn().mockReturnValue(false),
       },
@@ -165,6 +166,57 @@ describe('Visibility State Management Core Logic', () => {
       expect(totalCalls).toBeGreaterThanOrEqual(0); // At least attempted processing
     });
 
+    test('skips effect mutations on a player client', async () => {
+      global.game.user = { isGM: false };
+      const { updateSingleVisibilityEffect } = await import('../../../scripts/visibility/update.js');
+
+      const observerToken = {
+        actor: {
+          id: 'observer',
+          signature: 'observer-sig',
+        },
+      };
+
+      const targetToken = {
+        actor: {
+          id: 'target',
+          type: 'character',
+          signature: 'target-sig',
+          itemTypes: {
+            effect: [
+              {
+                id: 'hidden-aggregate',
+                flags: {
+                  'pf2e-visioner': {
+                    aggregateOffGuard: true,
+                    visibilityState: 'hidden',
+                    effectTarget: 'subject',
+                  },
+                },
+                system: {
+                  rules: [
+                    {
+                      key: 'EphemeralEffect',
+                      predicate: ['target:signature:observer-sig'],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          createEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          updateEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      };
+
+      await updateSingleVisibilityEffect(observerToken, targetToken, 'observed');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+      expect(targetToken.actor.updateEmbeddedDocuments).not.toHaveBeenCalled();
+      expect(targetToken.actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    });
+
     test('handles different effect target directions', async () => {
       const { updateSingleVisibilityEffect } = await import('../../../scripts/visibility/update.js');
 
@@ -293,6 +345,48 @@ describe('Visibility State Management Core Logic', () => {
           removeAllEffects: true,
         }),
       ).resolves.toBeUndefined();
+    });
+
+    test('removes legacy hidden off-guard effects when state becomes undetected', async () => {
+      global.game.user = { isGM: true };
+      const { updateSingleVisibilityEffect } = await import('../../../scripts/visibility/update.js');
+
+      const legacyHiddenEffect = {
+        id: 'legacy-hidden-on-target',
+        flags: {
+          'pf2e-visioner': {
+            isEphemeralOffGuard: true,
+            hiddenActorSignature: 'observer-sig',
+          },
+        },
+      };
+      const observerToken = {
+        actor: {
+          id: 'observer',
+          signature: 'observer-sig',
+          itemTypes: { effect: [] },
+          items: { get: jest.fn(() => null) },
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      };
+      const targetToken = {
+        actor: {
+          id: 'target',
+          type: 'character',
+          signature: 'target-sig',
+          itemTypes: { effect: [legacyHiddenEffect] },
+          items: { get: jest.fn((id) => (id === legacyHiddenEffect.id ? legacyHiddenEffect : null)) },
+          createEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          updateEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+          deleteEmbeddedDocuments: jest.fn().mockResolvedValue([]),
+        },
+      };
+
+      await updateSingleVisibilityEffect(observerToken, targetToken, 'undetected');
+
+      expect(targetToken.actor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+        'legacy-hidden-on-target',
+      ]);
     });
   });
 });

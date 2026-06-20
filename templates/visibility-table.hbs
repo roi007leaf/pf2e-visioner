@@ -88,7 +88,7 @@
             {{else if (eq target.currentVisibilityState "concealed")}}
               <span class="state-indicator visibility-concealed" data-tooltip="{{localize 'PF2E_VISIONER.MECHANICAL_EFFECTS.CONCEALED_TOOLTIP'}}">
                 <i class="fas fa-cloud"></i>
-                Concealed
+                {{localize 'PF2E_VISIONER.VISIBILITY_STATES.observed_concealed'}}
                 {{#unless target.isNonAvsToken}}
                 <span class="avs-chip">
                   <i class="fas fa-bolt-auto"></i>
