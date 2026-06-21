@@ -151,6 +151,10 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   }
 }
 
+export function wrapCanvasVisibilityRestrictVisibility(wrapped, ...args) {
+  return wrapped(...args);
+}
+
 function withDetectionFilterVisualPolicy(object, callWrapped) {
   const suppressDetectionFilterVisuals =
     shouldSuppressPendingMovementDetectionFilterVisuals(object);

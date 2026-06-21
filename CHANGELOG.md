@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.3.1] - 2026-06-21
+
+### Fixed
+
+- **Visioner loads reliably after the detection-wrapper split**: Consequences AVS handling, Point Out chat notifications, and the Foundry canvas visibility wrapper now import from the right module paths, preventing startup failures that could make Visioner disappear from settings.
+- **Presence-only senses stay indicator-only**: Lifesense and thoughtsense indicators now keep the token body, effects, stale soundwaves, and detection-filter meshes hidden through Foundry refreshes and render-flag updates.
+- **Lifesense respects blocked paths**: Lifesense no longer reveals living or undead targets through sight-blocking walls or silence/sound-blocking paths; thoughtsense remains independent of those paths.
+- **Thoughtsense indicators keep their mode color**: Thoughtsense now keeps its purple indicator color even when the observer is blind and deaf.
+- **Peek vision respects the clipped FOV for occlusion consumers**: Peek LOS geometry is clamped to the active peek FOV while still honoring the original wall-constrained LOS, preventing roof and occlusion logic from seeing outside the peek slit.
+
 ## [8.3.0] - 2026-06-20
 
 ### Added

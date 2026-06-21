@@ -1,6 +1,9 @@
 import { MODULE_ID } from '../../constants.js';
 import { createCanDetectVisibilityWrapper } from './detection-can-detect.js';
-import { wrapCanvasVisibilityTest } from './detection-canvas-visibility.js';
+import {
+  wrapCanvasVisibilityRestrictVisibility,
+  wrapCanvasVisibilityTest,
+} from './detection-canvas-visibility.js';
 import { wrapTokenRenderDetectionFilter } from './detection-filter-render.js';
 import { testDetectionModeVisibility } from './detection-mode-visibility.js';
 import { wrapTokenRefreshVisibility, wrapTokenRefreshState, wrapTokenApplyRenderFlags } from './detection-token-refresh.js';
@@ -29,6 +32,12 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
     MODULE_ID,
     'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility',
     wrapCanvasVisibilityTest,
+    'WRAPPER',
+  );
+  libWrapperAdapter.register(
+    MODULE_ID,
+    'foundry.canvas.groups.CanvasVisibility.prototype.restrictVisibility',
+    wrapCanvasVisibilityRestrictVisibility,
     'WRAPPER',
   );
   libWrapperAdapter.register(
@@ -73,12 +82,17 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
     );
     libWrapperAdapter.register(
       MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._applyRenderFlags',
+      wrapTokenApplyRenderFlags,
+      'WRAPPER',
+    );
+    libWrapperAdapter.register(
+      MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._renderDetectionFilter',
       wrapTokenRenderDetectionFilter,
       'WRAPPER',
     );
     void wrapTokenRefreshState;
-    void wrapTokenApplyRenderFlags;
     libWrapperAdapter.register(
       MODULE_ID,
       'TokenDocument.prototype.prepareBaseData',

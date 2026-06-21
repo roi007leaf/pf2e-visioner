@@ -18,6 +18,10 @@ import {
   resolveTooltipCssColor,
 } from './HoverTooltip/hover-tooltip-badge-elements.js';
 import { buildVisibilityFactorTooltipLines } from './HoverTooltip/hover-tooltip-factor-overlay.js';
+import {
+  clearPresenceOnlyTokenRenderSuppression,
+  suppressPresenceOnlyTokenRender,
+} from './system-hidden-presence-only-suppression.js';
 
 const LIFESENSE_INDICATOR_COLOR = 0x00d4ff;
 const THOUGHTSENSE_INDICATOR_COLOR = 0x9400d3;
@@ -26,6 +30,7 @@ const BLIND_DEAF_INDICATOR_COLOR = 0x555555;
 const TARGETED_FRIENDLY_COLOR = 0x00ff00;
 const TARGETED_HOSTILE_COLOR = 0xff0000;
 const TARGETED_NEUTRAL_COLOR = 0xffa500;
+const PRESENCE_ONLY_RENDER_STATE_KEY = '_pvSystemHiddenPresenceOnlyRenderState';
 
 function getTokenDispositions() {
   return globalThis.CONST?.TOKEN_DISPOSITIONS ?? {};
@@ -36,9 +41,9 @@ export function getSystemHiddenIndicatorBaseColor({
   shouldShowThoughtsenseIndicator = false,
   shouldShowEcholocationIndicator = false,
 } = {}) {
-  if (observerIsBlindAndDeaf) return BLIND_DEAF_INDICATOR_COLOR;
   if (shouldShowThoughtsenseIndicator) return THOUGHTSENSE_INDICATOR_COLOR;
   if (shouldShowEcholocationIndicator) return ECHOLOCATION_INDICATOR_COLOR;
+  if (observerIsBlindAndDeaf) return BLIND_DEAF_INDICATOR_COLOR;
   return LIFESENSE_INDICATOR_COLOR;
 }
 
@@ -250,7 +255,126 @@ function unregisterSystemHiddenIndicator(indicator) {
   releaseSystemHiddenIndicatorHooksIfIdle();
 }
 
-export function removeSystemHiddenIndicator(token) {
+function clearPresenceOnlyDetectionFilterVisuals(token) {
+  try {
+    if ('detectionFilter' in token) token.detectionFilter = null;
+  } catch (_) {
+    /* best-effort presence-only detection cleanup */
+  }
+  try {
+    const mesh = token?.detectionFilterMesh;
+    if (mesh && 'visible' in mesh) mesh.visible = false;
+    if (mesh && 'renderable' in mesh) mesh.renderable = false;
+    if (mesh && 'alpha' in mesh) mesh.alpha = 0;
+  } catch (_) {
+    /* best-effort presence-only detection mesh cleanup */
+  }
+}
+
+function forceVisiblePresenceOnlyRenderState(token) {
+  clearPresenceOnlyTokenRenderSuppression(token);
+  try {
+    if ('visible' in token) token.visible = true;
+    if ('renderable' in token) token.renderable = true;
+
+    const mesh = token?.mesh;
+    if (mesh) {
+      if ('visible' in mesh) mesh.visible = true;
+      if ('renderable' in mesh) mesh.renderable = true;
+      if ('alpha' in mesh) mesh.alpha = 1;
+    }
+
+    const effects = token?.effects;
+    if (effects && 'visible' in effects) effects.visible = true;
+  } catch (_) {
+    /* best-effort presence-only visible restore */
+  }
+  clearPresenceOnlyDetectionFilterVisuals(token);
+}
+
+function hidePresenceOnlyIndicatorTokenDetails(token, { indicator = null } = {}) {
+  if (!token) return;
+  if (
+    suppressPresenceOnlyTokenRender(token, {
+      mode: indicator?._pvIndicatorMode,
+      observerId: indicator?._pvObserverId,
+    })
+  ) {
+    return;
+  }
+  clearPresenceOnlyDetectionFilterVisuals(token);
+  try {
+    if ('visible' in token) token.visible = false;
+    if ('renderable' in token) token.renderable = false;
+  } catch (_) {
+    /* best-effort presence-only body hide */
+  }
+  try {
+    const mesh = token.mesh;
+    if (mesh && 'visible' in mesh) mesh.visible = false;
+    if (mesh && 'renderable' in mesh) mesh.renderable = false;
+    if (mesh && 'alpha' in mesh) mesh.alpha = 0;
+  } catch (_) {
+    /* best-effort presence-only mesh hide */
+  }
+  try {
+    const effects = token.effects;
+    if (effects && 'visible' in effects) effects.visible = false;
+  } catch (_) {
+    /* best-effort presence-only effect hide */
+  }
+}
+
+function restoreCapturedPresenceOnlyRenderState(token, { forceTokenVisible = false } = {}) {
+  const state = token?.[PRESENCE_ONLY_RENDER_STATE_KEY];
+  if (!state) return false;
+
+  try {
+    if (state.visible !== undefined && 'visible' in token) token.visible = state.visible;
+    if (state.renderable !== undefined && 'renderable' in token) {
+      token.renderable = state.renderable;
+    }
+
+    const mesh = state.mesh?.object || token.mesh;
+    if (mesh) {
+      if (state.mesh?.visible !== undefined && 'visible' in mesh) mesh.visible = state.mesh.visible;
+      if (state.mesh?.renderable !== undefined && 'renderable' in mesh) {
+        mesh.renderable = state.mesh.renderable;
+      }
+      if (state.mesh?.alpha !== undefined && 'alpha' in mesh) mesh.alpha = state.mesh.alpha;
+    }
+
+    const effects = state.effects?.object || token.effects;
+    if (effects && state.effects?.visible !== undefined && 'visible' in effects) {
+      effects.visible = state.effects.visible;
+    }
+    if (forceTokenVisible) {
+      forceVisiblePresenceOnlyRenderState(token);
+    }
+  } catch (_) {
+    /* best-effort presence-only render restore */
+  }
+
+  try {
+    delete token[PRESENCE_ONLY_RENDER_STATE_KEY];
+  } catch (_) {
+    token[PRESENCE_ONLY_RENDER_STATE_KEY] = null;
+  }
+  return true;
+}
+
+function discardCapturedPresenceOnlyRenderState(token) {
+  if (!token) return false;
+  const hadState = !!token[PRESENCE_ONLY_RENDER_STATE_KEY];
+  try {
+    delete token[PRESENCE_ONLY_RENDER_STATE_KEY];
+  } catch (_) {
+    token[PRESENCE_ONLY_RENDER_STATE_KEY] = null;
+  }
+  return hadState;
+}
+
+export function removeSystemHiddenIndicator(token, options = {}) {
   try {
     const indicator = token?._pvSystemHiddenIndicator;
     if (!indicator) return false;
@@ -288,6 +412,23 @@ export function removeSystemHiddenIndicator(token) {
     indicator.destroy?.({ children: false, texture: false, baseTexture: false });
     indicator._pvTokenRef = null;
     token._pvSystemHiddenIndicator = null;
+    const shouldRestoreRenderState = options?.restoreRenderState !== false;
+    const restored = shouldRestoreRenderState
+      ? restoreCapturedPresenceOnlyRenderState(token, {
+          forceTokenVisible: options?.forceTokenVisible === true,
+        })
+      : discardCapturedPresenceOnlyRenderState(token);
+    if (options?.preservePresenceOnlyRenderSuppression === true) {
+      suppressPresenceOnlyTokenRender(token, {
+        mode: indicator._pvIndicatorMode,
+        observerId: indicator._pvObserverId,
+        ttlMs: options?.presenceOnlyRenderSuppressionTtlMs,
+      });
+    } else {
+      clearPresenceOnlyTokenRenderSuppression(token, {
+        forceTokenVisible: options?.forceTokenVisible === true && !restored,
+      });
+    }
     return true;
   } catch (_) {
     return false;
@@ -528,6 +669,12 @@ function attachPulseAnimation({
     try {
       if (!indicator.parent || !canvasLayer?.ready) {
         return;
+      }
+      if (
+        indicator._pvIndicatorMode === 'thoughtsense' ||
+        indicator._pvIndicatorMode === 'lifesense'
+      ) {
+        hidePresenceOnlyIndicatorTokenDetails(token, { indicator });
       }
 
       const elapsed = (Date.now() - startTime) / 1000;

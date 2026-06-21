@@ -957,8 +957,11 @@ describe('StatelessVisibilityCalculator', () => {
                     auxiliary: []
                 },
                 observer: {
-                    precise: {},
+                    precise: {
+                        vision: { range: Infinity }
+                    },
                     imprecise: {
+                        hearing: { range: Infinity },
                         lifesense: { range: 60 }
                     },
                     conditions: {}
@@ -1481,8 +1484,11 @@ describe('StatelessVisibilityCalculator', () => {
                     auxiliary: ['invisible']
                 },
                 observer: {
-                    precise: {},
+                    precise: {
+                        vision: { range: Infinity }
+                    },
                     imprecise: {
+                        hearing: { range: 60 },
                         lifesense: { range: 60 }
                     },
                     conditions: {}

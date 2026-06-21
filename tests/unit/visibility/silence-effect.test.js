@@ -108,7 +108,7 @@ describe('Silence Effect Detection', () => {
         });
     });
 
-    describe('Non-auditory senses still work with Silence', () => {
+    describe('Non-auditory independent senses still work with Silence', () => {
         it('should allow tremorsense even with Silence effect', () => {
             const input = {
                 target: {
@@ -144,7 +144,7 @@ describe('Silence Effect Detection', () => {
             expect(result.detection.isPrecise).toBe(false);
         });
 
-        it('should allow lifesense even with Silence effect', () => {
+        it('should block imprecise lifesense when Silence prevents hearing', () => {
             const input = {
                 target: {
                     lightingLevel: 'darkness',
@@ -172,13 +172,11 @@ describe('Silence Effect Detection', () => {
 
             const result = calculateVisibility(input);
 
-            // Lifesense should still work (non-auditory)
-            expect(result.state).toBe('hidden');
-            expect(result.detection.sense).toBe('lifesense');
-            expect(result.detection.isPrecise).toBe(false);
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBeNull();
         });
 
-        it('should allow precise lifesense even with Silence effect', () => {
+        it('should block precise lifesense when Silence prevents hearing', () => {
             const input = {
                 target: {
                     lightingLevel: 'darkness',
@@ -207,10 +205,8 @@ describe('Silence Effect Detection', () => {
 
             const result = calculateVisibility(input);
 
-            // Precise lifesense should work and give Observed state
-            expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('lifesense');
-            expect(result.detection.isPrecise).toBe(true);
+            expect(result.state).toBe('undetected');
+            expect(result.detection).toBeNull();
         });
 
         it('should allow scent even with Silence effect', () => {

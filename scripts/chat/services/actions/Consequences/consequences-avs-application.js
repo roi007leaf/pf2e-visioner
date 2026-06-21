@@ -32,7 +32,7 @@ async function loadAvsOverrideManager(provided) {
 async function loadOverrideIndicator(provided) {
   if (provided) return provided;
   const { default: indicator } = await import(
-    '../../../../scripts/ui/OverrideValidationIndicator.js'
+    '../../../../ui/OverrideValidationIndicator.js'
   );
   return indicator;
 }

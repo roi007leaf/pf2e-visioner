@@ -9,7 +9,10 @@ import {
 } from '../../../scripts/services/PendingMovement/pending-token-movement.js';
 import { flushScheduledCanvasPerceptionUpdate } from '../../../scripts/helpers/perception-refresh.js';
 import { forcePendingMovementTokenInvisible } from '../../../scripts/services/PendingMovement/pending-movement-render-lock.js';
-import { wrapTokenRefreshVisibility } from '../../../scripts/services/Detection/detection-token-refresh.js';
+import {
+  wrapTokenApplyRenderFlags,
+  wrapTokenRefreshVisibility,
+} from '../../../scripts/services/Detection/detection-token-refresh.js';
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 import { FeatsHandler } from '../../../scripts/chat/services/FeatsHandler.js';
@@ -38,6 +41,148 @@ describe('detection token refresh wrapper', () => {
     global.game.settings.set('pf2e', 'gmVision', false);
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
     global.canvas = originalCanvas;
+  });
+
+  test('keeps presence-only sensed token hidden before and after core visibility refresh', () => {
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.effects = { visible: true };
+    target.detectionFilter = { id: 'stale-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target._pvPresenceOnlyRenderSuppression = {
+      mode: 'thoughtsense',
+      observerId: 'observer',
+      expiresAt: Date.now() + 1000,
+    };
+
+    const wrapped = jest.fn(() => {
+      expect(target.visible).toBe(false);
+      expect(target.renderable).toBe(false);
+      expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+      expect(target.effects.visible).toBe(false);
+      expect(target.detectionFilter).toBeNull();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.effects.visible = true;
+      target.detectionFilter = { id: 'core-recreated-soundwave-filter' };
+      target.detectionFilterMesh.visible = true;
+      target.detectionFilterMesh.renderable = true;
+      target.detectionFilterMesh.alpha = 1;
+      return 'wrapped-result';
+    });
+
+    expect(wrapTokenRefreshVisibility.call(target, wrapped)).toBe('wrapped-result');
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+    expect(target.effects.visible).toBe(false);
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+  });
+
+  test('derives presence-only suppression from active indicator during core visibility refresh', () => {
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.effects = { visible: true };
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target._pvSystemHiddenIndicator = {
+      _pvIndicatorMode: 'lifesense',
+      _pvObserverId: 'observer',
+    };
+
+    const wrapped = jest.fn(() => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.effects.visible = true;
+      target.detectionFilter = { id: 'core-recreated-lifesense-filter' };
+      target.detectionFilterMesh.visible = true;
+      target.detectionFilterMesh.renderable = true;
+      target.detectionFilterMesh.alpha = 1;
+      return 'wrapped-result';
+    });
+
+    expect(wrapTokenRefreshVisibility.call(target, wrapped)).toBe('wrapped-result');
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target._pvPresenceOnlyRenderSuppression).toMatchObject({
+      mode: 'lifesense',
+      observerId: 'observer',
+    });
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+    expect(target.effects.visible).toBe(false);
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
+  });
+
+  test('keeps presence-only sensed token hidden before and after render flags apply', () => {
+    const target = createMockToken({ id: 'target', visible: true });
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    target.effects = { visible: true };
+    target.detectionFilter = { id: 'stale-soundwave-filter' };
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target._pvPresenceOnlyRenderSuppression = {
+      mode: 'thoughtsense',
+      observerId: 'observer',
+      expiresAt: Date.now() + 1000,
+    };
+
+    const wrapped = jest.fn(() => {
+      expect(target.visible).toBe(false);
+      expect(target.renderable).toBe(false);
+      expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+      expect(target.effects.visible).toBe(false);
+
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      target.mesh.alpha = 1;
+      target.effects.visible = true;
+      target.detectionFilter = { id: 'core-recreated-soundwave-filter' };
+      target.detectionFilterMesh.visible = true;
+      target.detectionFilterMesh.renderable = true;
+      target.detectionFilterMesh.alpha = 1;
+      return 'wrapped-result';
+    });
+
+    expect(wrapTokenApplyRenderFlags.call(target, wrapped)).toBe('wrapped-result');
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+    expect(target.effects.visible).toBe(false);
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+    });
   });
 
   test('restores render-hidden token when current-view guard drops during refresh', () => {

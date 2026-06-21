@@ -36,11 +36,14 @@ describe('detection wrapper module ownership', () => {
     expect(source).toContain("from './detection-vision-sharing.js'");
     expect(source).toContain('testDetectionModeVisibility');
     expect(source).toContain('wrapCanvasVisibilityTest');
+    expect(source).toContain('wrapCanvasVisibilityRestrictVisibility');
     expect(source).toContain('wrapTokenRenderDetectionFilter');
     expect(source).toContain('createCanDetectVisibilityWrapper');
     expect(source).toContain('wrapTokenRefreshVisibility');
+    expect(source).toContain('wrapTokenApplyRenderFlags');
     expect(source).toContain('wrapTokenVisionSource');
     expect(source).toContain('wrapTokenDocumentPrepareBaseData');
+    expect(source).toContain("'foundry.canvas.placeables.Token.prototype._applyRenderFlags'");
   });
 
   test('detection wrappers use the pending movement detection gate seam', () => {

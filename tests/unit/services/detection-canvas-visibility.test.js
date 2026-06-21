@@ -15,7 +15,10 @@ import {
   getPendingMovementBlockedDetectionSources,
   shouldUseCoreDetectionDuringPendingMovement,
 } from '../../../scripts/services/PendingMovement/pending-movement-detection-gate.js';
-import { wrapCanvasVisibilityTest } from '../../../scripts/services/Detection/detection-canvas-visibility.js';
+import {
+  wrapCanvasVisibilityRestrictVisibility,
+  wrapCanvasVisibilityTest,
+} from '../../../scripts/services/Detection/detection-canvas-visibility.js';
 import { createCanDetectVisibilityWrapper } from '../../../scripts/services/Detection/detection-can-detect.js';
 import { testDetectionModeVisibility } from '../../../scripts/services/Detection/detection-mode-visibility.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
@@ -68,6 +71,13 @@ describe('canvas visibility wrapper', () => {
 
     expect(shouldHandlePendingMovementCanvasVisibilityForToken(target)).toBe(false);
     expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('restrictVisibility wrapper delegates to core visibility restriction', () => {
+    const wrapped = jest.fn(() => 'core-result');
+
+    expect(wrapCanvasVisibilityRestrictVisibility(wrapped)).toBe('core-result');
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
 

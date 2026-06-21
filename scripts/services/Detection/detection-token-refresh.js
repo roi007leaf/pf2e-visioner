@@ -31,6 +31,10 @@ import {
 } from '../PendingMovement/pending-movement-detection-filter-visuals.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isTokenBlinded } from './detection-visibility-context.js';
+import {
+  hasActivePresenceOnlyTokenRenderSuppression,
+  hidePresenceOnlySuppressedTokenDetails,
+} from '../system-hidden-presence-only-suppression.js';
 
 const CORE_ANIMATION_TOKEN_VISIBILITY_THROTTLE_MS = 22;
 const coreAnimationTokenVisibilityRefreshTimes = new WeakMap();
@@ -152,6 +156,11 @@ function restoreLivePreciseNonVisualRendering(token) {
 }
 
 function syncCurrentViewRenderHiddenState(token) {
+  if (hasActivePresenceOnlyTokenRenderSuppression(token)) {
+    hidePresenceOnlySuppressedTokenDetails(token);
+    return true;
+  }
+
   if (
     targetMustStayHiddenDuringPendingMovement(token) ||
     targetIsRenderHiddenForCurrentViewObserver(token)
@@ -167,7 +176,20 @@ function syncCurrentViewRenderHiddenState(token) {
   return false;
 }
 
+function refreshWithPresenceOnlySuppression(token, refreshWrapped) {
+  hidePresenceOnlySuppressedTokenDetails(token);
+  try {
+    return withSuppressedPendingMovementDetectionFilterVisuals(token, refreshWrapped);
+  } finally {
+    hidePresenceOnlySuppressedTokenDetails(token);
+  }
+}
+
 function refreshThenRestorePendingInvisible(token, refreshWrapped) {
+  if (hasActivePresenceOnlyTokenRenderSuppression(token)) {
+    return refreshWithPresenceOnlySuppression(token, refreshWrapped);
+  }
+
   const result = refreshWrapped();
   try {
     if (restorePlayerOwnedBlindedDeselectRendering(token)) {
@@ -221,6 +243,10 @@ export function wrapTokenRefreshState(wrapped, ...args) {
     return wrapped(...args);
   }
 
+  if (hasActivePresenceOnlyTokenRenderSuppression(this)) {
+    return refreshWithPresenceOnlySuppression(this, () => wrapped(...args));
+  }
+
   const result = wrapped(...args);
   try {
     syncCurrentViewRenderHiddenState(this);
@@ -236,6 +262,10 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
     return wrapped(...args);
   }
 
+  if (hasActivePresenceOnlyTokenRenderSuppression(this)) {
+    return refreshWithPresenceOnlySuppression(this, () => wrapped(...args));
+  }
+
   const result = wrapped(...args);
   try {
     syncCurrentViewRenderHiddenState(this);
@@ -249,6 +279,10 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   if (shouldBypassAvsForGmVision()) {
     restoreRenderLockForGmVisionBypass(this);
     return wrapped(...args);
+  }
+
+  if (hasActivePresenceOnlyTokenRenderSuppression(this)) {
+    return refreshWithPresenceOnlySuppression(this, () => wrapped(...args));
   }
 
   const bypassActiveAtEntry = isPendingMovementCoreAnimationBypassActive();

@@ -97,7 +97,7 @@ export function calculateVisibility(input) {
       observerName: input._debug?.observerName,
       targetName: input._debug?.targetName,
     }));
-    const result = handleBlindedObserver(observer, target, soundBlocked);
+    const result = handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight);
 
     return withProfile(result, profileMetadataForResult(result, target));
   }
@@ -105,8 +105,10 @@ export function calculateVisibility(input) {
   // 2. Check all available senses and return the best detection result
   const allDetectionResults = [];
 
-  // 2a. Check precise non-visual senses (bypass invisibility, lighting, and walls)
-  const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked);
+  // 2a. Check precise non-visual senses (bypass invisibility and lighting)
+  const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked, {
+    hasLineOfSight,
+  });
   if (preciseNonVisualResult) {
     allDetectionResults.push(preciseNonVisualResult);
   }
@@ -127,8 +129,10 @@ export function calculateVisibility(input) {
     }
   }
 
-  // 2c. Check imprecise senses (work through walls but provide worse detection)
-  const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, visualDetection);
+  // 2c. Check imprecise senses (provide worse detection than precise senses)
+  const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, {
+    hasLineOfSight,
+  });
   if (impreciseResult) {
     allDetectionResults.push(impreciseResult);
   }
@@ -221,15 +225,17 @@ function tremorsenseGroundContactBroken(observer, target) {
 /**
  * Handle blinded observer - can only use non-visual senses
  */
-function handleBlindedObserver(observer, target, soundBlocked) {
+function handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight = undefined) {
   // Check for non-visual senses that still work when blinded
-  const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target, soundBlocked);
+  const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target, soundBlocked, {
+    hasLineOfSight,
+  });
   if (nonVisualPrecise) {
     return nonVisualPrecise;
   }
 
   const nonVisualImprecise = checkImpreciseSenses(observer, target, soundBlocked, {
-    canDetect: false,
+    hasLineOfSight,
   });
   if (nonVisualImprecise) {
     return nonVisualImprecise;
@@ -250,7 +256,11 @@ function handleBlindedObserver(observer, target, soundBlocked) {
  * @param {Object} target - Target state
  * @returns {Object|null} Detection result or null
  */
-function checkNonAuditorySenses(observer, target) {
+function checkNonAuditorySenses(
+  observer,
+  target,
+  { hasLineOfSight = undefined, soundBlocked = false } = {},
+) {
   const { imprecise } = observer;
 
   // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
@@ -278,7 +288,7 @@ function checkNonAuditorySenses(observer, target) {
   }
 
   // Lifesense: detects living or undead creatures, BYPASSES invisibility
-  if (imprecise.lifesense && canLifesenseDetect(target)) {
+  if (imprecise.lifesense && canLifesenseReachTarget(target, { hasLineOfSight, soundBlocked })) {
     return {
       state: VisibilityState.HIDDEN,
       detection: {
@@ -303,6 +313,13 @@ function canLifesenseDetect(target) {
   const isLiving = !isUndead && !isConstruct;
 
   return isLiving || isUndead;
+}
+
+function canLifesenseReachTarget(
+  target,
+  { hasLineOfSight = undefined, soundBlocked = false } = {},
+) {
+  return canLifesenseDetect(target) && hasLineOfSight !== false && soundBlocked !== true;
 }
 
 /**
@@ -411,7 +428,12 @@ function checkHasPreciseNonVisualSense(observer) {
  * @param {Object} target - Target state
  * @param {boolean} soundBlocked - Whether sound is blocked (affects echolocation)
  */
-function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
+function checkPreciseNonVisualSenses(
+  observer,
+  target,
+  soundBlocked = false,
+  { hasLineOfSight = undefined } = {},
+) {
   const { precise, conditions } = observer;
   const { auxiliary } = target;
 
@@ -459,9 +481,13 @@ function checkPreciseNonVisualSenses(observer, target, soundBlocked = false) {
       continue;
     }
 
-    // Special handling for lifesense: check creature traits
+    // Special handling for lifesense: needs target traits plus open sight and hearing paths.
     if (senseType === SenseType.LIFESENSE) {
-      if (senseData && senseData.range > 0 && canLifesenseDetect(target)) {
+      if (
+        senseData &&
+        senseData.range > 0 &&
+        canLifesenseReachTarget(target, { hasLineOfSight, soundBlocked })
+      ) {
         return {
           state: VisibilityState.OBSERVED,
           detection: {
@@ -736,7 +762,12 @@ function determineVisualDetection(
  * @param {Object} target - Target state
  * @param {boolean} soundBlocked - Whether sound is blocked between observer and target
  */
-function checkImpreciseSenses(observer, target, soundBlocked = false) {
+function checkImpreciseSenses(
+  observer,
+  target,
+  soundBlocked = false,
+  { hasLineOfSight = undefined } = {},
+) {
   const { imprecise, conditions } = observer;
   const { auxiliary } = target;
   const isInvisible = auxiliary.includes('invisible');
@@ -772,7 +803,7 @@ function checkImpreciseSenses(observer, target, soundBlocked = false) {
   // Living = absence of "undead" and "construct" traits
   // Undead = presence of "undead" trait
   // Priority: 2
-  if (imprecise.lifesense && canLifesenseDetect(target)) {
+  if (imprecise.lifesense && canLifesenseReachTarget(target, { hasLineOfSight, soundBlocked })) {
     workingSenses.push({
       priority: 2,
       state: VisibilityState.HIDDEN,
@@ -937,6 +968,7 @@ export const _internal = {
   applyVisualModifiers,
   resolveInvisibilityFromPreviousState,
   canLifesenseDetect,
+  canLifesenseReachTarget,
   canThoughtsenseDetect,
   selectBestDetection,
 };

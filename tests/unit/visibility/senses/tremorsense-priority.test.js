@@ -233,7 +233,9 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
         test('lifesense should be used even when hearing also works', () => {
             const input = {
                 observer: {
-                    precise: {},
+                    precise: {
+                        vision: { range: Infinity }
+                    },
                     imprecise: {
                         lifesense: { range: 60 },
                         hearing: { range: Infinity }
@@ -249,7 +251,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                 target: {
                     lightingLevel: 'bright',
                     concealment: false,
-                    auxiliary: [],
+                    auxiliary: ['invisible'],
                     traits: [], // Living creature (no undead/construct traits)
                     movementAction: null
                 },
@@ -326,7 +328,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                 target: {
                     lightingLevel: 'bright',
                     concealment: false,
-                    auxiliary: [],
+                    auxiliary: ['invisible'],
                     traits: [], // Living creature
                     movementAction: null
                 },
@@ -381,7 +383,9 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
         test('lifesense > scent when both work', () => {
             const input = {
                 observer: {
-                    precise: {},
+                    precise: {
+                        vision: { range: Infinity }
+                    },
                     imprecise: {
                         lifesense: { range: 60 },
                         scent: { range: 30 },
@@ -398,7 +402,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                 target: {
                     lightingLevel: 'bright',
                     concealment: false,
-                    auxiliary: [],
+                    auxiliary: ['invisible'],
                     traits: [], // Living creature
                     movementAction: null
                 },

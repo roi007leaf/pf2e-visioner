@@ -14,6 +14,7 @@ jest.mock('../../../scripts/services/HoverTooltips.js', () => ({
 }));
 
 import {
+  createSystemHiddenIndicator,
   drawSystemHiddenIndicatorFrame,
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
@@ -23,6 +24,44 @@ import {
   HoverTooltips,
   showVisibilityIndicators,
 } from '../../../scripts/services/HoverTooltips.js';
+
+function makePixiMock() {
+  const makeDisplayObject = () => ({
+    position: { set: jest.fn() },
+    anchor: { set: jest.fn() },
+    addChild: jest.fn(),
+    removeChild: jest.fn(),
+    destroy: jest.fn(),
+    clear: jest.fn(),
+    lineStyle: jest.fn(),
+    beginFill: jest.fn(),
+    drawRect: jest.fn(),
+    endFill: jest.fn(),
+    on: jest.fn(),
+  });
+
+  return {
+    Graphics: jest.fn(function Graphics() {
+      return makeDisplayObject();
+    }),
+    Container: jest.fn(function Container() {
+      return makeDisplayObject();
+    }),
+    Text: jest.fn(function Text(text, style) {
+      return {
+        ...makeDisplayObject(),
+        text,
+        style,
+      };
+    }),
+    TextStyle: jest.fn(function TextStyle(options) {
+      return options;
+    }),
+    Point: jest.fn(function Point(x, y) {
+      return { x, y };
+    }),
+  };
+}
 
 describe('system-hidden indicator rendering helpers', () => {
   const tokenDispositions = {
@@ -43,7 +82,7 @@ describe('system-hidden indicator rendering helpers', () => {
         observerIsBlindAndDeaf: true,
         shouldShowThoughtsenseIndicator: true,
       }),
-    ).toBe(0x555555);
+    ).toBe(0x9400d3);
   });
 
   test('targeting color follows token disposition and falls back to mode color', () => {
@@ -134,5 +173,74 @@ describe('system-hidden indicator rendering helpers', () => {
     expect(HoverTooltips.tooltipMode).toBe('target');
     expect(HoverTooltips.currentHoveredToken).toBe(token);
     expect(showVisibilityIndicators).toHaveBeenCalledWith(token);
+  });
+
+  test('presence-only indicator tick keeps token body, effects, and soundwave hidden', async () => {
+    const pixi = makePixiMock();
+    const parent = {
+      addChild: jest.fn((child) => {
+        child.parent = parent;
+      }),
+    };
+    const token = {
+      document: { id: 'target', width: 1, x: 100, y: 100, disposition: 0 },
+      center: { x: 125, y: 125 },
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      effects: { visible: false },
+      detectionFilter: null,
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    };
+    const observer = { document: { id: 'observer' } };
+    const canvasLayer = {
+      ready: true,
+      grid: { size: 50 },
+      interface: parent,
+      tokens: { get: jest.fn(() => token) },
+    };
+
+    const indicator = await createSystemHiddenIndicator({
+      observer,
+      token,
+      indicatorMode: 'thoughtsense',
+      shouldShowThoughtsenseIndicator: true,
+      canvasLayer,
+      pixi,
+    });
+
+    token.visible = true;
+    token.renderable = true;
+    token.mesh.visible = true;
+    token.mesh.renderable = true;
+    token.mesh.alpha = 1;
+    token.effects.visible = true;
+    token.detectionFilter = { id: 'recreated-soundwave' };
+    token.detectionFilterMesh.visible = true;
+    token.detectionFilterMesh.renderable = true;
+    token.detectionFilterMesh.alpha = 1;
+
+    indicator._pvAnimateFunction();
+
+    expect(token._pvPresenceOnlyRenderSuppression).toMatchObject({
+      mode: 'thoughtsense',
+      observerId: 'observer',
+    });
+    expect(token).toMatchObject({
+      visible: false,
+      renderable: false,
+      mesh: {
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      },
+      effects: { visible: false },
+      detectionFilter: null,
+      detectionFilterMesh: {
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      },
+    });
   });
 });

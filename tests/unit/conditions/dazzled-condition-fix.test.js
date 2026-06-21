@@ -216,7 +216,7 @@ describe('Dazzled Condition - Correct Implementation', () => {
     });
 
     describe('Edge cases', () => {
-        test('dazzled observer with NO visual sense but precise thoughtsense sees OBSERVED', () => {
+        test('dazzled observer with NO visual sense can use precise thoughtsense', () => {
             const input = {
                 target: {
                     lightingLevel: 'bright',
@@ -234,9 +234,8 @@ describe('Dazzled Condition - Correct Implementation', () => {
             };
 
             const result = calculateVisibility(input);
-            // Thoughtsense is not affected by dazzled
             expect(result.state).toBe('observed');
-            expect(result.detection.sense).toBe('thoughtsense');
+            expect(result.detection).toMatchObject({ sense: 'thoughtsense', isPrecise: true });
         });
 
         test('not dazzled observer with only vision sees OBSERVED', () => {

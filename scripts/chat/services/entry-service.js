@@ -78,7 +78,7 @@ export async function handleRenderChatMessage(message, html) {
             console.warn('[PF2E Visioner] Point Out: Failed to show warning dialog:', err);
             // Fallback notification if dialog fails
             try {
-              import('../infra/notifications.js').then(({ notify }) =>
+              import('./infra/notifications.js').then(({ notify }) =>
                 notify?.warn?.('Point Out requires a selected target token.'),
               );
             } catch {}
