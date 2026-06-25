@@ -9,13 +9,6 @@ import {
   flushDetectionBatch,
   startDetectionBatch,
 } from '../../../stores/detection-map.js';
-import {
-  currentPendingMovementSightLineSeesTarget,
-  getRecentCompletedMovementVisibilityStateForObserver,
-  hasRecentCompletedMovementRefreshTargetForObserver,
-  hasPendingMovementEntryForPair,
-  recentCompletedMovementFinalSightLineSeesTarget,
-} from '../../../services/PendingMovement/pending-movement-sight-line.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -1012,59 +1005,11 @@ export class BatchOrchestrator {
     return clearExplicitVisiblePair(update.observer, update.target);
   }
 
-  _resolvePendingMovementVisibilityUpdate(update, currentVisibility) {
-    const nextVisibility = update?.visibility;
-    if (!update?.observer || !update?.target) return nextVisibility;
-
-    const hasPendingMovementPair = hasPendingMovementEntryForPair(update.observer, update.target);
-    const hasRecentCompletedMovementPair = hasRecentCompletedMovementRefreshTargetForObserver(
-      update.observer,
-      update.target,
-    );
-
-    if (
-      (currentVisibility === 'observed' || currentVisibility === 'concealed') &&
-      nextVisibility === 'hidden'
-    ) {
-      if (!hasPendingMovementPair && !hasRecentCompletedMovementPair) return nextVisibility;
-
-      if (hasPendingMovementPair) {
-        return currentPendingMovementSightLineSeesTarget(update.observer, update.target)
-          ? currentVisibility
-          : nextVisibility;
-      }
-
-      return recentCompletedMovementFinalSightLineSeesTarget(update.observer, update.target)
-        ? currentVisibility
-        : nextVisibility;
-    }
-
-    if (currentVisibility !== 'hidden') return nextVisibility;
-    if (nextVisibility !== 'observed' && nextVisibility !== 'concealed') {
-      return nextVisibility;
-    }
-
-    const recentCompletedMovementVisibility =
-      update.explicitVisiblePair === true
-        ? getRecentCompletedMovementVisibilityStateForObserver(update.observer, update.target)
-        : null;
-    if (!hasPendingMovementPair && recentCompletedMovementVisibility === currentVisibility) {
-      return currentVisibility;
-    }
-    const recentCompletedFinalSightLineSeesTarget =
-      update.explicitVisiblePair === true
-        ? recentCompletedMovementFinalSightLineSeesTarget(update.observer, update.target)
-        : null;
-    if (!hasPendingMovementPair && recentCompletedFinalSightLineSeesTarget === false) {
-      return currentVisibility;
-    }
-    const hasRecentCompletedRevealPair =
-      update.explicitVisiblePair === true && hasRecentCompletedMovementPair;
-    if (!hasPendingMovementPair && !hasRecentCompletedRevealPair) return nextVisibility;
-
-    return currentPendingMovementSightLineSeesTarget(update.observer, update.target)
-      ? nextVisibility
-      : currentVisibility;
+  _resolvePendingMovementVisibilityUpdate(update) {
+    // Freeze+settle contract: AVS is deferred during a move and only recomputes
+    // at move-end, so there is no during-move sight-line to reconcile against —
+    // apply the freshly computed visibility directly.
+    return update?.visibility;
   }
 
   /**

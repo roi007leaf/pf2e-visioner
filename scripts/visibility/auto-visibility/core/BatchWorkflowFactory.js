@@ -4,12 +4,7 @@ import { BatchOverrideValidationWorkflow } from './BatchOverrideValidationWorkfl
 import { BatchPostResultWorkflow } from './BatchPostResultWorkflow.js';
 import { BatchResultRenderLockWorkflow } from './BatchResultRenderLockWorkflow.js';
 import { BatchSuccessTelemetryWorkflow } from './BatchSuccessTelemetryWorkflow.js';
-import {
-  forceTokenInvisibleForObserverVisibility as defaultForceTokenInvisibleForObserverVisibility,
-  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
-  getPendingMovementObserverIds as defaultGetPendingMovementObserverIds,
-  refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
-} from '../../../services/PendingMovement/pending-movement-render-lock.js';
+import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/movement-tracking.js';
 
 export class BatchWorkflowFactory {
   #createDetectionBatchLifecycle;
@@ -67,10 +62,9 @@ export function createDefaultBatchWorkflowFactory({
     (globalThis.canvas?.tokens?.controlled || [])
       .map((token) => token?.document?.id)
       .filter(Boolean),
-  getActiveMovementTokenIds = defaultGetPendingMovementObserverIds,
-  forceTokenInvisibleForObserverVisibility =
-  defaultForceTokenInvisibleForObserverVisibility,
-  refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
+  getActiveMovementTokenIds = () => [],
+  forceTokenInvisibleForObserverVisibility = () => false,
+  refreshPendingMovementTokenVisibility = () => { },
   syncEphemeralEffectsForUpdates = async () => { },
   refreshPerceptionAfterBatch = async () => { },
   setSuppressLightingRefreshAfterBatch = () => { },
