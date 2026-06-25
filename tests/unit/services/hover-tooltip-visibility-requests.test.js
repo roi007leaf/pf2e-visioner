@@ -2,12 +2,11 @@ import {
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityIndicatorDecision,
   buildTooltipVisibilityRequests,
+  getTooltipCandidateTokens,
+  isTooltipTokenInEncounter,
   normalizeTooltipVisibilityState,
 } from '../../../scripts/services/HoverTooltip/hover-tooltip-visibility-requests.js';
-import {
-  clearPendingTokenMovementPosition,
-  setPendingTokenMovementPosition,
-} from '../../../scripts/services/PendingMovement/pending-token-movement.js';
+import { clearPendingTokenMovementPosition } from '../../../scripts/services/movement-tracking.js';
 
 function makeToken(id, { isOwner = true, isVisible = true } = {}) {
   return {
@@ -208,6 +207,59 @@ describe('hover tooltip visibility request planning', () => {
     ]);
   });
 
+  test('limits active encounter hover planning to encounter tokens', () => {
+    const subject = makeToken('subject');
+    const combatObserver = makeToken('combat-observer');
+    const offEncounterTokens = Array.from({ length: 100 }, (_, index) =>
+      makeToken(`off-encounter-${index}`),
+    );
+    const combat = {
+      combatants: [
+        { tokenId: subject.id },
+        { tokenId: combatObserver.id },
+      ],
+    };
+    const getVisibilityState = jest.fn((observer) =>
+      observer.id === combatObserver.id ? 'hidden' : 'observed',
+    );
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: subject,
+      allTokens: [subject, combatObserver, ...offEncounterTokens],
+      mode: 'target',
+      isGM: true,
+      getVisibilityState,
+      combat,
+    });
+
+    expect(getVisibilityState).toHaveBeenCalledTimes(1);
+    expect(getVisibilityState).toHaveBeenCalledWith(combatObserver, subject);
+    expect(requests).toEqual([
+      {
+        renderToken: combatObserver,
+        observerToken: combatObserver,
+        visibilityState: 'hidden',
+        mode: 'target',
+        detectionTarget: subject,
+        senseUsed: null,
+      },
+    ]);
+  });
+
+  test('keeps non-encounter hover planning scene-wide during active combat', () => {
+    const subject = makeToken('subject');
+    const combatToken = makeToken('combat-token');
+    const outsider = makeToken('outsider');
+    const combat = {
+      combatants: [{ tokenId: combatToken.id }],
+    };
+
+    expect(isTooltipTokenInEncounter(subject, combat)).toBe(false);
+    expect(getTooltipCandidateTokens([subject, combatToken, outsider], subject, { combat })).toEqual(
+      [subject, combatToken, outsider],
+    );
+  });
+
   test('returns no player requests for non-owned subject token', () => {
     const subject = makeToken('subject', { isOwner: false });
     const observer = makeToken('observer');
@@ -220,60 +272,6 @@ describe('hover tooltip visibility request planning', () => {
         isGM: false,
       }),
     ).toEqual([]);
-  });
-
-  test('uses render state without querying isVisible for hidden soundwave tokens during pending movement', () => {
-    const originalCanvas = global.canvas;
-    const observer = createMockToken({
-      id: 'observer',
-      flags: {
-        'pf2e-visioner': {
-          visibility: {
-            target: 'hidden',
-          },
-        },
-      },
-    });
-    const target = createMockToken({ id: 'target', visible: true });
-    target.detectionFilter = { id: 'soundwave-filter' };
-    const isVisibleGetter = jest.fn(() => true);
-    Object.defineProperty(target, 'isVisible', {
-      configurable: true,
-      get: isVisibleGetter,
-    });
-    global.canvas = {
-      ...global.canvas,
-      effects: {
-        visionSources: new Map([['observer', { active: true, object: observer }]]),
-        lightSources: new Map(),
-      },
-      tokens: {
-        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
-        placeables: [observer, target],
-      },
-    };
-
-    try {
-      setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-      const requests = buildTooltipVisibilityRequests({
-        subjectToken: observer,
-        allTokens: [observer, target],
-        mode: 'observer',
-        isGM: true,
-        getVisibilityMap: () => ({ target: 'hidden' }),
-      });
-
-      expect(requests).toHaveLength(1);
-      expect(requests[0]).toMatchObject({
-        renderToken: target,
-        observerToken: observer,
-        visibilityState: 'hidden',
-      });
-      expect(isVisibleGetter).not.toHaveBeenCalled();
-    } finally {
-      global.canvas = originalCanvas;
-    }
   });
 
   test('uses render state without querying isVisible for hidden soundwave tokens during controlled drag preview', () => {

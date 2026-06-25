@@ -103,7 +103,7 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledTimes(1);
   });
 
-  test('keeps moved-token highlight refresh active while pending movement render work exists', async () => {
+  test('skips moved-token highlight refresh while pending movement is still active', async () => {
     const refreshSystemHiddenHighlightsForMovedToken = jest.fn().mockResolvedValue(undefined);
 
     const result = await handleTokenUpdated(
@@ -111,16 +111,13 @@ describe('token render lifecycle service', () => {
       { x: 100 },
       {
         schedulePendingTokenMovementCompletion: jest.fn(),
-        hasPendingMovementRenderWork: () => true,
+        hasActivePendingTokenMovement: () => true,
         refreshSystemHiddenHighlightsForMovedToken,
       },
     );
 
     expect(result).toEqual({ handled: true });
-    expect(refreshSystemHiddenHighlightsForMovedToken).toHaveBeenCalledWith(
-      { id: 'token-1' },
-      { x: 100 },
-    );
+    expect(refreshSystemHiddenHighlightsForMovedToken).not.toHaveBeenCalled();
   });
 
   test('warns when moved-token highlight refresh fails', async () => {
@@ -167,38 +164,6 @@ describe('token render lifecycle service', () => {
 
     expect(result).toEqual({ handled: false, reason: 'not-controlled' });
     expect(result?.then).toBeUndefined();
-  });
-
-  test('re-hides pending render-locked token surfaces after core refresh', async () => {
-    const token = {
-      document: { id: 'target' },
-      visible: true,
-      renderable: true,
-      mesh: { visible: true, renderable: true, alpha: 1 },
-      targetPips: { visible: true },
-      levelIndicator: { visible: true },
-    };
-    const forceTokenRenderStateInvisible = jest.fn((refreshedToken) => {
-      refreshedToken.visible = false;
-      refreshedToken.renderable = false;
-      refreshedToken.targetPips.visible = false;
-      refreshedToken.levelIndicator.visible = false;
-    });
-    const refreshSystemHiddenHighlightsForRenderedToken = jest.fn();
-
-    const result = await handleTokenRefreshed(token, {
-      isRefreshTokenProcessingSuppressed: () => false,
-      hasPendingRenderState: () => true,
-      forceTokenRenderStateInvisible,
-      shouldRefreshRenderedTokenHighlights: () => false,
-      refreshSystemHiddenHighlightsForRenderedToken,
-    });
-
-    expect(result).toEqual({ handled: false, reason: 'pending-render-lock' });
-    expect(forceTokenRenderStateInvisible).toHaveBeenCalledWith(token);
-    expect(token.targetPips.visible).toBe(false);
-    expect(token.levelIndicator.visible).toBe(false);
-    expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
   });
 
   test('refreshes rendered-token highlights when refreshToken processing is not suppressed', async () => {
@@ -258,164 +223,14 @@ describe('token render lifecycle service', () => {
     expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
   });
 
-  test('refreshes pending movement visibility and highlights after AVS batch completion only when work is pending', async () => {
-    const refreshPendingMovementTokenVisibility = jest.fn();
+  test('refreshes system-hidden highlights after AVS batch completion', async () => {
     const refreshSystemHiddenHighlightsForControlledTokens = jest.fn();
 
     await expect(
       handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => false,
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens,
-      }),
-    ).resolves.toEqual({ handled: false, reason: 'no-pending-work' });
-    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
-    expect(refreshSystemHiddenHighlightsForControlledTokens).not.toHaveBeenCalled();
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => true,
-        refreshPendingMovementTokenVisibility,
         refreshSystemHiddenHighlightsForControlledTokens,
       }),
     ).resolves.toEqual({ handled: true });
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-    });
     expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
-  });
-
-  test('releases stale render-locks after AVS batch completion when no pending work remains', async () => {
-    const calls = [];
-    const refreshPendingMovementTokenVisibility = jest.fn(() => calls.push('refresh'));
-    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn();
-    const releaseAnimationSuppressionForStaleRelease = jest.fn(() => {
-      calls.push('release-suppression');
-      return true;
-    });
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => false,
-        getStaleRenderHiddenReleaseTargetIds: () => ['stale-target'],
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens,
-        releaseAnimationSuppressionForStaleRelease,
-      }),
-    ).resolves.toEqual({ handled: true, staleRenderRelease: true });
-
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete-stale-render-release',
-      targetTokenIds: ['stale-target'],
-    });
-    expect(releaseAnimationSuppressionForStaleRelease).toHaveBeenCalled();
-    expect(calls).toEqual(['release-suppression', 'refresh']);
-  });
-
-  test('still reports no pending work when no stale render-locks remain', async () => {
-    const refreshPendingMovementTokenVisibility = jest.fn();
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => false,
-        getStaleRenderHiddenReleaseTargetIds: () => [],
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
-      }),
-    ).resolves.toEqual({ handled: false, reason: 'no-pending-work' });
-    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
-  });
-
-  test('merges stale render-lock targets into pending-work AVS batch refresh', async () => {
-    const refreshPendingMovementTokenVisibility = jest.fn();
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => true,
-        getPendingMovementRefreshTargetIds: () => ['target'],
-        getStaleRenderHiddenReleaseTargetIds: () => ['stale-target'],
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
-      }),
-    ).resolves.toEqual({ handled: true });
-
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-      targetTokenIds: ['target', 'stale-target'],
-    });
-  });
-
-  test('sweeps stale render-locks again after AVS batch completion until released', async () => {
-    jest.useFakeTimers();
-    try {
-      const refreshPendingMovementTokenVisibility = jest.fn();
-      const staleIds = ['stale-target'];
-
-      await handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => true,
-        getPendingMovementRefreshTargetIds: () => [],
-        getStaleRenderHiddenReleaseTargetIds: () => staleIds,
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
-      });
-
-      const callsAfterHandler = refreshPendingMovementTokenVisibility.mock.calls.length;
-      jest.advanceTimersByTime(3000);
-      const sweepCalls = refreshPendingMovementTokenVisibility.mock.calls
-        .slice(callsAfterHandler)
-        .filter(([, options]) => options?.source === 'avs-batch-complete-stale-render-release');
-      expect(sweepCalls.length).toBeGreaterThan(0);
-      expect(sweepCalls[0][1].targetTokenIds).toEqual(['stale-target']);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('targets pending movement visibility refresh after AVS batch completion when targets are known', async () => {
-    const refreshPendingMovementTokenVisibility = jest.fn();
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => true,
-        getPendingMovementRefreshTargetIds: () => ['target'],
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
-      }),
-    ).resolves.toEqual({ handled: true });
-
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-      targetTokenIds: ['target'],
-    });
-  });
-
-  test('refreshes pending movement synchronously before system-hidden highlights after AVS batch completion', async () => {
-    const calls = [];
-    const refreshPendingMovementTokenVisibility = jest.fn(() => {
-      calls.push('pending');
-    });
-    const refreshSystemHiddenHighlightsForControlledTokens = jest.fn(() => {
-      calls.push('highlights');
-    });
-
-    await expect(
-      handleAvsBatchCompleteRefresh({
-        hasPendingMovementRenderWork: () => true,
-        getPendingMovementRefreshTargetIds: () => ['target'],
-        refreshPendingMovementTokenVisibility,
-        refreshSystemHiddenHighlightsForControlledTokens,
-      }),
-    ).resolves.toEqual({ handled: true });
-
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-      targetTokenIds: ['target'],
-    });
-    expect(calls).toEqual(['pending', 'highlights']);
   });
 });
