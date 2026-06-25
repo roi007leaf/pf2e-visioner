@@ -1,9 +1,6 @@
 import { MODULE_ID } from '../../constants.js';
 import { createCanDetectVisibilityWrapper } from './detection-can-detect.js';
-import {
-  wrapCanvasVisibilityRestrictVisibility,
-  wrapCanvasVisibilityTest,
-} from './detection-canvas-visibility.js';
+import { wrapCanvasVisibilityTest } from './detection-canvas-visibility.js';
 import { wrapTokenRenderDetectionFilter } from './detection-filter-render.js';
 import { testDetectionModeVisibility } from './detection-mode-visibility.js';
 import { wrapTokenRefreshVisibility, wrapTokenRefreshState, wrapTokenApplyRenderFlags } from './detection-token-refresh.js';
@@ -11,6 +8,7 @@ import {
   wrapTokenDocumentPrepareBaseData,
   wrapTokenVisionSource,
 } from './detection-vision-sharing.js';
+import { startDuringMoveSoundwaveOnDrag } from '../during-move-soundwave.js';
 import { VISIBILITY_DETECTION_THRESHOLDS } from './detection-visibility-context.js';
 
 export function registerDetectionWrappers({
@@ -32,12 +30,6 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
     MODULE_ID,
     'foundry.canvas.groups.CanvasVisibility.prototype.testVisibility',
     wrapCanvasVisibilityTest,
-    'WRAPPER',
-  );
-  libWrapperAdapter.register(
-    MODULE_ID,
-    'foundry.canvas.groups.CanvasVisibility.prototype.restrictVisibility',
-    wrapCanvasVisibilityRestrictVisibility,
     'WRAPPER',
   );
   libWrapperAdapter.register(
@@ -82,17 +74,18 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
     );
     libWrapperAdapter.register(
       MODULE_ID,
-      'foundry.canvas.placeables.Token.prototype._applyRenderFlags',
-      wrapTokenApplyRenderFlags,
-      'WRAPPER',
-    );
-    libWrapperAdapter.register(
-      MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._renderDetectionFilter',
       wrapTokenRenderDetectionFilter,
       'WRAPPER',
     );
     void wrapTokenRefreshState;
+    void wrapTokenApplyRenderFlags;
+    libWrapperAdapter.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._onDragLeftMove',
+      startDuringMoveSoundwaveOnDrag,
+      'WRAPPER',
+    );
     libWrapperAdapter.register(
       MODULE_ID,
       'TokenDocument.prototype.prepareBaseData',
