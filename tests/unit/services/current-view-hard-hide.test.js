@@ -1,0 +1,246 @@
+const controlled = [];
+let draggedToken = null;
+
+jest.mock('../../../scripts/services/gm-vision-bypass.js', () => ({
+  shouldBypassAvsForGmVision: jest.fn(() => false),
+}));
+jest.mock('../../../scripts/services/Detection/select-all-token-visibility-bypass.js', () => ({
+  isSelectAllTokenVisibilityBypassActive: jest.fn(() => false),
+}));
+jest.mock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
+  getVisionerVisibilityBetweenTokens: () => 'observed',
+}));
+
+import {
+  currentViewObservers,
+  targetIsHardHiddenFromCurrentView,
+  applyCurrentViewHardHide,
+  __setStoredVisibilityForTest,
+} from '../../../scripts/services/Detection/current-view-hard-hide.js';
+import { shouldBypassAvsForGmVision } from '../../../scripts/services/gm-vision-bypass.js';
+import { isSelectAllTokenVisibilityBypassActive } from '../../../scripts/services/Detection/select-all-token-visibility-bypass.js';
+
+beforeEach(() => {
+  controlled.length = 0;
+  draggedToken = null;
+  const tokens = {};
+  Object.defineProperty(tokens, 'controlled', { get: () => controlled, set: () => {}, configurable: true });
+  Object.defineProperty(tokens, '_draggedToken', { get: () => draggedToken, set: () => {}, configurable: true });
+  globalThis.canvas = { tokens };
+  shouldBypassAvsForGmVision.mockReturnValue(false);
+  isSelectAllTokenVisibilityBypassActive.mockReturnValue(false);
+});
+
+describe('currentViewObservers', () => {
+  it('returns controlled tokens', () => {
+    const a = { document: { id: 'a' } };
+    controlled.push(a);
+    expect(currentViewObservers().map((t) => t.document.id)).toEqual(['a']);
+  });
+
+  it('includes the dragged token and dedupes', () => {
+    const a = { document: { id: 'a' } };
+    draggedToken = a;
+    controlled.push(a);
+    expect(currentViewObservers().map((t) => t.document.id)).toEqual(['a']);
+  });
+});
+
+describe('targetIsHardHiddenFromCurrentView', () => {
+  const observer = { document: { id: 'obs' }, controlled: true };
+  function target(id, actorType = 'character', { hidden = false, invisible = false } = {}) {
+    return {
+      controlled: false,
+      document: { id, hidden },
+      actor: { type: actorType, itemTypes: { condition: invisible ? [{ slug: 'invisible' }] : [] } },
+    };
+  }
+  beforeEach(() => {
+    controlled.length = 0; controlled.push(observer);
+    globalThis.game = { user: { isGM: false } };
+    __setStoredVisibilityForTest(new Map());
+  });
+
+  it('undetected target is hard-hidden', () => {
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('unnoticed target is hard-hidden', () => {
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'unnoticed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('invisible + undetected is hard-hidden (covered by undetected branch)', () => {
+    const t = target('t', 'character', { invisible: true });
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('hidden NPC is NOT hard-hidden (shows soundwave)', () => {
+    const t = target('t', 'npc');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+  it('invisible + hidden NPC is NOT hard-hidden (soundwave, not hidden)', () => {
+    const t = target('t', 'npc', { invisible: true });
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+  it('hidden LOOT is hard-hidden (treated as undetected)', () => {
+    const t = target('t', 'loot');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('hidden HAZARD is hard-hidden', () => {
+    const t = target('t', 'hazard');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('observed target is NOT hard-hidden', () => {
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+  it('non-GM observer: foundry-hidden token is hard-hidden regardless of state', () => {
+    const t = target('t', 'character', { hidden: true });
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('GM observer: foundry-hidden token is NOT force-hidden by this rule', () => {
+    globalThis.game = { user: { isGM: true } };
+    const t = target('t', 'character', { hidden: true });
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+  it('the target itself when controlled is never hard-hidden', () => {
+    const t = target('t'); t.controlled = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('concealed target is NOT hard-hidden', () => {
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'concealed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('hidden character (non-loot/hazard) is NOT hard-hidden', () => {
+    const t = target('t', 'character');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('empty observer set → not hard-hidden (when not foundry-hidden)', () => {
+    controlled.length = 0;
+    draggedToken = null;
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('multiple observers: hidden for ANY observer → hard-hidden', () => {
+    const obs1 = { document: { id: 'obs1' }, controlled: true };
+    const obs2 = { document: { id: 'obs2' }, controlled: true };
+    controlled.length = 0;
+    controlled.push(obs1, obs2);
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([
+      ['obs1:t', 'observed'],
+      ['obs2:t', 'undetected'],
+    ]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+
+  it('GM-vision bypass active → not hard-hidden', () => {
+    shouldBypassAvsForGmVision.mockReturnValue(true);
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('select-all bypass active → not hard-hidden', () => {
+    isSelectAllTokenVisibilityBypassActive.mockReturnValue(true);
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+});
+
+describe('hard-hide decision cost (O(1), no LOS/wall work)', () => {
+  const observer = { document: { id: 'obs' }, controlled: true };
+  function target(id) {
+    return {
+      controlled: false,
+      document: { id, hidden: false },
+      actor: { type: 'character', itemTypes: { condition: [] } },
+    };
+  }
+  beforeEach(() => {
+    controlled.length = 0;
+    controlled.push(observer);
+    globalThis.game = { user: { isGM: false } };
+  });
+
+  it('reads the stored-visibility getter at most once per observer and runs no LOS testVisibility', () => {
+    const backing = new Map([['obs:t', 'undetected']]);
+    const getSpy = jest.fn((key) => backing.get(key));
+    __setStoredVisibilityForTest({ get: getSpy });
+
+    const testVisibility = jest.fn(() => {
+      throw new Error('hard-hide decision must not run LOS testVisibility');
+    });
+    globalThis.canvas.visibility = { testVisibility };
+
+    const t = target('t');
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+
+    expect(getSpy).toHaveBeenCalledTimes(1);
+    expect(getSpy).toHaveBeenCalledWith('obs:t');
+    expect(testVisibility).not.toHaveBeenCalled();
+  });
+
+  it('source module imports no wall/LOS helpers', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../../scripts/services/Detection/current-view-hard-hide.js'),
+      'utf8',
+    );
+    expect(source).not.toContain('wall-sense-utils');
+    expect(source).not.toContain('lineOfSightBlocked');
+    expect(source).not.toContain('lineOfSoundBlocked');
+    expect(source).not.toContain('testVisibility');
+    expect(source).not.toContain('visionSources');
+  });
+});
+
+describe('applyCurrentViewHardHide', () => {
+  beforeEach(() => {
+    controlled.length = 0;
+    controlled.push({ document: { id: 'obs' }, controlled: true });
+    globalThis.game = { user: { isGM: false } };
+    __setStoredVisibilityForTest(new Map());
+  });
+
+  it('forces token + mesh invisible and clears the detection filter when hard-hidden', () => {
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      document: { id: 't', hidden: false }, actor: { type: 'loot', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t.mesh.renderable).toBe(false);
+    expect(t.mesh.alpha).toBe(0);
+    expect(t.detectionFilter).toBe(null);
+  });
+
+  it('leaves a non-hidden token untouched', () => {
+    const t = { controlled: false, visible: true, renderable: true, mesh: { visible: true },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+  });
+});
