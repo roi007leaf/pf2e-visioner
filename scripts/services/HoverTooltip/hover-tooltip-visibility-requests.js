@@ -1,5 +1,3 @@
-import { shouldSkipPendingMovementTokenVisibilityRefresh } from '../PendingMovement/pending-movement-render-lock.js';
-
 export const SENSE_BADGE_BLOCKED_VISIBILITY_STATES = new Set(['undetected', 'unnoticed']);
 
 export function normalizeTooltipVisibilityState(visibilityState) {
@@ -8,7 +6,6 @@ export function normalizeTooltipVisibilityState(visibilityState) {
 
 export function canRenderTooltipToken(token) {
   if (!token) return false;
-  if (shouldSkipPendingMovementTokenVisibilityRefresh(token)) return true;
 
   const detectionFilterMesh = token.detectionFilterMesh;
   if (

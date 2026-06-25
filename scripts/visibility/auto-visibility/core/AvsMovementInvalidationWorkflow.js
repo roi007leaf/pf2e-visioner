@@ -3,9 +3,7 @@ import {
   setLastMovedTokenId,
   setSuppressTokenMovementLightingRefresh,
 } from '../../../services/runtime-state.js';
-import {
-  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
-} from '../../../services/PendingMovement/pending-movement-render-lock.js';
+import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/movement-tracking.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 
 function hasTakeCoverTrackingFlag(flagData) {
