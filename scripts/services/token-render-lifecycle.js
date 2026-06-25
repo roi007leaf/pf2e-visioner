@@ -9,9 +9,9 @@ import {
   cleanupOrphanedSoundwaveMeshes as defaultCleanupOrphanedSoundwaveMeshes,
   getStaleRenderHiddenCurrentViewTargetIds as defaultGetStaleRenderHiddenReleaseTargetIds,
   releasePendingMovementAnimationSuppressionForStaleRenderRelease as defaultReleaseAnimationSuppressionForStaleRelease,
-  schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
   targetIsRenderHiddenForCurrentViewObserver,
 } from './PendingMovement/pending-token-movement.js';
+import { schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion } from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   getMatchingControlledTokenForRefresh,
