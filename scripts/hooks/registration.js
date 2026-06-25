@@ -28,7 +28,6 @@ import { handlePreCreateChatMessage } from '../chat/services/pre-create-message.
 import { clearActorFeatureCache } from '../utils/actor-features.js';
 import { clearActiveSceneHearingRangeCache } from '../services/scene-hearing-range.js';
 import { clearActorConditionSlugCache } from '../services/sense-distance.js';
-import { clearPendingMovementWallGeometryCache } from '../services/PendingMovement/pending-movement-wall-blocking.js';
 import {
   initializeDeferredSeekManager,
   initializeTurnSneakTracker,
@@ -55,7 +54,6 @@ export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
   Hooks.on('canvasReady', () => {
-    clearPendingMovementWallGeometryCache();
     watchCurrentScenePreparedSenses();
   });
 
@@ -133,15 +131,12 @@ export async function registerHooks() {
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
-    clearPendingMovementWallGeometryCache();
     await handleWallCreated();
   });
   Hooks.on('updateWall', async (doc, changes) => {
-    clearPendingMovementWallGeometryCache();
     await handleWallUpdated(doc, changes);
   });
   Hooks.on('deleteWall', async (wallDocument) => {
-    clearPendingMovementWallGeometryCache();
     await handleWallDeleted(wallDocument);
   });
 
@@ -209,7 +204,6 @@ export async function registerHooks() {
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
   Hooks.on('updateScene', async (scene, changes) => {
     clearActiveSceneHearingRangeCache(scene);
-    clearPendingMovementWallGeometryCache();
     await handleSceneDisableAvsRefresh(scene, changes);
   });
 }
