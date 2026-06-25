@@ -106,6 +106,7 @@ export function handlePreUpdateTokenMovement(
   const movementRecorded = recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
     userId,
     hookOptions: options,
+    predictFinalVisibility: true,
   });
 
   if (movementRecorded) {

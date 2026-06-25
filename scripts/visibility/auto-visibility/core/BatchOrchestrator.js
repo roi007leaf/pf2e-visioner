@@ -9,6 +9,7 @@ import {
   flushDetectionBatch,
   startDetectionBatch,
 } from '../../../stores/detection-map.js';
+import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/movement-tracking.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -92,6 +93,8 @@ export class BatchOrchestrator {
     this.positionManager = dependencies.positionManager || null;
     this.overrideValidationManager = dependencies.overrideValidationManager || null;
     this.moduleId = dependencies.moduleId;
+    this._hasActivePendingTokenMovement =
+      dependencies.hasActivePendingTokenMovement || defaultHasActivePendingTokenMovement;
     this.nowProvider =
       dependencies.nowProvider ||
       (() => {
@@ -185,6 +188,7 @@ export class BatchOrchestrator {
     this._movementPerformanceTotals = {
       suppressedLightingRefreshes: 0,
     };
+    this._pendingPostMovementPerceptionRefresh = false;
   }
 
   _getPostBatchPerceptionRefreshSuppression() {
@@ -256,8 +260,15 @@ export class BatchOrchestrator {
     this._flushMovementStop();
   }
 
-  isTokenMovementActive() {
-    return this._isTokenMoving || !!this._movementSession;
+  isTokenMovementActive({
+    includeMovementSession = true,
+    includePendingMovementService = true,
+  } = {}) {
+    return (
+      this._isTokenMoving ||
+      (includeMovementSession && !!this._movementSession) ||
+      (includePendingMovementService && this._hasActivePendingTokenMovement())
+    );
   }
 
   recordMovementLightingRefreshSuppressed() {
@@ -339,6 +350,7 @@ export class BatchOrchestrator {
       this._movementSession = null;
       this._movingTokenIds.clear();
       this._movingTokenAnimationStartedAt.clear();
+      this._flushDeferredPostMovementPerceptionRefresh();
     }
   }
 
@@ -472,6 +484,7 @@ export class BatchOrchestrator {
       resultApplication: 0,
     };
     const movementSession = options.movementSession || null;
+    const isFinalMovementBatch = !!movementSession;
     const movementRevisionAtStart = this._movementRevision;
 
     // Check if AVS is disabled for the current scene
@@ -491,7 +504,9 @@ export class BatchOrchestrator {
 
     // CRITICAL: Don't process batch if tokens are still moving/animating
     // Wait for movement to complete to ensure accurate LOS calculations with final positions
-    const movementPreflightPlan = buildBatchPreflightPlan({ isTokenMoving: this._isTokenMoving });
+    const movementPreflightPlan = buildBatchPreflightPlan({
+      isTokenMoving: !isFinalMovementBatch && this.isTokenMovementActive(),
+    });
     if (!movementPreflightPlan.shouldProcess) {
       if (movementPreflightPlan.shouldQueueChangedTokens) {
         for (const id of changedTokens) {
@@ -857,7 +872,40 @@ export class BatchOrchestrator {
    * This prevents the need for users to reselect tokens to see visibility changes.
    * @private
    */
-  async _refreshPerceptionAfterBatch() {
+  async _refreshPerceptionAfterBatch({ isMovementBatch = false, force = false } = {}) {
+    if (
+      !force &&
+      !isMovementBatch &&
+      this.isTokenMovementActive({
+        includeMovementSession: false,
+        includePendingMovementService: true,
+      })
+    ) {
+      this._pendingPostMovementPerceptionRefresh = true;
+      return;
+    }
+
+    this._pendingPostMovementPerceptionRefresh = false;
+    return this._performPostBatchPerceptionRefresh();
+  }
+
+  _flushDeferredPostMovementPerceptionRefresh() {
+    if (!this._pendingPostMovementPerceptionRefresh) return false;
+    if (
+      this.isTokenMovementActive({
+        includeMovementSession: false,
+        includePendingMovementService: true,
+      })
+    ) {
+      return false;
+    }
+
+    this._pendingPostMovementPerceptionRefresh = false;
+    this._performPostBatchPerceptionRefresh();
+    return true;
+  }
+
+  async _performPostBatchPerceptionRefresh() {
     try {
       // Set flag to suppress lighting refresh events during perception update
       // This prevents feedback loops where perception.update triggers lightingRefresh
@@ -1012,6 +1060,58 @@ export class BatchOrchestrator {
     return update?.visibility;
   }
 
+  async _validateVisibleUpdatesAgainstCurrentVisibility(updates = []) {
+    const calculator = this.optimizedVisibilityCalculator;
+    if (!calculator?.calculateVisibility) return updates;
+
+    const validatedUpdates = [];
+    for (const update of updates) {
+      const nextVisibility = update?.visibility;
+      if (nextVisibility !== 'observed' && nextVisibility !== 'concealed') {
+        validatedUpdates.push(update);
+        continue;
+      }
+      if (!update?.observer || !update?.target) {
+        validatedUpdates.push(update);
+        continue;
+      }
+
+      const currentVisibility = this.visibilityMapService.getVisibilityBetween
+        ? this.visibilityMapService.getVisibilityBetween(update.observer, update.target)
+        : this.visibilityMapService.getVisibilityMap(update.observer)?.[update.target.document?.id] ||
+          'observed';
+      if (currentVisibility !== 'hidden' && currentVisibility !== 'undetected') {
+        validatedUpdates.push(update);
+        continue;
+      }
+
+      try {
+        const calculatedVisibility = await calculator.calculateVisibility(
+          update.observer,
+          update.target,
+          {
+            isMovementBatch: update?.isMovementBatch === true,
+            skipCache: true,
+            skipPrecomputedLOS: true,
+          },
+        );
+        if (calculatedVisibility === 'hidden' || calculatedVisibility === 'undetected') {
+          validatedUpdates.push({
+            ...update,
+            visibility: currentVisibility,
+            explicitVisiblePair: false,
+          });
+          continue;
+        }
+      } catch {
+        /* keep original update if validation cannot run */
+      }
+
+      validatedUpdates.push(update);
+    }
+    return validatedUpdates;
+  }
+
   /**
    * Apply batch results with deduplication.
    * @param {Object} batchResult - Result from BatchProcessor
@@ -1023,6 +1123,9 @@ export class BatchOrchestrator {
     if (!game.user.isGM || !batchResult.updates || batchResult.updates.length === 0) {
       return 0;
     }
+    batchResult.updates = await this._validateVisibleUpdatesAgainstCurrentVisibility(
+      batchResult.updates,
+    );
 
     const applicationPlan = buildBatchResultApplicationPlan({
       updates: batchResult.updates,

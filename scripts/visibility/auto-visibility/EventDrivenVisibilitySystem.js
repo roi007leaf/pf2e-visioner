@@ -366,7 +366,6 @@ export class EventDrivenVisibilitySystem {
     };
     return {
       ...movementSnapshot,
-      pendingMovement: null,
     };
   }
 

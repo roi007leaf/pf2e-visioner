@@ -34,7 +34,7 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
 const controlTokenSelectionRecalcState = {
   signatures: new Map(),
 };
-const CONTROL_TOKEN_RECALC_DELAY_MS = 180;
+const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
 const CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS = 700;
 const CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS = 180;
 const CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS = 180;

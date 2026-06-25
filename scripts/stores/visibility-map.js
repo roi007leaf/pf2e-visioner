@@ -705,6 +705,9 @@ export async function setPerceptionProfileBetween(
     ) {
       clearDetectionFilterVisuals(target);
     }
+    if (legacyState === 'hidden') {
+      refreshHiddenDetectionFilterVisualsForChanges([{ to: legacyState, targetId }]);
+    }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }
 
