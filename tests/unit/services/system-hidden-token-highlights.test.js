@@ -11,6 +11,7 @@ import {
   refreshSystemHiddenHighlightsForControlledTokens,
   refreshSystemHiddenHighlightsForMovedToken,
   refreshSystemHiddenHighlightsForRenderedToken,
+  removeSystemHiddenIndicatorsForObservedTargets,
   resolveSystemHiddenObserver,
   shouldEvaluateSystemHiddenIndicators,
 } from '../../../scripts/services/system-hidden-token-highlights.js';
@@ -659,5 +660,61 @@ describe('system-hidden indicator render lifecycle', () => {
       baseTexture: false,
     });
     expect(token._pvSystemHiddenIndicator).toBeNull();
+  });
+});
+
+describe('removeSystemHiddenIndicatorsForObservedTargets', () => {
+  test('removes the indicator when its observer now observes the target', async () => {
+    const removeSystemHiddenIndicator = jest.fn();
+    const observer = { document: { id: 'observer' } };
+    const target = {
+      document: { id: 'target' },
+      _pvSystemHiddenIndicator: { _pvObserverId: 'observer' },
+    };
+
+    const result = await removeSystemHiddenIndicatorsForObservedTargets({
+      getTokens: () => [observer, target],
+      getObserverById: (id) => (id === 'observer' ? observer : null),
+      getVisibilityState: () => 'observed',
+      loadVisualEffects: async () => ({ removeSystemHiddenIndicator }),
+    });
+
+    expect(removeSystemHiddenIndicator).toHaveBeenCalledWith(target);
+    expect(result).toEqual({ removed: 1 });
+  });
+
+  test('keeps the indicator while the target stays hidden', async () => {
+    const removeSystemHiddenIndicator = jest.fn();
+    const observer = { document: { id: 'observer' } };
+    const target = {
+      document: { id: 'target' },
+      _pvSystemHiddenIndicator: { _pvObserverId: 'observer' },
+    };
+
+    const result = await removeSystemHiddenIndicatorsForObservedTargets({
+      getTokens: () => [observer, target],
+      getObserverById: (id) => (id === 'observer' ? observer : null),
+      getVisibilityState: () => 'hidden',
+      loadVisualEffects: async () => ({ removeSystemHiddenIndicator }),
+    });
+
+    expect(removeSystemHiddenIndicator).not.toHaveBeenCalled();
+    expect(result).toEqual({ removed: 0 });
+  });
+
+  test('ignores tokens without a system-hidden indicator', async () => {
+    const removeSystemHiddenIndicator = jest.fn();
+    const getVisibilityState = jest.fn(() => 'observed');
+
+    const result = await removeSystemHiddenIndicatorsForObservedTargets({
+      getTokens: () => [{ document: { id: 'plain' } }],
+      getObserverById: () => ({ document: { id: 'observer' } }),
+      getVisibilityState,
+      loadVisualEffects: async () => ({ removeSystemHiddenIndicator }),
+    });
+
+    expect(getVisibilityState).not.toHaveBeenCalled();
+    expect(removeSystemHiddenIndicator).not.toHaveBeenCalled();
+    expect(result).toEqual({ removed: 0 });
   });
 });

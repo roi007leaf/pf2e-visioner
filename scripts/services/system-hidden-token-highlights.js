@@ -315,3 +315,38 @@ export async function refreshSystemHiddenHighlightsForRenderedToken(
   await updateSystemHiddenTokenHighlights(controlledToken.document.id);
   return { refreshed: true };
 }
+
+export async function removeSystemHiddenIndicatorsForObservedTargets({
+  getTokens = () => globalThis.canvas?.tokens?.placeables || [],
+  getObserverById = (id) => globalThis.canvas?.tokens?.get?.(id) ?? null,
+  getVisibilityState = null,
+  loadVisualEffects = loadDefaultVisualEffects,
+} = {}) {
+  const candidates = (getTokens() || []).filter((token) => token?._pvSystemHiddenIndicator);
+  if (candidates.length === 0) {
+    return { removed: 0 };
+  }
+
+  const { removeSystemHiddenIndicator } = await loadVisualEffects();
+  const resolveVisibility =
+    getVisibilityState ?? (await import('../utils.js')).getVisibilityBetween;
+  if (
+    typeof resolveVisibility !== 'function' ||
+    typeof removeSystemHiddenIndicator !== 'function'
+  ) {
+    return { removed: 0 };
+  }
+
+  let removed = 0;
+  for (const token of candidates) {
+    const observerId = token._pvSystemHiddenIndicator?._pvObserverId;
+    const observer = observerId ? getObserverById(observerId) : null;
+    if (!observer) continue;
+    const state = resolveVisibility(observer, token);
+    if (state === 'observed' || state === 'concealed') {
+      removeSystemHiddenIndicator(token);
+      removed += 1;
+    }
+  }
+  return { removed };
+}

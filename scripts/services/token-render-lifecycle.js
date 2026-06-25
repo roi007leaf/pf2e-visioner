@@ -8,6 +8,7 @@ import {
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
   refreshSystemHiddenHighlightsForControlledTokens as defaultRefreshSystemHiddenHighlightsForControlledTokens,
   refreshSystemHiddenHighlightsForRenderedToken as defaultRefreshSystemHiddenHighlightsForRenderedToken,
+  removeSystemHiddenIndicatorsForObservedTargets as defaultRemoveSystemHiddenIndicatorsForObservedTargets,
 } from './system-hidden-token-highlights.js';
 import { handlePreUpdateTokenMovement as defaultHandlePreUpdateTokenMovement } from './token-movement-preupdate.js';
 
@@ -141,9 +142,12 @@ export function handleTokenRefreshed(
 export async function handleAvsBatchCompleteRefresh({
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
+  removeSystemHiddenIndicatorsForObservedTargets =
+  defaultRemoveSystemHiddenIndicatorsForObservedTargets,
 } = {}) {
   try {
     await refreshSystemHiddenHighlightsForControlledTokens();
+    await removeSystemHiddenIndicatorsForObservedTargets();
     return { handled: true };
   } catch {
     return { handled: false, reason: 'error' };
