@@ -679,7 +679,7 @@ describe('removeSystemHiddenIndicatorsForObservedTargets', () => {
       loadVisualEffects: async () => ({ removeSystemHiddenIndicator }),
     });
 
-    expect(removeSystemHiddenIndicator).toHaveBeenCalledWith(target);
+    expect(removeSystemHiddenIndicator).toHaveBeenCalledWith(target, { forceTokenVisible: true });
     expect(result).toEqual({ removed: 1 });
   });
 

@@ -344,7 +344,7 @@ export async function removeSystemHiddenIndicatorsForObservedTargets({
     if (!observer) continue;
     const state = resolveVisibility(observer, token);
     if (state === 'observed' || state === 'concealed') {
-      removeSystemHiddenIndicator(token);
+      removeSystemHiddenIndicator(token, { forceTokenVisible: true });
       removed += 1;
     }
   }
