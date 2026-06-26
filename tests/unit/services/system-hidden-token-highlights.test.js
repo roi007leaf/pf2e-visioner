@@ -465,6 +465,130 @@ describe('system-hidden token highlight service', () => {
       shouldShowBlindDeafIndicator: true,
     });
   });
+
+  function thoughtsenseObserver() {
+    return {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      distanceTo: jest.fn(() => 25),
+      actor: {
+        system: { perception: { senses: [{ type: 'thoughtsense', range: 60 }] } },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+  }
+
+  function thoughtsenseTarget({ visible = false } = {}) {
+    return {
+      visible,
+      renderable: visible,
+      document: { id: 'target', x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+  }
+
+  test('builds presence-only thoughtsense indicator for a sound-blocked thoughtsensed target even when GM-visible', () => {
+    const observer = thoughtsenseObserver();
+    const target = thoughtsenseTarget({ visible: true });
+    const isSoundBlocked = jest.fn(() => true);
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        getVisibilityState: jest.fn(() => 'hidden'),
+        isSoundBlocked,
+        canThoughtsenseDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: true,
+      indicatorMode: 'thoughtsense',
+      shouldShowThoughtsenseIndicator: true,
+    });
+    expect(isSoundBlocked).toHaveBeenCalledWith(observer, target);
+  });
+
+  test('builds thoughtsense indicator for a system-hidden sound-blocked thoughtsensed target', () => {
+    const observer = thoughtsenseObserver();
+    const target = thoughtsenseTarget({ visible: false });
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        isSoundBlocked: jest.fn(() => true),
+        canThoughtsenseDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: true,
+      indicatorMode: 'thoughtsense',
+      shouldShowThoughtsenseIndicator: true,
+    });
+  });
+
+  test('does not build thoughtsense indicator for an audible thoughtsensed target (soundwave wins)', () => {
+    const observer = thoughtsenseObserver();
+    const target = thoughtsenseTarget({ visible: false });
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        getVisibilityState: jest.fn(() => 'hidden'),
+        isSoundBlocked: jest.fn(() => false),
+        canThoughtsenseDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowThoughtsenseIndicator: false,
+    });
+  });
+
+  test('does not build thoughtsense indicator for an observed target', () => {
+    const observer = thoughtsenseObserver();
+    const target = thoughtsenseTarget({ visible: true });
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        getVisibilityState: jest.fn(() => 'observed'),
+        isSoundBlocked: jest.fn(() => true),
+        canThoughtsenseDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowThoughtsenseIndicator: false,
+    });
+  });
+
+  test('does not build thoughtsense indicator when the observer lacks thoughtsense', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      distanceTo: jest.fn(() => 25),
+      actor: {
+        system: { perception: { senses: [{ type: 'lifesense', range: 60 }] } },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+    const target = thoughtsenseTarget({ visible: false });
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        getVisibilityState: jest.fn(() => 'hidden'),
+        isSoundBlocked: jest.fn(() => true),
+        canThoughtsenseDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowThoughtsenseIndicator: false,
+    });
+  });
 });
 
 describe('system-hidden indicator render lifecycle', () => {

@@ -213,9 +213,7 @@ export function buildSystemHiddenIndicatorDecision({
     thoughtsenseRange === Infinity || distanceInFeet <= thoughtsenseRange;
   const isWithinEcholocationRange =
     echolocationRange === Infinity || distanceInFeet <= echolocationRange;
-  const visibilityState = senseContext?.observerIsBlindAndDeaf
-    ? getVisibilityState?.(observer, token)
-    : null;
+  const visibilityState = getVisibilityState?.(observer, token) ?? null;
   const isHiddenFromObserver = visibilityState === 'hidden';
   const detectedByEcholocation =
     SYSTEM_HIDDEN_AUDITORY_PRECISE_SENSES.has(detection?.sense) && detection?.isPrecise !== false;
@@ -225,7 +223,11 @@ export function buildSystemHiddenIndicatorDecision({
   const shouldShowLifesenseIndicator =
     isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
   const shouldShowThoughtsenseIndicator =
-    isSystemHidden && canBeDetectedByThoughtsense && isWithinThoughtsenseRange;
+    !!senseContext?.observerHasThoughtsense &&
+    canBeDetectedByThoughtsense &&
+    isWithinThoughtsenseRange &&
+    (isSystemHidden || isHiddenFromObserver) &&
+    getSoundBlocked({ observer, token, isSoundBlocked });
   const shouldShowEcholocationIndicator =
     isSystemHidden &&
     !!senseContext?.observerHasEcholocation &&

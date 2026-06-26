@@ -37,6 +37,7 @@ import {
   ensureSystemHiddenKeyHandlerInstalled,
   removeSystemHiddenIndicator,
 } from './system-hidden-indicator-rendering.js';
+import { isPresenceOnlyIndicatorMode } from './system-hidden-presence-only-suppression.js';
 import { HoverTooltips } from './HoverTooltips.js';
 import {
   refreshTokenVisual,
@@ -334,7 +335,9 @@ export async function updateSystemHiddenTokenHighlights(
 
       // If indicator exists but shouldn't, remove it
       if (existingIndicator && !shouldShowIndicator) {
-        removeSystemHiddenIndicator(token);
+        removeSystemHiddenIndicator(token, {
+          forceTokenVisible: isPresenceOnlyIndicatorMode(existingIndicator._pvIndicatorMode),
+        });
         continue;
       }
 
