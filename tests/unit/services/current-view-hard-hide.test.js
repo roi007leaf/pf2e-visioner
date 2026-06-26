@@ -16,6 +16,7 @@ import {
   targetIsHardHiddenFromCurrentView,
   applyCurrentViewHardHide,
   releaseCurrentViewHardHide,
+  releaseCurrentViewHardHideIfMarked,
   releaseAllCurrentViewHardHide,
   __setStoredVisibilityForTest,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
@@ -244,6 +245,78 @@ describe('applyCurrentViewHardHide', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
     expect(applyCurrentViewHardHide(t)).toBe(false);
     expect(t.visible).toBe(true);
+  });
+
+  it('marks tokens it hard-hides', () => {
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    applyCurrentViewHardHide(t);
+    expect(t._pvCurrentViewHardHidden).toBe(true);
+  });
+
+  it('releases a token it previously hard-hid once it is no longer hard-hidden (undetected -> hidden)', () => {
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    applyCurrentViewHardHide(t);
+    expect(t.mesh.visible).toBe(false);
+
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.mesh.visible).toBe(true);
+    expect(t.renderable).toBe(true);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('does not restore a mesh it never hard-hid (presence-only meshes stay hidden)', () => {
+    const presenceOnly = { controlled: false, renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 'p', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:p', 'hidden']]));
+    expect(applyCurrentViewHardHide(presenceOnly)).toBe(false);
+    expect(presenceOnly.mesh.visible).toBe(false);
+  });
+});
+
+describe('releaseCurrentViewHardHideIfMarked', () => {
+  beforeEach(() => {
+    controlled.length = 0;
+    controlled.push({ document: { id: 'obs' }, controlled: true });
+    globalThis.game = { user: { isGM: false } };
+    __setStoredVisibilityForTest(new Map());
+  });
+
+  function markedHidden() {
+    return { controlled: false, renderable: false, _pvCurrentViewHardHidden: true,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+  }
+
+  it('releases a marked token that is no longer hard-hidden', () => {
+    const t = markedHidden();
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(releaseCurrentViewHardHideIfMarked(t)).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('keeps a marked token hidden while it is still hard-hidden', () => {
+    const t = markedHidden();
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(releaseCurrentViewHardHideIfMarked(t)).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBe(true);
+  });
+
+  it('no-ops for an unmarked token', () => {
+    const t = markedHidden();
+    delete t._pvCurrentViewHardHidden;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(releaseCurrentViewHardHideIfMarked(t)).toBe(false);
+    expect(t.mesh.visible).toBe(false);
   });
 });
 

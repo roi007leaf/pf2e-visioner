@@ -55,7 +55,10 @@ function foundryHiddenRequiresVisionerRenderLock(target) {
 }
 
 export function applyCurrentViewHardHide(token) {
-  if (!targetIsHardHiddenFromCurrentView(token)) return false;
+  if (!targetIsHardHiddenFromCurrentView(token)) {
+    releaseCurrentViewHardHideIfMarked(token);
+    return false;
+  }
   token.visible = false;
   token.renderable = false;
   if (token.mesh) {
@@ -64,7 +67,16 @@ export function applyCurrentViewHardHide(token) {
     if ('alpha' in token.mesh) token.mesh.alpha = 0;
   }
   token.detectionFilter = null;
+  token._pvCurrentViewHardHidden = true;
   return true;
+}
+
+export function releaseCurrentViewHardHideIfMarked(token) {
+  if (!token?._pvCurrentViewHardHidden) return false;
+  if (targetIsHardHiddenFromCurrentView(token)) return false;
+  const released = releaseCurrentViewHardHide(token);
+  token._pvCurrentViewHardHidden = false;
+  return released;
 }
 
 export function releaseCurrentViewHardHide(token) {

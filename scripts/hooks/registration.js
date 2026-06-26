@@ -41,6 +41,7 @@ import {
   handleTokenRefreshed,
   handleTokenUpdated,
 } from '../services/token-render-lifecycle.js';
+import { releaseCurrentViewHardHideIfMarked } from '../services/Detection/current-view-hard-hide.js';
 
 function clearActorFeatureCacheForItem(item) {
   const actor = item?.actor ?? item?.parent ?? null;
@@ -161,15 +162,24 @@ export async function registerHooks() {
 
   Hooks.on('pf2e-visioner.visibilityMapUpdated', ({ targetId, state }) => {
     try {
-      if (state !== 'undetected' && state !== 'unnoticed') return;
       const target = canvas?.tokens?.get?.(targetId);
-      const mesh = target?.detectionFilterMesh;
-      if (!mesh) return;
-      if ('visible' in mesh) mesh.visible = false;
-      if ('renderable' in mesh) mesh.renderable = false;
-      if ('alpha' in mesh) mesh.alpha = 0;
+      if (!target) return;
+      if (state === 'undetected' || state === 'unnoticed') {
+        const mesh = target.detectionFilterMesh;
+        if (!mesh) return;
+        if ('visible' in mesh) mesh.visible = false;
+        if ('renderable' in mesh) mesh.renderable = false;
+        if ('alpha' in mesh) mesh.alpha = 0;
+        return;
+      }
+      // Target left a render-hidden state (e.g. removing deafened reveals it via hearing):
+      // release the one-way current-view hard-hide so its mesh and soundwave repaint without
+      // needing a reselect.
+      if (releaseCurrentViewHardHideIfMarked(target)) {
+        target.refresh?.();
+      }
     } catch {
-      /* best-effort soundwave clear */
+      /* best-effort current-view render sync */
     }
   });
 
