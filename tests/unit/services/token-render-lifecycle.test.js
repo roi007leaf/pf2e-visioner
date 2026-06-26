@@ -166,6 +166,23 @@ describe('token render lifecycle service', () => {
     expect(result?.then).toBeUndefined();
   });
 
+  test('freezes rendered-token highlights while a drag/move is active (no mid-drag indicator churn)', () => {
+    const refreshSystemHiddenHighlightsForRenderedToken = jest.fn();
+
+    const result = handleTokenRefreshed(
+      { document: { id: 'token-1' } },
+      {
+        isRefreshTokenProcessingSuppressed: () => false,
+        isTokenDragOrMovementActive: () => true,
+        shouldRefreshRenderedTokenHighlights: () => true,
+        refreshSystemHiddenHighlightsForRenderedToken,
+      },
+    );
+
+    expect(result).toEqual({ handled: false, reason: 'token-move-active' });
+    expect(refreshSystemHiddenHighlightsForRenderedToken).not.toHaveBeenCalled();
+  });
+
   test('refreshes rendered-token highlights when refreshToken processing is not suppressed', async () => {
     const token = { id: 'token-1' };
     const refreshSystemHiddenHighlightsForRenderedToken = jest.fn().mockResolvedValue(undefined);

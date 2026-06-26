@@ -16,6 +16,14 @@ function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
 }
 
+function defaultIsTokenDragOrMovementActive() {
+  if (defaultHasActivePendingTokenMovement()) return true;
+  const tokens = globalThis.canvas?.tokens;
+  if (tokens?._draggedToken) return true;
+  const previews = tokens?.preview?.children;
+  return !!(previews && previews.some?.((c) => c?.document?.id));
+}
+
 const RENDERED_TOKEN_HIGHLIGHT_REFRESH_MIN_INTERVAL_MS = 100;
 const renderedTokenHighlightRefreshTimes = new Map();
 
@@ -110,6 +118,7 @@ export function handleTokenRefreshed(
   token,
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
+    isTokenDragOrMovementActive = defaultIsTokenDragOrMovementActive,
     shouldRefreshRenderedTokenHighlights: shouldRefreshRenderedTokenHighlightsForToken =
     shouldRefreshRenderedTokenHighlights,
     shouldThrottleRenderedTokenHighlightRefresh: shouldThrottleRenderedTokenHighlightRefreshForToken =
@@ -121,6 +130,13 @@ export function handleTokenRefreshed(
 ) {
   if (isRefreshTokenProcessingSuppressed()) {
     return { handled: false, reason: 'suppressed' };
+  }
+
+  // Freeze system-hidden indicators while hold-dragging or mid-move: recomputing them
+  // every render frame makes "conditions" pop in/out at stale grid cells during a drag.
+  // They settle after the move via the AVS batch-complete / control refresh.
+  if (isTokenDragOrMovementActive()) {
+    return { handled: false, reason: 'token-move-active' };
   }
 
   if (!shouldRefreshRenderedTokenHighlightsForToken(token)) {
