@@ -1,6 +1,9 @@
 import '../../setup.js';
 
-import { targetShouldShowSoundwave } from '../../../scripts/services/during-move-soundwave.js';
+import {
+  setSoundwaveMeshVisible,
+  targetShouldShowSoundwave,
+} from '../../../scripts/services/during-move-soundwave.js';
 
 function observer(seesTarget) {
   return { vision: { los: { contains: () => seesTarget } } };
@@ -47,5 +50,28 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
     expect(
       targetShouldShowSoundwave(target, [observer(true)], getVisibility('hidden'), noOverride),
     ).toBe(false);
+  });
+});
+
+describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
+  function makeTarget() {
+    return { detectionFilterMesh: { visible: true, renderable: true, alpha: 1 } };
+  }
+
+  test('hides the soundwave mesh when the observer gains sight (clears mid-move)', () => {
+    const t = makeTarget();
+    setSoundwaveMeshVisible(t, false);
+    expect(t.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  test('shows the soundwave mesh when the target is sensed out of sight', () => {
+    const t = { detectionFilterMesh: { visible: false, renderable: false, alpha: 0 } };
+    setSoundwaveMeshVisible(t, true);
+    expect(t.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  test('no-ops safely when the target has no detection filter mesh', () => {
+    expect(() => setSoundwaveMeshVisible({}, false)).not.toThrow();
+    expect(() => setSoundwaveMeshVisible(null, true)).not.toThrow();
   });
 });

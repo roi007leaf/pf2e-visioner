@@ -79,6 +79,17 @@ export function targetShouldShowSoundwave(
   return sensedOutOfSight;
 }
 
+export function setSoundwaveMeshVisible(target, visible) {
+  const mesh = target?.detectionFilterMesh;
+  if (!mesh) return;
+  if ('visible' in mesh && mesh.visible !== visible) mesh.visible = visible;
+  if ('renderable' in mesh && mesh.renderable !== visible) mesh.renderable = visible;
+  if ('alpha' in mesh) {
+    const nextAlpha = visible ? 1 : 0;
+    if (mesh.alpha !== nextAlpha) mesh.alpha = nextAlpha;
+  }
+}
+
 function refreshSoundwavesForActiveMovement() {
   const observers = currentViewObservers();
   if (!observers.length) return;
@@ -90,8 +101,10 @@ function refreshSoundwavesForActiveMovement() {
     try {
       if (wantsSoundwave) {
         if (filter && target.detectionFilter !== filter) target.detectionFilter = filter;
-      } else if (target.detectionFilter) {
-        target.detectionFilter = null;
+        setSoundwaveMeshVisible(target, true);
+      } else {
+        if (target.detectionFilter) target.detectionFilter = null;
+        setSoundwaveMeshVisible(target, false);
       }
     } catch {
       /* keep core filter state if assignment fails */
