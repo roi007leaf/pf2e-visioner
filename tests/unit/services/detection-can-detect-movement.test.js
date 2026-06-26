@@ -58,6 +58,16 @@ function lootTarget() {
   return { actor: { type: 'loot' }, document: { id: 'target' } };
 }
 
+function overrideHiddenTarget() {
+  return {
+    actor: { type: 'npc' },
+    document: {
+      id: 'target',
+      getFlag: (_mod, key) => (key === 'avs-override-from-observer' ? { state: 'hidden' } : null),
+    },
+  };
+}
+
 describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
   afterEach(() => {
     jest.resetModules();
@@ -84,14 +94,44 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       expect(result).toBe(false);
     });
 
-    test("hidden npc + visual mode basicSight + core true -> false (sight suppressed)", async () => {
+    test("hidden npc (AVS-computed, no override) + basicSight + core true -> true (reveals when sight LOS opens mid-move)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'hidden',
         threshold: 'hidden',
       });
       const { result } = callWrapper(wrapper, 'basicSight', true, npcTarget());
+      expect(result).toBe(true);
+    });
+
+    test("hidden npc (AVS-computed) + basicSight + core false -> false (no LOS yet, stays sensed)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'hidden',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', false, npcTarget());
       expect(result).toBe(false);
+    });
+
+    test("hidden npc WITH sticky hidden override + basicSight + core true -> false (deliberately hidden stays sensed-only)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'hidden',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, overrideHiddenTarget());
+      expect(result).toBe(false);
+    });
+
+    test("hidden npc WITH sticky hidden override + hearing + core true -> true (soundwave stays through the move)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'hidden',
+        threshold: 'undetected',
+      });
+      const { result } = callWrapper(wrapper, 'hearing', true, overrideHiddenTarget());
+      expect(result).toBe(true);
     });
 
     test("hidden npc + non-visual mode hearing + core true -> true (core drives soundwave)", async () => {

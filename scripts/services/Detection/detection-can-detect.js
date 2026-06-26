@@ -23,7 +23,7 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
 
     if (hasActivePendingTokenMovement()) {
-      return resolveDetectionDuringMovement(target, visibility, modeId, canDetect);
+      return resolveDetectionDuringMovement(observerToken, target, visibility, modeId, canDetect);
     }
 
     if (canUseVisionerHiddenDetection(modeId, visibility, threshold)) {
@@ -47,12 +47,26 @@ function targetIsLootOrHazard(target) {
   return actorType === 'loot' || actorType === 'hazard';
 }
 
-function resolveDetectionDuringMovement(target, visibility, modeId, canDetect) {
+function hasHiddenAvsOverride(observer, target) {
+  try {
+    const observerId = observer?.document?.id ?? observer?.id;
+    if (!observerId) return false;
+    const flag = target?.document?.getFlag?.(MODULE_ID, `avs-override-from-${observerId}`);
+    return flag?.state === 'hidden';
+  } catch {
+    return false;
+  }
+}
+
+function resolveDetectionDuringMovement(observer, target, visibility, modeId, canDetect) {
   if (visibility === 'undetected' || visibility === 'unnoticed') return false;
   if (visibility === 'hidden') {
     if (targetIsLootOrHazard(target)) return false;
     const nonVisualMode = !modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
-    return nonVisualMode ? canDetect : false;
+    if (hasHiddenAvsOverride(observer, target)) {
+      return nonVisualMode ? canDetect : false;
+    }
+    return canDetect;
   }
   return canDetect;
 }
