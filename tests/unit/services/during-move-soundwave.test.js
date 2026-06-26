@@ -1,6 +1,13 @@
 import '../../setup.js';
 
+let mockPendingPosition = null;
+jest.mock('../../../scripts/services/movement-tracking.js', () => ({
+  hasActivePendingTokenMovement: () => false,
+  getPendingTokenMovementPosition: () => mockPendingPosition,
+}));
+
 import {
+  observerDestinationCenter,
   observerSightContainsTarget,
   setSoundwaveMeshVisible,
   targetShouldShowSoundwave,
@@ -118,5 +125,58 @@ describe('observerSightContainsTarget (drag uses live geometric LOS, not stale v
   test('drag: keeps the soundwave when geometry is wall-blocked from the live preview position', () => {
     const observer = setup({ previewCenter: { x: 480, y: 480 }, sightBlocked: true });
     expect(observerSightContainsTarget(observer, target)).toBe(false);
+  });
+});
+
+describe('observerSightContainsTarget on commit uses the recorded destination (no reappear)', () => {
+  let savedCanvas;
+  let savedConfig;
+
+  beforeEach(() => {
+    savedCanvas = globalThis.canvas;
+    savedConfig = globalThis.CONFIG;
+    mockPendingPosition = null;
+  });
+  afterEach(() => {
+    globalThis.canvas = savedCanvas;
+    globalThis.CONFIG = savedConfig;
+    mockPendingPosition = null;
+  });
+
+  test('observerDestinationCenter prefers the recorded pending destination', () => {
+    globalThis.canvas = { grid: { size: 100 } };
+    mockPendingPosition = { x: 1000, y: 2000 };
+    const observer = { document: { id: 'o', width: 1, height: 1 }, center: { x: 0, y: 0 } };
+    expect(observerDestinationCenter(observer)).toEqual({ x: 1050, y: 2050 });
+  });
+
+  test('observerDestinationCenter falls back to the live center with no pending move', () => {
+    globalThis.canvas = { grid: { size: 100 } };
+    mockPendingPosition = null;
+    const observer = { document: { id: 'o', width: 1, height: 1 }, center: { x: 7, y: 9 } };
+    expect(observerDestinationCenter(observer)).toEqual({ x: 7, y: 9 });
+  });
+
+  test('commit checks LOS from the destination, not the still-animating origin', () => {
+    const destCenter = { x: 1050, y: 1050 };
+    globalThis.canvas = { grid: { size: 100 }, tokens: { preview: { children: [] } } };
+    mockPendingPosition = { x: 1000, y: 1000 };
+    globalThis.CONFIG = {
+      Canvas: {
+        polygonBackends: {
+          sight: {
+            // blocked from everywhere except the destination center
+            testCollision: (origin) => !(origin.x === destCenter.x && origin.y === destCenter.y),
+          },
+        },
+      },
+    };
+    const observer = {
+      document: { id: 'o', width: 1, height: 1 },
+      center: { x: 0, y: 0 },
+      vision: { los: { contains: () => false } },
+    };
+    const target = { center: { x: 1200, y: 1200 } };
+    expect(observerSightContainsTarget(observer, target)).toBe(true);
   });
 });

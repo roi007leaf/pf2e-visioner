@@ -1,4 +1,7 @@
-import { hasActivePendingTokenMovement } from './movement-tracking.js';
+import {
+  getPendingTokenMovementPosition,
+  hasActivePendingTokenMovement,
+} from './movement-tracking.js';
 import {
   currentViewObservers,
   targetIsHardHiddenFromCurrentView,
@@ -47,16 +50,32 @@ function geometricSightReaches(origin, points) {
   return false;
 }
 
+export function observerDestinationCenter(observer) {
+  const doc = observer?.document;
+  const gridSize = globalThis.canvas?.grid?.size;
+  const pending = getPendingTokenMovementPosition(observer);
+  if (pending && Number.isFinite(pending.x) && Number.isFinite(pending.y) && Number.isFinite(gridSize)) {
+    return {
+      x: pending.x + ((doc?.width ?? 1) * gridSize) / 2,
+      y: pending.y + ((doc?.height ?? 1) * gridSize) / 2,
+    };
+  }
+  return observer?.center ?? null;
+}
+
+export function observerSightOrigin(observer) {
+  const preview = previewForObserver(observer);
+  if (preview?.center) return preview.center;
+  return observerDestinationCenter(observer);
+}
+
 export function observerSightContainsTarget(observer, target) {
   try {
     const points = targetSightPoints(target);
     if (!points.length) return false;
-    const preview = previewForObserver(observer);
-    if (preview) {
-      const geom = geometricSightReaches(preview.center ?? observer?.center, points);
-      if (geom !== null) return geom;
-    }
-    const los = preview?.vision?.los || observer?.vision?.los;
+    const geom = geometricSightReaches(observerSightOrigin(observer), points);
+    if (geom !== null) return geom;
+    const los = previewForObserver(observer)?.vision?.los || observer?.vision?.los;
     return points.some((point) => los && los.contains(point.x, point.y));
   } catch {
     return false;
