@@ -842,7 +842,9 @@ export async function onCanvasReady() {
 
         // System-hidden highlights depend on freshly recalculated AVS state.
         // They are refreshed after recalculation settles.
-      } else {
+      } else if (game.user?.isGM) {
+        // Only the GM is omniscient: deselecting reveals every token. Players keep their
+        // last view frozen so undetected tokens and soundwaves remain instead of revealing all.
         try {
           const { updateSystemHiddenTokenHighlights } = await import(
             '../services/visual-effects.js'

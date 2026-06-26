@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import '../../setup.js';
 
 import {
@@ -110,5 +111,66 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
       },
     };
     expect(observerSightContainsTarget(observer, target)).toBe(true);
+  });
+});
+
+describe('refreshSoundwavesForActiveMovement (only mutates during a committed move)', () => {
+  let savedCanvas;
+
+  async function loadWith({ pendingMovement }) {
+    let mod;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/services/movement-tracking.js', () => ({
+        hasActivePendingTokenMovement: () => pendingMovement,
+      }));
+      jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
+        currentViewObservers: () => [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
+        targetIsHardHiddenFromCurrentView: () => false,
+      }));
+      jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
+        getVisionerVisibilityBetweenTokens: () => 'hidden',
+      }));
+      mod = await import('../../../scripts/services/during-move-soundwave.js');
+    });
+    return mod;
+  }
+
+  function makeTarget() {
+    return {
+      controlled: false,
+      center: { x: 100, y: 100 },
+      detectionFilter: 'PRE-EXISTING',
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 't' },
+    };
+  }
+
+  beforeEach(() => {
+    savedCanvas = globalThis.canvas;
+  });
+  afterEach(() => {
+    globalThis.canvas = savedCanvas;
+    jest.resetModules();
+  });
+
+  test('leaves soundwaves frozen while only hold-dragging (no pending movement)', async () => {
+    const target = makeTarget();
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: false });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBe('PRE-EXISTING');
+    expect(target.detectionFilterMesh.visible).toBe(false);
+  });
+
+  test('updates soundwaves during a committed move (pending movement active)', async () => {
+    const target = makeTarget();
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilterMesh.visible).toBe(true);
   });
 });

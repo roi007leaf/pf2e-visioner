@@ -90,7 +90,10 @@ export function setSoundwaveMeshVisible(target, visible) {
   }
 }
 
-function refreshSoundwavesForActiveMovement() {
+export function refreshSoundwavesForActiveMovement() {
+  // Only mutate soundwaves during an actual committed move. While merely hold-dragging
+  // (a drag preview exists but nothing has committed yet) the visuals must stay frozen.
+  if (!hasActivePendingTokenMovement()) return;
   const observers = currentViewObservers();
   if (!observers.length) return;
   const filter = getSoundwaveFilter();
