@@ -203,9 +203,18 @@ export function repositionIndicatorIfMoved(indicator, canvasLayer = globalThis.c
 }
 
 function syncAllSystemHiddenIndicatorPositions() {
-  for (const indicator of systemHiddenIndicators) {
+  // Per-frame work is scoped to active drags only: iterate the drag-preview clones (usually 0
+  // or 1), not every indicator. When nothing is dragging this returns immediately, so the
+  // ticker adds no cost during normal play or a slow drag. Snap-back on drop/cancel and
+  // committed-move repositioning are handled by the refreshToken sync.
+  const previews = globalThis.canvas?.tokens?.preview?.children;
+  if (!previews?.length) return;
+  for (const preview of previews) {
     try {
-      repositionIndicatorIfMoved(indicator);
+      const original =
+        preview?._original ?? globalThis.canvas?.tokens?.get?.(preview?.document?.id);
+      const indicator = original?._pvSystemHiddenIndicator;
+      if (indicator) repositionIndicatorIfMoved(indicator);
     } catch (_) {
       /* best-effort indicator position sync */
     }
