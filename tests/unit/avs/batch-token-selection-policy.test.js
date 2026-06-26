@@ -1,6 +1,7 @@
 import {
   isMovementVisibilityBatch,
   resolveVisibleBatchTokens,
+  shouldUseFullTokenScope,
 } from '../../../scripts/visibility/auto-visibility/core/BatchTokenSelectionPolicy.js';
 
 function token(id, extras = {}) {
@@ -64,5 +65,13 @@ describe('BatchTokenSelectionPolicy', () => {
 
     expect(result.visibleChangedTokens.size).toBe(0);
     expect(result.hasVisibleChangedTokens).toBe(false);
+  });
+
+  test('uses full token scope for movement batches or when a full-scope recalc is forced', () => {
+    expect(shouldUseFullTokenScope({ isMovementBatch: true, forceFullScope: false })).toBe(true);
+    expect(shouldUseFullTokenScope({ isMovementBatch: false, forceFullScope: true })).toBe(true);
+    expect(shouldUseFullTokenScope({ isMovementBatch: true, forceFullScope: true })).toBe(true);
+    expect(shouldUseFullTokenScope({ isMovementBatch: false, forceFullScope: false })).toBe(false);
+    expect(shouldUseFullTokenScope()).toBe(false);
   });
 });

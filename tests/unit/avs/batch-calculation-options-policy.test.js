@@ -70,4 +70,19 @@ describe('BatchCalculationOptionsPolicy', () => {
       postBatchPerceptionSuppression: suppression,
     });
   });
+
+  test('skipViewportFilter defaults to isMovementBatch but can be forced for non-movement batches', () => {
+    const defaulted = buildBatchCalculationOptions({
+      isMovementBatch: false,
+    });
+    expect(defaulted.calcOptions.skipViewportFilter).toBe(false);
+    expect(defaulted.calcOptions.isMovementBatch).toBe(false);
+
+    const forced = buildBatchCalculationOptions({
+      isMovementBatch: false,
+      skipViewportFilter: true,
+    });
+    expect(forced.calcOptions.skipViewportFilter).toBe(true);
+    expect(forced.calcOptions.isMovementBatch).toBe(false);
+  });
 });

@@ -70,6 +70,19 @@ describe('runtime state service', () => {
     expect(service.getRuntimeFlag('suppressNextAvsPostBatchPerceptionRefresh')).toBeNull();
   });
 
+  test('full-scope recalc request is consumed once then cleared', () => {
+    expect(service.consumeFullVisibilityScopeRecalc()).toBe(false);
+
+    service.requestFullVisibilityScopeRecalc();
+    expect(service.getRuntimeFlag('forceFullVisibilityScopeRecalc')).toBe(true);
+
+    expect(service.consumeFullVisibilityScopeRecalc()).toBe(true);
+    expect(service.consumeFullVisibilityScopeRecalc()).toBe(false);
+    expect(
+      Object.prototype.hasOwnProperty.call(global.game.pf2eVisioner, 'forceFullVisibilityScopeRecalc'),
+    ).toBe(false);
+  });
+
   test('returns nullish values without creating state when game is unavailable', () => {
     delete global.game;
 

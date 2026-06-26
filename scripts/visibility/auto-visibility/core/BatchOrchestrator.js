@@ -33,7 +33,9 @@ import { buildCoalesceDrainPlan, buildProcessBatchAdmissionPlan } from './BatchQ
 import {
   isMovementVisibilityBatch,
   resolveVisibleBatchTokens,
+  shouldUseFullTokenScope,
 } from './BatchTokenSelectionPolicy.js';
+import { consumeFullVisibilityScopeRecalc } from '../../../services/runtime-state.js';
 import { collectUnsettledChangedTokenIds } from './BatchTokenSettlingPolicy.js';
 import { ExclusionManager } from './ExclusionManager.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
@@ -554,7 +556,13 @@ export class BatchOrchestrator {
       changedTokens,
       movementSession: options.movementSession,
     });
-    const candidateTokens = isMovementBatch
+    // Sense-affecting changes (conditions/effects/actor) request a full-scope recalc so the
+    // changed token is re-evaluated against ALL tokens, not just the on-screen viewport subset.
+    // Without this, removing e.g. deafened from a token whose audible targets are off-screen
+    // leaves those pairs stale (the token keeps "not hearing" them).
+    const forceFullScope = consumeFullVisibilityScopeRecalc();
+    const useFullTokenScope = shouldUseFullTokenScope({ isMovementBatch, forceFullScope });
+    const candidateTokens = useFullTokenScope
       ? canvas.tokens?.placeables || []
       : this._getAllTokens();
     const { allTokens, visibleChangedTokens, hasVisibleChangedTokens } = resolveVisibleBatchTokens({
@@ -598,7 +606,7 @@ export class BatchOrchestrator {
     // Detect movement batches via the stop-timer movementSession only. lastMovedTokenId can
     // outlive movement, so using it here makes later non-movement refreshes bypass filters.
 
-    if (isMovementBatch) {
+    if (useFullTokenScope) {
       try {
         this.batchProcessor?.globalVisibilityCache?.clear?.();
         this.batchProcessor?.globalLosCache?.clear?.();
@@ -643,6 +651,7 @@ export class BatchOrchestrator {
         isTokenMoving: this._isTokenMoving,
         movementSession: options.movementSession,
         isMovementBatch,
+        skipViewportFilter: useFullTokenScope,
         postBatchPerceptionSuppression,
       });
       this._lastLosMemo = nextLosMemo;
