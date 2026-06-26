@@ -187,6 +187,33 @@ const systemHiddenHookRegistrations = {
   canvasTearDown: { event: 'canvasTearDown', id: null, registered: false },
 };
 
+let indicatorPositionTickerActive = false;
+
+function syncAllSystemHiddenIndicatorPositions() {
+  for (const indicator of systemHiddenIndicators) {
+    try {
+      const center = getLiveTokenCenter(indicator?._pvTokenRef);
+      if (center && indicator?.position?.set) indicator.position.set(center.x, center.y);
+    } catch (_) {
+      /* best-effort indicator position sync */
+    }
+  }
+}
+
+function ensureIndicatorPositionTicker() {
+  if (indicatorPositionTickerActive) return;
+  const ticker = globalThis.canvas?.app?.ticker;
+  if (!ticker?.add) return;
+  ticker.add(syncAllSystemHiddenIndicatorPositions);
+  indicatorPositionTickerActive = true;
+}
+
+function removeIndicatorPositionTicker() {
+  if (!indicatorPositionTickerActive) return;
+  globalThis.canvas?.app?.ticker?.remove?.(syncAllSystemHiddenIndicatorPositions);
+  indicatorPositionTickerActive = false;
+}
+
 export function removeSystemHiddenFactorsBadge(indicator) {
   if (!indicator) return;
   indicator._pvFactorsActive = false;
@@ -202,6 +229,7 @@ export function removeSystemHiddenFactorsBadge(indicator) {
 
 function releaseSystemHiddenIndicatorHooksIfIdle() {
   if (systemHiddenIndicators.size > 0) return;
+  removeIndicatorPositionTicker();
   for (const registration of Object.values(systemHiddenHookRegistrations)) {
     if (!registration.registered) continue;
     globalThis.Hooks?.off?.(registration.event, registration.id);
@@ -282,6 +310,7 @@ function registerSystemHiddenIndicator(token, indicator) {
   indicator._pvTokenRef = token;
   systemHiddenIndicators.add(indicator);
   ensureSystemHiddenIndicatorHooks();
+  ensureIndicatorPositionTicker();
 }
 
 function unregisterSystemHiddenIndicator(indicator) {
@@ -704,10 +733,6 @@ function attachPulseAnimation({
       if (!indicator.parent || !canvasLayer?.ready) {
         return;
       }
-      // Keep the indicator on its token's live position so it tracks the token while it is
-      // hold-dragged (follows the drag preview) or animating, instead of lagging at the origin.
-      const liveCenter = getLiveTokenCenter(token, canvasLayer);
-      if (liveCenter) indicator.position.set(liveCenter.x, liveCenter.y);
       if (
         indicator._pvIndicatorMode === 'thoughtsense' ||
         indicator._pvIndicatorMode === 'lifesense'
