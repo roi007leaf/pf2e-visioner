@@ -125,13 +125,6 @@ export function hasPendingTokenMovementPosition(tokenOrId) {
   return pendingTokenMovementPositions.has(tokenId);
 }
 
-export function getPendingTokenMovementPosition(tokenOrId) {
-  const tokenId = typeof tokenOrId === 'string' ? tokenOrId : tokenIdOf(tokenOrId);
-  if (!tokenId) return null;
-  const entry = pendingTokenMovementPositions.get(tokenId);
-  return entry?.position ?? null;
-}
-
 export function clearPendingTokenMovementPosition(tokenId) {
   if (!tokenId) return;
 

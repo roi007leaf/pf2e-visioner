@@ -1,13 +1,6 @@
 import '../../setup.js';
 
-let mockPendingPosition = null;
-jest.mock('../../../scripts/services/movement-tracking.js', () => ({
-  hasActivePendingTokenMovement: () => false,
-  getPendingTokenMovementPosition: () => mockPendingPosition,
-}));
-
 import {
-  observerDestinationCenter,
   observerSightContainsTarget,
   setSoundwaveMeshVisible,
   targetShouldShowSoundwave,
@@ -84,99 +77,38 @@ describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
   });
 });
 
-describe('observerSightContainsTarget (drag uses live geometric LOS, not stale vision.los)', () => {
+describe('observerSightContainsTarget (live vision polygon contains the target center)', () => {
   const target = { center: { x: 500, y: 500 } };
   let savedCanvas;
-  let savedConfig;
-
-  beforeEach(() => {
-    savedCanvas = globalThis.canvas;
-    savedConfig = globalThis.CONFIG;
-  });
   afterEach(() => {
     globalThis.canvas = savedCanvas;
-    globalThis.CONFIG = savedConfig;
+  });
+  beforeEach(() => {
+    savedCanvas = globalThis.canvas;
+    globalThis.canvas = { tokens: { preview: { children: [] } } };
   });
 
-  function setup({ previewCenter = null, sightBlocked = false } = {}) {
-    const observer = { document: { id: 'obs' }, center: { x: 0, y: 0 }, vision: { los: { contains: () => false } } };
-    const previews = previewCenter
-      ? [{ _original: observer, document: { id: 'obs' }, center: previewCenter, vision: { los: { contains: () => false } } }]
-      : [];
-    globalThis.canvas = { tokens: { preview: { children: previews } } };
-    globalThis.CONFIG = {
-      Canvas: { polygonBackends: { sight: { testCollision: () => sightBlocked } } },
-    };
-    return observer;
-  }
-
-  test('committed move (no preview): falls back to the observer vision polygon', () => {
-    const observer = setup({ previewCenter: null });
-    observer.vision.los.contains = () => true;
+  test('true when the observer vision polygon contains the target center', () => {
+    const observer = { vision: { los: { contains: () => true } } };
     expect(observerSightContainsTarget(observer, target)).toBe(true);
   });
 
-  test('drag: sees the target via geometric LOS from the live preview position even though the original vision.los is stale', () => {
-    const observer = setup({ previewCenter: { x: 480, y: 480 }, sightBlocked: false });
-    // original + preview vision.los both say false (stale), geometry says clear
-    expect(observerSightContainsTarget(observer, target)).toBe(true);
-  });
-
-  test('drag: keeps the soundwave when geometry is wall-blocked from the live preview position', () => {
-    const observer = setup({ previewCenter: { x: 480, y: 480 }, sightBlocked: true });
+  test('false when the observer vision polygon does not contain the target center', () => {
+    const observer = { vision: { los: { contains: () => false } } };
     expect(observerSightContainsTarget(observer, target)).toBe(false);
   });
-});
 
-describe('observerSightContainsTarget on commit uses the recorded destination (no reappear)', () => {
-  let savedCanvas;
-  let savedConfig;
-
-  beforeEach(() => {
-    savedCanvas = globalThis.canvas;
-    savedConfig = globalThis.CONFIG;
-    mockPendingPosition = null;
-  });
-  afterEach(() => {
-    globalThis.canvas = savedCanvas;
-    globalThis.CONFIG = savedConfig;
-    mockPendingPosition = null;
-  });
-
-  test('observerDestinationCenter prefers the recorded pending destination', () => {
-    globalThis.canvas = { grid: { size: 100 } };
-    mockPendingPosition = { x: 1000, y: 2000 };
-    const observer = { document: { id: 'o', width: 1, height: 1 }, center: { x: 0, y: 0 } };
-    expect(observerDestinationCenter(observer)).toEqual({ x: 1050, y: 2050 });
-  });
-
-  test('observerDestinationCenter falls back to the live center with no pending move', () => {
-    globalThis.canvas = { grid: { size: 100 } };
-    mockPendingPosition = null;
-    const observer = { document: { id: 'o', width: 1, height: 1 }, center: { x: 7, y: 9 } };
-    expect(observerDestinationCenter(observer)).toEqual({ x: 7, y: 9 });
-  });
-
-  test('commit checks LOS from the destination, not the still-animating origin', () => {
-    const destCenter = { x: 1050, y: 1050 };
-    globalThis.canvas = { grid: { size: 100 }, tokens: { preview: { children: [] } } };
-    mockPendingPosition = { x: 1000, y: 1000 };
-    globalThis.CONFIG = {
-      Canvas: {
-        polygonBackends: {
-          sight: {
-            // blocked from everywhere except the destination center
-            testCollision: (origin) => !(origin.x === destCenter.x && origin.y === destCenter.y),
-          },
+  test('prefers the drag preview vision polygon when one exists', () => {
+    const observer = { document: { id: 'obs' }, vision: { los: { contains: () => false } } };
+    globalThis.canvas = {
+      tokens: {
+        preview: {
+          children: [
+            { _original: observer, document: { id: 'obs' }, vision: { los: { contains: () => true } } },
+          ],
         },
       },
     };
-    const observer = {
-      document: { id: 'o', width: 1, height: 1 },
-      center: { x: 0, y: 0 },
-      vision: { los: { contains: () => false } },
-    };
-    const target = { center: { x: 1200, y: 1200 } };
     expect(observerSightContainsTarget(observer, target)).toBe(true);
   });
 });

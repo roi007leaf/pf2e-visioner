@@ -1,7 +1,4 @@
-import {
-  getPendingTokenMovementPosition,
-  hasActivePendingTokenMovement,
-} from './movement-tracking.js';
+import { hasActivePendingTokenMovement } from './movement-tracking.js';
 import {
   currentViewObservers,
   targetIsHardHiddenFromCurrentView,
@@ -30,53 +27,12 @@ function previewForObserver(observer) {
   return previews.find((c) => c?._original === observer || (id && c?.document?.id === id)) || null;
 }
 
-function targetSightPoints(target) {
-  const documentPoints = target?.document?.getVisibilityTestPoints?.();
-  if (Array.isArray(documentPoints) && documentPoints.length) return documentPoints;
-  const center = target?.center;
-  return center ? [center] : [];
-}
-
-function geometricSightReaches(origin, points) {
-  const sight = globalThis.CONFIG?.Canvas?.polygonBackends?.sight;
-  if (!origin || !sight?.testCollision) return null;
-  for (const point of points) {
-    try {
-      if (!sight.testCollision(origin, point, { type: 'sight', mode: 'any' })) return true;
-    } catch {
-      /* ignore individual ray failures */
-    }
-  }
-  return false;
-}
-
-export function observerDestinationCenter(observer) {
-  const doc = observer?.document;
-  const gridSize = globalThis.canvas?.grid?.size;
-  const pending = getPendingTokenMovementPosition(observer);
-  if (pending && Number.isFinite(pending.x) && Number.isFinite(pending.y) && Number.isFinite(gridSize)) {
-    return {
-      x: pending.x + ((doc?.width ?? 1) * gridSize) / 2,
-      y: pending.y + ((doc?.height ?? 1) * gridSize) / 2,
-    };
-  }
-  return observer?.center ?? null;
-}
-
-export function observerSightOrigin(observer) {
-  const preview = previewForObserver(observer);
-  if (preview?.center) return preview.center;
-  return observerDestinationCenter(observer);
-}
-
 export function observerSightContainsTarget(observer, target) {
   try {
-    const points = targetSightPoints(target);
-    if (!points.length) return false;
-    const geom = geometricSightReaches(observerSightOrigin(observer), points);
-    if (geom !== null) return geom;
+    const center = target?.center;
+    if (!center) return false;
     const los = previewForObserver(observer)?.vision?.los || observer?.vision?.los;
-    return points.some((point) => los && los.contains(point.x, point.y));
+    return !!(los && los.contains(center.x, center.y));
   } catch {
     return false;
   }
