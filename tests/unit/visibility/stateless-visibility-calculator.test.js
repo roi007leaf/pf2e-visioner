@@ -961,7 +961,6 @@ describe('StatelessVisibilityCalculator', () => {
                         vision: { range: Infinity }
                     },
                     imprecise: {
-                        hearing: { range: Infinity },
                         lifesense: { range: 60 }
                     },
                     conditions: {}

@@ -753,10 +753,13 @@ function determineVisualDetection(
  * These provide hidden state when they detect
  *
  * IMPORTANT: Checks ALL imprecise senses and returns the BEST detection based on priority.
- * This ensures that tremorsense/lifesense are used even if hearing also works.
  *
- * Priority: Tremorsense > Lifesense > Scent > Hearing
- * (Hearing is last because it doesn't bypass invisibility and can make targets undetected)
+ * Priority: Hearing > Tremorsense > Lifesense > Thoughtsense > Scent
+ * Hearing takes precedence whenever it can actually detect the target (observer not
+ * deafened, sound not blocked, target not invisible). Only when hearing is not possible
+ * do we fall back to the next imprecise sense. Hearing cannot detect an invisible target
+ * (it returns undetected), so for invisible targets the invisibility-bypassing senses
+ * (tremorsense/lifesense/thoughtsense/scent) win instead.
  *
  * @param {Object} observer - Observer state
  * @param {Object} target - Target state
@@ -777,7 +780,7 @@ function checkImpreciseSenses(
 
   // Tremorsense: detects ground-based vibrations, BYPASSES invisibility
   // CRITICAL: Tremorsense only works if target is on the ground at the same elevation
-  // Priority: 1 (highest)
+  // Priority: 1 (highest fallback, used when hearing cannot detect)
   if (imprecise.tremorsense) {
     // Check if target is elevated (not on the ground at observer's level)
     const isTargetElevated = tremorsenseGroundContactBroken(observer, target);
@@ -845,7 +848,9 @@ function checkImpreciseSenses(
   // - Normally detects at hidden level
   // - With invisible target: returns undetected (invisibility makes target undetected to visual senses)
   // - With sound blocked: cannot detect (treated as if observer is deafened for this target)
-  // Priority: 4 (lowest - because it can return "undetected" for invisible targets)
+  // Priority: 0 (highest) when it actually detects (target not invisible); the fallback
+  // senses are only used when hearing cannot detect. For an invisible target hearing
+  // yields undetected, kept at priority 4 so the invisibility-bypassing senses win.
   if (imprecise.hearing && !conditions.deafened && !soundBlocked) {
     if (isInvisible) {
       workingSenses.push({
@@ -855,7 +860,7 @@ function checkImpreciseSenses(
       });
     } else {
       workingSenses.push({
-        priority: 4,
+        priority: 0,
         state: VisibilityState.HIDDEN,
         detection: {
           isPrecise: false,
