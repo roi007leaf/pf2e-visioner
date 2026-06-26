@@ -27,12 +27,37 @@ function previewForObserver(observer) {
   return previews.find((c) => c?._original === observer || (id && c?.document?.id === id)) || null;
 }
 
-function observerSightContainsTarget(observer, target) {
+function targetSightPoints(target) {
+  const documentPoints = target?.document?.getVisibilityTestPoints?.();
+  if (Array.isArray(documentPoints) && documentPoints.length) return documentPoints;
+  const center = target?.center;
+  return center ? [center] : [];
+}
+
+function geometricSightReaches(origin, points) {
+  const sight = globalThis.CONFIG?.Canvas?.polygonBackends?.sight;
+  if (!origin || !sight?.testCollision) return null;
+  for (const point of points) {
+    try {
+      if (!sight.testCollision(origin, point, { type: 'sight', mode: 'any' })) return true;
+    } catch {
+      /* ignore individual ray failures */
+    }
+  }
+  return false;
+}
+
+export function observerSightContainsTarget(observer, target) {
   try {
-    const center = target?.center;
-    if (!center) return false;
-    const los = previewForObserver(observer)?.vision?.los || observer?.vision?.los;
-    return !!(los && los.contains(center.x, center.y));
+    const points = targetSightPoints(target);
+    if (!points.length) return false;
+    const preview = previewForObserver(observer);
+    if (preview) {
+      const geom = geometricSightReaches(preview.center ?? observer?.center, points);
+      if (geom !== null) return geom;
+    }
+    const los = preview?.vision?.los || observer?.vision?.los;
+    return points.some((point) => los && los.contains(point.x, point.y));
   } catch {
     return false;
   }

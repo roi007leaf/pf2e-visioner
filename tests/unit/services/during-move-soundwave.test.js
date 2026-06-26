@@ -1,6 +1,7 @@
 import '../../setup.js';
 
 import {
+  observerSightContainsTarget,
   setSoundwaveMeshVisible,
   targetShouldShowSoundwave,
 } from '../../../scripts/services/during-move-soundwave.js';
@@ -73,5 +74,49 @@ describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
   test('no-ops safely when the target has no detection filter mesh', () => {
     expect(() => setSoundwaveMeshVisible({}, false)).not.toThrow();
     expect(() => setSoundwaveMeshVisible(null, true)).not.toThrow();
+  });
+});
+
+describe('observerSightContainsTarget (drag uses live geometric LOS, not stale vision.los)', () => {
+  const target = { center: { x: 500, y: 500 } };
+  let savedCanvas;
+  let savedConfig;
+
+  beforeEach(() => {
+    savedCanvas = globalThis.canvas;
+    savedConfig = globalThis.CONFIG;
+  });
+  afterEach(() => {
+    globalThis.canvas = savedCanvas;
+    globalThis.CONFIG = savedConfig;
+  });
+
+  function setup({ previewCenter = null, sightBlocked = false } = {}) {
+    const observer = { document: { id: 'obs' }, center: { x: 0, y: 0 }, vision: { los: { contains: () => false } } };
+    const previews = previewCenter
+      ? [{ _original: observer, document: { id: 'obs' }, center: previewCenter, vision: { los: { contains: () => false } } }]
+      : [];
+    globalThis.canvas = { tokens: { preview: { children: previews } } };
+    globalThis.CONFIG = {
+      Canvas: { polygonBackends: { sight: { testCollision: () => sightBlocked } } },
+    };
+    return observer;
+  }
+
+  test('committed move (no preview): falls back to the observer vision polygon', () => {
+    const observer = setup({ previewCenter: null });
+    observer.vision.los.contains = () => true;
+    expect(observerSightContainsTarget(observer, target)).toBe(true);
+  });
+
+  test('drag: sees the target via geometric LOS from the live preview position even though the original vision.los is stale', () => {
+    const observer = setup({ previewCenter: { x: 480, y: 480 }, sightBlocked: false });
+    // original + preview vision.los both say false (stale), geometry says clear
+    expect(observerSightContainsTarget(observer, target)).toBe(true);
+  });
+
+  test('drag: keeps the soundwave when geometry is wall-blocked from the live preview position', () => {
+    const observer = setup({ previewCenter: { x: 480, y: 480 }, sightBlocked: true });
+    expect(observerSightContainsTarget(observer, target)).toBe(false);
   });
 });
