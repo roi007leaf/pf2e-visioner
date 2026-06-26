@@ -20,6 +20,7 @@ import {
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
   showObserverHoverTooltips,
+  syncSystemHiddenIndicatorPositionForToken,
 } from '../../../scripts/services/system-hidden-indicator-rendering.js';
 import {
   HoverTooltips,
@@ -275,5 +276,37 @@ describe('getLiveTokenCenter (indicator tracks its token, incl. drag preview)', 
     const token = { document: { id: 't', x: 200, y: 200, width: 2, height: 2 } };
     const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
     expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 300, y: 300 });
+  });
+});
+
+describe('syncSystemHiddenIndicatorPositionForToken', () => {
+  function indicator() {
+    return { position: { set: jest.fn() } };
+  }
+
+  test('repositions the indicator to the token live center', () => {
+    const ind = indicator();
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 700, y: 800 }, _pvSystemHiddenIndicator: ind };
+    const canvasLayer = { tokens: { get: () => token, preview: { children: [] } }, grid: { size: 100 } };
+
+    expect(syncSystemHiddenIndicatorPositionForToken(token, canvasLayer)).toBe(true);
+    expect(ind.position.set).toHaveBeenCalledWith(700, 800);
+  });
+
+  test('repositions to the drag preview center when dragging (refreshToken fires for the preview)', () => {
+    const ind = indicator();
+    const original = { document: { id: 't', width: 1, height: 1 }, center: { x: 300, y: 400 }, _pvSystemHiddenIndicator: ind };
+    const preview = { _original: original, document: { id: 't', width: 1, height: 1 }, center: { x: 2500, y: 400 } };
+    const canvasLayer = { tokens: { get: () => original, preview: { children: [preview] } }, grid: { size: 100 } };
+
+    // refreshToken fires for the preview clone; sync resolves the original + uses preview center
+    expect(syncSystemHiddenIndicatorPositionForToken(preview, canvasLayer)).toBe(true);
+    expect(ind.position.set).toHaveBeenCalledWith(2500, 400);
+  });
+
+  test('no-ops when the token has no indicator', () => {
+    const token = { document: { id: 't' }, center: { x: 0, y: 0 } };
+    const canvasLayer = { tokens: { get: () => token, preview: { children: [] } }, grid: { size: 100 } };
+    expect(syncSystemHiddenIndicatorPositionForToken(token, canvasLayer)).toBe(false);
   });
 });

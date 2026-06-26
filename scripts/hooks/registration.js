@@ -42,6 +42,7 @@ import {
   handleTokenUpdated,
 } from '../services/token-render-lifecycle.js';
 import { releaseCurrentViewHardHideIfMarked } from '../services/Detection/current-view-hard-hide.js';
+import { syncSystemHiddenIndicatorPositionForToken } from '../services/system-hidden-indicator-rendering.js';
 
 function clearActorFeatureCacheForItem(item) {
   const actor = item?.actor ?? item?.parent ?? null;
@@ -158,7 +159,16 @@ export async function registerHooks() {
     await handleTokenUpdated(tokenDoc, changes);
   });
 
-  Hooks.on('refreshToken', (token) => handleTokenRefreshed(token));
+  Hooks.on('refreshToken', (token) => {
+    // Reposition the indicator synchronously with the token render so it tracks during a
+    // fast drag (which auto-pans the canvas and would otherwise skip the throttled RAF loop).
+    try {
+      syncSystemHiddenIndicatorPositionForToken(token);
+    } catch {
+      /* best-effort indicator position sync */
+    }
+    return handleTokenRefreshed(token);
+  });
 
   Hooks.on('pf2e-visioner.visibilityMapUpdated', ({ targetId, state }) => {
     try {

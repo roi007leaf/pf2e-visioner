@@ -36,6 +36,18 @@ function getTokenDispositions() {
   return globalThis.CONST?.TOKEN_DISPOSITIONS ?? {};
 }
 
+export function syncSystemHiddenIndicatorPositionForToken(token, canvasLayer = globalThis.canvas) {
+  const tokenId = token?.document?.id ?? token?.id;
+  if (!tokenId) return false;
+  const owner = canvasLayer?.tokens?.get?.(tokenId) ?? token;
+  const indicator = owner?._pvSystemHiddenIndicator;
+  if (!indicator?.position?.set) return false;
+  const center = getLiveTokenCenter(owner, canvasLayer);
+  if (!center) return false;
+  indicator.position.set(center.x, center.y);
+  return true;
+}
+
 export function getLiveTokenCenter(token, canvasLayer = globalThis.canvas) {
   if (!token) return null;
   const previews = canvasLayer?.tokens?.preview?.children;
