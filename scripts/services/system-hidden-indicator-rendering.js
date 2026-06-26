@@ -36,6 +36,28 @@ function getTokenDispositions() {
   return globalThis.CONST?.TOKEN_DISPOSITIONS ?? {};
 }
 
+export function getLiveTokenCenter(token, canvasLayer = globalThis.canvas) {
+  if (!token) return null;
+  const previews = canvasLayer?.tokens?.preview?.children;
+  const preview = previews?.find?.(
+    (child) =>
+      child?._original === token ||
+      (child?.document?.id && token?.document?.id && child.document.id === token.document.id),
+  );
+  const source = preview ?? token;
+  const center = source.center;
+  if (center && Number.isFinite(center.x) && Number.isFinite(center.y)) {
+    return { x: center.x, y: center.y };
+  }
+  const gridSize = canvasLayer?.grid?.size ?? 0;
+  const width = source.document?.width ?? 1;
+  const height = source.document?.height ?? 1;
+  return {
+    x: (source.document?.x ?? 0) + (width * gridSize) / 2,
+    y: (source.document?.y ?? 0) + (height * gridSize) / 2,
+  };
+}
+
 export function getSystemHiddenIndicatorBaseColor({
   observerIsBlindAndDeaf = false,
   shouldShowThoughtsenseIndicator = false,
@@ -670,6 +692,10 @@ function attachPulseAnimation({
       if (!indicator.parent || !canvasLayer?.ready) {
         return;
       }
+      // Keep the indicator on its token's live position so it tracks the token while it is
+      // hold-dragged (follows the drag preview) or animating, instead of lagging at the origin.
+      const liveCenter = getLiveTokenCenter(token, canvasLayer);
+      if (liveCenter) indicator.position.set(liveCenter.x, liveCenter.y);
       if (
         indicator._pvIndicatorMode === 'thoughtsense' ||
         indicator._pvIndicatorMode === 'lifesense'

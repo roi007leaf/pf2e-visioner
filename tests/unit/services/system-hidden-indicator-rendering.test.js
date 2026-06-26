@@ -16,6 +16,7 @@ jest.mock('../../../scripts/services/HoverTooltips.js', () => ({
 import {
   createSystemHiddenIndicator,
   drawSystemHiddenIndicatorFrame,
+  getLiveTokenCenter,
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
   showObserverHoverTooltips,
@@ -242,5 +243,37 @@ describe('system-hidden indicator rendering helpers', () => {
         alpha: 0,
       },
     });
+  });
+});
+
+describe('getLiveTokenCenter (indicator tracks its token, incl. drag preview)', () => {
+  function tokenAt(id, cx, cy) {
+    return { document: { id, x: cx - 50, y: cy - 50, width: 1, height: 1 }, center: { x: cx, y: cy } };
+  }
+
+  test('returns the token center when there is no drag preview', () => {
+    const token = tokenAt('t', 300, 400);
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 300, y: 400 });
+  });
+
+  test('follows the drag preview clone position (matched by _original)', () => {
+    const token = tokenAt('t', 300, 400);
+    const preview = { _original: token, document: { id: 't', width: 1, height: 1 }, center: { x: 1500, y: 400 } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 1500, y: 400 });
+  });
+
+  test('matches the preview clone by document id when _original is absent', () => {
+    const token = tokenAt('t', 300, 400);
+    const preview = { document: { id: 't', width: 1, height: 1 }, center: { x: 900, y: 400 } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 900, y: 400 });
+  });
+
+  test('falls back to document coordinates when no center is available', () => {
+    const token = { document: { id: 't', x: 200, y: 200, width: 2, height: 2 } };
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 300, y: 300 });
   });
 });
