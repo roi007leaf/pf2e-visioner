@@ -189,11 +189,23 @@ const systemHiddenHookRegistrations = {
 
 let indicatorPositionTickerActive = false;
 
+export function repositionIndicatorIfMoved(indicator, canvasLayer = globalThis.canvas) {
+  const position = indicator?.position;
+  if (!position?.set) return false;
+  const center = getLiveTokenCenter(indicator?._pvTokenRef, canvasLayer);
+  if (!center) return false;
+  // Only re-set when it actually moved: setting position on an interactive object dirties its
+  // hit-area, so skipping unchanged indicators keeps fast drags smooth (avoids a per-frame
+  // reposition of every indicator) while still snapping back to the token when a drag ends.
+  if (position.x === center.x && position.y === center.y) return false;
+  position.set(center.x, center.y);
+  return true;
+}
+
 function syncAllSystemHiddenIndicatorPositions() {
   for (const indicator of systemHiddenIndicators) {
     try {
-      const center = getLiveTokenCenter(indicator?._pvTokenRef);
-      if (center && indicator?.position?.set) indicator.position.set(center.x, center.y);
+      repositionIndicatorIfMoved(indicator);
     } catch (_) {
       /* best-effort indicator position sync */
     }

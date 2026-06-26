@@ -19,6 +19,7 @@ import {
   getLiveTokenCenter,
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
+  repositionIndicatorIfMoved,
   showObserverHoverTooltips,
   syncSystemHiddenIndicatorPositionForToken,
 } from '../../../scripts/services/system-hidden-indicator-rendering.js';
@@ -308,5 +309,30 @@ describe('syncSystemHiddenIndicatorPositionForToken', () => {
     const token = { document: { id: 't' }, center: { x: 0, y: 0 } };
     const canvasLayer = { tokens: { get: () => token, preview: { children: [] } }, grid: { size: 100 } };
     expect(syncSystemHiddenIndicatorPositionForToken(token, canvasLayer)).toBe(false);
+  });
+});
+
+describe('repositionIndicatorIfMoved (skip-if-unchanged keeps fast drags smooth)', () => {
+  test('skips position.set when the indicator is already at the token center', () => {
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 400, y: 400 } };
+    const indicator = { _pvTokenRef: token, position: { x: 400, y: 400, set: jest.fn() } };
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+
+    expect(repositionIndicatorIfMoved(indicator, canvasLayer)).toBe(false);
+    expect(indicator.position.set).not.toHaveBeenCalled();
+  });
+
+  test('repositions only when the live center moved (e.g. drag preview)', () => {
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 400, y: 400 } };
+    const preview = { _original: token, document: { id: 't', width: 1, height: 1 }, center: { x: 1800, y: 400 } };
+    const indicator = { _pvTokenRef: token, position: { x: 400, y: 400, set: jest.fn() } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+
+    expect(repositionIndicatorIfMoved(indicator, canvasLayer)).toBe(true);
+    expect(indicator.position.set).toHaveBeenCalledWith(1800, 400);
+  });
+
+  test('no-ops for an indicator without a position', () => {
+    expect(repositionIndicatorIfMoved({ _pvTokenRef: {} }, {})).toBe(false);
   });
 });
