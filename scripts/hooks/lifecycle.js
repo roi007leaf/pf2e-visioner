@@ -13,6 +13,7 @@ import {
   setSuppressLightingRefresh,
 } from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
+import { clearAllDetectionFilterVisuals } from '../stores/visibility-map.js';
 import {
   isSelectAllTokenVisibilityBypassActive,
   primeSelectAllTokenVisibilityBypassFromKeyboard,
@@ -238,6 +239,7 @@ function scheduleNoObserverVisibilityRefresh() {
       if (completed) return;
       if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
       // Freeze+settle: core drives rendering; just nudge a vision refresh.
+      clearAllDetectionFilterVisuals();
       scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
       completed = true;
     } catch {
@@ -368,6 +370,7 @@ function restoreVisionerHiddenTokensForSelectAll() {
   // Freeze+settle: the select-all visibility bypass is applied by the detection
   // wrappers (isSelectAllTokenVisibilityBypassActive) returning core's result,
   // so core re-renders every token natively — no render-lock restore needed.
+  clearAllDetectionFilterVisuals();
 }
 
 function handleSelectAllTokenVisibilityBypassKeydown(event) {

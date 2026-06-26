@@ -194,6 +194,15 @@ function shouldClearObservedDetectionFilterForChange(change) {
   return true;
 }
 
+export function clearAllDetectionFilterVisuals(tokens = globalThis.canvas?.tokens?.placeables ?? []) {
+  let cleared = 0;
+  for (const token of tokens ?? []) {
+    clearDetectionFilterVisuals(token);
+    cleared += 1;
+  }
+  return cleared;
+}
+
 function clearDetectionFilterVisuals(token) {
   if (!token) return;
 

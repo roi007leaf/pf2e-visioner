@@ -1,4 +1,5 @@
 import {
+  clearAllDetectionFilterVisuals,
   getPerceptionProfileBetween,
   getPerceptionProfileMap,
   getVisibilityBetween,
@@ -705,5 +706,30 @@ describe('Visibility Map V2 profile storage', () => {
       global.canvas.visibility = originalVisibility;
       global.canvas.tokens = originalTokens;
     }
+  });
+});
+
+describe('clearAllDetectionFilterVisuals (GM deselect / select-all omniscience)', () => {
+  const makeToken = () => ({
+    detectionFilter: {},
+    detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
+    _pvHiddenEcho: { visible: true },
+  });
+
+  test('clears the detection filter, mesh and hidden echo for every token', () => {
+    const a = makeToken();
+    const b = makeToken();
+    const cleared = clearAllDetectionFilterVisuals([a, b]);
+    expect(cleared).toBe(2);
+    for (const t of [a, b]) {
+      expect(t.detectionFilter).toBeNull();
+      expect(t.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+      expect(t._pvHiddenEcho.visible).toBe(false);
+    }
+  });
+
+  test('tolerates tokens without detection visuals and empty input', () => {
+    expect(() => clearAllDetectionFilterVisuals([{}, null])).not.toThrow();
+    expect(clearAllDetectionFilterVisuals([])).toBe(0);
   });
 });
