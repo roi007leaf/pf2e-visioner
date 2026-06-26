@@ -67,6 +67,29 @@ export function applyCurrentViewHardHide(token) {
   return true;
 }
 
+export function releaseCurrentViewHardHide(token) {
+  if (!token || token.controlled) return false;
+  const mesh = token.mesh;
+  const wasHardHidden =
+    token.renderable === false || mesh?.visible === false || (mesh && mesh.alpha === 0);
+  if (!wasHardHidden) return false;
+  if ('renderable' in token) token.renderable = true;
+  if (mesh) {
+    if ('visible' in mesh) mesh.visible = true;
+    if ('renderable' in mesh) mesh.renderable = true;
+    if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
+  }
+  return true;
+}
+
+export function releaseAllCurrentViewHardHide(tokens = globalThis.canvas?.tokens?.placeables ?? []) {
+  let released = 0;
+  for (const token of tokens ?? []) {
+    if (releaseCurrentViewHardHide(token)) released += 1;
+  }
+  return released;
+}
+
 export function targetIsHardHiddenFromCurrentView(target) {
   if (!target?.document?.id) return false;
   if (shouldBypassAvsForGmVision()) return false;

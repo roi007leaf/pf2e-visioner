@@ -15,6 +15,8 @@ import {
   currentViewObservers,
   targetIsHardHiddenFromCurrentView,
   applyCurrentViewHardHide,
+  releaseCurrentViewHardHide,
+  releaseAllCurrentViewHardHide,
   __setStoredVisibilityForTest,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
 import { shouldBypassAvsForGmVision } from '../../../scripts/services/gm-vision-bypass.js';
@@ -242,5 +244,51 @@ describe('applyCurrentViewHardHide', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
     expect(applyCurrentViewHardHide(t)).toBe(false);
     expect(t.visible).toBe(true);
+  });
+});
+
+describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', () => {
+  function hardHidden() {
+    return {
+      controlled: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 't', hidden: false },
+    };
+  }
+
+  it('restores a hard-hidden token render state', () => {
+    const t = hardHidden();
+    expect(releaseCurrentViewHardHide(t)).toBe(true);
+    expect(t.renderable).toBe(true);
+    expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  it('uses GM-hidden alpha for foundry-hidden tokens', () => {
+    const t = hardHidden();
+    t.document.hidden = true;
+    releaseCurrentViewHardHide(t);
+    expect(t.mesh.alpha).toBe(0.5);
+  });
+
+  it('leaves an already-visible token untouched', () => {
+    const t = { controlled: false, renderable: true, mesh: { visible: true, renderable: true, alpha: 1 }, document: { id: 't', hidden: false } };
+    expect(releaseCurrentViewHardHide(t)).toBe(false);
+  });
+
+  it('never restores a controlled token', () => {
+    const t = hardHidden();
+    t.controlled = true;
+    expect(releaseCurrentViewHardHide(t)).toBe(false);
+  });
+
+  it('releaseAllCurrentViewHardHide restores every hard-hidden token and counts them', () => {
+    const a = hardHidden();
+    const b = hardHidden();
+    const c = { controlled: false, renderable: true, mesh: { visible: true, alpha: 1 }, document: { id: 'c', hidden: false } };
+    const released = releaseAllCurrentViewHardHide([a, b, c]);
+    expect(released).toBe(2);
+    expect(a.renderable).toBe(true);
+    expect(b.mesh.visible).toBe(true);
   });
 });
