@@ -653,10 +653,6 @@ export class VisionAnalyzer {
         continue;
       }
 
-      if (wall?.document?.sound === edgeSenseTypes.LIMITED) {
-        continue;
-      }
-
       const isDoor = wall?.document?.door > 0;
       const isOpen = wall?.document?.ds === 1;
       if (isDoor && isOpen) {
@@ -1404,6 +1400,9 @@ export class VisionAnalyzer {
         target.center,
       );
 
+      const edgeSenseTypes = getEdgeSenseTypes();
+      const limitedSoundIntersections = [];
+
       for (const wall of candidateWalls) {
         const wallCoords = wall?.document?.c;
         if (!Array.isArray(wallCoords) || wallCoords.length < 4) {
@@ -1449,9 +1448,30 @@ export class VisionAnalyzer {
             if (!soundSenseBlocks) {
               continue;
             }
+
+            if (wall.document.sound === edgeSenseTypes.LIMITED) {
+              limitedSoundIntersections.push({
+                x: intersection.x,
+                y: intersection.y,
+                t0: intersection.t0,
+              });
+              continue;
+            }
             // Found a normal (non-limited) sound-blocking wall
             return true;
           }
+        }
+      }
+
+      if (limitedSoundIntersections.length >= 2) {
+        const epsilon = 0.1;
+        const first = limitedSoundIntersections[0];
+        const allSamePoint = limitedSoundIntersections.every(
+          (point) => Math.abs(point.x - first.x) < epsilon && Math.abs(point.y - first.y) < epsilon,
+        );
+
+        if (!allSamePoint) {
+          return true;
         }
       }
       // Check if polygon backend for sound is available

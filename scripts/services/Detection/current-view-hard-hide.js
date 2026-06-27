@@ -109,7 +109,13 @@ export function targetIsHardHiddenFromCurrentView(target) {
   if (target.controlled) return false;
   if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
 
-  for (const observer of currentViewObservers()) {
+  const observers = currentViewObservers();
+  if (observers.length === 0) {
+    if (globalThis.game?.user?.isGM) return false;
+    return !!target._pvCurrentViewHardHidden;
+  }
+
+  for (const observer of observers) {
     if (tokenIdOf(observer) === tokenIdOf(target)) continue;
     const state = getStoredVisibilityState(observer, target);
     if (visionerStateHidesTargetRendering(state, target)) return true;

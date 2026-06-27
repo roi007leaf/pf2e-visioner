@@ -1,5 +1,28 @@
 # Changelog
 
+## [8.3.2] - 2026-06-27
+
+### Added
+
+- **Presence-only thoughtsense marker for sound-blocked hidden targets**: A hidden target detected by thoughtsense only (sound is blocked, no hearing) now renders presence-only — the creature token and its soundwave ring are hidden and only the purple thoughtsense indicator shows, including in the GM view. Audible hidden targets keep their soundwave.
+
+### Changed
+
+- **Rebuilt during-move visibility as a freeze-and-settle engine**: While a token moves, Visioner now lets Foundry's core detection render the scene and recomputes a fresh AVS assessment once the move finishes, instead of running a per-frame render-lock and sight-line layer. Movement visibility is more reliable and lighter-weight, with live soundwaves driven directly off the token's detection filter.
+- **Hearing takes precedence among imprecise senses**: When several imprecise senses could detect a target, hearing is now the detecting sense whenever it actually can (observer not deafened, sound not blocked, target not invisible), falling back through Tremorsense > Lifesense > Thoughtsense > Scent only when hearing cannot. Invisible targets are unchanged.
+
+### Fixed
+
+- **Soundwaves clear the moment line of sight opens mid-move**: A hidden target revealed during an observer's move now drops its soundwave ring at the square where line of sight reaches it, instead of only at the end of the move. Deliberately hidden creatures (Hide or AVS overrides) keep their soundwave through the whole move.
+- **Off-screen targets recompute when sense-affecting conditions change**: Removing a sense condition such as deafened now re-evaluates the whole scene instead of only the on-screen viewport, so off-screen audible targets are no longer left stale (for example, soundwaves now appear for off-screen creatures after deafened is removed).
+- **GM deselect and select-all restore tokens and clear stale rings**: Deselecting all tokens or pressing select-all as GM now restores hard-hidden (undetected) tokens and clears leftover soundwave detection rings, so tokens no longer stay invisible or keep stray rings after losing a controlled observer.
+- **Player views stay frozen on deselect and during hold-drag**: Players no longer reveal every undetected token or clear soundwaves when deselecting (that omniscience is now GM-only), and hold-dragging a token no longer mutates soundwave visuals before the move is committed.
+- **Tokens repaint when leaving a render-hidden state without a reselect**: A token hard-hidden while undetected now repaints its token and soundwave as soon as it becomes detectable again (for example after deafened is removed), instead of staying blank until the observer is reselected.
+- **Thoughtsense/lifesense indicator clears and restores on observed transition**: The purple presence-only indicator is removed and the token's visibility is restored when a move gains sight of a sensed target, so an observed token no longer stays invisible or keeps a stuck indicator.
+- **System-hidden indicators track their token during drags and movement**: The lifesense/thoughtsense indicator square now follows the token frame-by-frame during hold-drags and movement (including fast, auto-panning drags) and settles after the move, instead of lagging behind or popping in at the wrong grid cells.
+- **Players no longer reveal undetected tokens when deselecting**: A player deselecting their token now keeps its last view frozen, so undetected tokens stay hidden instead of becoming visible once no token is controlled. GM deselect still reveals everything.
+- **Limited (terrain) walls now obscure hearing like sight**: A wall set to Limited for sound now follows Foundry's terrain rule for hearing — sound passes through one crossing but is blocked by a second — matching how Limited walls already work for sight. A creature behind a terrain wall crossed twice is now undetected (fully hidden, no soundwave) instead of showing a hidden soundwave through the wall.
+
 ## [8.3.1] - 2026-06-21
 
 ### Fixed

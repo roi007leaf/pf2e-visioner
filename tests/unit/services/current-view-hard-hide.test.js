@@ -141,6 +141,33 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
   });
 
+  it('non-GM player deselect (no observers) freezes a previously hard-hidden token', () => {
+    controlled.length = 0;
+    draggedToken = null;
+    const t = target('t');
+    t._pvCurrentViewHardHidden = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+
+  it('non-GM player with no observers does NOT hide a token it never hard-hid', () => {
+    controlled.length = 0;
+    draggedToken = null;
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('GM deselect (no observers) releases even a previously hard-hidden token', () => {
+    globalThis.game = { user: { isGM: true } };
+    controlled.length = 0;
+    draggedToken = null;
+    const t = target('t');
+    t._pvCurrentViewHardHidden = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
   it('multiple observers: hidden for ANY observer → hard-hidden', () => {
     const obs1 = { document: { id: 'obs1' }, controlled: true };
     const obs2 = { document: { id: 'obs2' }, controlled: true };

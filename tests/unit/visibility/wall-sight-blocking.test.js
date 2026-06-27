@@ -724,4 +724,43 @@ describe('Wall Sight Blocking Fix', () => {
     });
 
   });
+
+  describe('isSoundBlocked - limited (terrain) wall logic', () => {
+    test('a single limited sound wall does NOT block sound (terrain crossed once)', () => {
+      const observer = makeZeroSizeToken({ id: 'limited-sound-listener', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'limited-sound-source', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeWall({ sound: CONST.WALL_SENSE_TYPES.LIMITED, c: [50, -10, 50, 10] }),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(false);
+    });
+
+    test('two distinct limited sound walls block sound (terrain crossed twice)', () => {
+      const observer = makeZeroSizeToken({ id: 'limited-sound-listener-2', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'limited-sound-source-2', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeWall({ sound: CONST.WALL_SENSE_TYPES.LIMITED, c: [30, -10, 30, 10] }),
+        makeWall({ sound: CONST.WALL_SENSE_TYPES.LIMITED, c: [70, -10, 70, 10] }),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(true);
+    });
+
+    test('a single normal sound wall still blocks sound on one crossing', () => {
+      const observer = makeZeroSizeToken({ id: 'normal-sound-listener', x: 0, y: 0 });
+      const target = makeZeroSizeToken({ id: 'normal-sound-source', x: 100, y: 0 });
+
+      global.canvas.walls.placeables = [
+        makeWall({ sound: CONST.WALL_SENSE_TYPES.NORMAL, c: [50, -10, 50, 10] }),
+      ];
+
+      const result = visionAnalyzer.isSoundBlocked(observer, target);
+      expect(result).toBe(true);
+    });
+  });
 });
