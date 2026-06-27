@@ -21,9 +21,9 @@
             "hidden": "藏匿",
             "undetected": "无踪",
             "concealed": "隐蔽",
-            "observed_concealed": "可见 + 隐蔽",
             "avs": "自动能见度",
-            "unnoticed": "未发现"
+            "unnoticed": "未发现",
+            "observed_concealed": "可见 + 隐蔽"
         },
         "COVER_STATES": {
             "none": "无掩蔽",
@@ -99,7 +99,7 @@
             "NO_TOKEN_ID": "未在按钮上找到指示物ID",
             "END_TURN_FAILED": "未能成功应用回合结束时的能见度变更。",
             "NO_DEFERRED_POSITIONS": "无需进行推迟位置检查以验证。",
-            "PARTY_RESTORE_SUCCESS": "PF2E Visioner：恢复{count}个团队指示物状态",
+            "PARTY_RESTORE_SUCCESS": "PF2E Visioner：恢复{count}个队伍指示物状态",
             "OVERRIDE_KEEP_FAILED": "无法保持状态覆写",
             "AVS_ACCEPTED_IN_TABLE": "在{group}表中已接受{count}次变更",
             "SNEAK_APPLY_FAILED": "未能应用潜行变更：{errors}",
@@ -108,7 +108,7 @@
             "NO_TOKENS_PROVIDED": "无指示物可供清理",
             "VISION_CACHE_UNAVAILABLE": "无法清除视觉缓存",
             "NO_DEFERRED_OUTCOMES": "未找到可验证的推迟结果。",
-            "PARTY_RESTORE_FAILED": "PF2E Visioner：无法恢复团队指示物",
+            "PARTY_RESTORE_FAILED": "PF2E Visioner：无法恢复队伍指示物",
             "SNEAK_CLEAR_FAILED": "PF2E Visioner：未能清除潜行标记。请查看控制台。",
             "NO_UNDEFERRED_TOKENS": "未找到可恢复至推迟状态的指示物。",
             "VALIDATION_FAILED": "未能处理回合结束时的验证。",
@@ -142,8 +142,6 @@
             "RANGE_LIMIT_ACTIVE_CUSTOM": "激活射程限制：仅显示{distance}尺内的目标",
             "NO_TARGETS_IN_RANGE": "30尺射程内无有效目标存在",
             "NO_TARGETS_IN_RANGE_CUSTOM": "{distance}尺射程内无有效目标",
-            "INVISIBLE_CAP_LABEL": "隐形",
-            "INVISIBLE_CAP_TOOLTIP": "目标处于隐形状态。使用视觉进行搜索可以确定其位置，但不能使其变为可见；需要使用精确的非视觉感官才能观察到它。",
             "BUTTON_PROCESSED": "结果已应用",
             "NO_UNDETECTED_TOKENS": "{name}的搜索行动未发现藏匿或无踪指示物",
             "NO_CHANGES": "{name}的搜索行动未发生能见度变化",
@@ -168,7 +166,9 @@
             "SENSE_UNSEEN_APPLIED": "已应用察觉未见",
             "LIFESENSE_TOOLTIP": "你能感知到范围内的活物与不死生物（模糊感官）",
             "TEMPLATE_OUT_OF_RANGE": "搜索测量板中心距角色{distance}尺远，超出了至多{max}尺的放置距离限制。",
-            "SEARCH_EXPLORATION_ROLL": "搜寻探索行动：搜索（秘密检定）"
+            "SEARCH_EXPLORATION_ROLL": "搜寻探索行动：搜索（秘密检定）",
+            "INVISIBLE_CAP_LABEL": "隐形",
+            "INVISIBLE_CAP_TOOLTIP": "目标是隐形的。视觉搜索可以找到它的位置，但无法使其变为可见；需要使用非视觉的精确感官来观察它。"
         },
         "HIDE_AUTOMATION": {
             "BUTTON_APPLY": "应用躲藏结果",
@@ -466,22 +466,6 @@
                 "name": "忽略死亡指示物",
                 "hint": "死亡指示物将不提供自动掩蔽"
             },
-            "PEEK_SLIT_ANGLE": {
-                "name": "Peek Slit Angle (°)",
-                "hint": "Width of the peek vision cone in degrees."
-            },
-            "PEEK_SWEEP_ANGLE": {
-                "name": "Peek Sweep Angle (°)",
-                "hint": "How far left/right the peek slit can be aimed from its base direction, in degrees."
-            },
-            "PEEK_RANGE": {
-                "name": "Peek Range (ft)",
-                "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
-            },
-            "CORNER_PEEK_ENABLED": {
-                "name": "Enable Corner Peeking",
-                "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
-            },
             "TOKEN_INTERSECTION_MODE": {
                 "hint": "如何基于指示物遮挡计算掩蔽",
                 "name": "指示物连线相交模式",
@@ -542,7 +526,7 @@
             },
             "ENABLE_CAMERA_VISION_AGGREGATION": {
                 "name": "摄像视角整合",
-                "hint": "若启用，具有旁观权限的摄像账号在多个团队指示物运行时，将显示所有受控指示物的最佳（最宽松）能见度状态，而非仅显示首个指示物的情况。这对于需要摄像能够看到全部团队成员所看见场景的流媒体情景非常有用。"
+                "hint": "若启用，具有旁观权限的摄像账号在多个队伍指示物运行时，将显示所有受控指示物的最佳（最宽松）能见度状态，而非仅显示首个指示物的情况。这对于需要摄像能够看到全部队伍成员所看见场景的流媒体情景非常有用。"
             },
             "SEEK_TEMPLATE_SKIP_DIALOG": {
                 "name": "始终跳过“搜索测量板”对话框",
@@ -597,6 +581,22 @@
             "SEEK_TEMPLATE_MAX_PLACEMENT_DISTANCE": {
                 "name": "搜索测量板最大放置距离",
                 "hint": "从执行搜索动作的指示物到放置的搜索测量板中心的最大距离（以尺为单位）。若设置为0，则不限放置距离。"
+            },
+            "PEEK_SLIT_ANGLE": {
+                "name": "窥视孔角度（度）",
+                "hint": "窥孔锥形视野的的宽度（以度为单位）。"
+            },
+            "PEEK_SWEEP_ANGLE": {
+                "name": "窥视扫掠角（度）",
+                "hint": "窥视孔从起始方向可以向左或向右偏转的角度，以度为单位。"
+            },
+            "PEEK_RANGE": {
+                "name": "窥视距离（尺）",
+                "hint": "窥视视觉线的最大长度，以尺为单位。0 = 无限。"
+            },
+            "CORNER_PEEK_ENABLED": {
+                "name": "启用角落窥视",
+                "hint": "允许指示物在长按窥视绑定键时，在角落处进行窥视。每扇门独立在墙体配置中控制窥视功能。"
             }
         },
         "UI": {
@@ -648,7 +648,7 @@
             "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}：{FROM} → {TO}（专长升级）",
             "BULK_SET_VISIBILITY": "批量能见度设置",
             "FILTER_BY_DETECTION_TOOLTIP": "仅显示处于当前视窗内的指示物",
-            "SELECT_ALL_PARTY": "选择团队内全部指示物",
+            "SELECT_ALL_PARTY": "选择队伍内全部指示物",
             "STANDARD_OR_GREATER_TOOLTIP": "标准或高等掩蔽",
             "ACKNOWLEDGE_END_TURN": "确认回合结束位置的验证结果",
             "HIDE_FOUNDRY_HIDDEN_TOOLTIP": "视觉上隐藏处于Foundry不可见状态的指示物（document.hidden）",
@@ -679,7 +679,7 @@
             "MARK_WALL_HIDDEN": "将该墙体标记为对玩家隐藏",
             "SET_ALL_WALLS_OBSERVED": "设置列表内所有墙体为可见",
             "SET_ALL_WALLS_HIDDEN": "设置列表内所有墙体为隐藏",
-            "TARGET_ALL_PARTY": "将团队内全部指示物设为目标",
+            "TARGET_ALL_PARTY": "将队伍内全部指示物设为目标",
             "TARGET_ALL_ENEMIES": "将全部敌人指示物设为目标",
             "CLEAR_ALL_SELECTIONS": "清除所有选择与目标",
             "APPLY_COVER_CHANGE": "应用该掩蔽变更",
@@ -693,7 +693,7 @@
             "SET_ALL_WALLS_NO_COVER": "设置所有墙体为无掩蔽",
             "SET_ALL_WALLS_STANDARD_COVER": "设置所有墙体为标准掩蔽",
             "SET_ALL_WALLS_GREATER_COVER": "设置所有墙体为高等掩蔽",
-            "WALL_TYPE_CYCLE_TOOLTIP": "左键点击：下一项丨右键点击：上一项",
+            "WALL_TYPE_CYCLE_TOOLTIP": "左键单击：下一项丨右键单击：上一项",
             "SELECT_WALL_AND_PAN": "选择墙体并将镜头移至它",
             "WALL_COVER_AUTO_SHORT": "自动监测",
             "COVER_OVERRIDDEN_VIA": "掩蔽覆盖{source}：{originalLabel} → {finalLabel}",
@@ -852,7 +852,7 @@
             "CLICK_TO_PAN": "点击平移至主人指示物",
             "CLICK_TO_PAN_MINION": "点击平移至仆从指示物",
             "MIDDLE_CLICK_TO_CYCLE": "中键点击切换仆从",
-            "RIGHT_CLICK_TO_REMOVE": "右键点击取消视角共享",
+            "RIGHT_CLICK_TO_REMOVE": "右键单击取消视角共享",
             "BULK_SET_COVER": "批量掩蔽设置",
             "CEASELESS_SHADOWS_TAKE_COVER_TOOLTIP": "“阴影不绝”使从生物处获得的掩蔽提升一级：次等掩蔽变为标准掩蔽；标准掩蔽变为高等掩蔽。"
         },
@@ -862,10 +862,6 @@
             "hidden": "隐藏"
         },
         "KEYBINDINGS": {
-            "HOLD_PEEK": {
-                "name": "Toggle Peek (Corner)",
-                "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
-            },
             "OPEN_TOKEN_MANAGER": {
                 "hint": "打开所选指示物的指示物管理器",
                 "name": "打开视野管理器"
@@ -909,6 +905,10 @@
             "OPEN_HAZARD_LOOT_MANAGER": {
                 "name": "打开危害/战利品管理器",
                 "hint": "打开模组的危害/战利品管理器对话框，以便批量编辑场景内战利品与危害的能见度。"
+            },
+            "HOLD_PEEK": {
+                "name": "开关窥视（角落）",
+                "hint": "按键以开始在最近的拐角处朝光标方向，以定向锥形视野进行窥视；再次按键则停止。该锥形视野在激活期间会跟随光标移动。"
             }
         },
         "REGION_BEHAVIOR": {
@@ -1435,13 +1435,13 @@
             "BODY": "自动能见度系统需要一个多边形视角；而GM视角不会生成这样的多边形。请禁用GM视角后再启用自动能见度系统。"
         },
         "OVERRIDE_INDICATOR": {
-            "TOOLTIP_RIGHT_CLICK": "右键点击：接受全部",
-            "TOOLTIP_LEFT_CLICK": "左键点击：打开详情",
-            "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+右键点击：拒绝全部",
+            "TOOLTIP_RIGHT_CLICK": "右键单击：接受全部",
+            "TOOLTIP_LEFT_CLICK": "左键单击：打开详情",
+            "TOOLTIP_SHIFT_RIGHT_CLICK": "Shift+右键单击：拒绝全部",
             "TOOLTIP_HEADER": "有效的更改",
             "TOOLTIP_NEXT": "接下来：",
             "QUEUE_POSITION": "{total}分之{current}",
-            "ROW_RIGHT_CLICK": "右键点击以接受该次更改"
+            "ROW_RIGHT_CLICK": "右键单击以接受该次更改"
         },
         "TIMED_OVERRIDE": {
             "DURATION": "持续时间",
@@ -1508,11 +1508,11 @@
             "SOUND_HINT": "选择该层级边界是采用原生V14声音碰撞，始终阻挡声音还是从不阻挡声音的模式。"
         },
         "PEEK": {
-            "CHECK_LABEL": "Peek Through Door",
-            "DC_FIELD_LABEL": "Peek DC",
-            "ALLOW_FIELD_LABEL": "Allow Peeking",
-            "NOT_ALLOWED": "Peeking is not allowed through this door.",
-            "TOO_FAR": "You are too far from the door to peek through it."
+            "CHECK_LABEL": "透过门窥视",
+            "DC_FIELD_LABEL": "窥视DC",
+            "ALLOW_FIELD_LABEL": "允许窥视",
+            "NOT_ALLOWED": "禁止透过这扇门进行窥视。",
+            "TOO_FAR": "你离门太远，以至于无法透过其进行窥视。"
         }
     }
 }
