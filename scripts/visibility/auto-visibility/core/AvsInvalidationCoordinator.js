@@ -4,6 +4,7 @@ import {
   isLightingRefreshSuppressed,
   isTokenLightMovementLightingRefreshSuppressed,
   isTokenMovementLightingRefreshSuppressed,
+  requestFullVisibilityScopeRecalc,
   setSuppressLightingRefresh,
   setSuppressTokenLightMovementLightingRefresh,
 } from '../../../services/runtime-state.js';
@@ -493,6 +494,7 @@ export class AvsInvalidationCoordinator {
     if (!Array.isArray(tokenIds) || tokenIds.length === 0) return false;
 
     this.#clearVisibilityAndLosCaches();
+    requestFullVisibilityScopeRecalc();
     this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;
   }
@@ -521,6 +523,7 @@ export class AvsInvalidationCoordinator {
 
     this.#clearVisionAnalyzerCaches(metadata.tokens);
     this.cacheManager?.getGlobalVisibilityCache?.()?.clear?.();
+    requestFullVisibilityScopeRecalc();
     if (metadata.recalculateAllTokenPairs) {
       this.#clearVisibilityAndLosCaches();
       this.visibilityState?.markAllTokensChangedImmediate?.();
@@ -554,6 +557,7 @@ export class AvsInvalidationCoordinator {
     const tokenIds = Array.isArray(metadata.tokenIds) ? metadata.tokenIds : [];
     if (tokenIds.length === 0) return false;
 
+    requestFullVisibilityScopeRecalc();
     this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;
   }

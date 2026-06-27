@@ -1,19 +1,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../../stores/visibility-map.js';
-import {
-  isPendingMovementCoreAnimationBypassActive,
-  isPendingMovementCoreAnimationPerceptionRefresh,
-  isPendingMovementHiddenStateVisibilityProbe,
-  pairAllowsLiveImpreciseSoundwave,
-  shouldUseCoreDetectionDuringPendingMovement,
-  shouldTemporarilyBlockSightDetection,
-} from '../PendingMovement/pending-movement-detection-gate.js';
-import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
-import {
-  targetHasAnyHiddenAvsOverride,
-  targetMustStayHiddenDuringPendingMovement,
-} from '../PendingMovement/pending-token-movement.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
@@ -29,80 +17,58 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const canDetect = wrapped(visionSource, target, ...args);
     if (shouldBypassAvsForGmVision()) return canDetect;
     if (isSelectAllTokenVisibilityBypassActive()) return canDetect;
-    if (targetMustStayHiddenDuringPendingMovement(target)) return false;
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
-    const overrideHiddenActive = targetHasAnyHiddenAvsOverride(target);
-    if (!overrideHiddenActive && isPendingMovementCoreAnimationBypassActive()) {
-      if (pairAllowsLiveImpreciseSoundwave(observerToken, target)) {
-        if (
-          threshold === VISIBILITY_DETECTION_THRESHOLDS.undetected &&
-          (!modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId))
-        ) {
-          return true;
-        }
-        if (modeId && !NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
-          return false;
-        }
-      }
-      return canDetect;
-    }
-    if (
-      !overrideHiddenActive &&
-      (isPendingMovementCoreAnimationPerceptionRefresh() ||
-        isPendingMovementCoreAnimationBypassActive()) &&
-      !shouldHandlePendingMovementCanvasVisibilityForToken(target)
-    ) {
-      return canDetect;
-    }
-    if (
-      !overrideHiddenActive &&
-      shouldUseCoreDetectionDuringPendingMovement(observerToken, target)
-    ) {
-      return canDetect;
-    }
 
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
-    const pendingMovementSightBlocked =
-      !isPendingMovementHiddenStateVisibilityProbe() &&
-      threshold === VISIBILITY_DETECTION_THRESHOLDS.hidden &&
-      shouldTemporarilyBlockSightDetection(observerToken, target);
+
+    if (hasActivePendingTokenMovement()) {
+      return resolveDetectionDuringMovement(observerToken, target, visibility, modeId, canDetect);
+    }
 
     if (canUseVisionerHiddenDetection(modeId, visibility, threshold)) {
       return true;
     }
-
-    if (
-      !pendingMovementSightBlocked &&
-      canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)
-    ) {
+    if (canUseExplicitVisionerDetection(observerToken, target, modeId, visibility, threshold)) {
       return true;
     }
-
-    if (
-      threshold === VISIBILITY_DETECTION_THRESHOLDS.undetected &&
-      (!modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) &&
-      pairAllowsLiveImpreciseSoundwave(observerToken, target)
-    ) {
-      return true;
-    }
-
     if (canDetect === false) {
       return false;
     }
-
     if (!meetsMinimumPerceptionRank(observerToken, target)) {
       return false;
     }
-
-    if (pendingMovementSightBlocked) {
-      return false;
-    }
-
-    return !reachesVisibilityThreshold(observerToken, target, threshold, {
-      visibility,
-    });
+    return !reachesVisibilityThreshold(observerToken, target, threshold, { visibility });
   };
+}
+
+function targetIsLootOrHazard(target) {
+  const actorType = String(target?.actor?.type ?? '').toLowerCase();
+  return actorType === 'loot' || actorType === 'hazard';
+}
+
+function hasHiddenAvsOverride(observer, target) {
+  try {
+    const observerId = observer?.document?.id ?? observer?.id;
+    if (!observerId) return false;
+    const flag = target?.document?.getFlag?.(MODULE_ID, `avs-override-from-${observerId}`);
+    return flag?.state === 'hidden';
+  } catch {
+    return false;
+  }
+}
+
+function resolveDetectionDuringMovement(observer, target, visibility, modeId, canDetect) {
+  if (visibility === 'undetected' || visibility === 'unnoticed') return false;
+  if (visibility === 'hidden') {
+    if (targetIsLootOrHazard(target)) return false;
+    const nonVisualMode = !modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
+    if (hasHiddenAvsOverride(observer, target)) {
+      return nonVisualMode ? canDetect : false;
+    }
+    return canDetect;
+  }
+  return canDetect;
 }
 
 function canUseVisionerHiddenDetection(

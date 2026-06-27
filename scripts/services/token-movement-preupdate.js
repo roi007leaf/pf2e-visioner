@@ -1,8 +1,5 @@
-import {
-  getPendingMovementRefreshTargetIds,
-  refreshPendingMovementTokenVisibility,
-  setPendingTokenMovementPosition,
-} from './PendingMovement/pending-token-movement.js';
+import { setPendingTokenMovementPosition } from './movement-tracking.js';
+import { ensureDuringMoveSoundwaveRefresh } from './during-move-soundwave.js';
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
@@ -86,8 +83,7 @@ export function handlePreUpdateTokenMovement(
     notifyWarn = notifyDefaultWarn,
     getControlledTokens = getDefaultControlledTokens,
     setPendingTokenMovementPosition: recordPendingMovement = setPendingTokenMovementPosition,
-    getPendingMovementRefreshTargetIds: getRefreshTargetIds = getPendingMovementRefreshTargetIds,
-    refreshPendingMovementTokenVisibility: refreshPendingMovement = refreshPendingMovementTokenVisibility,
+    startDuringMoveSoundwaves = ensureDuringMoveSoundwaveRefresh,
     getConditionManager = getDefaultConditionManager,
     isCurrentUserGm = isDefaultCurrentUserGm,
   } = {},
@@ -104,6 +100,9 @@ export function handlePreUpdateTokenMovement(
     return false;
   }
 
+  // Freeze+settle contract: record the move so `_canDetect` becomes move-aware
+  // (core drives live rendering); start the live soundwave loop. No per-frame
+  // visioner visibility recompute — the persisted state re-derives at move-end.
   const movementRecorded = recordPendingMovement(tokenDoc, changes, getControlledTokens(), {
     userId,
     hookOptions: options,
@@ -111,13 +110,11 @@ export function handlePreUpdateTokenMovement(
   });
 
   if (movementRecorded) {
-    const movingTokenId = tokenDoc?.id;
-    const targetTokenIds = getRefreshTargetIds?.(movingTokenId) ?? [];
-    refreshPendingMovement?.(movingTokenId ? [movingTokenId] : [], {
-      skipPerceptionRefresh: true,
-      source: 'pre-update-token-movement',
-      ...(targetTokenIds.length ? { targetTokenIds } : {}),
-    });
+    try {
+      startDuringMoveSoundwaves();
+    } catch {
+      /* never block the move */
+    }
   }
 
   if (isCurrentUserGm()) {

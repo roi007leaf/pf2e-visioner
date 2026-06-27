@@ -23,6 +23,7 @@ export function buildBatchCalculationOptions({
   isTokenMoving = false,
   movementSession = null,
   isMovementBatch = false,
+  skipViewportFilter = isMovementBatch,
   postBatchPerceptionSuppression = null,
   ttlMs = DEFAULT_BURST_LOS_MEMO_TTL_MS,
 } = {}) {
@@ -37,7 +38,7 @@ export function buildBatchCalculationOptions({
       burstLosMemo: nextLosMemo.map,
       fastMode: isTokenMoving,
       skipPrecomputedLOS: !!movementSession,
-      skipViewportFilter: isMovementBatch,
+      skipViewportFilter,
       isMovementBatch,
       postBatchPerceptionSuppression,
     },

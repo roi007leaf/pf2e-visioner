@@ -7,10 +7,7 @@ import { markExplicitVisiblePair } from '../../../scripts/services/ExplicitVisib
 import {
     clearPendingTokenMovementPosition,
     setPendingTokenMovementPosition,
-} from '../../../scripts/services/PendingMovement/pending-token-movement.js';
-import {
-    shouldTemporarilyForceTokenInvisible,
-} from '../../../scripts/services/PendingMovement/pending-movement-render-lock.js';
+} from '../../../scripts/services/movement-tracking.js';
 
 // Mock dependencies
 const mockLibWrapper = {
@@ -770,63 +767,6 @@ describe('Deafened Detection Wrapper', () => {
             )).toBe(true);
             expect(basicSightInstance._testPoint).toHaveBeenCalled();
             expect(hearingInstance._testPoint).toHaveBeenCalled();
-
-            clearPendingTokenMovementPosition('observer');
-            global.canvas = originalCanvas;
-        });
-
-        test('pending force check keeps undetected basic sight state render-locked', () => {
-            const originalCanvas = global.canvas;
-            const basicSightWrapper = mockLibWrapper.register.mock.calls.find(
-                call => call[1] === 'CONFIG.Canvas.detectionModes.basicSight._canDetect'
-            )?.[2];
-            const observer = {
-                id: 'observer',
-                actor: {},
-                document: {
-                    id: 'observer',
-                    x: 0,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    getFlag: jest.fn().mockReturnValue({ target: 'undetected' }),
-                },
-            };
-            const target = {
-                id: 'target',
-                actor: {},
-                controlled: false,
-                document: {
-                    id: 'target',
-                    x: 150,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    getVisibilityTestPoints: jest.fn().mockReturnValue([{ x: 175, y: 25 }]),
-                },
-            };
-            global.canvas = {
-                grid: { size: 50 },
-                walls: { placeables: [] },
-                tokens: {
-                    get: jest.fn((id) => (id === 'observer' ? observer : null)),
-                    placeables: [observer, target],
-                },
-                effects: {
-                    visionSources: [{ active: true, object: observer }],
-                    lightSources: [],
-                },
-                visibility: {
-                    testVisibility: jest.fn(() =>
-                        basicSightWrapper(jest.fn().mockReturnValue(true), { object: observer }, target)
-                    ),
-                },
-            };
-
-            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-            expect(shouldTemporarilyForceTokenInvisible(target)).toBe(true);
-            expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
 
             clearPendingTokenMovementPosition('observer');
             global.canvas = originalCanvas;
@@ -1895,132 +1835,5 @@ describe('Deafened Detection Wrapper', () => {
             expect(detectionModeInstance._testPoint).toHaveBeenCalled();
         });
 
-        test('hearing still renders a hidden target during pending sight-blocked movement when sound detects it', () => {
-            const originalCanvas = global.canvas;
-            global.canvas = {
-                grid: { size: 50 },
-                walls: {
-                    placeables: [
-                        {
-                            document: {
-                                id: 'wall',
-                                c: [100, 0, 100, 200],
-                                sight: 1,
-                                door: 0,
-                                ds: 0,
-                            },
-                        },
-                    ],
-                },
-            };
-
-            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
-                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
-            )?.[2];
-            const observer = {
-                id: 'observer',
-                actor: {},
-                document: {
-                    id: 'observer',
-                    x: 0,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
-                },
-            };
-            const target = {
-                id: 'target',
-                actor: {},
-                document: {
-                    id: 'target',
-                    x: 150,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    level: 'level-b',
-                    getFlag: jest.fn().mockReturnValue(false),
-                },
-            };
-            const detectionModeInstance = {
-                id: 'hearing',
-                _canDetect: jest.fn().mockReturnValue(true),
-                _testPoint: jest.fn().mockReturnValue(true),
-            };
-
-            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-            const result = wrappedFunction.call(
-                detectionModeInstance,
-                { object: observer },
-                { id: 'hearing', enabled: true },
-                { ...mockConfig, object: target },
-            );
-
-            expect(result).toBe(true);
-            expect(detectionModeInstance._testPoint).toHaveBeenCalled();
-
-            clearPendingTokenMovementPosition('observer');
-            global.canvas = originalCanvas;
-        });
-
-        test('hearing does not render every pending hidden target when sound point test fails', () => {
-            const originalCanvas = global.canvas;
-            global.canvas = {
-                grid: { size: 50 },
-                walls: {
-                    placeables: [],
-                },
-            };
-
-            const wrappedFunction = mockLibWrapper.register.mock.calls.find(
-                call => call[1] === 'foundry.canvas.perception.DetectionMode.prototype.testVisibility'
-            )?.[2];
-            const observer = {
-                id: 'observer',
-                actor: {},
-                document: {
-                    id: 'observer',
-                    x: 0,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    getFlag: jest.fn().mockReturnValue({ target: 'hidden' }),
-                },
-            };
-            const target = {
-                id: 'target',
-                actor: {},
-                document: {
-                    id: 'target',
-                    x: 150,
-                    y: 0,
-                    width: 1,
-                    height: 1,
-                    level: 'level-b',
-                    getFlag: jest.fn().mockReturnValue(false),
-                },
-            };
-            const detectionModeInstance = {
-                id: 'hearing',
-                _canDetect: jest.fn().mockReturnValue(true),
-                _testPoint: jest.fn().mockReturnValue(false),
-            };
-
-            setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
-
-            const result = wrappedFunction.call(
-                detectionModeInstance,
-                { object: observer },
-                { id: 'hearing', enabled: true },
-                { ...mockConfig, object: target },
-            );
-
-            expect(result).toBe(false);
-            expect(detectionModeInstance._testPoint).toHaveBeenCalled();
-
-            clearPendingTokenMovementPosition('observer');
-            global.canvas = originalCanvas;
-        });
     });
 });

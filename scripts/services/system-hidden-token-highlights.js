@@ -213,9 +213,7 @@ export function buildSystemHiddenIndicatorDecision({
     thoughtsenseRange === Infinity || distanceInFeet <= thoughtsenseRange;
   const isWithinEcholocationRange =
     echolocationRange === Infinity || distanceInFeet <= echolocationRange;
-  const visibilityState = senseContext?.observerIsBlindAndDeaf
-    ? getVisibilityState?.(observer, token)
-    : null;
+  const visibilityState = getVisibilityState?.(observer, token) ?? null;
   const isHiddenFromObserver = visibilityState === 'hidden';
   const detectedByEcholocation =
     SYSTEM_HIDDEN_AUDITORY_PRECISE_SENSES.has(detection?.sense) && detection?.isPrecise !== false;
@@ -225,7 +223,11 @@ export function buildSystemHiddenIndicatorDecision({
   const shouldShowLifesenseIndicator =
     isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
   const shouldShowThoughtsenseIndicator =
-    isSystemHidden && canBeDetectedByThoughtsense && isWithinThoughtsenseRange;
+    !!senseContext?.observerHasThoughtsense &&
+    canBeDetectedByThoughtsense &&
+    isWithinThoughtsenseRange &&
+    (isSystemHidden || isHiddenFromObserver) &&
+    getSoundBlocked({ observer, token, isSoundBlocked });
   const shouldShowEcholocationIndicator =
     isSystemHidden &&
     !!senseContext?.observerHasEcholocation &&
@@ -314,4 +316,39 @@ export async function refreshSystemHiddenHighlightsForRenderedToken(
   const { updateSystemHiddenTokenHighlights } = await loadVisualEffects();
   await updateSystemHiddenTokenHighlights(controlledToken.document.id);
   return { refreshed: true };
+}
+
+export async function removeSystemHiddenIndicatorsForObservedTargets({
+  getTokens = () => globalThis.canvas?.tokens?.placeables || [],
+  getObserverById = (id) => globalThis.canvas?.tokens?.get?.(id) ?? null,
+  getVisibilityState = null,
+  loadVisualEffects = loadDefaultVisualEffects,
+} = {}) {
+  const candidates = (getTokens() || []).filter((token) => token?._pvSystemHiddenIndicator);
+  if (candidates.length === 0) {
+    return { removed: 0 };
+  }
+
+  const { removeSystemHiddenIndicator } = await loadVisualEffects();
+  const resolveVisibility =
+    getVisibilityState ?? (await import('../utils.js')).getVisibilityBetween;
+  if (
+    typeof resolveVisibility !== 'function' ||
+    typeof removeSystemHiddenIndicator !== 'function'
+  ) {
+    return { removed: 0 };
+  }
+
+  let removed = 0;
+  for (const token of candidates) {
+    const observerId = token._pvSystemHiddenIndicator?._pvObserverId;
+    const observer = observerId ? getObserverById(observerId) : null;
+    if (!observer) continue;
+    const state = resolveVisibility(observer, token);
+    if (state === 'observed' || state === 'concealed') {
+      removeSystemHiddenIndicator(token, { forceTokenVisible: true });
+      removed += 1;
+    }
+  }
+  return { removed };
 }

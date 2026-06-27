@@ -1,28 +1,27 @@
 import {
-  hasPendingMovementRenderWork as defaultHasPendingMovementRenderWork,
-  getPendingMovementRefreshTargetIds as defaultGetPendingMovementRefreshTargetIds,
-  refreshPendingMovementTokenVisibility as defaultRefreshPendingMovementTokenVisibility,
-  hasPendingRenderState as defaultHasPendingRenderState,
-  forceTokenRenderStateInvisible as defaultForceTokenRenderStateInvisible,
-} from './PendingMovement/pending-movement-render-lock.js';
-import {
-  cleanupOrphanedSoundwaveMeshes as defaultCleanupOrphanedSoundwaveMeshes,
-  getStaleRenderHiddenCurrentViewTargetIds as defaultGetStaleRenderHiddenReleaseTargetIds,
-  releasePendingMovementAnimationSuppressionForStaleRenderRelease as defaultReleaseAnimationSuppressionForStaleRelease,
+  hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement,
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
-  targetIsRenderHiddenForCurrentViewObserver,
-} from './PendingMovement/pending-token-movement.js';
+} from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import {
   getMatchingControlledTokenForRefresh,
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
   refreshSystemHiddenHighlightsForControlledTokens as defaultRefreshSystemHiddenHighlightsForControlledTokens,
   refreshSystemHiddenHighlightsForRenderedToken as defaultRefreshSystemHiddenHighlightsForRenderedToken,
+  removeSystemHiddenIndicatorsForObservedTargets as defaultRemoveSystemHiddenIndicatorsForObservedTargets,
 } from './system-hidden-token-highlights.js';
 import { handlePreUpdateTokenMovement as defaultHandlePreUpdateTokenMovement } from './token-movement-preupdate.js';
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
+}
+
+function defaultIsTokenDragOrMovementActive() {
+  if (defaultHasActivePendingTokenMovement()) return true;
+  const tokens = globalThis.canvas?.tokens;
+  if (tokens?._draggedToken) return true;
+  const previews = tokens?.preview?.children;
+  return !!(previews && previews.some?.((c) => c?.document?.id));
 }
 
 const RENDERED_TOKEN_HIGHLIGHT_REFRESH_MIN_INTERVAL_MS = 100;
@@ -90,6 +89,7 @@ export async function handleTokenUpdated(
   {
     schedulePendingTokenMovementCompletion = defaultSchedulePendingTokenMovementCompletion,
     refreshSystemHiddenHighlightsForMovedToken = defaultRefreshSystemHiddenHighlightsForMovedToken,
+    hasActivePendingTokenMovement = defaultHasActivePendingTokenMovement,
     warn = console.warn,
   } = {},
 ) {
@@ -104,7 +104,9 @@ export async function handleTokenUpdated(
       /* best effort */
     }
 
-    await refreshSystemHiddenHighlightsForMovedToken(tokenDoc, changes);
+    if (!hasActivePendingTokenMovement()) {
+      await refreshSystemHiddenHighlightsForMovedToken(tokenDoc, changes);
+    }
     return { handled: true };
   } catch (error) {
     warn('PF2E Visioner | updateToken hook failed:', error);
@@ -116,37 +118,25 @@ export function handleTokenRefreshed(
   token,
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
+    isTokenDragOrMovementActive = defaultIsTokenDragOrMovementActive,
     shouldRefreshRenderedTokenHighlights: shouldRefreshRenderedTokenHighlightsForToken =
     shouldRefreshRenderedTokenHighlights,
     shouldThrottleRenderedTokenHighlightRefresh: shouldThrottleRenderedTokenHighlightRefreshForToken =
     shouldThrottleRenderedTokenHighlightRefresh,
-    hasPendingRenderState = defaultHasPendingRenderState,
-    forceTokenRenderStateInvisible = defaultForceTokenRenderStateInvisible,
     refreshSystemHiddenHighlightsForRenderedToken =
     defaultRefreshSystemHiddenHighlightsForRenderedToken,
     warn = console.warn,
   } = {},
 ) {
-  try {
-    if (token && targetIsRenderHiddenForCurrentViewObserver(token)) {
-      const mesh = token.detectionFilterMesh;
-      if (mesh && (mesh.visible || mesh.alpha > 0 || mesh.renderable)) {
-        if ('visible' in mesh) mesh.visible = false;
-        if ('renderable' in mesh) mesh.renderable = false;
-        if ('alpha' in mesh) mesh.alpha = 0;
-      }
-    }
-  } catch {
-    /* best-effort detection filter mesh suppression */
-  }
-
   if (isRefreshTokenProcessingSuppressed()) {
     return { handled: false, reason: 'suppressed' };
   }
 
-  if (hasPendingRenderState(token)) {
-    forceTokenRenderStateInvisible(token);
-    return { handled: false, reason: 'pending-render-lock' };
+  // Freeze system-hidden indicators while hold-dragging or mid-move: recomputing them
+  // every render frame makes "conditions" pop in/out at stale grid cells during a drag.
+  // They settle after the move via the AVS batch-complete / control refresh.
+  if (isTokenDragOrMovementActive()) {
+    return { handled: false, reason: 'token-move-active' };
   }
 
   if (!shouldRefreshRenderedTokenHighlightsForToken(token)) {
@@ -165,86 +155,15 @@ export function handleTokenRefreshed(
     });
 }
 
-const STALE_RENDER_RELEASE_SWEEP_DELAYS_MS = [300, 800, 1500, 2500];
-
-function refreshStaleRenderHiddenReleaseTargets({
-  getStaleRenderHiddenReleaseTargetIds,
-  refreshPendingMovementTokenVisibility,
-  releaseAnimationSuppressionForStaleRelease,
-}) {
-  const staleTargetTokenIds = getStaleRenderHiddenReleaseTargetIds();
-  if (!staleTargetTokenIds.length) return false;
-
-  releaseAnimationSuppressionForStaleRelease();
-  refreshPendingMovementTokenVisibility([], {
-    ignoreObservedGrace: true,
-    source: 'avs-batch-complete-stale-render-release',
-    targetTokenIds: staleTargetTokenIds,
-  });
-  return true;
-}
-
-function scheduleStaleRenderHiddenReleaseSweeps(deps) {
-  for (const delayMs of STALE_RENDER_RELEASE_SWEEP_DELAYS_MS) {
-    setTimeout(() => {
-      try {
-        refreshStaleRenderHiddenReleaseTargets(deps);
-      } catch {
-        /* best-effort stale render-lock release */
-      }
-    }, delayMs);
-  }
-}
-
 export async function handleAvsBatchCompleteRefresh({
-  hasPendingMovementRenderWork = defaultHasPendingMovementRenderWork,
-  getPendingMovementRefreshTargetIds = defaultGetPendingMovementRefreshTargetIds,
-  getStaleRenderHiddenReleaseTargetIds = defaultGetStaleRenderHiddenReleaseTargetIds,
-  refreshPendingMovementTokenVisibility = defaultRefreshPendingMovementTokenVisibility,
   refreshSystemHiddenHighlightsForControlledTokens =
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
-  releaseAnimationSuppressionForStaleRelease = defaultReleaseAnimationSuppressionForStaleRelease,
-  cleanupOrphanedSoundwaveMeshesForBatch = defaultCleanupOrphanedSoundwaveMeshes,
+  removeSystemHiddenIndicatorsForObservedTargets =
+  defaultRemoveSystemHiddenIndicatorsForObservedTargets,
 } = {}) {
   try {
-    try {
-      cleanupOrphanedSoundwaveMeshesForBatch();
-    } catch {
-      /* best-effort orphan mesh cleanup */
-    }
-    const staleTargetTokenIds = getStaleRenderHiddenReleaseTargetIds();
-    const sweepDeps = {
-      getStaleRenderHiddenReleaseTargetIds,
-      refreshPendingMovementTokenVisibility,
-      releaseAnimationSuppressionForStaleRelease,
-    };
-    if (staleTargetTokenIds.length) scheduleStaleRenderHiddenReleaseSweeps(sweepDeps);
-
-    if (!hasPendingMovementRenderWork()) {
-      if (!staleTargetTokenIds.length) {
-        return { handled: false, reason: 'no-pending-work' };
-      }
-      releaseAnimationSuppressionForStaleRelease();
-      refreshPendingMovementTokenVisibility([], {
-        ignoreObservedGrace: true,
-        source: 'avs-batch-complete-stale-render-release',
-        targetTokenIds: staleTargetTokenIds,
-      });
-      return { handled: true, staleRenderRelease: true };
-    }
-    if (staleTargetTokenIds.length) {
-      releaseAnimationSuppressionForStaleRelease();
-    }
-
-    const targetTokenIds = [
-      ...new Set([...getPendingMovementRefreshTargetIds(), ...staleTargetTokenIds]),
-    ];
-    refreshPendingMovementTokenVisibility([], {
-      ignoreObservedGrace: true,
-      source: 'avs-batch-complete',
-      ...(targetTokenIds.length ? { targetTokenIds } : {}),
-    });
     await refreshSystemHiddenHighlightsForControlledTokens();
+    await removeSystemHiddenIndicatorsForObservedTargets();
     return { handled: true };
   } catch {
     return { handled: false, reason: 'error' };

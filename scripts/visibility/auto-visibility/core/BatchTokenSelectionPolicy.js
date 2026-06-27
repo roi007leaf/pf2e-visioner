@@ -6,6 +6,13 @@ export function isMovementVisibilityBatch({
   return !!movementSession;
 }
 
+export function shouldUseFullTokenScope({
+  isMovementBatch = false,
+  forceFullScope = false,
+} = {}) {
+  return !!isMovementBatch || !!forceFullScope;
+}
+
 export function resolveVisibleBatchTokens({
   changedTokens = new Set(),
   candidateTokens = [],

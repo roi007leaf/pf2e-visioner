@@ -49,39 +49,6 @@ describe('controlToken lighting refresh suppression', () => {
     ).toBe(false);
   });
 
-  test('lifecycle controlToken suppresses redundant occlusion-only perception bursts', async () => {
-    const perceptionUpdate = jest.fn();
-    global.canvas.perception = {
-      update: perceptionUpdate,
-    };
-    const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
-    await onCanvasReady();
-
-    const restoreIndicatorsCb = getControlTokenCallbacks().find((callback) =>
-      String(callback).includes('allowControlledFallback'),
-    );
-
-    expect(restoreIndicatorsCb).toBeTruthy();
-
-    const token = { document: { id: 'observer', getFlag: jest.fn(() => ({})) } };
-    await restoreIndicatorsCb(token, true);
-
-    global.canvas.perception.update({ refreshOcclusion: true });
-    global.canvas.perception.update({ refreshVision: true, refreshOcclusion: true });
-
-    expect(perceptionUpdate).toHaveBeenCalledTimes(1);
-    expect(perceptionUpdate).toHaveBeenCalledWith({
-      refreshVision: true,
-      refreshOcclusion: true,
-    });
-
-    jest.advanceTimersByTime(701);
-    global.canvas.perception.update({ refreshOcclusion: true });
-
-    expect(perceptionUpdate).toHaveBeenCalledTimes(2);
-    expect(perceptionUpdate).toHaveBeenLastCalledWith({ refreshOcclusion: true });
-  });
-
   test('UI controlToken suppression clears through runtime-state semantics', async () => {
     const { registerUIHooks } = await import('../../../scripts/hooks/ui.js');
     registerUIHooks();

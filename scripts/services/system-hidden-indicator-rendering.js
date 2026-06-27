@@ -36,6 +36,40 @@ function getTokenDispositions() {
   return globalThis.CONST?.TOKEN_DISPOSITIONS ?? {};
 }
 
+export function syncSystemHiddenIndicatorPositionForToken(token, canvasLayer = globalThis.canvas) {
+  const tokenId = token?.document?.id ?? token?.id;
+  if (!tokenId) return false;
+  const owner = canvasLayer?.tokens?.get?.(tokenId) ?? token;
+  const indicator = owner?._pvSystemHiddenIndicator;
+  if (!indicator?.position?.set) return false;
+  const center = getLiveTokenCenter(owner, canvasLayer);
+  if (!center) return false;
+  indicator.position.set(center.x, center.y);
+  return true;
+}
+
+export function getLiveTokenCenter(token, canvasLayer = globalThis.canvas) {
+  if (!token) return null;
+  const previews = canvasLayer?.tokens?.preview?.children;
+  const preview = previews?.find?.(
+    (child) =>
+      child?._original === token ||
+      (child?.document?.id && token?.document?.id && child.document.id === token.document.id),
+  );
+  const source = preview ?? token;
+  const center = source.center;
+  if (center && Number.isFinite(center.x) && Number.isFinite(center.y)) {
+    return { x: center.x, y: center.y };
+  }
+  const gridSize = canvasLayer?.grid?.size ?? 0;
+  const width = source.document?.width ?? 1;
+  const height = source.document?.height ?? 1;
+  return {
+    x: (source.document?.x ?? 0) + (width * gridSize) / 2,
+    y: (source.document?.y ?? 0) + (height * gridSize) / 2,
+  };
+}
+
 export function getSystemHiddenIndicatorBaseColor({
   observerIsBlindAndDeaf = false,
   shouldShowThoughtsenseIndicator = false,
@@ -153,6 +187,54 @@ const systemHiddenHookRegistrations = {
   canvasTearDown: { event: 'canvasTearDown', id: null, registered: false },
 };
 
+let indicatorPositionTickerActive = false;
+
+export function repositionIndicatorIfMoved(indicator, canvasLayer = globalThis.canvas) {
+  const position = indicator?.position;
+  if (!position?.set) return false;
+  const center = getLiveTokenCenter(indicator?._pvTokenRef, canvasLayer);
+  if (!center) return false;
+  // Only re-set when it actually moved: setting position on an interactive object dirties its
+  // hit-area, so skipping unchanged indicators keeps fast drags smooth (avoids a per-frame
+  // reposition of every indicator) while still snapping back to the token when a drag ends.
+  if (position.x === center.x && position.y === center.y) return false;
+  position.set(center.x, center.y);
+  return true;
+}
+
+function syncAllSystemHiddenIndicatorPositions() {
+  // Per-frame work is scoped to active drags only: iterate the drag-preview clones (usually 0
+  // or 1), not every indicator. When nothing is dragging this returns immediately, so the
+  // ticker adds no cost during normal play or a slow drag. Snap-back on drop/cancel and
+  // committed-move repositioning are handled by the refreshToken sync.
+  const previews = globalThis.canvas?.tokens?.preview?.children;
+  if (!previews?.length) return;
+  for (const preview of previews) {
+    try {
+      const original =
+        preview?._original ?? globalThis.canvas?.tokens?.get?.(preview?.document?.id);
+      const indicator = original?._pvSystemHiddenIndicator;
+      if (indicator) repositionIndicatorIfMoved(indicator);
+    } catch (_) {
+      /* best-effort indicator position sync */
+    }
+  }
+}
+
+function ensureIndicatorPositionTicker() {
+  if (indicatorPositionTickerActive) return;
+  const ticker = globalThis.canvas?.app?.ticker;
+  if (!ticker?.add) return;
+  ticker.add(syncAllSystemHiddenIndicatorPositions);
+  indicatorPositionTickerActive = true;
+}
+
+function removeIndicatorPositionTicker() {
+  if (!indicatorPositionTickerActive) return;
+  globalThis.canvas?.app?.ticker?.remove?.(syncAllSystemHiddenIndicatorPositions);
+  indicatorPositionTickerActive = false;
+}
+
 export function removeSystemHiddenFactorsBadge(indicator) {
   if (!indicator) return;
   indicator._pvFactorsActive = false;
@@ -168,6 +250,7 @@ export function removeSystemHiddenFactorsBadge(indicator) {
 
 function releaseSystemHiddenIndicatorHooksIfIdle() {
   if (systemHiddenIndicators.size > 0) return;
+  removeIndicatorPositionTicker();
   for (const registration of Object.values(systemHiddenHookRegistrations)) {
     if (!registration.registered) continue;
     globalThis.Hooks?.off?.(registration.event, registration.id);
@@ -248,6 +331,7 @@ function registerSystemHiddenIndicator(token, indicator) {
   indicator._pvTokenRef = token;
   systemHiddenIndicators.add(indicator);
   ensureSystemHiddenIndicatorHooks();
+  ensureIndicatorPositionTicker();
 }
 
 function unregisterSystemHiddenIndicator(indicator) {

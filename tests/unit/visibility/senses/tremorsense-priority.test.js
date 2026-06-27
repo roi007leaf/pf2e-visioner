@@ -1,23 +1,20 @@
 /**
- * Tests for tremorsense priority over other imprecise senses
- * 
- * This test suite verifies that tremorsense is properly prioritized over hearing,
- * ensuring it works even when the observer can hear the target.
- * 
- * Bug: Previously, tremorsense only worked when the observer was deafened or sound
- * was blocked, because the code checked senses sequentially and returned the first
- * one that worked. Since most creatures have hearing by default, hearing would
- * always detect first, preventing tremorsense from being used.
- * 
- * Fix: Refactored checkImpreciseSenses to check ALL senses and return the best one
- * based on priority: Tremorsense > Lifesense > Scent > Hearing
+ * Tests for imprecise-sense precedence.
+ *
+ * Hearing takes precedence among the imprecise senses: when the observer can hear the
+ * target (not deafened, sound not blocked, target not invisible), hearing is the
+ * detecting sense. Only when hearing cannot detect do we fall back to the next imprecise
+ * sense, in the order Tremorsense > Lifesense > Thoughtsense > Scent.
+ *
+ * Invisible targets are a special case: hearing cannot detect them (it returns
+ * undetected), so the invisibility-bypassing senses win for invisible targets.
  */
 
 import { calculateVisibility } from '../../../../scripts/visibility/StatelessVisibilityCalculator.js';
 
 describe('Tremorsense Priority over Other Imprecise Senses', () => {
     describe('Tremorsense vs Hearing Priority', () => {
-        test('tremorsense should be used even when hearing also works', () => {
+        test('hearing takes precedence over tremorsense when the target is audible', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -47,13 +44,13 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
 
             const result = calculateVisibility(input);
 
-            // Should detect with tremorsense (priority 1) not hearing (priority 4)
+            // Hearing (priority 0) wins over tremorsense (priority 1) when it can detect
             expect(result.state).toBe('hidden');
-            expect(result.detection.sense).toBe('tremorsense');
+            expect(result.detection.sense).toBe('hearing');
             expect(result.detection.isPrecise).toBe(false);
         });
 
-        test('tremorsense should be used when observer is NOT deafened', () => {
+        test('tremorsense is used when the observer is deafened (hearing unavailable)', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -63,7 +60,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                     },
                     conditions: {
                         blinded: false,
-                        deafened: false, // NOT deafened
+                        deafened: true, // deafened -> hearing unavailable
                         dazzled: false
                     },
                     lightingLevel: 'bright',
@@ -83,12 +80,12 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
 
             const result = calculateVisibility(input);
 
-            // Tremorsense should still be used, not hearing
+            // Hearing unavailable (deafened) -> tremorsense is the detecting sense
             expect(result.state).toBe('hidden');
             expect(result.detection.sense).toBe('tremorsense');
         });
 
-        test('tremorsense should be used when sound is NOT blocked', () => {
+        test('tremorsense is used when sound is blocked (hearing unavailable)', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -112,13 +109,13 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                     movementAction: null
                 },
                 rayDarkness: null,
-                soundBlocked: false, // Sound NOT blocked
+                soundBlocked: true, // sound blocked -> hearing unavailable
                 hasLineOfSight: true
             };
 
             const result = calculateVisibility(input);
 
-            // Tremorsense should still be used, not hearing
+            // Hearing unavailable (sound blocked) -> tremorsense is the detecting sense
             expect(result.state).toBe('hidden');
             expect(result.detection.sense).toBe('tremorsense');
         });
@@ -270,7 +267,43 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
     });
 
     describe('Scent vs Hearing Priority', () => {
-        test('scent should be used even when hearing also works', () => {
+        test('scent is used when hearing is blocked (hearing unavailable)', () => {
+            const input = {
+                observer: {
+                    precise: {},
+                    imprecise: {
+                        scent: { range: 30 },
+                        hearing: { range: Infinity }
+                    },
+                    conditions: {
+                        blinded: false,
+                        deafened: false,
+                        dazzled: false
+                    },
+                    lightingLevel: 'bright',
+                    movementAction: null
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: [],
+                    traits: [],
+                    movementAction: null
+                },
+                rayDarkness: null,
+                soundBlocked: true, // sound blocked -> hearing unavailable
+                hasLineOfSight: true
+            };
+
+            const result = calculateVisibility(input);
+
+            // Hearing unavailable (sound blocked) -> scent is the detecting sense
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('scent');
+            expect(result.detection.isPrecise).toBe(false);
+        });
+
+        test('hearing takes precedence over scent when the target is audible', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -300,10 +333,53 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
 
             const result = calculateVisibility(input);
 
-            // Should detect with scent (priority 3) not hearing (priority 4)
+            // Hearing (priority 0) wins over scent when it can detect
             expect(result.state).toBe('hidden');
-            expect(result.detection.sense).toBe('scent');
+            expect(result.detection.sense).toBe('hearing');
             expect(result.detection.isPrecise).toBe(false);
+        });
+    });
+
+    describe('Thoughtsense vs Hearing Priority', () => {
+        function thoughtsenseInput(soundBlocked) {
+            return {
+                observer: {
+                    precise: {},
+                    imprecise: {
+                        thoughtsense: { range: 100 },
+                        hearing: { range: Infinity }
+                    },
+                    conditions: {
+                        blinded: false,
+                        deafened: false,
+                        dazzled: false
+                    },
+                    lightingLevel: 'bright',
+                    movementAction: null
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: [],
+                    traits: [], // has a mind (not mindless)
+                    movementAction: null
+                },
+                rayDarkness: null,
+                soundBlocked,
+                hasLineOfSight: true
+            };
+        }
+
+        test('hearing takes precedence over thoughtsense when the target is audible', () => {
+            const result = calculateVisibility(thoughtsenseInput(false));
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('hearing');
+        });
+
+        test('thoughtsense is used when sound is blocked (hearing unavailable)', () => {
+            const result = calculateVisibility(thoughtsenseInput(true));
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('thoughtsense');
         });
     });
 
@@ -344,7 +420,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
             expect(result.detection.sense).toBe('tremorsense');
         });
 
-        test('tremorsense > scent when both work', () => {
+        test('tremorsense > scent in the fallback order when hearing is blocked', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -369,13 +445,13 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
                     movementAction: null
                 },
                 rayDarkness: null,
-                soundBlocked: false,
+                soundBlocked: true, // hearing unavailable -> fall back to the next senses
                 hasLineOfSight: true
             };
 
             const result = calculateVisibility(input);
 
-            // Tremorsense (priority 1) should be chosen over scent (priority 3)
+            // Fallback order: tremorsense (priority 1) beats scent (priority 3)
             expect(result.state).toBe('hidden');
             expect(result.detection.sense).toBe('tremorsense');
         });
@@ -418,7 +494,7 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
             expect(result.detection.sense).toBe('lifesense');
         });
 
-        test('all four imprecise senses: tremorsense wins', () => {
+        test('all five imprecise senses, audible target: hearing wins', () => {
             const input = {
                 observer: {
                     precise: {},
@@ -450,7 +526,44 @@ describe('Tremorsense Priority over Other Imprecise Senses', () => {
 
             const result = calculateVisibility(input);
 
-            // Tremorsense (priority 1) should win
+            // Hearing (priority 0) wins over every fallback sense when it can detect
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('hearing');
+        });
+
+        test('all four fallback senses, hearing blocked: tremorsense wins', () => {
+            const input = {
+                observer: {
+                    precise: {},
+                    imprecise: {
+                        tremorsense: { range: 60 },
+                        lifesense: { range: 60 },
+                        scent: { range: 30 },
+                        hearing: { range: Infinity }
+                    },
+                    conditions: {
+                        blinded: false,
+                        deafened: false,
+                        dazzled: false
+                    },
+                    lightingLevel: 'bright',
+                    movementAction: null
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    concealment: false,
+                    auxiliary: [],
+                    traits: [], // Living creature
+                    movementAction: null
+                },
+                rayDarkness: null,
+                soundBlocked: true, // hearing unavailable -> fall back to the next senses
+                hasLineOfSight: true
+            };
+
+            const result = calculateVisibility(input);
+
+            // Fallback order: tremorsense (priority 1) wins
             expect(result.state).toBe('hidden');
             expect(result.detection.sense).toBe('tremorsense');
         });

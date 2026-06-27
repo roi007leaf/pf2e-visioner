@@ -28,7 +28,6 @@ import { handlePreCreateChatMessage } from '../chat/services/pre-create-message.
 import { clearActorFeatureCache } from '../utils/actor-features.js';
 import { clearActiveSceneHearingRangeCache } from '../services/scene-hearing-range.js';
 import { clearActorConditionSlugCache } from '../services/sense-distance.js';
-import { clearPendingMovementWallGeometryCache } from '../services/PendingMovement/pending-movement-wall-blocking.js';
 import {
   initializeDeferredSeekManager,
   initializeTurnSneakTracker,
@@ -42,6 +41,8 @@ import {
   handleTokenRefreshed,
   handleTokenUpdated,
 } from '../services/token-render-lifecycle.js';
+import { releaseCurrentViewHardHideIfMarked } from '../services/Detection/current-view-hard-hide.js';
+import { syncSystemHiddenIndicatorPositionForToken } from '../services/system-hidden-indicator-rendering.js';
 
 function clearActorFeatureCacheForItem(item) {
   const actor = item?.actor ?? item?.parent ?? null;
@@ -55,7 +56,6 @@ export async function registerHooks() {
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);
   Hooks.on('canvasReady', () => {
-    clearPendingMovementWallGeometryCache();
     watchCurrentScenePreparedSenses();
   });
 
@@ -133,15 +133,12 @@ export async function registerHooks() {
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
   Hooks.on('createWall', async () => {
-    clearPendingMovementWallGeometryCache();
     await handleWallCreated();
   });
   Hooks.on('updateWall', async (doc, changes) => {
-    clearPendingMovementWallGeometryCache();
     await handleWallUpdated(doc, changes);
   });
   Hooks.on('deleteWall', async (wallDocument) => {
-    clearPendingMovementWallGeometryCache();
     await handleWallDeleted(wallDocument);
   });
 
@@ -162,19 +159,37 @@ export async function registerHooks() {
     await handleTokenUpdated(tokenDoc, changes);
   });
 
-  Hooks.on('refreshToken', (token) => handleTokenRefreshed(token));
+  Hooks.on('refreshToken', (token) => {
+    // Reposition the indicator synchronously with the token render so it tracks during a
+    // fast drag (which auto-pans the canvas and would otherwise skip the throttled RAF loop).
+    try {
+      syncSystemHiddenIndicatorPositionForToken(token);
+    } catch {
+      /* best-effort indicator position sync */
+    }
+    return handleTokenRefreshed(token);
+  });
 
   Hooks.on('pf2e-visioner.visibilityMapUpdated', ({ targetId, state }) => {
     try {
-      if (state !== 'undetected' && state !== 'unnoticed') return;
       const target = canvas?.tokens?.get?.(targetId);
-      const mesh = target?.detectionFilterMesh;
-      if (!mesh) return;
-      if ('visible' in mesh) mesh.visible = false;
-      if ('renderable' in mesh) mesh.renderable = false;
-      if ('alpha' in mesh) mesh.alpha = 0;
+      if (!target) return;
+      if (state === 'undetected' || state === 'unnoticed') {
+        const mesh = target.detectionFilterMesh;
+        if (!mesh) return;
+        if ('visible' in mesh) mesh.visible = false;
+        if ('renderable' in mesh) mesh.renderable = false;
+        if ('alpha' in mesh) mesh.alpha = 0;
+        return;
+      }
+      // Target left a render-hidden state (e.g. removing deafened reveals it via hearing):
+      // release the one-way current-view hard-hide so its mesh and soundwave repaint without
+      // needing a reselect.
+      if (releaseCurrentViewHardHideIfMarked(target)) {
+        target.refresh?.();
+      }
     } catch {
-      /* best-effort soundwave clear */
+      /* best-effort current-view render sync */
     }
   });
 
@@ -209,7 +224,6 @@ export async function registerHooks() {
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
   Hooks.on('updateScene', async (scene, changes) => {
     clearActiveSceneHearingRangeCache(scene);
-    clearPendingMovementWallGeometryCache();
     await handleSceneDisableAvsRefresh(scene, changes);
   });
 }

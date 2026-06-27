@@ -5,7 +5,6 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
-import { getPendingMovementPerformanceSnapshot } from '../../services/PendingMovement/pending-movement-render-lock.js';
 import { getLogger } from '../../utils/logger.js';
 import { profileToLegacyVisibility } from '../perception-profile.js';
 import { AvsInvalidationCoordinator } from './core/AvsInvalidationCoordinator.js';
@@ -367,7 +366,6 @@ export class EventDrivenVisibilitySystem {
     };
     return {
       ...movementSnapshot,
-      pendingMovement: getPendingMovementPerformanceSnapshot(),
     };
   }
 

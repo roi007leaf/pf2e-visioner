@@ -6,17 +6,6 @@ import { injectChatAutomationStyles } from '../chat/chat-automation-styles.js';
 import { MODULE_ID } from '../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { initializeHoverTooltips } from '../services/HoverTooltips.js';
-import {
-  clearNoObserverDetectionFilterVisuals,
-  getControlledObserverDetectionVisualTargetIds,
-  getPendingMovementRefreshTargetIds,
-  hasPendingMovementRenderWork,
-  primePendingControlledTokenDragIntent,
-  refreshPendingControlledTokenDragIntent,
-  refreshPendingMovementTokenVisibility,
-  releasePendingControlledTokenDragIntent,
-  restorePendingMovementTokenRendering,
-} from '../services/PendingMovement/pending-movement-render-lock.js';
 import { runVisibilityV2MigrationIfNeeded } from '../migrations/visibility-v2-migration.js';
 import { registerSocket } from '../services/socket.js';
 import {
@@ -24,13 +13,8 @@ import {
   setSuppressLightingRefresh,
 } from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
-import {
-  forcePendingMovementTokenInvisible,
-  installOcclusionOnlyPerceptionSuppression,
-  targetMustStayHiddenDuringPendingMovement,
-} from '../services/PendingMovement/pending-token-movement.js';
-import { clearDetectionFilterVisuals } from '../services/PendingMovement/pending-movement-detection-filter-visuals.js';
-import { getPendingRenderState } from '../services/PendingMovement/pending-movement-render-state.js';
+import { clearAllDetectionFilterVisuals } from '../stores/visibility-map.js';
+import { releaseAllCurrentViewHardHide } from '../services/Detection/current-view-hard-hide.js';
 import {
   isSelectAllTokenVisibilityBypassActive,
   primeSelectAllTokenVisibilityBypassFromKeyboard,
@@ -52,7 +36,7 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
 const controlTokenSelectionRecalcState = {
   signatures: new Map(),
 };
-const CONTROL_TOKEN_RECALC_DELAY_MS = 180;
+const CONTROL_TOKEN_RECALC_DELAY_MS = 0;
 const CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS = 700;
 const CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS = 180;
 const CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS = 180;
@@ -255,13 +239,9 @@ function scheduleNoObserverVisibilityRefresh() {
     try {
       if (completed) return;
       if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
-      for (const token of canvas?.tokens?.placeables || []) {
-        restorePendingMovementTokenRendering(token, {
-          ignoreObservedGrace: true,
-          ignoreObserverLocks: true,
-        });
-      }
-      clearNoObserverDetectionFilterVisuals();
+      // Freeze+settle: core drives rendering; just nudge a vision refresh.
+      releaseAllCurrentViewHardHide();
+      clearAllDetectionFilterVisuals();
       scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
       completed = true;
     } catch {
@@ -275,34 +255,13 @@ function scheduleNoObserverVisibilityRefresh() {
 }
 
 function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
+  void token;
   try {
     if (isSelectAllTokenVisibilityBypassActive()) {
       restoreVisionerHiddenTokensForSelectAll();
-      return;
     }
-
-    const hasRenderWork = hasPendingMovementRenderWork();
-    const targetTokenIds = [
-      ...new Set([
-        ...(hasRenderWork ? getPendingMovementRefreshTargetIds() : []),
-        ...getControlledObserverDetectionVisualTargetIds(token),
-      ]),
-    ];
-    refreshPendingMovementTokenVisibility(
-      [],
-      targetTokenIds.length
-        ? {
-          ignoreObservedGrace: true,
-          source: 'control-token-session',
-          targetTokenIds,
-          skipPerceptionRefresh: true,
-        }
-        : {
-          ignoreObservedGrace: true,
-          skipTokenRefresh: true,
-          skipPerceptionRefresh: true,
-        },
-    );
+    // Freeze+settle: no per-frame visioner refresh on control — core renders
+    // live and AVS settles at move-end.
   } catch {
     /* best effort */
   }
@@ -327,14 +286,11 @@ function eventTargetsCanvasView(event) {
 function primeControlledTokenDragIntentFromCanvasPointer(event) {
   if (event?.button !== 0) return;
   if (!eventTargetsCanvasView(event)) return;
-
-  for (const token of canvas?.tokens?.controlled || []) {
-    primePendingControlledTokenDragIntent(token);
-  }
+  // Freeze+settle: live drag soundwaves are driven by the _onDragLeftMove
+  // wrapper (during-move-soundwave.js), not a pointer-intent prime here.
 }
 
 function releaseControlledTokenDragIntentFromCanvasPointer() {
-  releasePendingControlledTokenDragIntent();
   controlledDragPointerMoveRefreshState.lastRefreshAt = 0;
   if (controlledDragPointerMoveRefreshState.timeoutId) {
     clearTimeout(controlledDragPointerMoveRefreshState.timeoutId);
@@ -359,12 +315,7 @@ function refreshControlledTokenDragIntentFromCanvasPointer() {
       controlledDragPointerMoveRefreshState.refreshFrameId = null;
       const currentControlledTokens = canvas?.tokens?.controlled || controlledTokens;
       if (!currentControlledTokens.length) return;
-      for (const token of currentControlledTokens) {
-        refreshPendingControlledTokenDragIntent(token, {
-          coalesceFrame: true,
-          includeRenderHiddenTargets: true,
-        });
-      }
+      // Freeze+settle: drag soundwaves handled by the _onDragLeftMove wrapper.
     });
   };
 
@@ -418,15 +369,11 @@ function registerSelectAllTokenVisibilityBypassListener() {
 }
 
 function restoreVisionerHiddenTokensForSelectAll() {
-  for (const token of canvas?.tokens?.placeables || []) {
-    const hiddenContext = getPendingRenderState(token)?.lastHiddenContext;
-    if (!hiddenContext?.renderHiddenByVisioner || hiddenContext.foundryHidden) continue;
-
-    restorePendingMovementTokenRendering(token, {
-      ignoreObservedGrace: true,
-      ignoreObserverLocks: true,
-    });
-  }
+  // Freeze+settle: the select-all visibility bypass is applied by the detection
+  // wrappers (isSelectAllTokenVisibilityBypassActive) returning core's result,
+  // so core re-renders every token natively — no render-lock restore needed.
+  releaseAllCurrentViewHardHide();
+  clearAllDetectionFilterVisuals();
 }
 
 function handleSelectAllTokenVisibilityBypassKeydown(event) {
@@ -807,21 +754,9 @@ export function onReady() {
 }
 
 function enforceHiddenTokensPerFrame() {
-  const tokens = globalThis.canvas?.tokens?.placeables;
-  if (!tokens?.length) return;
-  for (const token of tokens) {
-    if (!token?.actor?.itemTypes?.condition?.length) continue;
-    try {
-      if (targetMustStayHiddenDuringPendingMovement(token)) {
-        if (token.renderable !== false || (token.mesh?.alpha ?? 0) > 0 || token.detectionFilter) {
-          forcePendingMovementTokenInvisible(token);
-          clearDetectionFilterVisuals(token);
-        }
-      }
-    } catch {
-      /* best-effort per-frame enforcement */
-    }
-  }
+  // Freeze+settle: foundry-hidden / blocking-state hard-hide is enforced by the
+  // always-on detection wrappers (_canDetect / testVisibility), not a per-frame
+  // render sweep. Retained as a no-op (its ticker registration is disabled).
 }
 
 let _hiddenTokenTickerRegistered = false;
@@ -872,10 +807,6 @@ export async function onCanvasReady() {
     // OPTIMIZED: Only update wall visuals if the token actually has wall flags to avoid triggering AVS
     bindHookOnce('restoreIndicatorsOnControl', 'controlToken', async (token, controlled) => {
       if (controlled) {
-        installOcclusionOnlyPerceptionSuppression(CONTROL_TOKEN_OCCLUSION_SUPPRESSION_MS, {
-          coalesceSelectionRefresh: true,
-          selectionFlushDelayMs: CONTROL_TOKEN_SELECTION_PERCEPTION_FLUSH_MS,
-        });
         scheduleRefreshPendingVisibilityAfterControlToken(token);
       }
 
@@ -911,7 +842,9 @@ export async function onCanvasReady() {
 
         // System-hidden highlights depend on freshly recalculated AVS state.
         // They are refreshed after recalculation settles.
-      } else {
+      } else if (game.user?.isGM) {
+        // Only the GM is omniscient: deselecting reveals every token. Players keep their
+        // last view frozen so undetected tokens and soundwaves remain instead of revealing all.
         try {
           const { updateSystemHiddenTokenHighlights } = await import(
             '../services/visual-effects.js'

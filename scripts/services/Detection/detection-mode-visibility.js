@@ -1,15 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
 import {
-  getPendingMovementHiddenStateBlock,
-  isPendingMovementCoreAnimationBypassActive,
-  isPendingMovementCoreAnimationPerceptionRefresh,
-  isPendingMovementHiddenStateVisibilityProbe,
-  pairAllowsLiveImpreciseSoundwave,
-  shouldUseCoreDetectionDuringPendingMovement,
-  shouldTemporarilyBlockSightDetection,
-} from '../PendingMovement/pending-movement-detection-gate.js';
-import { shouldHandlePendingMovementCanvasVisibilityForToken } from '../PendingMovement/pending-movement-render-lock.js';
-import {
   getVisionerVisibilityBetweenTokens,
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
@@ -43,52 +33,10 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   const modeId = mode?.id ?? this?.id ?? null;
   const observerToken = visionSource?.object;
   const targetToken = config.object;
-  if (isPendingMovementCoreAnimationBypassActive()) {
-    if (pairAllowsLiveImpreciseSoundwave(observerToken, targetToken)) {
-      return NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
-    }
-    return testDetectionPoints(this, visionSource, mode, config);
-  }
-  if (
-    (isPendingMovementCoreAnimationPerceptionRefresh() ||
-      isPendingMovementCoreAnimationBypassActive()) &&
-    !shouldHandlePendingMovementCanvasVisibilityForToken(targetToken)
-  ) {
-    return testDetectionPoints(this, visionSource, mode, config);
-  }
-  if (shouldUseCoreDetectionDuringPendingMovement(observerToken, targetToken)) {
-    return testDetectionPoints(this, visionSource, mode, config);
-  }
-
-  if (
-    NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
-    pairAllowsLiveImpreciseSoundwave(observerToken, targetToken)
-  ) {
-    return true;
-  }
-
-  const hiddenStateContext = getPendingMovementHiddenStateBlock(targetToken);
-  if (hiddenStateContext && !isPendingMovementHiddenStateVisibilityProbe()) {
-    return false;
-  }
-
-  const pendingMovementSightBlocked =
-    !isPendingMovementHiddenStateVisibilityProbe() &&
-    shouldTemporarilyBlockSightDetection(observerToken, targetToken);
-
-  if (
-    !NON_VISUAL_DETECTION_MODE_IDS.has(modeId) &&
-    pendingMovementSightBlocked
-  ) {
-    return false;
-  }
 
   if (NON_VISUAL_DETECTION_MODE_IDS.has(modeId)) {
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, targetToken);
     if (visibility === 'hidden') {
-      if (pendingMovementSightBlocked) {
-        return testDetectionPoints(this, visionSource, mode, config);
-      }
       return true;
     }
   }

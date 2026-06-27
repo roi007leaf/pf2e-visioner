@@ -140,3 +140,13 @@ export function getPostBatchPerceptionRefreshSuppression() {
 export function clearPostBatchPerceptionRefreshSuppression() {
   setRuntimeFlag('suppressNextAvsPostBatchPerceptionRefresh', null);
 }
+
+export function requestFullVisibilityScopeRecalc() {
+  return setRuntimeFlag('forceFullVisibilityScopeRecalc', true);
+}
+
+export function consumeFullVisibilityScopeRecalc() {
+  const requested = !!getRuntimeFlag('forceFullVisibilityScopeRecalc');
+  if (requested) clearRuntimeFlag('forceFullVisibilityScopeRecalc');
+  return requested;
+}

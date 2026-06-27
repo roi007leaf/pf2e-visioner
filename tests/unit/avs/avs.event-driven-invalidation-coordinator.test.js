@@ -91,10 +91,6 @@ describe('EventDrivenVisibilitySystem invalidation coordinator wiring', () => {
 
       expect(system.getMovementPerformanceSnapshot()).toEqual({
         ...movementSnapshot,
-        pendingMovement: expect.objectContaining({
-          refreshCalls: expect.any(Number),
-          tokensScanned: expect.any(Number),
-        }),
       });
       expect(AvsInvalidationCoordinator).toHaveBeenCalledWith({
         systemStateProvider,

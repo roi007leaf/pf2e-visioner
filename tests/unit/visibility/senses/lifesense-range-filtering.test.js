@@ -13,10 +13,73 @@
 
 import { jest } from '@jest/globals';
 
+function getGridSize() {
+    return Number(globalThis.canvas?.grid?.size ?? globalThis.canvas?.dimensions?.size ?? 100) || 100;
+}
+
+function positionedCenter(tokenOrDoc, position) {
+    const doc = tokenOrDoc?.document || tokenOrDoc || {};
+    const width = Number(doc?.width ?? tokenOrDoc?.width ?? 1) || 1;
+    const height = Number(doc?.height ?? tokenOrDoc?.height ?? 1) || 1;
+    const gridSize = getGridSize();
+    const x = Number(position?.x ?? doc?.x ?? tokenOrDoc?.x ?? 0) || 0;
+    const y = Number(position?.y ?? doc?.y ?? tokenOrDoc?.y ?? 0) || 0;
+    return {
+        x: x + (width * gridSize) / 2,
+        y: y + (height * gridSize) / 2,
+        elevation: Number(position?.elevation ?? doc?.elevation ?? tokenOrDoc?.elevation ?? 0) || 0,
+    };
+}
+
+function createPositionedTokenProxy(tokenOrDoc, position) {
+    const doc = tokenOrDoc?.document || tokenOrDoc || null;
+    if (!doc) return tokenOrDoc;
+    const token = tokenOrDoc;
+    const nativeDistanceTo = typeof token?.distanceTo === 'function' ? token.distanceTo : null;
+    const x = Number(position?.x ?? doc.x ?? token?.x ?? 0) || 0;
+    const y = Number(position?.y ?? doc.y ?? token?.y ?? 0) || 0;
+    const elevation = Number(position?.elevation ?? doc.elevation ?? token?.elevation ?? 0) || 0;
+    const center = positionedCenter(doc, { x, y, elevation });
+    let tokenProxy = null;
+
+    const docProxy = new Proxy(doc, {
+        get(target, prop) {
+            if (prop === 'x') return x;
+            if (prop === 'y') return y;
+            if (prop === 'elevation') return elevation;
+            if (prop === 'object') return tokenProxy || target.object;
+            if (prop === 'getCenterPoint') return () => ({ ...center });
+            const value = target[prop];
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+
+    tokenProxy = new Proxy(token || {}, {
+        get(target, prop) {
+            if (prop === 'document') return docProxy;
+            if (prop === 'x') return x;
+            if (prop === 'y') return y;
+            if (prop === 'center') return center;
+            if (prop === 'elevation') return elevation;
+            if (prop === 'id') return doc.id;
+            if (prop === 'name') return doc.name ?? target.name;
+            if (prop === 'actor') return target.actor ?? doc.actor;
+            if (prop === 'getCenterPoint') return () => ({ ...center });
+            if (prop === 'distanceTo') {
+                return (other) =>
+                    nativeDistanceTo ? Number(nativeDistanceTo.call(tokenProxy, other)) : 0;
+            }
+            const value = target[prop];
+            return typeof value === 'function' ? value.bind(target) : value;
+        },
+    });
+
+    return tokenProxy;
+}
+
 describe('Lifesense Range Filtering', () => {
     let tokenStateToInput;
     let calculateVisibility;
-    let createPositionedTokenProxy;
     let LevelsIntegration;
     let mockCanvas;
     let mockObserver;
@@ -43,9 +106,6 @@ describe('Lifesense Range Filtering', () => {
 
         const calculatorModule = await import('../../../../scripts/visibility/StatelessVisibilityCalculator.js');
         calculateVisibility = calculatorModule.calculateVisibility;
-
-        const pendingObserverSensesModule = await import('../../../../scripts/services/PendingMovement/pending-movement-observer-senses.js');
-        createPositionedTokenProxy = pendingObserverSensesModule.createPositionedTokenProxy;
 
         const levelsModule = await import('../../../../scripts/services/LevelsIntegration.js');
         LevelsIntegration = levelsModule.LevelsIntegration;

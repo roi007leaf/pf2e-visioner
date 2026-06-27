@@ -7,10 +7,7 @@ import {
   createAggregateEffectData,
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
-import {
-  hasPendingMovementRenderWork,
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition,
-} from '../services/PendingMovement/pending-movement-render-lock.js';
+import { hasActivePendingTokenMovement } from '../services/movement-tracking.js';
 import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
 import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
 import { deleteExistingEmbeddedItems, runWithEffectLock } from './utils.js';
@@ -50,7 +47,7 @@ export async function updateSingleVisibilityEffect(
 ) {
   if (!game.user?.isGM) return;
   if (!observerToken?.actor || !targetToken?.actor) return;
-  if (options.deferDuringPendingMovement !== false && hasPendingMovementRenderWork()) return;
+  if (options.deferDuringPendingMovement !== false && hasActivePendingTokenMovement()) return;
 
   const debugMode = false;
   // Determine receiver based on effectTarget
@@ -68,14 +65,6 @@ export async function updateSingleVisibilityEffect(
 
   if (newVisibilityState !== 'hidden' || options.removeAllEffects) {
     await cleanupLegacyVisibilityPair(observerToken, targetToken);
-  }
-  if (
-    (newVisibilityState === 'observed' || newVisibilityState === 'concealed') &&
-    shouldSuppressObservedTargetForObserver(observerToken)
-  ) {
-    suppressPendingMovementDetectionFilterVisualsForObservedTransition(targetToken, {
-      durationMs: OBSERVED_EFFECT_MUTATION_SUPPRESSION_MS,
-    });
   }
 
   await runWithEffectLock(effectReceiverToken.actor, async () => {

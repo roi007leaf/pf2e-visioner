@@ -18,12 +18,6 @@ import {
 } from '../visibility/perception-profile.js';
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import {
-  currentPendingMovementSightLineSeesTarget,
-  getPendingMovementObserverIds,
-  hasPendingMovementRenderWork,
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition,
-} from '../services/PendingMovement/pending-movement-render-lock.js';
-import {
   areTokenFlagValuesEqual,
   applyTokenFlagUpdatePasses,
   getTokenDocument,
@@ -186,9 +180,6 @@ function getCurrentViewObserverIds() {
   for (const token of canvas?.tokens?.controlled || []) {
     addToken(token);
   }
-  for (const id of getPendingMovementObserverIds()) {
-    if (id) ids.add(id);
-  }
 
   return ids;
 }
@@ -198,12 +189,18 @@ function shouldClearObservedDetectionFilterForChange(change) {
   if (viewObserverIds.size === 0) return true;
   if (!change?.observerId) return true;
   if (!viewObserverIds.has(change.observerId)) return false;
-  if (!hasPendingMovementRenderWork()) return true;
+  // Observed/concealed targets never carry a soundwave filter (core-native
+  // contract) — clear it on the transition regardless of move state.
+  return true;
+}
 
-  const observer = tokenObjectById(change.observerId);
-  const target = tokenObjectById(change.targetId);
-  if (!observer || !target) return true;
-  return currentPendingMovementSightLineSeesTarget(observer, target);
+export function clearAllDetectionFilterVisuals(tokens = globalThis.canvas?.tokens?.placeables ?? []) {
+  let cleared = 0;
+  for (const token of tokens ?? []) {
+    clearDetectionFilterVisuals(token);
+    cleared += 1;
+  }
+  return cleared;
 }
 
 function clearDetectionFilterVisuals(token) {
@@ -260,7 +257,6 @@ function clearObservedDetectionFilterVisualsForChanges(changes = []) {
     if (!shouldClearObservedDetectionFilterForChange(change)) continue;
     const target = tokenObjectById(change.targetId);
     clearDetectionFilterVisuals(target);
-    suppressPendingMovementDetectionFilterVisualsForObservedTransition(target);
   }
 }
 
@@ -717,6 +713,9 @@ export async function setPerceptionProfileBetween(
       })
     ) {
       clearDetectionFilterVisuals(target);
+    }
+    if (legacyState === 'hidden') {
+      refreshHiddenDetectionFilterVisualsForChanges([{ to: legacyState, targetId }]);
     }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }

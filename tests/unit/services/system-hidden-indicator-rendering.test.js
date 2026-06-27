@@ -16,9 +16,12 @@ jest.mock('../../../scripts/services/HoverTooltips.js', () => ({
 import {
   createSystemHiddenIndicator,
   drawSystemHiddenIndicatorFrame,
+  getLiveTokenCenter,
   getSystemHiddenIndicatorColor,
   removeSystemHiddenFactorsBadge,
+  repositionIndicatorIfMoved,
   showObserverHoverTooltips,
+  syncSystemHiddenIndicatorPositionForToken,
 } from '../../../scripts/services/system-hidden-indicator-rendering.js';
 import {
   HoverTooltips,
@@ -242,5 +245,94 @@ describe('system-hidden indicator rendering helpers', () => {
         alpha: 0,
       },
     });
+  });
+});
+
+describe('getLiveTokenCenter (indicator tracks its token, incl. drag preview)', () => {
+  function tokenAt(id, cx, cy) {
+    return { document: { id, x: cx - 50, y: cy - 50, width: 1, height: 1 }, center: { x: cx, y: cy } };
+  }
+
+  test('returns the token center when there is no drag preview', () => {
+    const token = tokenAt('t', 300, 400);
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 300, y: 400 });
+  });
+
+  test('follows the drag preview clone position (matched by _original)', () => {
+    const token = tokenAt('t', 300, 400);
+    const preview = { _original: token, document: { id: 't', width: 1, height: 1 }, center: { x: 1500, y: 400 } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 1500, y: 400 });
+  });
+
+  test('matches the preview clone by document id when _original is absent', () => {
+    const token = tokenAt('t', 300, 400);
+    const preview = { document: { id: 't', width: 1, height: 1 }, center: { x: 900, y: 400 } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 900, y: 400 });
+  });
+
+  test('falls back to document coordinates when no center is available', () => {
+    const token = { document: { id: 't', x: 200, y: 200, width: 2, height: 2 } };
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+    expect(getLiveTokenCenter(token, canvasLayer)).toEqual({ x: 300, y: 300 });
+  });
+});
+
+describe('syncSystemHiddenIndicatorPositionForToken', () => {
+  function indicator() {
+    return { position: { set: jest.fn() } };
+  }
+
+  test('repositions the indicator to the token live center', () => {
+    const ind = indicator();
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 700, y: 800 }, _pvSystemHiddenIndicator: ind };
+    const canvasLayer = { tokens: { get: () => token, preview: { children: [] } }, grid: { size: 100 } };
+
+    expect(syncSystemHiddenIndicatorPositionForToken(token, canvasLayer)).toBe(true);
+    expect(ind.position.set).toHaveBeenCalledWith(700, 800);
+  });
+
+  test('repositions to the drag preview center when dragging (refreshToken fires for the preview)', () => {
+    const ind = indicator();
+    const original = { document: { id: 't', width: 1, height: 1 }, center: { x: 300, y: 400 }, _pvSystemHiddenIndicator: ind };
+    const preview = { _original: original, document: { id: 't', width: 1, height: 1 }, center: { x: 2500, y: 400 } };
+    const canvasLayer = { tokens: { get: () => original, preview: { children: [preview] } }, grid: { size: 100 } };
+
+    // refreshToken fires for the preview clone; sync resolves the original + uses preview center
+    expect(syncSystemHiddenIndicatorPositionForToken(preview, canvasLayer)).toBe(true);
+    expect(ind.position.set).toHaveBeenCalledWith(2500, 400);
+  });
+
+  test('no-ops when the token has no indicator', () => {
+    const token = { document: { id: 't' }, center: { x: 0, y: 0 } };
+    const canvasLayer = { tokens: { get: () => token, preview: { children: [] } }, grid: { size: 100 } };
+    expect(syncSystemHiddenIndicatorPositionForToken(token, canvasLayer)).toBe(false);
+  });
+});
+
+describe('repositionIndicatorIfMoved (skip-if-unchanged keeps fast drags smooth)', () => {
+  test('skips position.set when the indicator is already at the token center', () => {
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 400, y: 400 } };
+    const indicator = { _pvTokenRef: token, position: { x: 400, y: 400, set: jest.fn() } };
+    const canvasLayer = { tokens: { preview: { children: [] } }, grid: { size: 100 } };
+
+    expect(repositionIndicatorIfMoved(indicator, canvasLayer)).toBe(false);
+    expect(indicator.position.set).not.toHaveBeenCalled();
+  });
+
+  test('repositions only when the live center moved (e.g. drag preview)', () => {
+    const token = { document: { id: 't', width: 1, height: 1 }, center: { x: 400, y: 400 } };
+    const preview = { _original: token, document: { id: 't', width: 1, height: 1 }, center: { x: 1800, y: 400 } };
+    const indicator = { _pvTokenRef: token, position: { x: 400, y: 400, set: jest.fn() } };
+    const canvasLayer = { tokens: { preview: { children: [preview] } }, grid: { size: 100 } };
+
+    expect(repositionIndicatorIfMoved(indicator, canvasLayer)).toBe(true);
+    expect(indicator.position.set).toHaveBeenCalledWith(1800, 400);
+  });
+
+  test('no-ops for an indicator without a position', () => {
+    expect(repositionIndicatorIfMoved({ _pvTokenRef: {} }, {})).toBe(false);
   });
 });

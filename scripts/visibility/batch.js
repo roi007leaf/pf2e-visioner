@@ -4,10 +4,7 @@ import {
   createEphemeralEffectRule,
 } from '../helpers/visibility-helpers.js';
 import { OffGuardSuppression } from '../rule-elements/operations/OffGuardSuppression.js';
-import {
-  hasPendingMovementRenderWork,
-  suppressPendingMovementDetectionFilterVisualsForObservedTransition,
-} from '../services/PendingMovement/pending-movement-render-lock.js';
+import { hasActivePendingTokenMovement } from '../services/movement-tracking.js';
 import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
 import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
 import { deleteExistingEmbeddedItems, runWithEffectLock } from './utils.js';
@@ -42,7 +39,7 @@ function shouldSuppressObservedTargetForObserver(observerToken) {
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
   if (!game.user?.isGM) return;
   if (!observerToken?.actor || !targetUpdates?.length) return;
-  if (options.deferDuringPendingMovement !== false && hasPendingMovementRenderWork()) return;
+  if (options.deferDuringPendingMovement !== false && hasActivePendingTokenMovement()) return;
   try {
     const oType = observerToken?.actor?.type;
     if (oType && ['loot', 'vehicle', 'party'].includes(oType)) return;
@@ -67,14 +64,6 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
         receiver,
         suppressionContext,
       );
-    if (
-      (update.state === 'observed' || update.state === 'concealed') &&
-      shouldSuppressObservedTargetForObserver(observerToken)
-    ) {
-      suppressPendingMovementDetectionFilterVisualsForObservedTransition(update.target, {
-        durationMs: OBSERVED_EFFECT_MUTATION_SUPPRESSION_MS,
-      });
-    }
     const receiverId = receiver.actor.id;
     if (
       update.state === 'observed' ||

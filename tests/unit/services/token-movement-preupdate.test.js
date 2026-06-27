@@ -67,18 +67,14 @@ describe('token movement pre-update service', () => {
     expect(warn).toHaveBeenCalledWith('You cannot move until Sneak has started.');
   });
 
-  test('records pending movement and immediately refreshes targeted render locks', () => {
+  test('records the pending movement via setPendingTokenMovementPosition', () => {
     const setPendingTokenMovementPosition = jest.fn(() => true);
-    const getPendingMovementRefreshTargetIds = jest.fn(() => ['target']);
-    const refreshPendingMovementTokenVisibility = jest.fn();
 
     handlePreUpdateTokenMovement(makeTokenDoc({ id: 'mover' }), { x: 100 }, { animate: true }, 'u1', {
       isAvsEnabled: () => false,
       isUserGm: () => false,
       getControlledTokens: () => [{ document: { id: 'mover' } }],
       setPendingTokenMovementPosition,
-      getPendingMovementRefreshTargetIds,
-      refreshPendingMovementTokenVisibility,
     });
 
     expect(setPendingTokenMovementPosition).toHaveBeenCalledWith(
@@ -91,29 +87,6 @@ describe('token movement pre-update service', () => {
         predictFinalVisibility: true,
       },
     );
-    expect(getPendingMovementRefreshTargetIds).toHaveBeenCalledWith('mover');
-    expect(refreshPendingMovementTokenVisibility).toHaveBeenCalledWith(['mover'], {
-      skipPerceptionRefresh: true,
-      source: 'pre-update-token-movement',
-      targetTokenIds: ['target'],
-    });
-  });
-
-  test('does not refresh render locks when pending movement is not recorded', () => {
-    const getPendingMovementRefreshTargetIds = jest.fn(() => ['target']);
-    const refreshPendingMovementTokenVisibility = jest.fn();
-
-    handlePreUpdateTokenMovement(makeTokenDoc({ id: 'mover' }), { x: 100 }, { animate: true }, 'u1', {
-      isAvsEnabled: () => false,
-      isUserGm: () => false,
-      getControlledTokens: () => [{ document: { id: 'mover' } }],
-      setPendingTokenMovementPosition: jest.fn(() => false),
-      getPendingMovementRefreshTargetIds,
-      refreshPendingMovementTokenVisibility,
-    });
-
-    expect(getPendingMovementRefreshTargetIds).not.toHaveBeenCalled();
-    expect(refreshPendingMovementTokenVisibility).not.toHaveBeenCalled();
   });
 
   test('fires established invisible cleanup from the GM client without awaiting it', () => {

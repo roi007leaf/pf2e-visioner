@@ -38,13 +38,9 @@ export class DependencyInjectionContainer {
     });
 
     this.#factories.set('movementSightLineResolver', async () => {
-      const {
-        currentPendingMovementSightLineSeesTarget,
-        recentCompletedMovementFinalSightLineSeesTarget,
-      } = await import('../../../services/PendingMovement/pending-movement-sight-line.js');
-      return (observer, target) =>
-        currentPendingMovementSightLineSeesTarget(observer, target) === true ||
-        recentCompletedMovementFinalSightLineSeesTarget(observer, target) === true;
+      // Freeze+settle contract: AVS defers during a move and recomputes at
+      // move-end, so there is no during-move sight-line to extend LOS with.
+      return () => false;
     });
 
     // Lighting raster service (fast-path darkness sampling)
