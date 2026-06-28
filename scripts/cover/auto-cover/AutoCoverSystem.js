@@ -39,6 +39,13 @@ export class AutoCoverSystem {
    */
   _activePairsByAttacker = new Map();
 
+  /**
+   * Store transient cover-adjustment records for chat indicators, keyed by `attackerId:targetId`
+   * @type {Map<string, Object>}
+   * @private
+   */
+  _coverAdjustmentRecords = new Map();
+
   constructor() {
     this._detector = coverDetector;
     this._stateManager = coverStateManager;
@@ -79,6 +86,40 @@ export class AutoCoverSystem {
     const arr = Array.from(set);
     this._activePairsByAttacker.delete(attackerId);
     return arr;
+  }
+
+  /**
+   * Records a rule-element cover adjustment for the chat indicator
+   * @param {Object} attacker
+   * @param {Object} target
+   * @param {{ originalState: string, finalState: string, sources: string[] }} info
+   */
+  recordCoverAdjustment(attacker, target, info) {
+    try {
+      const aId = attacker?.id;
+      const tId = target?.id;
+      if (!aId || !tId || !info) return;
+      this._coverAdjustmentRecords.set(`${aId}:${tId}`, { ...info, ts: Date.now() });
+    } catch {}
+  }
+
+  /**
+   * Consumes and returns the recorded cover adjustment for a pair (15s expiry)
+   * @param {string} attackerId
+   * @param {string} targetId
+   * @returns {Object|null}
+   */
+  consumeCoverAdjustment(attackerId, targetId) {
+    try {
+      const key = `${attackerId}:${targetId}`;
+      if (!this._coverAdjustmentRecords.has(key)) return null;
+      const rec = this._coverAdjustmentRecords.get(key);
+      this._coverAdjustmentRecords.delete(key);
+      if (!rec?.ts || Date.now() - rec.ts > 15000) return null;
+      return rec;
+    } catch {
+      return null;
+    }
   }
 
   /**

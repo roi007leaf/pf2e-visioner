@@ -218,6 +218,44 @@ describe('AutoCoverSystem', () => {
     });
   });
 
+  describe('cover adjustment chat records', () => {
+    test('records and consumes a cover adjustment for a pair', () => {
+      const attacker = { id: 'atk' };
+      const target = { id: 'def' };
+      autoCoverSystem.recordCoverAdjustment(attacker, target, {
+        originalState: 'standard',
+        finalState: 'none',
+        sources: ['phase-bolt'],
+      });
+
+      const rec = autoCoverSystem.consumeCoverAdjustment('atk', 'def');
+      expect(rec).toMatchObject({
+        originalState: 'standard',
+        finalState: 'none',
+        sources: ['phase-bolt'],
+      });
+      // Consumed: a second read returns null
+      expect(autoCoverSystem.consumeCoverAdjustment('atk', 'def')).toBeNull();
+    });
+
+    test('ignores expired cover adjustment records', () => {
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1000);
+      autoCoverSystem.recordCoverAdjustment({ id: 'atk' }, { id: 'def' }, {
+        originalState: 'lesser',
+        finalState: 'none',
+        sources: ['x'],
+      });
+      nowSpy.mockReturnValue(1000 + 15001);
+      expect(autoCoverSystem.consumeCoverAdjustment('atk', 'def')).toBeNull();
+      nowSpy.mockRestore();
+    });
+
+    test('does not record without both token ids', () => {
+      autoCoverSystem.recordCoverAdjustment({ id: 'atk' }, {}, { finalState: 'none' });
+      expect(autoCoverSystem.consumeCoverAdjustment('atk', undefined)).toBeNull();
+    });
+  });
+
   describe('error handling', () => {
     test('should handle detection calls gracefully', () => {
       const sourceToken = global.createMockToken({ id: 'source' });

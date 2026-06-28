@@ -1200,6 +1200,7 @@
       "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo: selected spotter not found.",
       "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} does not provide cover for this Strike.",
       "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: cover override unavailable.",
+      "COVER_ADJUSTMENT_TOOLTIP": "Cover adjusted by rule element ({SOURCES}): {ORIGINAL} → {FINAL}",
       "FROM_LINKED_DARKNESS": "From linked Darkness template",
       "NO_POSITION_CHANGE": "No position change",
       "SEARCH_WALL_PLACEHOLDER": "Search by identifier or wall ID...",

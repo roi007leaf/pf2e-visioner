@@ -39,6 +39,8 @@ async function defaultLoadOperationClass(className) {
       return (await import('./operations/DistanceBasedVisibility.js')).DistanceBasedVisibility;
     case 'CoverOverride':
       return (await import('./operations/CoverOverride.js')).CoverOverride;
+    case 'CoverAdjustment':
+      return (await import('./operations/CoverAdjustment.js')).CoverAdjustment;
     case 'SenseModifier':
       return (await import('./operations/SenseModifier.js')).SenseModifier;
     case 'DetectionModeModifier':
@@ -415,6 +417,8 @@ export function buildRuleElementRegistryValues(operations = []) {
           return 'conditionalState';
         case 'overrideCover':
           return 'overrideCover';
+        case 'adjustCover':
+          return 'coverAdjustments';
         case 'provideCover':
           return 'providesCover';
         case 'modifySenses':
@@ -459,6 +463,11 @@ async function removeOperation(operation, token, ruleElementId, getOperationClas
     case 'provideCover': {
       const OperationClass = await getOperationClass('CoverOverride');
       await OperationClass?.removeProvideCover?.(token);
+      break;
+    }
+    case 'adjustCover': {
+      const OperationClass = await getOperationClass('CoverAdjustment');
+      await OperationClass?.removeCoverAdjustment?.(operation, token, null);
       break;
     }
     case 'modifySenses': {
@@ -532,6 +541,11 @@ async function applyOperation(
       await OperationClass?.applyProvideCover?.(operation, token, ruleElementContext);
       break;
     }
+    case 'adjustCover': {
+      const OperationClass = await getOperationClass('CoverAdjustment');
+      await OperationClass?.applyCoverAdjustment?.(operation, token, ruleElementContext);
+      break;
+    }
     case 'modifySenses': {
       const OperationClass = await getOperationClass('SenseModifier');
       await OperationClass?.applySenseModifications?.(
@@ -601,12 +615,14 @@ async function refreshTokenRuleElementState({
   registryKey,
   ruleElementId,
   ruleSlug = 'effect',
+  rulePriority,
   getOperationClass,
   warn,
 }) {
   const ruleElementContext = {
     item,
     slug: ruleSlug,
+    priority: rulePriority,
     ruleElementId,
     ruleElementRegistryKey: registryKey,
   };
@@ -676,6 +692,7 @@ export async function refreshVisionerRuleElementItem(
       registryKey,
       ruleElementId,
       ruleSlug: visionerRule.slug || 'effect',
+      rulePriority: visionerRule.priority,
       getOperationClass,
       warn,
     });

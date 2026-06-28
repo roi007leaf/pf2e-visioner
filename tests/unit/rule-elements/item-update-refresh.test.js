@@ -68,6 +68,10 @@ function makeOperationClasses() {
       applyCoverOverride: jest.fn().mockResolvedValue(undefined),
       applyProvideCover: jest.fn().mockResolvedValue(undefined),
     },
+    CoverAdjustment: {
+      removeCoverAdjustment: jest.fn().mockResolvedValue(undefined),
+      applyCoverAdjustment: jest.fn().mockResolvedValue(undefined),
+    },
     SenseModifier: {
       restoreSenses: jest.fn().mockResolvedValue(undefined),
       applySenseModifications: jest.fn().mockResolvedValue(undefined),
@@ -171,6 +175,43 @@ describe('rule-element item update refresh', () => {
       'auraVisibility',
       'visionSharing',
     ]);
+  });
+
+  test('maps adjustCover operations to the coverAdjustments registry flag', () => {
+    expect(buildRuleElementRegistryValues([{ type: 'adjustCover' }])).toEqual(['coverAdjustments']);
+  });
+
+  test('reapplies adjustCover and re-registers coverAdjustments after item update', async () => {
+    const operations = [
+      { type: 'adjustCover', mode: 'step', steps: -1, direction: 'from', observers: 'all' },
+    ];
+    const item = makeItem({
+      operations,
+      rules: [{ key: 'PF2eVisionerEffect', slug: 'effect', priority: 120, operations }],
+    });
+    const token = makeToken('token-1', 'actor-1', { 'item-item-1': ['coverAdjustments'] });
+    const operationClasses = makeOperationClasses();
+    const loadOperationClass = jest.fn(async (className) => operationClasses[className]);
+
+    await refreshVisionerRuleElementItem(item, [token], {
+      loadOperationClass,
+      recalculateTokenIds: jest.fn().mockResolvedValue(undefined),
+      warn: jest.fn(),
+    });
+
+    expect(operationClasses.CoverAdjustment.removeCoverAdjustment).toHaveBeenCalledWith(
+      { ...operations[0], source: 'item-1-effect' },
+      token,
+      null,
+    );
+    expect(operationClasses.CoverAdjustment.applyCoverAdjustment).toHaveBeenCalledWith(
+      { ...operations[0], source: 'item-1-effect' },
+      token,
+      expect.objectContaining({ item, slug: 'effect', priority: 120, ruleElementId: 'item-1-effect' }),
+    );
+    expect(token.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'ruleElementRegistry', {
+      'item-item-1': ['coverAdjustments'],
+    });
   });
 
   test('schedules relevant item updates after PF2e has processed the rules', async () => {

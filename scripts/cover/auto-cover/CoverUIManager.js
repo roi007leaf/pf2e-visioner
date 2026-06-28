@@ -278,6 +278,7 @@ export class CoverUIManager {
       let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       let snipingDuoCoverIgnore = message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
       let offGuardSuppression = message?.flags?.['pf2e-visioner']?.offGuardSuppression;
+      let coverAdjustment = message?.flags?.['pf2e-visioner']?.coverAdjustment;
 
       // Also check for manual cover by examining the message for token references
       let manualCoverInfo = null;
@@ -321,7 +322,8 @@ export class CoverUIManager {
         !featUpgradeInfo &&
         !ruleElementBlocks &&
         !snipingDuoCoverIgnore &&
-        !offGuardSuppression
+        !offGuardSuppression &&
+        !coverAdjustment
       ) {
         return;
       }
@@ -332,7 +334,7 @@ export class CoverUIManager {
 
       // Check if indicator already exists to avoid duplicates
       if (
-        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator, .pf2e-visioner-cover-sniping-duo-indicator, .pf2e-visioner-off-guard-suppression-indicator')
+        $html.find('.pf2e-visioner-cover-override-indicator, .pf2e-visioner-cover-manual-indicator, .pf2e-visioner-cover-feat-indicator, .pf2e-visioner-cover-rule-element-indicator, .pf2e-visioner-cover-sniping-duo-indicator, .pf2e-visioner-off-guard-suppression-indicator, .pf2e-visioner-cover-adjustment-indicator')
           .length > 0
       ) {
         return;
@@ -635,6 +637,66 @@ export class CoverUIManager {
         } catch (e) { }
       }
 
+      if (coverAdjustment) {
+        try {
+          const { originalState, finalState, sources } = coverAdjustment;
+          const originalLabel = getCoverLabel(originalState);
+          const finalLabel = getCoverLabel(finalState);
+          const sourceList = Array.isArray(sources) ? sources.join(', ') : '';
+          const tooltip =
+            game.i18n?.localize?.('PF2E_VISIONER.UI.COVER_ADJUSTMENT_TOOLTIP')
+              ?.replace?.('{ORIGINAL}', originalLabel)
+              ?.replace?.('{FINAL}', finalLabel)
+              ?.replace?.('{SOURCES}', sourceList) ||
+            `Cover adjusted by rule element: ${originalLabel} → ${finalLabel}`;
+
+          const originalColor =
+            COVER_STATES?.[originalState]?.color || 'var(--color-text-secondary, #666)';
+          const finalColor = COVER_STATES?.[finalState]?.color || 'rgb(155, 89, 182)';
+          const originalIcon = COVER_STATES?.[originalState]?.icon || 'fas fa-shield';
+          const finalIcon = COVER_STATES?.[finalState]?.icon || 'fas fa-shield';
+
+          indicatorHtml += `
+                 <span class="pf2e-visioner-cover-adjustment-indicator" data-tooltip="${tooltip}" data-tooltip-direction="UP" style="
+                   margin-left: 4px;
+                   padding: 2px 4px;
+                   background: rgba(155, 89, 182, 0.12);
+                   border-radius: 3px;
+                   font-size: 1em;
+                   display: inline-flex;
+                   align-items: center;
+                   gap: 3px;
+                   vertical-align: middle;
+                   border: 1px solid rgba(155, 89, 182, 0.25);
+                   cursor: help;
+                 ">
+                   <i class="fas fa-wand-magic-sparkles" style="
+                     color: rgb(155, 89, 182);
+                     font-size: 0.7em;
+                     opacity: 0.85;
+                   "></i>
+                   <span style="
+                     color: ${originalColor};
+                     opacity: 0.8;
+                     display: inline-flex;
+                     align-items: center;
+                     filter: brightness(0.7);
+                     text-decoration: line-through;
+                   ">
+                     <i class="${originalIcon}" style="font-size: 0.9em;"></i>
+                   </span>
+                   <i class="fas fa-arrow-right" style="color: rgb(155, 89, 182); font-size: 0.7em; opacity: 0.85;"></i>
+                   <span style="
+                     color: ${finalColor};
+                     display: inline-flex;
+                     align-items: center;
+                   ">
+                     <i class="${finalIcon}" style="font-size: 0.9em;"></i>
+                   </span>
+                 </span>`;
+        } catch (e) {}
+      }
+
       if (!indicatorHtml) return;
 
       // Find the specific AC span element (the adjusted AC value)
@@ -717,6 +779,7 @@ export class CoverUIManager {
       const hasRuleElementBlocks = !!message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       const hasSnipingDuoCoverIgnore = !!message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
       const hasOffGuardSuppression = !!message?.flags?.['pf2e-visioner']?.offGuardSuppression;
+      const hasCoverAdjustment = !!message?.flags?.['pf2e-visioner']?.coverAdjustment;
 
       // Also check for manual cover
       let hasManualCover = false;
@@ -749,7 +812,8 @@ export class CoverUIManager {
         hasFeatUpgrade ||
         hasRuleElementBlocks ||
         hasSnipingDuoCoverIgnore ||
-        hasOffGuardSuppression
+        hasOffGuardSuppression ||
+        hasCoverAdjustment
       );
     } catch (e) {
       console.warn('PF2E Visioner | Error in shouldShowCoverOverrideIndicator:', e);

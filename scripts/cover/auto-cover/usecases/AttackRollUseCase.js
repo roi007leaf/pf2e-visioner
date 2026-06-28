@@ -635,6 +635,23 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
       }
     } catch (_) {}
+
+    try {
+      const coverAdjustment = this.autoCoverSystem.consumeCoverAdjustment(
+        speakerTokenId,
+        targetTokenId,
+      );
+      if (coverAdjustment) {
+        if (!data.flags) data.flags = {};
+        if (!data.flags['pf2e-visioner']) data.flags['pf2e-visioner'] = {};
+        data.flags['pf2e-visioner'].coverAdjustment = coverAdjustment;
+        if (doc && doc.updateSource) {
+          try {
+            doc.updateSource({ 'flags.pf2e-visioner.coverAdjustment': coverAdjustment });
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   /**
