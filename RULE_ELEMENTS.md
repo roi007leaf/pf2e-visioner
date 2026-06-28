@@ -4,22 +4,17 @@ This document describes the custom rule elements provided by the PF2E Visioner m
 
 ## Overview
 
-The `PF2eVisionerEffect` rule element accepts an array of operations that modify visibility, cover, detection modes, senses, and action qualifications. All operations use the same priority-based stacking system: when multiple operations target the same pair, the highest-priority operation wins; equal priorities stack cumulatively.
+The `PF2eVisionerEffect` rule element accepts an array of operations that modify visibility, cover, detection modes, senses, and action qualifications. All operations use the same priority-based stacking system: when multiple operations target the same pair, every active operation is applied cumulatively in descending priority order.
 
 ## Core Concepts
 
 ### Priority Stacking
 
-Rule element operations are prioritized numerically. When multiple operations of the same type apply to the same observer-target pair:
-
-- **Highest priority wins** for override-style operations (e.g., `overrideVisibility`, `overrideCover`)
-- **Cumulative stacking** for additive operations (e.g., `adjustCover` in `bonus` mode)
-
-If multiple operations have the same priority and the same scope, they stack additively.
+Rule element operations are prioritized numerically. When multiple operations apply to the same observer-target pair, every active operation is applied cumulatively in descending priority order. Priority controls the order of application, not exclusion; all operations that pass their predicates are applied to the running state.
 
 ### Cover Ladder
 
-Relative cover adjustments use a cover ladder for `mode: "step"`:
+Relative cover adjustments use a cover ladder. For `mode: "step"`:
 
 - None = 0
 - Lesser = 1
@@ -28,7 +23,7 @@ Relative cover adjustments use a cover ladder for `mode: "step"`:
 
 Steps clamp to the ladder: stepping down from None stays at None; stepping up from Greater stays at Greater.
 
-For `mode: "bonus"`, the adjustment amount converts back to the PF2E AC bonus system: each step = 1 AC bonus (None → Lesser = +1, Lesser → Standard = +1, Standard → Greater = +2).
+For `mode: "bonus"`, the adjustment amount is subtracted from the AC bonus (e.g., `-2` reduces any cover AC bonus by 2). The cover values map to AC bonuses: none = 0, lesser = 1, standard = 2, greater = 4. After applying the adjustment, the result clamps back to the cover ladder.
 
 ### Scopes
 
@@ -55,12 +50,11 @@ Reduces a target's effective cover at roll time without permanently changing sto
 - `targets` (required if direction is `"to"`): `"targeted"`, `"all"`, or a list of target UUIDs
 - `predicate` (optional): Predicate array evaluated against the roll context; adjustments apply only if true
 - `source` (optional): Label for audit/chat output (e.g., `"shooting-star-target"`)
-- `priority` (optional, default 100): Numeric priority for stacking; higher wins
 
 **Behavior:**
 
-- Cover adjustments are **cumulative by priority**: multiple operations stack if they have equal priority and scope
-- **Next-attack consume-once**: A `next-attack` adjustment applies to the first qualifying roll, then the adjustment is consumed and cleared; it cannot be reused until the effect is reapplied or toggled
+- **Cumulative application**: All active adjustments are applied cumulatively to the cover state in descending priority order; priority controls application order only, not exclusion
+- **Next-attack consume-once**: A `next-attack` adjustment applies to the first qualifying roll, then the adjustment is consumed and cleared from the flag; it returns only if the carrying effect is reapplied or retriggers the operation
 - **While-active persist**: A `while-active` adjustment remains active for the entire effect duration
 - **Predicate gating**: If a predicate is supplied, the adjustment only applies if the predicate evaluates true in the roll context
 
@@ -69,13 +63,18 @@ Reduces a target's effective cover at roll time without permanently changing sto
 **Shooting Star (step-based, while-active):**
 ```json
 {
-  "type": "adjustCover",
-  "mode": "step",
-  "steps": -1,
-  "direction": "from",
-  "observers": "all",
-  "scope": "while-active",
-  "source": "shooting-star-target",
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "adjustCover",
+      "mode": "step",
+      "steps": -1,
+      "direction": "from",
+      "observers": "all",
+      "scope": "while-active",
+      "source": "shooting-star-target"
+    }
+  ],
   "priority": 120
 }
 ```
@@ -85,19 +84,24 @@ All observers treat the target as having one less step of cover (e.g., standard 
 **Phase Bolt (bonus-based, next-attack, with predicate):**
 ```json
 {
-  "type": "adjustCover",
-  "mode": "bonus",
-  "amount": -2,
-  "direction": "to",
-  "targets": "targeted",
-  "scope": "next-attack",
-  "source": "phase-bolt",
-  "predicate": ["item:slug:phase-bolt"],
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "adjustCover",
+      "mode": "bonus",
+      "amount": -2,
+      "direction": "to",
+      "targets": "targeted",
+      "scope": "next-attack",
+      "source": "phase-bolt",
+      "predicate": ["item:slug:phase-bolt"]
+    }
+  ],
   "priority": 120
 }
 ```
 
-When rolling an attack with the phase-bolt item, the target gains a -2 AC bonus from reduced cover on the next attack roll, then the adjustment clears.
+When rolling an attack with the phase-bolt item, the target's cover AC bonus is reduced by 2 on the next attack roll, then the adjustment clears.
 
 ---
 
