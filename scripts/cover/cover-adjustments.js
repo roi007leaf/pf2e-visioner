@@ -47,7 +47,7 @@ async function defaultConsumeCoverAdjustment(defender, attackerId, sourceId) {
   return CoverAdjustment.consumeCoverAdjustment(defender, attackerId, sourceId);
 }
 
-export async function resolveAdjustedCover({ attacker, defender, baseState, rollOptions, deps = {} }) {
+export async function resolveAdjustedCover({ attacker, defender, baseState, rollOptions, consume = true, deps = {} }) {
   const {
     getActiveCoverAdjustments = defaultGetActiveCoverAdjustments,
     consumeCoverAdjustment = defaultConsumeCoverAdjustment,
@@ -59,7 +59,7 @@ export async function resolveAdjustedCover({ attacker, defender, baseState, roll
   if (!adjustments?.length) return { state: baseState, applied: [] };
 
   const { state, applied } = applyCoverAdjustments(baseState, adjustments, rollOptions);
-  if (applied.length && isGM()) {
+  if (consume && applied.length && isGM()) {
     const byId = new Map(adjustments.map((a) => [a.id, a]));
     for (const id of applied) {
       if (byId.get(id)?.scope === 'next-attack') {

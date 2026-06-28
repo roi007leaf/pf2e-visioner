@@ -95,7 +95,7 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
       }
     }
 
-    state = await this._applyCoverAdjustments(attacker, target, state, dialog?.context ?? null);
+    state = await this._applyCoverAdjustments(attacker, target, state, dialog?.context ?? null, { consume: false });
 
     try {
       await this.coverUIManager.injectDialogCoverUI(
@@ -339,6 +339,10 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
 
       if (!state) {
         return;
+      }
+
+      if (highestFoundManualCover === 'none') {
+        state = await this._applyCoverAdjustments(attacker, target, state, context, { consume: true });
       }
 
       // Persist cover info early so it's available for final safety injection

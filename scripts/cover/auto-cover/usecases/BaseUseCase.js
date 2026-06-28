@@ -236,12 +236,12 @@ export class BaseAutoCoverUseCase {
     return coverState;
   }
 
-  async _applyCoverAdjustments(attacker, defender, state, context = null) {
+  async _applyCoverAdjustments(attacker, defender, state, context = null, { consume = true } = {}) {
     try {
       if (!attacker?.id || !defender?.id) return state;
       const { resolveAdjustedCover } = await import('../../cover-adjustments.js');
       const rollOptions = this._buildCoverRollOptions(attacker, defender, context);
-      const { state: adjusted } = await resolveAdjustedCover({ attacker, defender, baseState: state, rollOptions });
+      const { state: adjusted } = await resolveAdjustedCover({ attacker, defender, baseState: state, rollOptions, consume });
       return adjusted ?? state;
     } catch (error) {
       console.warn('PF2E Visioner | Failed to apply cover adjustments:', error);

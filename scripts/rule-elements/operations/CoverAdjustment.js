@@ -12,7 +12,7 @@ export class CoverAdjustment {
     const itemSlug = ruleElement?.item?.slug || ruleElement?.item?.name?.slugify?.() || 'unknown';
     return {
       id: operation.source || `rule-element-${itemSlug}`,
-      priority: operation.priority ?? 100,
+      priority: operation.priority ?? ruleElement?.priority ?? 100,
       mode: operation.mode,
       steps: operation.steps,
       amount: operation.amount,

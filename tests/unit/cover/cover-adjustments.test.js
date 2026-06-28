@@ -74,4 +74,28 @@ describe('resolveAdjustedCover', () => {
     await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'standard', rollOptions: [], deps });
     expect(consumed).toEqual([]);
   });
+
+  test('consume:false does not consume next-attack even as GM', async () => {
+    const consumed = [];
+    const deps = {
+      getActiveCoverAdjustments: () => [{ id: 'oneshot', mode: 'step', steps: -1, scope: 'next-attack' }],
+      consumeCoverAdjustment: async (d, a, s) => consumed.push(s),
+      isGM: () => true,
+    };
+    const result = await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'standard', rollOptions: [], consume: false, deps });
+    expect(result.state).toBe('lesser');
+    expect(consumed).toEqual([]);
+  });
+
+  test('consume:true consumes next-attack as GM', async () => {
+    const consumed = [];
+    const deps = {
+      getActiveCoverAdjustments: () => [{ id: 'oneshot', mode: 'step', steps: -1, scope: 'next-attack' }],
+      consumeCoverAdjustment: async (d, a, s) => consumed.push(s),
+      isGM: () => true,
+    };
+    const result = await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'standard', rollOptions: [], consume: true, deps });
+    expect(result.state).toBe('lesser');
+    expect(consumed).toEqual(['oneshot']);
+  });
 });

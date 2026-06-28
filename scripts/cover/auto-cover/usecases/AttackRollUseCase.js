@@ -657,7 +657,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this._ensureUnsuppressedOffGuardModifier(ctx, attacker, target);
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
-    state = await this._applyCoverAdjustments(attacker, target, state, ctx);
+    state = await this._applyCoverAdjustments(attacker, target, state, ctx, { consume: false });
 
     const snipingDuoCoverIgnore = coverDetector.peekSnipingDuoCoverIgnore(attacker.id, target.id);
 
@@ -842,7 +842,10 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
 
         const manualCover = getCoverBetween(attacker, target);
-        const detected = this._detectCover(attacker, target, context);
+        let detected = this._detectCover(attacker, target, context);
+        if (manualCover === 'none') {
+          detected = await this._applyCoverAdjustments(attacker, target, detected, context, { consume: true });
+        }
         let chosen = null;
         try {
           // Only show popup if keybind is held
