@@ -2,6 +2,7 @@ import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
 import { AuraVisibility } from './operations/AuraVisibility.js';
+import { CoverAdjustment } from './operations/CoverAdjustment.js';
 import { CoverOverride } from './operations/CoverOverride.js';
 import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
@@ -65,6 +66,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               'modifyDetectionModes',
               'overrideVisibility',
               'overrideCover',
+              'adjustCover',
               'provideCover',
               'modifyActionQualification',
               'modifyLighting',
@@ -222,8 +224,16 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
           mode: new fields.StringField({
             required: false,
-            choices: ['one-way', 'two-way', 'replace', 'reverse'],
+            choices: ['one-way', 'two-way', 'replace', 'reverse', 'step', 'bonus'],
             initial: 'one-way',
+          }),
+
+          steps: new fields.NumberField({ required: false, nullable: true }),
+          amount: new fields.NumberField({ required: false, nullable: true }),
+          scope: new fields.StringField({
+            required: false,
+            choices: ['while-active', 'next-attack'],
+            initial: 'while-active',
           }),
 
           masterActorUuid: new fields.StringField({ required: false }),
@@ -510,6 +520,12 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'auraVisibility':
           if (registeredFlags.includes('auraVisibility')) {
             updates['flags.pf2e-visioner.auraVisibility'] = null;
+          }
+          break;
+
+        case 'adjustCover':
+          if (registeredFlags.includes('coverAdjustments')) {
+            updates['flags.pf2e-visioner.coverAdjustments'] = null;
           }
           break;
 
@@ -823,6 +839,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           await this.registerFlag(token, 'auraVisibility');
           break;
 
+        case 'adjustCover':
+          await CoverAdjustment.applyCoverAdjustment(operation, token, this);
+          await this.registerFlag(token, 'coverAdjustments');
+          break;
+
         default:
           console.warn(`PF2E Visioner | Unknown operation type: ${operation.type}`);
       }
@@ -1014,6 +1035,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
 
         case 'shareVision':
           await ShareVision.removeShareVision(operation, token);
+          break;
+
+        case 'adjustCover':
+          await CoverAdjustment.removeCoverAdjustment(operation, token, this);
           break;
 
         default:
