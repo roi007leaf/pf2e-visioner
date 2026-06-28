@@ -95,6 +95,8 @@ class SavingThrowUseCase extends BaseAutoCoverUseCase {
       }
     }
 
+    state = await this._applyCoverAdjustments(attacker, target, state, dialog?.context ?? null);
+
     try {
       await this.coverUIManager.injectDialogCoverUI(
         dialog,

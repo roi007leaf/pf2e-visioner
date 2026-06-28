@@ -657,6 +657,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this._ensureUnsuppressedOffGuardModifier(ctx, attacker, target);
     const manualCover = getCoverBetween(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
+    state = await this._applyCoverAdjustments(attacker, target, state, ctx);
 
     const snipingDuoCoverIgnore = coverDetector.peekSnipingDuoCoverIgnore(attacker.id, target.id);
 

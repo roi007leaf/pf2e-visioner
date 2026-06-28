@@ -177,6 +177,8 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
         }
       }
 
+      state = await this._applyCoverAdjustments(target, hider, state, null);
+
       const originalDetectedState = state;
       let wasOverridden = false;
       let overrideSource = null;

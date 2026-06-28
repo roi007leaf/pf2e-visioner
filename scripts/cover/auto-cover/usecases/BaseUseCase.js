@@ -5,6 +5,7 @@
 import autoCoverSystem from '../AutoCoverSystem.js';
 import coverUIManager from '../CoverUIManager.js';
 import templateManager from '../TemplateManager.js';
+import { PredicateHelper } from '../../../rule-elements/PredicateHelper.js';
 export class BaseAutoCoverUseCase {
   constructor() {
     // Ensure this class is not instantiated directly
@@ -233,6 +234,30 @@ export class BaseAutoCoverUseCase {
     });
 
     return coverState;
+  }
+
+  async _applyCoverAdjustments(attacker, defender, state, context = null) {
+    try {
+      if (!attacker?.id || !defender?.id) return state;
+      const { resolveAdjustedCover } = await import('../../cover-adjustments.js');
+      const rollOptions = this._buildCoverRollOptions(attacker, defender, context);
+      const { state: adjusted } = await resolveAdjustedCover({ attacker, defender, baseState: state, rollOptions });
+      return adjusted ?? state;
+    } catch (error) {
+      console.warn('PF2E Visioner | Failed to apply cover adjustments:', error);
+      return state;
+    }
+  }
+
+  _buildCoverRollOptions(attacker, defender, context = null) {
+    const options = PredicateHelper.combineRollOptions(
+      PredicateHelper.getTokenRollOptions(attacker),
+      PredicateHelper.getTargetRollOptions(defender, attacker),
+    );
+    const ctxOptions = Array.isArray(context?.options) ? [...context.options] : [];
+    const itemSlug = context?.item?.slug;
+    if (itemSlug) ctxOptions.push(`item:slug:${itemSlug}`);
+    return [...options, ...ctxOptions];
   }
 
   normalizeTokenRef(ref) {
