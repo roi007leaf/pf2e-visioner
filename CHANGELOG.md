@@ -6,6 +6,7 @@
 
 - **System conditions can drive Visioner visibility (opt-in)**: With the new "System conditions act as Visioner overrides" setting enabled, applying the PF2E Hidden, Concealed, or Undetected condition to a token makes it that to its enemies; removing the condition reverts to automatic visibility. Existing manual overrides are never replaced.
 - **Presence-only thoughtsense marker for sound-blocked hidden targets**: A hidden target detected by thoughtsense only (sound is blocked, no hearing) now renders presence-only — the creature token and its soundwave ring are hidden and only the purple thoughtsense indicator shows, including in the GM view. Audible hidden targets keep their soundwave.
+- **Relative cover adjustments via Rule Elements (`adjustCover`)**: A `PF2eVisionerEffect` operation that reduces a target's effective cover at roll time — by one or more steps (`mode: "step"`) or by an AC-bonus amount (`mode: "bonus"`) — without permanently changing stored cover. Supports `while-active` (persistent while the effect lasts) and `next-attack` (consumed after the first qualifying roll) scopes, cumulative stacking by priority, and predicates. Enables spells like Shooting Star and Phase Bolt to carry the behavior directly.
 
 ### Changed
 

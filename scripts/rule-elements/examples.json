@@ -288,5 +288,48 @@
         "priority": 100
       }
     ]
+  },
+  "shootingStar": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.SHOOTING_STAR.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.SHOOTING_STAR.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "adjustCover",
+            "mode": "step",
+            "steps": -1,
+            "direction": "from",
+            "observers": "all",
+            "scope": "while-active",
+            "source": "shooting-star-target"
+          }
+        ],
+        "priority": 120
+      }
+    ]
+  },
+  "phaseBolt": {
+    "name": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.PHASE_BOLT.NAME",
+    "description": "PF2E_VISIONER.RULE_ELEMENTS.EFFECT.EXAMPLES.PHASE_BOLT.DESCRIPTION",
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "adjustCover",
+            "mode": "bonus",
+            "amount": -2,
+            "direction": "to",
+            "targets": "targeted",
+            "scope": "next-attack",
+            "source": "phase-bolt",
+            "predicate": ["item:slug:phase-bolt"]
+          }
+        ],
+        "priority": 120
+      }
+    ]
   }
 }
