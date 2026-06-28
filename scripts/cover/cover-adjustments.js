@@ -6,11 +6,11 @@ const COVER_BONUS = { none: 0, lesser: 1, standard: 2, greater: 4 };
 export function adjustCoverState(state, adjustment) {
   if (adjustment?.mode === 'step') {
     const index = Math.max(0, COVER_ORDER.indexOf(state));
-    const next = Math.max(0, Math.min(index + Number(adjustment.steps || 0), COVER_ORDER.length - 1));
+    const next = Math.max(0, Math.min(index + Number(adjustment.steps ?? 0), COVER_ORDER.length - 1));
     return COVER_ORDER[next];
   }
   if (adjustment?.mode === 'bonus') {
-    const bonus = Math.max(0, (COVER_BONUS[state] ?? 0) + Number(adjustment.amount || 0));
+    const bonus = Math.max(0, (COVER_BONUS[state] ?? 0) + Number(adjustment.amount ?? 0));
     if (bonus >= 4) return 'greater';
     if (bonus >= 2) return 'standard';
     if (bonus >= 1) return 'lesser';
@@ -27,11 +27,8 @@ export function applyCoverAdjustments(state, adjustments, rollOptions) {
     if (adjustment?.predicate?.length && !PredicateHelper.evaluate(adjustment.predicate, rollOptions || [])) {
       continue;
     }
-    const next = adjustCoverState(current, adjustment);
-    if (next !== current || adjustment?.mode) {
-      current = next;
-      applied.push(adjustment.id);
-    }
+    current = adjustCoverState(current, adjustment);
+    applied.push(adjustment.id);
   }
   return { state: current, applied };
 }
