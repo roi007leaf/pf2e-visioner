@@ -32,3 +32,40 @@ export function applyCoverAdjustments(state, adjustments, rollOptions) {
   }
   return { state: current, applied };
 }
+
+function defaultIsGM() {
+  return !!globalThis.game?.user?.isGM;
+}
+
+async function defaultGetActiveCoverAdjustments(attacker, defender) {
+  const { CoverAdjustment } = await import('../rule-elements/operations/CoverAdjustment.js');
+  return CoverAdjustment.getActiveCoverAdjustments(attacker, defender);
+}
+
+async function defaultConsumeCoverAdjustment(defender, attackerId, sourceId) {
+  const { CoverAdjustment } = await import('../rule-elements/operations/CoverAdjustment.js');
+  return CoverAdjustment.consumeCoverAdjustment(defender, attackerId, sourceId);
+}
+
+export async function resolveAdjustedCover({ attacker, defender, baseState, rollOptions, deps = {} }) {
+  const {
+    getActiveCoverAdjustments = defaultGetActiveCoverAdjustments,
+    consumeCoverAdjustment = defaultConsumeCoverAdjustment,
+    isGM = defaultIsGM,
+  } = deps;
+  if (!attacker?.id || !defender?.id) return { state: baseState, applied: [] };
+
+  const adjustments = await getActiveCoverAdjustments(attacker, defender);
+  if (!adjustments?.length) return { state: baseState, applied: [] };
+
+  const { state, applied } = applyCoverAdjustments(baseState, adjustments, rollOptions);
+  if (applied.length && isGM()) {
+    const byId = new Map(adjustments.map((a) => [a.id, a]));
+    for (const id of applied) {
+      if (byId.get(id)?.scope === 'next-attack') {
+        await consumeCoverAdjustment(defender, attacker.id, id);
+      }
+    }
+  }
+  return { state, applied };
+}

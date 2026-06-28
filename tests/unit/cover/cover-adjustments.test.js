@@ -1,4 +1,4 @@
-import { adjustCoverState, applyCoverAdjustments } from '../../../scripts/cover/cover-adjustments.js';
+import { adjustCoverState, applyCoverAdjustments, resolveAdjustedCover } from '../../../scripts/cover/cover-adjustments.js';
 
 describe('adjustCoverState', () => {
   test('step -1 walks down the ladder and clamps at none', () => {
@@ -34,5 +34,44 @@ describe('applyCoverAdjustments', () => {
   test('applies adjustment whose predicate matches', () => {
     const adjustments = [{ id: 'a', priority: 100, mode: 'step', steps: -1, predicate: ['item:slug:shooting-star'] }];
     expect(applyCoverAdjustments('standard', adjustments, ro)).toEqual({ state: 'lesser', applied: ['a'] });
+  });
+});
+
+function tok(id) { return { id, document: { id } }; }
+
+describe('resolveAdjustedCover', () => {
+  test('applies adjustments and consumes only next-attack ones that fired', async () => {
+    const consumed = [];
+    const deps = {
+      getActiveCoverAdjustments: () => [
+        { id: 'persist', priority: 100, mode: 'step', steps: -1, scope: 'while-active' },
+        { id: 'oneshot', priority: 90, mode: 'step', steps: -1, scope: 'next-attack' },
+      ],
+      consumeCoverAdjustment: async (d, a, sourceId) => consumed.push(sourceId),
+      isGM: () => true,
+    };
+    const result = await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'greater', rollOptions: [], deps });
+    expect(result.state).toBe('lesser');
+    expect(result.applied.sort()).toEqual(['oneshot', 'persist']);
+    expect(consumed).toEqual(['oneshot']);
+  });
+
+  test('no adjustments returns base unchanged, consumes nothing', async () => {
+    const consumed = [];
+    const deps = { getActiveCoverAdjustments: () => [], consumeCoverAdjustment: async (d, a, s) => consumed.push(s), isGM: () => true };
+    const result = await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'standard', rollOptions: [], deps });
+    expect(result).toEqual({ state: 'standard', applied: [] });
+    expect(consumed).toEqual([]);
+  });
+
+  test('non-GM does not consume', async () => {
+    const consumed = [];
+    const deps = {
+      getActiveCoverAdjustments: () => [{ id: 'oneshot', mode: 'step', steps: -1, scope: 'next-attack' }],
+      consumeCoverAdjustment: async (d, a, s) => consumed.push(s),
+      isGM: () => false,
+    };
+    await resolveAdjustedCover({ attacker: tok('a'), defender: tok('d'), baseState: 'standard', rollOptions: [], deps });
+    expect(consumed).toEqual([]);
   });
 });
