@@ -104,6 +104,7 @@ function buildTooltipRequest({
 export function buildObserverTooltipVisibilityRequests({
   observerToken,
   targetTokens = [],
+  isGM = false,
   getVisibilityMap = () => ({}),
   getDetectionBetween = () => null,
 } = {}) {
@@ -123,6 +124,7 @@ export function buildObserverTooltipVisibilityRequests({
       });
 
       if (!request) return null;
+      if (!isGM && SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(request.visibilityState)) return null;
       return canRenderToken || request.senseUsed ? request : null;
     })
     .filter(Boolean);
@@ -191,6 +193,7 @@ export function buildTooltipVisibilityRequests({
     return buildObserverTooltipVisibilityRequests({
       observerToken: subjectToken,
       targetTokens: otherTokens,
+      isGM,
       getVisibilityMap,
       getDetectionBetween,
     });

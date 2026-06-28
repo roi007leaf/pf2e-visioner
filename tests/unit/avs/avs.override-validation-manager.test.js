@@ -650,6 +650,19 @@ describe('OverrideValidationManager display filtering', () => {
       return { manager, observer, target };
     }
 
+    test('never flags system-condition overrides (authoritative while the condition exists)', async () => {
+      const { manager, observer, target } = await setupManagerForObservedTarget([], 'none', 'observed');
+
+      const result = await manager.checkOverrideValidity(observer.id, target.id, {
+        state: 'hidden',
+        source: 'system-condition',
+        hasCover: false,
+        hasConcealment: false,
+      });
+
+      expect(result).toBeNull();
+    });
+
     test.each(['sneak_action', 'hide_action'])(
       'does not flag %s stealth overrides when the target has Legendary Sneak',
       async (source) => {
@@ -689,9 +702,26 @@ describe('OverrideValidationManager display filtering', () => {
       );
     });
 
-    test('still flags manual hidden Legendary Sneak overrides when AVS would calculate undetected', async () => {
+    test('never downgrades a hidden Legendary Sneak override to undetected, even when AVS would calculate undetected', async () => {
       const { manager, observer, target } = await setupManagerForObservedTarget(
         [{ type: 'feat', system: { slug: 'legendary-sneak' } }],
+        'none',
+        'undetected',
+      );
+
+      const result = await manager.checkOverrideValidity(observer.id, target.id, {
+        state: 'hidden',
+        source: 'manual_action',
+        hasCover: false,
+        hasConcealment: false,
+      });
+
+      expect(result).toBeNull();
+    });
+
+    test('without Legendary Sneak, a hidden override is still flagged when AVS would calculate undetected', async () => {
+      const { manager, observer, target } = await setupManagerForObservedTarget(
+        [],
         'none',
         'undetected',
       );

@@ -1,3 +1,5 @@
+import { MODULE_ID } from '../../constants.js';
+import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import { getVisionerVisibilityBetweenTokens } from './detection-visibility-context.js';
@@ -54,7 +56,95 @@ function foundryHiddenRequiresVisionerRenderLock(target) {
   return !!target?.document?.hidden && !globalThis.game?.user?.isGM;
 }
 
+const HARD_HIDDEN_CHROME_KEY = '_pvHardHiddenChromeVisibility';
+
+function hardHiddenChromeSurfaces(token) {
+  return [
+    token?.effects,
+    token?.nameplate,
+    token?.bars,
+    token?.tooltip,
+    token?.levelIndicator,
+    token?.targetArrows,
+    token?.targetPips,
+    token?.turnMarker,
+    token?.turnMarker?.mesh,
+  ].filter((surface) => surface && 'visible' in surface);
+}
+
+function hideHardHiddenChromeSurfaces(token) {
+  const existing = token[HARD_HIDDEN_CHROME_KEY];
+  if (existing) {
+    for (const entry of existing) {
+      if (entry.surface && 'visible' in entry.surface) entry.surface.visible = false;
+    }
+    return;
+  }
+  const captured = hardHiddenChromeSurfaces(token).map((surface) => ({
+    surface,
+    visible: surface.visible,
+  }));
+  for (const entry of captured) entry.surface.visible = false;
+  token[HARD_HIDDEN_CHROME_KEY] = captured;
+}
+
+function restoreHardHiddenChromeSurfaces(token) {
+  const captured = token?.[HARD_HIDDEN_CHROME_KEY];
+  if (!captured) return;
+  for (const entry of captured) {
+    try {
+      if (entry.surface && 'visible' in entry.surface) entry.surface.visible = entry.visible;
+    } catch {
+      /* best-effort chrome restore */
+    }
+  }
+  try {
+    delete token[HARD_HIDDEN_CHROME_KEY];
+  } catch {
+    token[HARD_HIDDEN_CHROME_KEY] = null;
+  }
+}
+
+function hasUndetectedAvsOverride(observer, target) {
+  try {
+    const observerId = tokenIdOf(observer);
+    if (!observerId) return false;
+    const state = target?.document?.getFlag?.(MODULE_ID, `avs-override-from-${observerId}`)?.state;
+    return state === 'undetected' || state === 'unnoticed';
+  } catch {
+    return false;
+  }
+}
+
+function shouldDeferRenderingToCoreDuringMove(target) {
+  if (!hasActivePendingTokenMovement()) return false;
+  if (!target?.document?.id) return false;
+  if (target.controlled) return false;
+  if (shouldBypassAvsForGmVision()) return false;
+  if (isSelectAllTokenVisibilityBypassActive()) return false;
+  if (foundryHiddenRequiresVisionerRenderLock(target)) return false;
+  if (hiddenStateShouldRenderHideTarget(target)) return false;
+
+  const observers = currentViewObservers();
+  if (observers.length === 0) return false;
+
+  let deferrable = false;
+  for (const observer of observers) {
+    if (tokenIdOf(observer) === tokenIdOf(target)) continue;
+    const state = getStoredVisibilityState(observer, target);
+    if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) continue;
+    if (hasUndetectedAvsOverride(observer, target)) return false;
+    deferrable = true;
+  }
+  return deferrable;
+}
+
 export function applyCurrentViewHardHide(token) {
+  if (shouldDeferRenderingToCoreDuringMove(token)) {
+    if (token.visible) releaseCurrentViewHardHide(token);
+    token._pvCurrentViewHardHidden = false;
+    return false;
+  }
   if (!targetIsHardHiddenFromCurrentView(token)) {
     releaseCurrentViewHardHideIfMarked(token);
     return false;
@@ -67,6 +157,7 @@ export function applyCurrentViewHardHide(token) {
     if ('alpha' in token.mesh) token.mesh.alpha = 0;
   }
   token.detectionFilter = null;
+  hideHardHiddenChromeSurfaces(token);
   token._pvCurrentViewHardHidden = true;
   return true;
 }
@@ -91,6 +182,7 @@ export function releaseCurrentViewHardHide(token) {
     if ('renderable' in mesh) mesh.renderable = true;
     if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
   }
+  restoreHardHiddenChromeSurfaces(token);
   return true;
 }
 

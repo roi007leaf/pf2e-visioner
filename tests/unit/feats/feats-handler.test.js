@@ -124,14 +124,23 @@ describe('FeatsHandler - all feats coverage', () => {
     });
 
     describe('hide feat adjusters', () => {
-      test('terrain-stalker, legendary-sneak, vanish-into-the-land apply on hide', () => {
+      test('terrain-stalker and vanish-into-the-land apply on hide; legendary-sneak does not boost the result', () => {
         const actor = createActorWithFeats(['terrain-stalker', 'legendary-sneak', 'vanish-into-the-land']);
         const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'hide', {
           terrainMatches: true,
           inNaturalTerrain: true,
         });
-        // terrain-stalker +1, legendary-sneak +1, vanish-into-the-land +1 = 3 but clamped to 2
+        // terrain-stalker +1, vanish-into-the-land +1 = 2; legendary-sneak contributes 0
         expect(shift).toBe(2);
+      });
+
+      test('legendary-sneak alone does not shift the hide outcome (it only removes the cover/concealment requirement)', () => {
+        const actor = createActorWithFeats(['legendary-sneak']);
+        const { shift } = FeatsHandler.getOutcomeAdjustment(actor, 'hide', {
+          terrainMatches: true,
+          inNaturalTerrain: true,
+        });
+        expect(shift).toBe(0);
       });
 
       test('vanish-into-the-land improves concealment ladder on hide success', () => {

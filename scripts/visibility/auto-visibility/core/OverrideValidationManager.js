@@ -695,6 +695,11 @@ export class OverrideValidationManager {
       return null;
     }
 
+    if (override.source === 'system-condition') {
+      flushPerf({ reason: 'system-condition-authoritative' });
+      return null;
+    }
+
     if (override.timedOverride) {
       const timer = override.timedOverride;
       if (timer.type === 'realtime' && timer.expiresAt && timer.expiresAt > Date.now()) {
@@ -927,8 +932,14 @@ export class OverrideValidationManager {
         }
       }
 
+      const legendarySneakKeepsHiddenFromUndetected =
+        override.state === 'hidden' &&
+        (visibility === 'undetected' || visibility === 'unnoticed') &&
+        FeatsHandler.hasFeat(target, 'legendary-sneak');
+
       if (
         !ignoresStealthPositionValidation &&
+        !legendarySneakKeepsHiddenFromUndetected &&
         shouldValidateObscuredVisibility &&
         STEALTH_OVERRIDE_STATES.has(override.state) &&
         (visibility === 'undetected' || visibility === 'unnoticed') &&

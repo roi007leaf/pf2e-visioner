@@ -42,6 +42,10 @@ import {
   handleTokenUpdated,
 } from '../services/token-render-lifecycle.js';
 import { releaseCurrentViewHardHideIfMarked } from '../services/Detection/current-view-hard-hide.js';
+import {
+  handleConditionItemChange,
+  handleTokenCreatedForSystemConditions,
+} from '../services/system-condition-overrides.js';
 import { syncSystemHiddenIndicatorPositionForToken } from '../services/system-hidden-indicator-rendering.js';
 
 function clearActorFeatureCacheForItem(item) {
@@ -117,6 +121,7 @@ export async function registerHooks() {
 
   Hooks.on('createToken', (tokenDoc) => {
     watchActorPreparedSenses(tokenDoc?.actor ?? tokenDoc?.object?.actor);
+    handleTokenCreatedForSystemConditions(tokenDoc);
   });
 
   // Register item update hooks for rule element updates
@@ -129,6 +134,7 @@ export async function registerHooks() {
   Hooks.on('createItem', async (item, options, userId) => {
     clearActorFeatureCacheForItem(item);
     handleActorSenseChangeItemEvent(item, null, options, userId);
+    handleConditionItemChange(item);
   });
 
   // Wall lifecycle: refresh indicators and see-through state when walls change
@@ -219,6 +225,7 @@ export async function registerHooks() {
     clearActorFeatureCacheForItem(item);
     await cleanupDeletedEffectItem(item);
     handleActorSenseChangeItemEvent(item, null);
+    handleConditionItemChange(item);
   });
 
   // Handle scene updates to trigger AVS recalculation when disableAVS flag changes

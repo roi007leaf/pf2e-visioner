@@ -4,6 +4,7 @@
 
 ### Added
 
+- **System conditions can drive Visioner visibility (opt-in)**: With the new "System conditions act as Visioner overrides" setting enabled, applying the PF2E Hidden, Concealed, or Undetected condition to a token makes it that to its enemies; removing the condition reverts to automatic visibility. Existing manual overrides are never replaced.
 - **Presence-only thoughtsense marker for sound-blocked hidden targets**: A hidden target detected by thoughtsense only (sound is blocked, no hearing) now renders presence-only — the creature token and its soundwave ring are hidden and only the purple thoughtsense indicator shows, including in the GM view. Audible hidden targets keep their soundwave.
 
 ### Changed
@@ -22,6 +23,10 @@
 - **System-hidden indicators track their token during drags and movement**: The lifesense/thoughtsense indicator square now follows the token frame-by-frame during hold-drags and movement (including fast, auto-panning drags) and settles after the move, instead of lagging behind or popping in at the wrong grid cells.
 - **Players no longer reveal undetected tokens when deselecting**: A player deselecting their token now keeps its last view frozen, so undetected tokens stay hidden instead of becoming visible once no token is controlled. GM deselect still reveals everything.
 - **Limited (terrain) walls now obscure hearing like sight**: A wall set to Limited for sound now follows Foundry's terrain rule for hearing — sound passes through one crossing but is blocked by a second — matching how Limited walls already work for sight. A creature behind a terrain wall crossed twice is now undetected (fully hidden, no soundwave) instead of showing a hidden soundwave through the wall.
+- **Undetected creatures reveal mid-move when line of sight opens**: An undetected target now becomes visible the moment a moving observer's line of sight reaches it, instead of only after the move finishes. Creatures deliberately hidden via a Sneak/Hide override stay undetected through the move.
+- **Hidden creatures no longer leak their chrome**: When a creature is hard-hidden from you (undetected), its PF2E condition icons, nameplate, and bars are now hidden along with the token instead of floating at its location or riding the movement ruler during a drag; they reappear when it becomes visible again.
+- **Legendary Sneak no longer forces creatures undetected**: Legendary Sneak no longer adds a phantom degree-of-success boost to Hide, and it never auto-downgrades a Hidden creature to Undetected when it moves — it only removes the cover/concealment requirement for Hide and Sneak, as the feat states.
+- **Observer-perspective tooltips no longer reveal undetected creatures**: Holding the observer hotkey as a player no longer shows visibility badges for any creature it cannot perceive (undetected or unnoticed), which previously gave away their location. The GM still sees everything.
 
 ## [8.3.1] - 2026-06-21
 

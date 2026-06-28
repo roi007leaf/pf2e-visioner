@@ -485,10 +485,18 @@ function extractImpreciseSenses(capabilities, distanceInFeet, { hearingDistanceI
   return imprecise;
 }
 
+function systemConditionOverridesEnabled() {
+  try {
+    return !!globalThis.game?.settings?.get?.(MODULE_ID, 'systemConditionOverrides');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Extract concealment from target
  */
-function extractConcealment(target, options) {
+export function extractConcealment(target, options) {
   // Check for concealment effects
   const flags = target?.document?.flags?.['pf2e-visioner'] || {};
 
@@ -497,7 +505,7 @@ function extractConcealment(target, options) {
   }
 
   // Check PF2e actor conditions
-  if (target.actor?.conditions) {
+  if (target.actor?.conditions && !systemConditionOverridesEnabled()) {
     const concealed = target.actor.conditions.find((c) => c.slug === 'concealed');
     if (concealed) {
       return true;

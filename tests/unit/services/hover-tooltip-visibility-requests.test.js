@@ -91,6 +91,46 @@ describe('hover tooltip visibility request planning', () => {
     ]);
   });
 
+  test('non-GM observer mode hides ALL undetected/unnoticed targets (no location leak)', () => {
+    const observer = makeToken('observer');
+    const undetected = makeToken('undetected');
+    const unnoticed = makeToken('unnoticed');
+    const hidden = makeToken('hidden');
+    const getVisibilityMap = jest.fn(() => ({
+      undetected: 'undetected',
+      unnoticed: 'unnoticed',
+      hidden: 'hidden',
+    }));
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: observer,
+      allTokens: [observer, undetected, unnoticed, hidden],
+      mode: 'observer',
+      isGM: false,
+      getVisibilityMap,
+      getDetectionBetween: () => null,
+    });
+
+    expect(requests.map((r) => r.renderToken.id)).toEqual(['hidden']);
+  });
+
+  test('GM observer mode still shows undetected targets (omniscience preserved)', () => {
+    const observer = makeToken('observer');
+    const undetected = makeToken('undetected');
+    const getVisibilityMap = jest.fn(() => ({ undetected: 'undetected' }));
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: observer,
+      allTokens: [observer, undetected],
+      mode: 'observer',
+      isGM: true,
+      getVisibilityMap,
+      getDetectionBetween: () => null,
+    });
+
+    expect(requests.map((r) => r.renderToken.id)).toEqual(['undetected']);
+  });
+
   test('keeps observer-mode lifesense targets when core visibility hides them', () => {
     const observer = makeToken('observer');
     const target = makeToken('target', { isVisible: false });

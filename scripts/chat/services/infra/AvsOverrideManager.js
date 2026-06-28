@@ -203,7 +203,8 @@ export class AvsOverrideManager {
         src === 'point_out_action' ||
         src === 'manual_action' ||
         src === 'take_cover_action' ||
-        src === 'encounter_stealth_initiative';
+        src === 'encounter_stealth_initiative' ||
+        src === 'system-condition';
 
       let appliedCount = 0;
       for (const [, changeData] of changesByTarget) {

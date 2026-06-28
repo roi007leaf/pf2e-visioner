@@ -128,6 +128,40 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     );
   });
 
+  test('applyOverrides creates one-way for system-condition', async () => {
+    const A = mkToken('A', 'Observer');
+    const B = mkToken('B', 'Target');
+
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    let AvsOverrideManager, mockedSetVisibility;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/utils.js', () => ({
+        __esModule: true,
+        setPerceptionProfileBetween: jest.fn().mockResolvedValue(true),
+        setVisibilityBetween: jest.fn().mockResolvedValue(true),
+      }));
+      AvsOverrideManager = (await import('../../../scripts/chat/services/infra/AvsOverrideManager.js')).default;
+      mockedSetVisibility = (await import('../../../scripts/utils.js')).setPerceptionProfileBetween;
+    });
+
+    const ok = await AvsOverrideManager.applyOverrides(
+      A,
+      [{ target: B, state: 'hidden' }],
+      { source: 'system-condition' },
+    );
+
+    expect(ok).toBe(true);
+
+    expect(B.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      'avs-override-from-A',
+      expect.objectContaining({ observerId: 'A', targetId: 'B', detectionState: 'hidden' }),
+    );
+    expect(A.document.setFlag).not.toHaveBeenCalled();
+    expect(mockedSetVisibility).toHaveBeenCalledTimes(1);
+  });
+
   test('applyOverrides creates one-way for diversion_action', async () => {
     const A = mkToken('A', 'Observer');
     const B = mkToken('B', 'Target');

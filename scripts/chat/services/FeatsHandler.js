@@ -76,7 +76,6 @@ const SNEAK_FEAT_ADJUSTERS = {
 const HIDE_FEAT_ADJUSTERS = {
   'terrain-stalker': (ctx) => (ctx.terrainMatches ? +1 : 0),
   'vanish-into-the-land': (ctx) => (ctx.inNaturalTerrain ? +1 : 0),
-  'legendary-sneak': () => +1,
 };
 
 const SEEK_FEAT_ADJUSTERS = {

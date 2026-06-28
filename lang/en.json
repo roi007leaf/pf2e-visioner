@@ -884,6 +884,10 @@
         "name": "Hidden Walls",
         "hint": "Allows configuring of walls conditional visibility states within the Visioner manager. Visual indicator when succeeding at Seek"
       },
+      "SYSTEM_CONDITION_OVERRIDES": {
+        "name": "System conditions act as Visioner overrides",
+        "hint": "When a token has the PF2E Hidden, Concealed, or Undetected condition, force that visibility toward the token for its enemies. Removing the condition reverts to automatic visibility. Manual overrides are never replaced."
+      },
       "AUTO_COVER": {
         "name": "Enable Auto-Cover",
         "hint": "Allows cover to be automatically applied based on token coverage in relation to walls and other tokens"

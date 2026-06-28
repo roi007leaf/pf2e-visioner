@@ -10,6 +10,9 @@ jest.mock('../../../scripts/services/Detection/select-all-token-visibility-bypas
 jest.mock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
   getVisionerVisibilityBetweenTokens: () => 'observed',
 }));
+jest.mock('../../../scripts/services/movement-tracking.js', () => ({
+  hasActivePendingTokenMovement: jest.fn(() => false),
+}));
 
 import {
   currentViewObservers,
@@ -22,6 +25,7 @@ import {
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
 import { shouldBypassAvsForGmVision } from '../../../scripts/services/gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from '../../../scripts/services/Detection/select-all-token-visibility-bypass.js';
+import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 
 beforeEach(() => {
   controlled.length = 0;
@@ -32,6 +36,7 @@ beforeEach(() => {
   globalThis.canvas = { tokens };
   shouldBypassAvsForGmVision.mockReturnValue(false);
   isSelectAllTokenVisibilityBypassActive.mockReturnValue(false);
+  hasActivePendingTokenMovement.mockReturnValue(false);
 });
 
 describe('currentViewObservers', () => {
@@ -274,6 +279,33 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.visible).toBe(true);
   });
 
+  it('hides token chrome surfaces (condition icons, nameplate, bars) when hard-hidden', () => {
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      effects: { visible: true }, nameplate: { visible: true }, bars: { visible: true },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.effects.visible).toBe(false);
+    expect(t.nameplate.visible).toBe(false);
+    expect(t.bars.visible).toBe(false);
+  });
+
+  it('restores chrome surfaces to their captured visibility on release', () => {
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      effects: { visible: true }, nameplate: { visible: false }, bars: { visible: true },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    applyCurrentViewHardHide(t);
+    expect(t.effects.visible).toBe(false);
+
+    releaseCurrentViewHardHide(t);
+    expect(t.effects.visible).toBe(true);
+    expect(t.nameplate.visible).toBe(false);
+    expect(t.bars.visible).toBe(true);
+  });
+
   it('marks tokens it hard-hides', () => {
     const t = { controlled: false, visible: true, renderable: true,
       mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
@@ -305,6 +337,70 @@ describe('applyCurrentViewHardHide', () => {
     __setStoredVisibilityForTest(new Map([['obs:p', 'hidden']]));
     expect(applyCurrentViewHardHide(presenceOnly)).toBe(false);
     expect(presenceOnly.mesh.visible).toBe(false);
+  });
+});
+
+describe('applyCurrentViewHardHide - defer to core during movement (undetected -> observed reveal)', () => {
+  beforeEach(() => {
+    controlled.length = 0;
+    controlled.push({ document: { id: 'obs' }, controlled: true });
+    globalThis.game = { user: { isGM: false } };
+    hasActivePendingTokenMovement.mockReturnValue(true);
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+  });
+
+  function undetectedToken({ visible, getFlag, actorType = 'npc' } = {}) {
+    return {
+      controlled: false,
+      visible,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      detectionFilter: null,
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: false, getFlag },
+      actor: { type: actorType, itemTypes: { condition: [] } },
+    };
+  }
+
+  it('reveals a non-sticky undetected token when core sees it mid-move (token.visible true)', () => {
+    const t = undetectedToken({ visible: true });
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.renderable).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+    expect(t.mesh.alpha).toBe(1);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('keeps a non-sticky undetected token hidden mid-move while core cannot see it (token.visible false)', () => {
+    const t = undetectedToken({ visible: false });
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('keeps a sticky undetected (Sneak override) token hard-hidden mid-move even with core sight', () => {
+    const getFlag = (_mod, key) =>
+      key === 'avs-override-from-obs' ? { state: 'undetected' } : null;
+    const t = undetectedToken({ visible: true, getFlag });
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+  });
+
+  it('keeps undetected loot hard-hidden mid-move (loot never defers)', () => {
+    const t = undetectedToken({ visible: true, actorType: 'loot' });
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+  });
+
+  it('hard-hides a non-sticky undetected token when no move is active', () => {
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    const t = undetectedToken({ visible: true });
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
   });
 });
 

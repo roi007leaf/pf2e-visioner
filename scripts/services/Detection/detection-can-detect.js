@@ -58,8 +58,25 @@ function hasHiddenAvsOverride(observer, target) {
   }
 }
 
+function hasUndetectedAvsOverride(observer, target) {
+  try {
+    const observerId = observer?.document?.id ?? observer?.id;
+    if (!observerId) return false;
+    const state = target?.document?.getFlag?.(MODULE_ID, `avs-override-from-${observerId}`)?.state;
+    return state === 'undetected' || state === 'unnoticed';
+  } catch {
+    return false;
+  }
+}
+
 function resolveDetectionDuringMovement(observer, target, visibility, modeId, canDetect) {
-  if (visibility === 'undetected' || visibility === 'unnoticed') return false;
+  if (visibility === 'undetected' || visibility === 'unnoticed') {
+    if (targetIsLootOrHazard(target)) return false;
+    if (hasUndetectedAvsOverride(observer, target)) return false;
+    const nonVisualMode = !modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
+    if (nonVisualMode) return false;
+    return canDetect;
+  }
   if (visibility === 'hidden') {
     if (targetIsLootOrHazard(target)) return false;
     const nonVisualMode = !modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId);

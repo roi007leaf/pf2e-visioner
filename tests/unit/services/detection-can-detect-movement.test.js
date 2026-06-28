@@ -68,13 +68,24 @@ function overrideHiddenTarget() {
   };
 }
 
+function overrideUndetectedTarget() {
+  return {
+    actor: { type: 'npc' },
+    document: {
+      id: 'target',
+      getFlag: (_mod, key) =>
+        key === 'avs-override-from-observer' ? { state: 'undetected' } : null,
+    },
+  };
+}
+
 describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
   afterEach(() => {
     jest.resetModules();
   });
 
   describe('during an active pending token movement', () => {
-    test("undetected + hearing + core true -> false (hidden completely)", async () => {
+    test("undetected + hearing + core true -> false (stays unheard mid-move; only sight reveals)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'undetected',
@@ -84,14 +95,54 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       expect(result).toBe(false);
     });
 
-    test("unnoticed + basicSight + core true -> false", async () => {
+    test("undetected npc (no override) + basicSight + core true -> true (reveals when sight LOS opens mid-move)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'undetected',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, npcTarget());
+      expect(result).toBe(true);
+    });
+
+    test("undetected npc (no override) + basicSight + core false -> false (no LOS yet)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'undetected',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', false, npcTarget());
+      expect(result).toBe(false);
+    });
+
+    test("undetected npc WITH sticky undetected override + basicSight + core true -> false (sneak stays hidden)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'undetected',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, overrideUndetectedTarget());
+      expect(result).toBe(false);
+    });
+
+    test("undetected loot + basicSight + core true -> false (loot stays hidden)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'undetected',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, lootTarget());
+      expect(result).toBe(false);
+    });
+
+    test("unnoticed npc (no override) + basicSight + core true -> true (reveals when sight LOS opens mid-move)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'unnoticed',
         threshold: 'hidden',
       });
       const { result } = callWrapper(wrapper, 'basicSight', true, npcTarget());
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     test("hidden npc (AVS-computed, no override) + basicSight + core true -> true (reveals when sight LOS opens mid-move)", async () => {
