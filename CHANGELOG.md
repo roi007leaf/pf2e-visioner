@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.3.3] - 2026-06-29
+
+### Added
+
+- **Chat indicator when a Rule Element adjusts cover**: When an `adjustCover` Rule Element changes the cover used for a roll, the GM now sees a compact indicator on the chat card showing the change — the original cover crossed out, an arrow, then the final cover — with a hover tooltip naming the adjustment source and the transition (for example, "Cover adjusted by rule element (shooting-star): Standard → None"). It appears on attack rolls, saving throws, and Stealth checks, and only the GM sees it. This mirrors the existing Sniping Duo and cover-override indicators, so adjusted cover is auditable at a glance instead of silently altering a roll. On attack rolls the chip sits next to the target's AC; on saving throws and Stealth checks — where cover is a circumstance modifier on the roller rather than a DC — it sits next to the roll result.
+
+### Fixed
+
+- **`adjustCover` "while-active" adjustments no longer vanish when the carrying effect is edited or refreshed**: Editing an effect that holds an `adjustCover` operation — or any item update that re-runs its Rule Elements — went through a separate refresh path that did not recognize `adjustCover`. That path cleared the stored cover-adjustment flag and never re-applied it, so a `while-active` adjustment worked once and then disappeared on the next edit or lifecycle event (it appeared to "work only once"). The refresh path now applies, removes, and re-registers `adjustCover` like every other operation, so `while-active` adjustments persist for the full duration of the effect and survive edits and world reloads.
+- **`adjustCover` can now target a specific creature instead of always affecting everyone**: The operation read the wrong targeting field — it always resolved `observers`, which defaults to "all", so any attempt to scope the adjustment via `targets`/`tokenIds` was ignored and every pair was affected. Targeting is now chosen by `direction`, exactly as documented: `direction: "from"` uses `observers` (which observers get the reduced-cover view of the subject) and `direction: "to"` uses `targets` (which targets get reduced cover from the subject). This makes `"specific"` (with `tokenIds`), `"targeted"`, `"enemies"`, and `"allies"` all work, so an adjustment can apply to a single chosen creature rather than the whole scene.
+
 ## [8.3.2] - 2026-06-27
 
 ### Added

@@ -41,6 +41,60 @@ describe('CoverAdjustment storage', () => {
     expect(subject.document.getFlag('pf2e-visioner', 'coverAdjustments').pc[0]).toMatchObject({ id: 'shooting-star', mode: 'step', steps: -1, scope: 'while-active' });
   });
 
+  test("direction 'to' resolves targeting via targets (ignoring observers default), enabling a specific target", async () => {
+    const subject = makeToken('caster');
+    const foe = makeToken('foe');
+    const orig = CoverAdjustment.getTargetTokens;
+    const spy = jest.fn(() => [foe]);
+    CoverAdjustment.getTargetTokens = spy;
+    try {
+      await CoverAdjustment.applyCoverAdjustment(
+        {
+          type: 'adjustCover',
+          direction: 'to',
+          observers: 'all',
+          targets: 'specific',
+          tokenIds: ['foe'],
+          mode: 'step',
+          steps: -1,
+          source: 's',
+        },
+        subject,
+        { item: { slug: 's' } },
+      );
+      expect(spy).toHaveBeenCalledWith(subject, 'specific', undefined, ['foe']);
+    } finally {
+      CoverAdjustment.getTargetTokens = orig;
+    }
+  });
+
+  test("direction 'from' resolves targeting via observers, enabling a specific observer", async () => {
+    const subject = makeToken('defender');
+    const pc = makeToken('pc');
+    const orig = CoverAdjustment.getTargetTokens;
+    const spy = jest.fn(() => [pc]);
+    CoverAdjustment.getTargetTokens = spy;
+    try {
+      await CoverAdjustment.applyCoverAdjustment(
+        {
+          type: 'adjustCover',
+          direction: 'from',
+          observers: 'specific',
+          targets: 'all',
+          tokenIds: ['pc'],
+          mode: 'step',
+          steps: -1,
+          source: 's',
+        },
+        subject,
+        { item: { slug: 's' } },
+      );
+      expect(spy).toHaveBeenCalledWith(subject, 'specific', undefined, ['pc']);
+    } finally {
+      CoverAdjustment.getTargetTokens = orig;
+    }
+  });
+
   test('getActiveCoverAdjustments + consume', async () => {
     const target = makeToken('foe');
     await target.document.setFlag('pf2e-visioner', 'coverAdjustments', { caster: [{ id: 'phase-bolt', scope: 'next-attack', mode: 'bonus', amount: -2 }] });

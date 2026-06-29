@@ -254,6 +254,18 @@ describe('AutoCoverSystem', () => {
       autoCoverSystem.recordCoverAdjustment({ id: 'atk' }, {}, { finalState: 'none' });
       expect(autoCoverSystem.consumeCoverAdjustment('atk', undefined)).toBeNull();
     });
+
+    test('consumes by defender id regardless of attacker (saving throws)', () => {
+      autoCoverSystem.recordCoverAdjustment({ id: 'caster' }, { id: 'saver' }, {
+        originalState: 'standard',
+        finalState: 'lesser',
+        sources: ['shooting-star'],
+      });
+
+      const rec = autoCoverSystem.consumeCoverAdjustmentByDefender('saver');
+      expect(rec).toMatchObject({ originalState: 'standard', finalState: 'lesser' });
+      expect(autoCoverSystem.consumeCoverAdjustmentByDefender('saver')).toBeNull();
+    });
   });
 
   describe('error handling', () => {

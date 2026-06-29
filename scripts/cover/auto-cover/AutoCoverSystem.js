@@ -123,6 +123,29 @@ export class AutoCoverSystem {
   }
 
   /**
+   * Consumes the recorded cover adjustment for a defender (cover holder), regardless of attacker.
+   * Used by saving throws where the saver is the message speaker but the attacker is not easily
+   * resolved at chat-message creation time.
+   * @param {string} defenderId
+   * @returns {Object|null}
+   */
+  consumeCoverAdjustmentByDefender(defenderId) {
+    try {
+      if (!defenderId) return null;
+      for (const [key, rec] of this._coverAdjustmentRecords.entries()) {
+        if (key.endsWith(`:${defenderId}`)) {
+          this._coverAdjustmentRecords.delete(key);
+          if (!rec?.ts || Date.now() - rec.ts > 15000) return null;
+          return rec;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Gets all active pairs involving a specific token ID
    * @param {string} tokenId
    * @returns {Array<{attackerId: string, targetId: string}>}

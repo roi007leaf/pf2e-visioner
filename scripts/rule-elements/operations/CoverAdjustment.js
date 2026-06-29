@@ -23,8 +23,9 @@ export class CoverAdjustment {
 
   static async applyCoverAdjustment(operation, subjectToken, ruleElement = null) {
     if (!subjectToken) return;
-    const { targets = 'all', observers, direction = 'from', range, tokenIds } = operation;
-    const targetTokens = this.getTargetTokens(subjectToken, observers || targets, range, tokenIds);
+    const { targets = 'all', observers = 'all', direction = 'from', range, tokenIds } = operation;
+    const selector = direction === 'to' ? targets : observers;
+    const targetTokens = this.getTargetTokens(subjectToken, selector, range, tokenIds);
     const descriptor = this.descriptor(operation, ruleElement);
 
     for (const targetToken of targetTokens) {
@@ -60,9 +61,10 @@ export class CoverAdjustment {
 
   static async removeCoverAdjustment(operation, subjectToken, ruleElement = null) {
     if (!subjectToken) return;
-    const { targets = 'all', observers, direction = 'from', range, tokenIds } = operation;
+    const { targets = 'all', observers = 'all', direction = 'from', range, tokenIds } = operation;
+    const selector = direction === 'to' ? targets : observers;
     const sourceId = this.descriptor(operation, ruleElement).id;
-    const targetTokens = this.getTargetTokens(subjectToken, observers || targets, range, tokenIds);
+    const targetTokens = this.getTargetTokens(subjectToken, selector, range, tokenIds);
     for (const targetToken of targetTokens) {
       if (targetToken.id === subjectToken.id) continue;
       if (direction === 'to') await this.consumeCoverAdjustment(targetToken, subjectToken.id, sourceId);

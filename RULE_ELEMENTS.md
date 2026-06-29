@@ -46,8 +46,9 @@ Reduces a target's effective cover at roll time without permanently changing sto
 - `amount` (required if mode is `"bonus"`): Integer AC bonus (e.g., `-2`)
 - `scope` (required): `"while-active"` or `"next-attack"`
 - `direction` (required): `"from"` (observer gains reduced cover view) or `"to"` (target gains reduced cover protection)
-- `observers` (required if direction is `"from"`): `"all"` or a list of observer UUIDs
-- `targets` (required if direction is `"to"`): `"targeted"`, `"all"`, or a list of target UUIDs
+- `observers` (required if direction is `"from"`): `"all"`, `"enemies"`, `"allies"`, `"targeted"`, `"selected"`, or `"specific"`
+- `targets` (required if direction is `"to"`): `"all"`, `"enemies"`, `"allies"`, `"targeted"`, `"selected"`, or `"specific"`
+- `tokenIds` (required if `observers`/`targets` is `"specific"`): a list of scene token ids the adjustment is scoped to
 - `predicate` (optional): Predicate array evaluated against the roll context; adjustments apply only if true
 - `source` (optional): Label for audit/chat output (e.g., `"shooting-star-target"`)
 
@@ -102,6 +103,52 @@ All observers treat the target as having one less step of cover (e.g., standard 
 ```
 
 When rolling an attack with the phase-bolt item, the target's cover AC bonus is reduced by 2 on the next attack roll, then the adjustment clears.
+
+**Scoped to a specific creature:**
+
+Use `"specific"` with `tokenIds` (scene token ids) to adjust cover for one chosen pair instead of the whole scene. The field follows `direction`: `"to"` reads `targets`, `"from"` reads `observers`.
+
+Effect on the attacker — reduce one specific defender's cover from this attacker only:
+```json
+{
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "adjustCover",
+      "mode": "step",
+      "steps": -1,
+      "direction": "to",
+      "targets": "specific",
+      "tokenIds": ["<defenderTokenId>"],
+      "scope": "while-active",
+      "source": "vs-specific"
+    }
+  ],
+  "priority": 120
+}
+```
+
+Effect on the defender — reduce its cover only against one specific attacker:
+```json
+{
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "adjustCover",
+      "mode": "step",
+      "steps": -1,
+      "direction": "from",
+      "observers": "specific",
+      "tokenIds": ["<attackerTokenId>"],
+      "scope": "while-active",
+      "source": "vs-specific"
+    }
+  ],
+  "priority": 120
+}
+```
+
+Every other creature continues to use its normally detected cover. `"targeted"` (current targets), `"enemies"`, and `"allies"` are also accepted in place of `"specific"`.
 
 ---
 
