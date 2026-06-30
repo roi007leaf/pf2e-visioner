@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.5] - 2026-06-30
+
+### Fixed
+
+- **Defeated creatures no longer stay stuck on a stale visibility state**: A dead, dying, or unconscious NPC was excluded from automatic visibility entirely, so others' view of it was never recomputed — a creature that died while undetected or hidden kept that state indefinitely. The corpse then only flickered into view while a token was moving (Foundry's own rendering) and vanished again once movement settled, sometimes leaving its status icon floating. Defeated tokens are now still excluded as observers (a corpse senses nothing) but are recomputed like any other target, so a downed creature becomes visible per normal sight as soon as the next visibility pass runs (for example when any nearby token moves).
+
 ## [8.3.4] - 2026-06-30
 
 ### Fixed

@@ -352,7 +352,7 @@ export class EventDrivenVisibilitySystem {
     // Filter to only valid, non-excluded tokens and delegate to VisibilityStateManager
     const validIds = ids.filter(id => {
       const tok = canvas.tokens?.get(id);
-      return tok && !this.#exclusionManager.isExcludedToken(tok);
+      return tok && !this.#exclusionManager.isExcludedAsTarget(tok);
     });
 
     this.#visibilityStateManager.recalculateForTokens(validIds);
@@ -383,7 +383,7 @@ export class EventDrivenVisibilitySystem {
         const map = this.#visibilityMapService?.getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }
-      if (target && this.#exclusionManager.isExcludedToken(target)) {
+      if (target && this.#exclusionManager.isExcludedAsTarget(target)) {
         const map = this.#visibilityMapService?.getVisibilityMap?.(observer || {});
         return map?.[target?.document?.id] || 'observed';
       }

@@ -667,6 +667,12 @@ export class BatchOrchestrator {
       timings.batchProcessing = this.nowProvider() - stageStart;
       timings.detailedBatchTimings = batchResult.detailedTimings || {};
 
+      if (Array.isArray(batchResult?.updates) && this.exclusionManager?.isExcludedToken) {
+        batchResult.updates = batchResult.updates.filter(
+          (update) => !this.exclusionManager.isExcludedToken(update?.observer),
+        );
+      }
+
       if (this._movementRevision !== movementRevisionAtStart) {
         for (const id of visibleChangedTokens) {
           this._pendingTokens.add(id);

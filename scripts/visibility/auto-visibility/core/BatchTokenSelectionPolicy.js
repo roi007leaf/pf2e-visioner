@@ -21,8 +21,13 @@ export function resolveVisibleBatchTokens({
   const allTokens = [];
   const visibleIdSet = new Set();
 
+  const isExcludedAsTarget = (token) =>
+    exclusionManager?.isExcludedAsTarget
+      ? exclusionManager.isExcludedAsTarget(token)
+      : !!exclusionManager?.isExcludedToken?.(token);
+
   for (const token of candidateTokens || []) {
-    if (exclusionManager?.isExcludedToken?.(token)) continue;
+    if (isExcludedAsTarget(token)) continue;
 
     allTokens.push(token);
     const id = token?.document?.id;

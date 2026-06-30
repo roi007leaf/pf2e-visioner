@@ -56,6 +56,39 @@ describe('BatchTokenSelectionPolicy', () => {
     expect(result.hasVisibleChangedTokens).toBe(true);
   });
 
+  test('keeps defeated tokens in the universe as targets via isExcludedAsTarget', () => {
+    const defeated = token('D');
+    const exclusionManager = {
+      isExcludedToken: jest.fn((candidate) => candidate === defeated),
+      isExcludedAsTarget: jest.fn(() => false),
+    };
+
+    const result = resolveVisibleBatchTokens({
+      changedTokens: new Set(['A', 'D']),
+      candidateTokens: [token('A'), defeated],
+      exclusionManager,
+    });
+
+    expect(result.allTokens.map((candidate) => candidate.document.id)).toEqual(['A', 'D']);
+    expect(exclusionManager.isExcludedAsTarget).toHaveBeenCalled();
+    expect(exclusionManager.isExcludedToken).not.toHaveBeenCalled();
+  });
+
+  test('falls back to isExcludedToken when isExcludedAsTarget is absent', () => {
+    const excluded = token('B');
+    const exclusionManager = {
+      isExcludedToken: jest.fn((candidate) => candidate === excluded),
+    };
+
+    const result = resolveVisibleBatchTokens({
+      changedTokens: new Set(['A', 'B']),
+      candidateTokens: [token('A'), excluded],
+      exclusionManager,
+    });
+
+    expect(result.allTokens.map((candidate) => candidate.document.id)).toEqual(['A']);
+  });
+
   test('reports when no changed tokens survive selected token filtering', () => {
     const result = resolveVisibleBatchTokens({
       changedTokens: new Set(['outside-viewport']),

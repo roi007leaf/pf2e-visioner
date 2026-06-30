@@ -16,6 +16,30 @@ export class ExclusionManager {
      * @returns {boolean} True if token should be excluded
      */
     isExcludedToken(token) {
+        return this._isExcludedToken(token, { excludeDefeated: true });
+    }
+
+    /**
+     * Check if a token should be excluded specifically in the TARGET role.
+     * Defeated tokens still can't observe, but a corpse remains a visible target,
+     * so its visibility must keep being recomputed.
+     * @param {Object} token - Token to check
+     * @returns {boolean} True if token should be excluded as a target
+     */
+    isExcludedAsTarget(token) {
+        return this._isExcludedToken(token, { excludeDefeated: false });
+    }
+
+    /**
+     * Public wrapper around the defeated-token check.
+     * @param {Object} token - Token to check
+     * @returns {boolean} True if token is defeated/unconscious/dead
+     */
+    isDefeatedToken(token) {
+        return this._isDefeatedToken(token);
+    }
+
+    _isExcludedToken(token, { excludeDefeated = true } = {}) {
         try {
             if (!token?.document) return true;
             if (token.document.hidden) return true;
@@ -26,7 +50,7 @@ export class ExclusionManager {
             }
 
             // Skip defeated / unconscious / dead tokens: they can't currently observe others
-            if (this._isDefeatedToken(token)) {
+            if (excludeDefeated && this._isDefeatedToken(token)) {
                 return true;
             }
 
@@ -43,7 +67,7 @@ export class ExclusionManager {
                 /* ignore */
             }
 
-            // Note: Do not exclude based on sneak-active or viewport visibility; 
+            // Note: Do not exclude based on sneak-active or viewport visibility;
             // AVS must still process them for awareness and override validation
 
         } catch {

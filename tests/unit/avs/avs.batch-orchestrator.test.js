@@ -143,6 +143,26 @@ describe('BatchOrchestrator', () => {
     expect(applied).toEqual([['A', 'B', 'hidden']]);
   });
 
+  test('drops updates whose observer is excluded as observer (defeated corpse)', async () => {
+    const corpse = createMockToken({ id: 'D', x: 50, y: 0 });
+    global.canvas.tokens.placeables = [...global.canvas.tokens.placeables, corpse];
+    exclusionManager.isExcludedToken = jest.fn((tok) => tok?.document?.id === 'D');
+    batchProcessor.process.mockResolvedValueOnce({
+      updates: [
+        { observer: corpse, target: global.canvas.tokens.placeables[1], visibility: 'hidden' },
+        { observer: global.canvas.tokens.placeables[0], target: corpse, visibility: 'hidden' },
+      ],
+      breakdown: { visGlobalHits: 0, visGlobalMisses: 1, losGlobalHits: 0, losGlobalMisses: 1 },
+      processedTokens: 1,
+      precomputeStats: { observerUsed: 0, observerMiss: 1, targetUsed: 0, targetMiss: 1 },
+      detailedTimings: {},
+    });
+
+    await orchestrator.processBatch(new Set(['A']));
+
+    expect(applied).toEqual([['A', 'D', 'hidden']]);
+  });
+
   test('defers batch processing while pending movement service is active', async () => {
     const [observer] = global.canvas.tokens.placeables;
     const movementRecorded = setPendingTokenMovementPosition(
