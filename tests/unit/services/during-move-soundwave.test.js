@@ -55,6 +55,34 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
   });
 });
 
+describe('tokenVision disabled (theater of mind: global sight, no move-time soundwaves)', () => {
+  let savedCanvas;
+  afterEach(() => {
+    globalThis.canvas = savedCanvas;
+  });
+  beforeEach(() => {
+    savedCanvas = globalThis.canvas;
+    globalThis.canvas = { scene: { tokenVision: false }, tokens: { preview: { children: [] } } };
+  });
+
+  test('observerSightContainsTarget is true when scene token vision is disabled (no los polygon)', () => {
+    expect(observerSightContainsTarget({ vision: null }, target)).toBe(true);
+  });
+
+  test('no soundwave for observed target when token vision disabled', () => {
+    expect(
+      targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed')),
+    ).toBe(false);
+  });
+
+  test('AVS hidden override still shows soundwave even with token vision disabled', () => {
+    const overrideHidden = () => true;
+    expect(
+      targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed'), overrideHidden),
+    ).toBe(true);
+  });
+});
+
 describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
   function makeTarget() {
     return { detectionFilterMesh: { visible: true, renderable: true, alpha: 1 } };

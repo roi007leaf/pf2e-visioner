@@ -29,6 +29,7 @@ function previewForObserver(observer) {
 
 export function observerSightContainsTarget(observer, target) {
   try {
+    if (globalThis.canvas?.scene?.tokenVision === false) return true;
     const center = target?.center;
     if (!center) return false;
     const los = previewForObserver(observer)?.vision?.los || observer?.vision?.los;

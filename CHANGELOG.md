@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.4] - 2026-06-30
+
+### Fixed
+
+- **No-vision (theater-of-mind) scenes no longer flag every token as heard-only on movement**: In scenes with token vision disabled, moving a token made every other token appear as a greyed, soundwave-ringed "sensed but unseen" creature until it was hovered, then re-broke on the next move. The during-move soundwave check decided whether an observer could see a target from its vision polygon, which does not exist when a scene has token vision turned off, so observed tokens were mistaken for out-of-sight ones. With token vision disabled (global sight), observers are now treated as seeing every target, so no stray soundwave rings appear on movement. Manual "hidden" overrides still show their ring.
+
 ## [8.3.3] - 2026-06-29
 
 ### Added
