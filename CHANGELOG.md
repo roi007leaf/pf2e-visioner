@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.3.8] - 2026-07-01
+
+### Fixed
+
+- **Precisely-sensed creatures (e.g. echolocation) no longer show a soundwave ring**: A creature detected precisely by a non-visual sense such as echolocation is correctly `observed`, but it still displayed the "heard, not seen" soundwave ring. Echolocation has no dedicated Foundry detection mode, so the creature is detected through the imprecise **hearing** detection mode — and Foundry attaches the hearing soundwave filter to anything that mode detects, regardless of whether the sense is precise. Visioner now clears that ring whenever the viewing token actually observes the target, so precisely-sensed creatures render as normal observed tokens. Imprecisely-heard (hidden) creatures keep their soundwave.
+
+- **No more soundwave flicker on precisely-sensed creatures while moving**: Moving a token near a creature you sense precisely but cannot see — for example one detected by echolocation through a door — briefly flashed a soundwave ring on it for about a second before settling to no ring. The during-move soundwave check treated any sensed-but-out-of-sight creature as needing a ring, including precisely-sensed (observed) ones. Soundwaves are an imprecise-detection cue, so the during-move check now only rings creatures that are actually hidden (heard, not seen); observed and concealed creatures no longer flicker a ring mid-move.
+
+- **Observed creatures no longer vanish mid-move when they carry an undetected/hidden condition**: A creature you observe (for example a prone, off-guard target you can plainly see) but which also carries the PF2e `undetected`, `hidden`, or `unnoticed` condition would blink out completely for the duration of any token's movement, then reappear when the move settled. The PF2e system's sight detection refuses to detect anything carrying those conditions; while stationary Visioner works around that, but during a move it deferred to that same core check, so the observed creature disappeared. Visioner now keeps observed and concealed creatures detectable throughout a move (line-of-sight is still enforced by the vision polygon, so moving behind a wall still hides them), matching the stationary behavior.
+
+### Changed
+
+- **System conditions are now consumed when converted to Visioner overrides**: With "System conditions act as Visioner overrides" enabled, applying a standalone (GM-applied) Hidden, Concealed, or Undetected condition now converts it into a permanent Visioner override against the creature's enemies **and removes the PF2e condition itself**. Previously the condition was kept, which caused problems: because a PF2e condition is actor-wide, the system refuses to detect the creature by sight for _everyone_, so Visioner had to fight that per-viewer — and during movement the creature would blink out entirely, or a precisely-sensed creature would still show a soundwave. Consuming the condition hands full ownership of the visibility state to Visioner and eliminates that interference. Conditions granted by an effect, spell, or rule element (for example from Sneak or Avoid Notice) are left untouched. The conversion is permanent: once removed, the condition is not restored if the override is later cleared.
+
 ## [8.3.7] - 2026-07-01
 
 ### Fixed

@@ -695,7 +695,7 @@ export class OverrideValidationManager {
       return null;
     }
 
-    if (override.source === 'system-condition') {
+    if (override.source === 'system-condition' || override.source === 'converted-system-condition') {
       flushPerf({ reason: 'system-condition-authoritative' });
       return null;
     }

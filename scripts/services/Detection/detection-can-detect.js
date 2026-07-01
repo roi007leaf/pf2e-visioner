@@ -84,6 +84,9 @@ function resolveDetectionDuringMovement(observer, target, visibility, modeId, ca
     if (hasHiddenAvsOverride(observer, target)) return false;
     return canDetect;
   }
+  if (visibility === 'observed' || visibility === 'concealed') {
+    return true;
+  }
   return canDetect;
 }
 

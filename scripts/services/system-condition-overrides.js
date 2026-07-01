@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../constants.js';
 
 export const SYSTEM_CONDITION_OVERRIDE_SOURCE = 'system-condition';
+export const CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE = 'converted-system-condition';
 
 const SYSTEM_CONDITION_STATES = {
   concealed: 'concealed',
@@ -29,6 +30,22 @@ function collectionValues(value) {
 
 export function isSystemConditionSlug(slug) {
   return Object.prototype.hasOwnProperty.call(SYSTEM_CONDITION_STATES, normalizeSlug(slug));
+}
+
+function isStandaloneCondition(condition) {
+  try {
+    if (condition?.grantedBy) return false;
+  } catch {
+    /* fall through */
+  }
+  if (condition?.flags?.pf2e?.grantedBy) return false;
+  return true;
+}
+
+export function removableSystemConditionItems(actor) {
+  return collectionValues(actor?.itemTypes?.condition).filter(
+    (condition) => isSystemConditionSlug(condition?.slug) && isStandaloneCondition(condition),
+  );
 }
 
 export function strongestSystemConditionState(actor) {
@@ -87,18 +104,25 @@ async function defaultGetOverrideData(observer, target) {
   return AvsOverrideManager.getOverrideData(observer, target);
 }
 
-async function defaultApplyOverride(observer, target, state) {
+async function defaultApplyOverride(observer, target, state, source = SYSTEM_CONDITION_OVERRIDE_SOURCE) {
   const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
-  return AvsOverrideManager.applyOverrides(
-    observer,
-    { target, state },
-    { source: SYSTEM_CONDITION_OVERRIDE_SOURCE },
-  );
+  return AvsOverrideManager.applyOverrides(observer, { target, state }, { source });
 }
 
 async function defaultRemoveOverride(observerId, targetId) {
   const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
   return AvsOverrideManager.removeOverride(observerId, targetId);
+}
+
+async function defaultRemoveConditionItems(conditions) {
+  if (!globalThis.game?.user?.isGM) return;
+  for (const condition of conditions) {
+    try {
+      await condition?.delete?.();
+    } catch {
+      /* best-effort: another process may have already removed it */
+    }
+  }
 }
 
 export async function syncSystemConditionOverridesForToken(token, deps = {}) {
@@ -109,6 +133,8 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
     removeOverride = defaultRemoveOverride,
     resolveEnemies = resolveEnemyObservers,
     strongestState = strongestSystemConditionState,
+    getRemovableConditions = removableSystemConditionItems,
+    removeConditions = defaultRemoveConditionItems,
   } = deps;
 
   const targetId = token?.document?.id;
@@ -117,6 +143,16 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
   const state = isEnabled() ? strongestState(token.actor) : null;
   const enemies = resolveEnemies(token);
 
+  // A standalone (GM-applied, not effect-granted) system condition is consumed:
+  // converted into a permanent Visioner override and then removed, so the actor-wide
+  // condition no longer blocks core detection for observers that should see it.
+  const removable = state ? getRemovableConditions(token.actor) : [];
+  const consuming = removable.length > 0 && enemies.length > 0;
+  const appliedSource = consuming
+    ? CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE
+    : SYSTEM_CONDITION_OVERRIDE_SOURCE;
+
+  let appliedAny = false;
   for (const observer of enemies) {
     const observerId = observer?.document?.id;
     if (!observerId) continue;
@@ -124,11 +160,22 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
     const existingSource = existing?.source ?? null;
 
     if (state) {
-      if (existing && existingSource !== SYSTEM_CONDITION_OVERRIDE_SOURCE) continue;
-      await applyOverride(observer, token, state);
+      if (
+        existing &&
+        existingSource !== SYSTEM_CONDITION_OVERRIDE_SOURCE &&
+        existingSource !== CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE
+      ) {
+        continue;
+      }
+      await applyOverride(observer, token, state, appliedSource);
+      appliedAny = true;
     } else if (existingSource === SYSTEM_CONDITION_OVERRIDE_SOURCE) {
       await removeOverride(observerId, targetId);
     }
+  }
+
+  if (consuming && appliedAny) {
+    await removeConditions(removable);
   }
 }
 

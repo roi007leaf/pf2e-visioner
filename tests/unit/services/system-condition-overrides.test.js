@@ -1,6 +1,8 @@
 import {
+  CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
   SYSTEM_CONDITION_OVERRIDE_SOURCE,
   isSystemConditionSlug,
+  removableSystemConditionItems,
   strongestSystemConditionState,
   resolveEnemyObservers,
   syncSystemConditionOverridesForToken,
@@ -113,5 +115,92 @@ describe('syncSystemConditionOverridesForToken', () => {
     await syncSystemConditionOverridesForToken(tgt(), deps);
     expect(state.applied).toEqual([]);
     expect(state.removed).toEqual([['pc1', 't']]);
+  });
+});
+
+describe('removableSystemConditionItems', () => {
+  test('includes standalone system conditions, excludes granted and non-system', () => {
+    const actorWith = {
+      itemTypes: {
+        condition: [
+          { slug: 'undetected' },
+          { slug: 'hidden', grantedBy: { id: 'effect' } },
+          { slug: 'off-guard' },
+          { slug: 'concealed', flags: { pf2e: { grantedBy: { id: 'x' } } } },
+        ],
+      },
+    };
+    expect(removableSystemConditionItems(actorWith).map((c) => c.slug)).toEqual(['undetected']);
+  });
+});
+
+function makeConsumeDeps(overrides = {}) {
+  const applied = [];
+  const removedOverrides = [];
+  const removedConditions = [];
+  return {
+    state: { applied, removedOverrides, removedConditions },
+    deps: {
+      isEnabled: () => true,
+      getOverrideData: jest.fn(async () => null),
+      applyOverride: jest.fn(async (o, t, s, src) =>
+        applied.push([o.document.id, t.document.id, s, src]),
+      ),
+      removeOverride: jest.fn(async (oId, tId) => removedOverrides.push([oId, tId])),
+      resolveEnemies: () => [obs('pc1')],
+      strongestState: () => 'undetected',
+      getRemovableConditions: () => [{ slug: 'undetected' }],
+      removeConditions: jest.fn(async (conds) =>
+        removedConditions.push(...conds.map((c) => c.slug)),
+      ),
+      ...overrides,
+    },
+  };
+}
+
+describe('syncSystemConditionOverridesForToken condition consumption', () => {
+  test('standalone condition → converts to a permanent override and removes the condition', async () => {
+    const { state, deps } = makeConsumeDeps();
+    await syncSystemConditionOverridesForToken(tgt(), deps);
+    expect(state.applied).toEqual([
+      ['pc1', 't', 'undetected', CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE],
+    ]);
+    expect(state.removedConditions).toEqual(['undetected']);
+  });
+
+  test('effect-granted only (nothing removable) → transient source, condition kept', async () => {
+    const { state, deps } = makeConsumeDeps({ getRemovableConditions: () => [] });
+    await syncSystemConditionOverridesForToken(tgt(), deps);
+    expect(state.applied).toEqual([['pc1', 't', 'undetected', SYSTEM_CONDITION_OVERRIDE_SOURCE]]);
+    expect(state.removedConditions).toEqual([]);
+  });
+
+  test('no enemies → condition is not consumed', async () => {
+    const { state, deps } = makeConsumeDeps({ resolveEnemies: () => [] });
+    await syncSystemConditionOverridesForToken(tgt(), deps);
+    expect(state.removedConditions).toEqual([]);
+  });
+
+  test('all enemies already carry a manual override → condition kept', async () => {
+    const { state, deps } = makeConsumeDeps({
+      getOverrideData: jest.fn(async () => ({ source: 'manual_action', state: 'observed' })),
+    });
+    await syncSystemConditionOverridesForToken(tgt(), deps);
+    expect(state.applied).toEqual([]);
+    expect(state.removedConditions).toEqual([]);
+  });
+
+  test('converted override is not reverted once the condition is gone (no revert loop)', async () => {
+    const { state, deps } = makeConsumeDeps({
+      strongestState: () => null,
+      getRemovableConditions: () => [],
+      getOverrideData: jest.fn(async () => ({
+        source: CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
+        state: 'undetected',
+      })),
+    });
+    await syncSystemConditionOverridesForToken(tgt(), deps);
+    expect(state.removedOverrides).toEqual([]);
+    expect(state.removedConditions).toEqual([]);
   });
 });

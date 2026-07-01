@@ -69,6 +69,56 @@ describe('canvas visibility wrapper', () => {
     });
   });
 
+  test('clears the detection ring when a current-view observer sees the target as observed (precise echolocation)', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'hearing-soundwave-filter' };
+      return true;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(target.detectionFilter).toBeNull();
+  });
+
+  test('keeps the detection ring when the current-view observer only hears the target (hidden)', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'hearing-soundwave-filter' };
+      return true;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(target.detectionFilter).toEqual({ id: 'hearing-soundwave-filter' });
+  });
+
   test('GM Vision bypass keeps core can-detect result', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

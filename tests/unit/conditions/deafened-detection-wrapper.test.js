@@ -348,7 +348,7 @@ describe('Deafened Detection Wrapper', () => {
             expect(basicSightWrapper(jest.fn().mockReturnValue(false), { object: observer }, target)).toBe(true);
         });
 
-        test('basic sight does not let explicit observed pair bypass pending wall-blocked movement', () => {
+        test('basic sight keeps an explicit observed pair detectable through _canDetect during a pending move (LOS/wall enforcement is deferred to the polygon _testPoint, matching the stationary contract)', () => {
             const originalCanvas = global.canvas;
             global.canvas = {
                 grid: { size: 50 },
@@ -397,7 +397,7 @@ describe('Deafened Detection Wrapper', () => {
             markExplicitVisiblePair(observer, target);
             setPendingTokenMovementPosition(observer.document, { x: 0, y: 0 }, [observer]);
 
-            expect(basicSightWrapper(jest.fn().mockReturnValue(false), { object: observer }, target)).toBe(false);
+            expect(basicSightWrapper(jest.fn().mockReturnValue(false), { object: observer }, target)).toBe(true);
 
             clearPendingTokenMovementPosition('observer');
             global.canvas = originalCanvas;

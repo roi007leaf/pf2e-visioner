@@ -18,8 +18,12 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
     expect(targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'))).toBe(false);
   });
 
-  test('soundwave when observed target is out of every observer sight', () => {
-    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'))).toBe(true);
+  test('no soundwave for an observed target out of sight (precisely sensed, e.g. echolocation — a ring is imprecise-only)', () => {
+    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'))).toBe(false);
+  });
+
+  test('no soundwave for a concealed target out of sight (concealed is a seen state, not imprecise)', () => {
+    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'))).toBe(false);
   });
 
   test('soundwave for a stored-hidden target out of sight', () => {

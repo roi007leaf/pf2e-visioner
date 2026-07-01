@@ -225,29 +225,31 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       expect(result).toBe(false);
     });
 
-    test("observed defers to core: core true -> true, core false -> false", async () => {
-      const wrapperTrue = await loadWrapper({
+    test("observed + basicSight + core true -> true (stays visible during the move)", async () => {
+      const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'observed',
         threshold: 'hidden',
       });
-      expect(callWrapper(wrapperTrue, 'basicSight', true, npcTarget()).result).toBe(true);
-
-      const wrapperFalse = await loadWrapper({
-        hasActivePendingTokenMovement: true,
-        visibility: 'observed',
-        threshold: 'hidden',
-      });
-      expect(callWrapper(wrapperFalse, 'basicSight', false, npcTarget()).result).toBe(false);
+      expect(callWrapper(wrapper, 'basicSight', true, npcTarget()).result).toBe(true);
     });
 
-    test("concealed + core true -> true (defers to core)", async () => {
+    test("observed + basicSight + core false -> true (core sight is blocked mid-move, e.g. by an undetected condition on an otherwise-observed target; the polygon LOS test still gates the actual reveal)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'observed',
+        threshold: 'hidden',
+      });
+      expect(callWrapper(wrapper, 'basicSight', false, npcTarget()).result).toBe(true);
+    });
+
+    test("concealed + basicSight + core false -> true (concealed target stays detectable during the move)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'concealed',
         threshold: 'hidden',
       });
-      const { result } = callWrapper(wrapper, 'basicSight', true, npcTarget());
+      const { result } = callWrapper(wrapper, 'basicSight', false, npcTarget());
       expect(result).toBe(true);
     });
   });

@@ -74,7 +74,7 @@ export function targetShouldShowSoundwave(
     if (observer === target) continue;
     if (observerSightContainsTarget(observer, target)) return false;
     const visibility = getVisibility(observer, target);
-    if (visibility === 'hidden' || visibility === 'observed' || visibility === 'concealed') {
+    if (visibility === 'hidden') {
       sensedOutOfSight = true;
     }
   }
