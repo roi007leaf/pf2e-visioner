@@ -1,5 +1,8 @@
 import '../../../setup.js';
-import { handleDoorRightDown } from '../../../../scripts/services/Peek/peek-door-control.js';
+import {
+  handleDoorRightDown,
+  shouldPeekDoor,
+} from '../../../../scripts/services/Peek/peek-door-control.js';
 
 function control(wallId = 'door1', peekAllowed = true) {
   return {
@@ -12,6 +15,48 @@ function control(wallId = 'door1', peekAllowed = true) {
     },
   };
 }
+
+describe('shouldPeekDoor', () => {
+  let originalGame;
+  let originalFoundry;
+  let originalKeyboardManager;
+
+  beforeEach(() => {
+    originalGame = globalThis.game;
+    originalFoundry = globalThis.foundry;
+    originalKeyboardManager = globalThis.KeyboardManager;
+  });
+
+  afterEach(() => {
+    globalThis.game = originalGame;
+    globalThis.foundry = originalFoundry;
+    if (originalKeyboardManager === undefined) delete globalThis.KeyboardManager;
+    else globalThis.KeyboardManager = originalKeyboardManager;
+  });
+
+  test('uses Foundry namespaced KeyboardManager for modifier state', () => {
+    const isModifierActive = jest.fn(() => true);
+    delete globalThis.KeyboardManager;
+    globalThis.game = {
+      ...globalThis.game,
+      keyboard: { isModifierActive },
+    };
+    globalThis.foundry = {
+      ...globalThis.foundry,
+      helpers: {
+        ...(globalThis.foundry?.helpers ?? {}),
+        interaction: {
+          KeyboardManager: {
+            MODIFIER_KEYS: { SHIFT: 'Shift' },
+          },
+        },
+      },
+    };
+
+    expect(shouldPeekDoor({ shiftKey: false })).toBe(true);
+    expect(isModifierActive).toHaveBeenCalledWith('Shift');
+  });
+});
 
 describe('handleDoorRightDown', () => {
   let manager;

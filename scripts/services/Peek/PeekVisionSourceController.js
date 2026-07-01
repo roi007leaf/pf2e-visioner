@@ -1,3 +1,5 @@
+const ORIGINAL_GEOMETRY_FUNCTION = Symbol('pf2eVisionerOriginalGeometryFunction');
+
 export class PeekVisionSourceController {
   constructor({ refreshPerception } = {}) {
     this._refresh = refreshPerception || defaultRefresh;
@@ -95,8 +97,10 @@ export class PeekVisionSourceController {
       'getBounds',
       'getBoundsFast',
     ]) {
-      const fn = los?.[method];
-      if (typeof fn === 'function') geometry[method] = (...args) => fn.apply(los, args);
+      const fn = this._unwrapGeometryFunction(los?.[method]);
+      if (typeof fn === 'function') {
+        geometry[method] = this._markGeometryFunction((...args) => fn.apply(los, args), fn);
+      }
     }
 
     for (const prop of ['bounds']) {
@@ -117,20 +121,30 @@ export class PeekVisionSourceController {
       'lineSegmentIntersects',
       'testPoint',
     ]) {
-      if (typeof fov?.[method] !== 'function') continue;
+      const fovMethod = this._unwrapGeometryFunction(fov?.[method]);
+      if (typeof fovMethod !== 'function') continue;
       const originalMethod = originalLosGeometry?.[method];
-      this._assignGeometryProperty(los, method, (...args) =>
-        this._testPeekFovWithinOriginalLos({
-          fovResult: fov[method](...args),
-          originalResult:
-            typeof originalMethod === 'function' ? originalMethod(...args) : true,
-        }),
+      const wrappedMethod = this._markGeometryFunction(
+        (...args) =>
+          this._testPeekFovWithinOriginalLos({
+            fovResult: fovMethod.apply(fov, args),
+            originalResult:
+              typeof originalMethod === 'function' ? originalMethod(...args) : true,
+          }),
+        this._unwrapGeometryFunction(originalMethod) ?? fovMethod,
       );
+      this._assignGeometryProperty(los, method, wrappedMethod);
     }
 
     for (const method of ['getBounds', 'getBoundsFast']) {
-      if (typeof fov?.[method] !== 'function') continue;
-      this._assignGeometryProperty(los, method, (...args) => fov[method](...args));
+      const fovMethod = this._unwrapGeometryFunction(fov?.[method]);
+      if (typeof fovMethod !== 'function') continue;
+      const originalMethod = originalLosGeometry?.[method];
+      const wrappedMethod = this._markGeometryFunction(
+        (...args) => fovMethod.apply(fov, args),
+        this._unwrapGeometryFunction(originalMethod) ?? fovMethod,
+      );
+      this._assignGeometryProperty(los, method, wrappedMethod);
     }
 
     for (const prop of ['bounds']) {
@@ -153,6 +167,29 @@ export class PeekVisionSourceController {
   _geometryResultIsEmpty(result) {
     const points = result?.points;
     return Array.isArray(points) && points.length === 0;
+  }
+
+  _unwrapGeometryFunction(fn) {
+    if (typeof fn !== 'function') return fn;
+    const seen = new Set();
+    let current = fn;
+    while (typeof current?.[ORIGINAL_GEOMETRY_FUNCTION] === 'function') {
+      if (seen.has(current)) break;
+      seen.add(current);
+      current = current[ORIGINAL_GEOMETRY_FUNCTION];
+    }
+    return current;
+  }
+
+  _markGeometryFunction(fn, original) {
+    if (typeof fn !== 'function' || typeof original !== 'function') return fn;
+    try {
+      Object.defineProperty(fn, ORIGINAL_GEOMETRY_FUNCTION, {
+        configurable: true,
+        value: this._unwrapGeometryFunction(original),
+      });
+    } catch (_) {}
+    return fn;
   }
 
   _assignGeometryProperty(target, key, value) {

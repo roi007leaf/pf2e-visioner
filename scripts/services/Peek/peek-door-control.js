@@ -6,8 +6,11 @@ let _registered = false;
 
 export function shouldPeekDoor(event) {
   try {
-    if (game?.keyboard?.isModifierActive && typeof KeyboardManager !== 'undefined') {
-      return game.keyboard.isModifierActive(KeyboardManager.MODIFIER_KEYS.SHIFT);
+    const keyboardManager =
+      globalThis.foundry?.helpers?.interaction?.KeyboardManager ?? globalThis.KeyboardManager;
+    const shiftKey = keyboardManager?.MODIFIER_KEYS?.SHIFT;
+    if (globalThis.game?.keyboard?.isModifierActive && shiftKey) {
+      return globalThis.game.keyboard.isModifierActive(shiftKey);
     }
   } catch (_) {}
   return !!(event?.shiftKey ?? event?.nativeEvent?.shiftKey ?? event?.data?.originalEvent?.shiftKey);

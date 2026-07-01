@@ -73,6 +73,39 @@ describe('PeekVisionSourceController contract', () => {
     expect(token.vision.los.bounds).toBe(token.vision.fov.bounds);
   });
 
+  test('apply snapshots FOV geometry before overriding shared corner-peek LOS polygon', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const bounds = { x: 10, y: 10, width: 50, height: 50 };
+    const contains = jest.fn((x) => x < 100);
+    const getBounds = jest.fn(() => bounds);
+    const sharedPolygon = {
+      points: [10, 10, 60, 20, 20, 60],
+      bounds,
+      contains,
+      getBounds,
+    };
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los: sharedPolygon,
+        fov: sharedPolygon,
+      },
+      initializeVisionSource: jest.fn(),
+    };
+
+    ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 10, ignoredWallIds: [] });
+    ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 10, ignoredWallIds: [] });
+    contains.mockClear();
+    getBounds.mockClear();
+
+    expect(token.vision.los.contains(50, 400)).toBe(true);
+    expect(token.vision.los.contains(400, 400)).toBe(false);
+    expect(token.vision.los.getBounds()).toBe(bounds);
+    expect(contains.mock.calls.length).toBeLessThanOrEqual(4);
+    expect(getBounds).toHaveBeenCalled();
+  });
+
   test('clear is idempotent and never updates token document', () => {
     const refresh = jest.fn();
     const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
