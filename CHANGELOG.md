@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.7] - 2026-07-01
+
+### Fixed
+
+- **Heard-but-unseen creatures no longer vanish while you move a token**: When moving a token, any creature you can hear but not see (a "hidden" soundwave target) briefly disappeared entirely for the duration of the movement, then popped back as a soundwave once the move settled. While stationary, Visioner force-shows the soundwave for hidden creatures because the core hearing sense is unreliable; but during a move it deferred to that same unreliable core detection, which reports "not heard" throughout the movement animation, so the creature — mesh and soundwave ring alike — blanked out until the move ended. Non-visual senses (hearing, tremorsense, scent, lifesense, thoughtsense) now keep detecting hidden creatures throughout a move, matching the stationary behavior, so their soundwaves stay put. Sight still reveals a hidden creature the moment line of sight opens mid-move, and deliberately hidden creatures keep their soundwave without being revealed.
+
 ## [8.3.6] - 2026-06-30
 
 ### Fixed

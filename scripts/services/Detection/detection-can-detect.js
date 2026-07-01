@@ -80,9 +80,8 @@ function resolveDetectionDuringMovement(observer, target, visibility, modeId, ca
   if (visibility === 'hidden') {
     if (targetIsLootOrHazard(target)) return false;
     const nonVisualMode = !modeId || NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
-    if (hasHiddenAvsOverride(observer, target)) {
-      return nonVisualMode ? canDetect : false;
-    }
+    if (nonVisualMode) return true;
+    if (hasHiddenAvsOverride(observer, target)) return false;
     return canDetect;
   }
   return canDetect;

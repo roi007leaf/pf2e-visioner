@@ -185,7 +185,17 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       expect(result).toBe(true);
     });
 
-    test("hidden npc + non-visual mode hearing + core true -> true (core drives soundwave)", async () => {
+    test("hidden npc WITH sticky hidden override + hearing + core false -> true (deliberately hidden keeps its soundwave even when core hearing drops mid-move)", async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'hidden',
+        threshold: 'undetected',
+      });
+      const { result } = callWrapper(wrapper, 'hearing', false, overrideHiddenTarget());
+      expect(result).toBe(true);
+    });
+
+    test("hidden npc + non-visual mode hearing + core true -> true (visioner forces the soundwave, matching the stationary contract)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'hidden',
@@ -195,14 +205,14 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       expect(result).toBe(true);
     });
 
-    test("hidden npc + non-visual mode hearing + core false -> false", async () => {
+    test("hidden npc + non-visual mode hearing + core false -> true (core hearing drops out mid-move; visioner forces the soundwave so the target does not disappear)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
         visibility: 'hidden',
         threshold: 'undetected',
       });
       const { result } = callWrapper(wrapper, 'hearing', false, npcTarget());
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     test("hidden loot + hearing + core true -> false (loot treated as undetected)", async () => {
