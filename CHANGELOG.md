@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.6] - 2026-06-30
+
+### Fixed
+
+- **GM Vision no longer paints soundwaves on every token while moving**: With GM Vision enabled the GM sees the whole scene, but moving a token still drew a "heard, not seen" soundwave ring on every other creature until it was hovered, then re-drew them on the next move. The during-move soundwave engine did not honor the GM Vision bypass that the rest of automatic visibility already respects. It now suppresses and clears all move-time soundwaves while GM Vision is active, so tokens simply stay visible.
+
 ## [8.3.5] - 2026-06-30
 
 ### Fixed

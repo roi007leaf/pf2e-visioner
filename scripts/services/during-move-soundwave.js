@@ -4,6 +4,7 @@ import {
   targetIsHardHiddenFromCurrentView,
 } from './Detection/current-view-hard-hide.js';
 import { getVisionerVisibilityBetweenTokens } from './Detection/detection-visibility-context.js';
+import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
 
 let running = false;
 let cachedSoundwaveFilter = null;
@@ -95,6 +96,18 @@ export function refreshSoundwavesForActiveMovement() {
   // Only mutate soundwaves during an actual committed move. While merely hold-dragging
   // (a drag preview exists but nothing has committed yet) the visuals must stay frozen.
   if (!hasActivePendingTokenMovement()) return;
+  if (shouldBypassAvsForGmVision()) {
+    for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
+      if (target.controlled) continue;
+      try {
+        if (target.detectionFilter) target.detectionFilter = null;
+        setSoundwaveMeshVisible(target, false);
+      } catch {
+        /* keep core filter state if assignment fails */
+      }
+    }
+    return;
+  }
   const observers = currentViewObservers();
   if (!observers.length) return;
   const filter = getSoundwaveFilter();

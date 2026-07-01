@@ -145,7 +145,7 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
 describe('refreshSoundwavesForActiveMovement (only mutates during a committed move)', () => {
   let savedCanvas;
 
-  async function loadWith({ pendingMovement }) {
+  async function loadWith({ pendingMovement, gmVisionBypass = false }) {
     let mod;
     await jest.isolateModulesAsync(async () => {
       jest.doMock('../../../scripts/services/movement-tracking.js', () => ({
@@ -157,6 +157,9 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
         getVisionerVisibilityBetweenTokens: () => 'hidden',
+      }));
+      jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
+        shouldBypassAvsForGmVision: () => gmVisionBypass,
       }));
       mod = await import('../../../scripts/services/during-move-soundwave.js');
     });
@@ -200,5 +203,17 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     mod.refreshSoundwavesForActiveMovement();
 
     expect(target.detectionFilterMesh.visible).toBe(true);
+  });
+
+  test('GM vision bypass paints no soundwaves and clears existing ones during move', async () => {
+    const target = makeTarget();
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, gmVisionBypass: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
   });
 });
