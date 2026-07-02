@@ -1258,6 +1258,10 @@
         "name": "Toggle Peek (Corner)",
         "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
       },
+      "HOLD_DOOR_PEEK": {
+        "name": "(PL TODO) Door Peek",
+        "hint": "(PL TODO) Press this configured key while hovering a peek-enabled door to peek through it. No default; configure your own key."
+      },
       "OPEN_TOKEN_MANAGER": {
         "name": "Otwórz Menedżera Widoczności",
         "hint": "Otwórz menedżera tokenów dla wybranych tokenów"

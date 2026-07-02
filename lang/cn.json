@@ -909,6 +909,10 @@
             "HOLD_PEEK": {
                 "name": "开关窥视（角落）",
                 "hint": "按键以开始在最近的拐角处朝光标方向，以定向锥形视野进行窥视；再次按键则停止。该锥形视野在激活期间会跟随光标移动。"
+            },
+            "HOLD_DOOR_PEEK": {
+                "name": "Door Peek",
+                "hint": "Press this configured key while hovering a peek-enabled door to peek through it. No default; configure your own key."
             }
         },
         "REGION_BEHAVIOR": {

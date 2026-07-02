@@ -1,8 +1,12 @@
 import '../../../setup.js';
 import {
+  clearHoveredDoorControl,
   handleDoorRightDown,
-  shouldPeekDoor,
+  handleDoorPeekKeyDown,
+  registerDoorPeekInteraction,
+  setHoveredDoorControl,
 } from '../../../../scripts/services/Peek/peek-door-control.js';
+import { KEYBINDINGS } from '../../../../scripts/constants.js';
 
 function control(wallId = 'door1', peekAllowed = true) {
   return {
@@ -16,45 +20,138 @@ function control(wallId = 'door1', peekAllowed = true) {
   };
 }
 
-describe('shouldPeekDoor', () => {
-  let originalGame;
-  let originalFoundry;
-  let originalKeyboardManager;
-
-  beforeEach(() => {
-    originalGame = globalThis.game;
-    originalFoundry = globalThis.foundry;
-    originalKeyboardManager = globalThis.KeyboardManager;
+describe('door peek keybinding metadata', () => {
+  test('has no default binding', () => {
+    expect(KEYBINDINGS.holdDoorPeek.editable).toEqual([]);
   });
+});
 
-  afterEach(() => {
-    globalThis.game = originalGame;
-    globalThis.foundry = originalFoundry;
-    if (originalKeyboardManager === undefined) delete globalThis.KeyboardManager;
-    else globalThis.KeyboardManager = originalKeyboardManager;
-  });
+describe('registerDoorPeekInteraction', () => {
+  function setupDoorPeekInteraction() {
+    const originalCanvas = global.canvas;
+    const originalFoundry = globalThis.foundry;
+    const manager = { tryStartDoorPeek: jest.fn(async () => true) };
+    const registered = new Map();
+    function DoorControl() {}
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, fn) => registered.set(target, fn)),
+    };
+    const token = createMockToken({ id: 'p', x: -50, y: 50 });
+    token.center = { x: -50, y: 50 };
 
-  test('uses Foundry namespaced KeyboardManager for modifier state', () => {
-    const isModifierActive = jest.fn(() => true);
-    delete globalThis.KeyboardManager;
-    globalThis.game = {
-      ...globalThis.game,
-      keyboard: { isModifierActive },
+    global.canvas = {
+      ...global.canvas,
+      grid: { size: 100 },
+      tokens: { controlled: [token] },
+      mousePosition: { x: 10, y: 20 },
     };
     globalThis.foundry = {
       ...globalThis.foundry,
-      helpers: {
-        ...(globalThis.foundry?.helpers ?? {}),
-        interaction: {
-          KeyboardManager: {
-            MODIFIER_KEYS: { SHIFT: 'Shift' },
-          },
-        },
-      },
+      canvas: { containers: { DoorControl } },
     };
 
-    expect(shouldPeekDoor({ shiftKey: false })).toBe(true);
-    expect(isModifierActive).toHaveBeenCalledWith('Shift');
+    registerDoorPeekInteraction(manager, { libWrapperAdapter });
+
+    return {
+      manager,
+      registered,
+      restore() {
+        clearHoveredDoorControl();
+        global.canvas = originalCanvas;
+        globalThis.foundry = originalFoundry;
+      },
+    };
+  }
+
+  test('tracks hovered door controls for keybind-only door peek', async () => {
+    const { manager, registered, restore } = setupDoorPeekInteraction();
+
+    try {
+      const hoverIn = registered.get('foundry.canvas.containers.DoorControl.prototype._onMouseOver');
+      const hoverOut = registered.get(
+        'foundry.canvas.containers.DoorControl.prototype._onMouseOut',
+      );
+      const doorControl = control('door1');
+      const wrappedHoverIn = jest.fn(() => 'hovered');
+      const wrappedHoverOut = jest.fn(() => 'unhovered');
+
+      expect(hoverIn.call(doorControl, wrappedHoverIn, {})).toBe('hovered');
+      expect(await handleDoorPeekKeyDown(manager)).toBe(true);
+      expect(manager.tryStartDoorPeek).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'p' }),
+        expect.objectContaining({ id: 'door1' }),
+        expect.anything(),
+      );
+
+      expect(hoverOut.call(doorControl, wrappedHoverOut, {})).toBe('unhovered');
+      manager.tryStartDoorPeek.mockClear();
+      expect(await handleDoorPeekKeyDown(manager)).toBe(false);
+      expect(manager.tryStartDoorPeek).not.toHaveBeenCalled();
+
+      expect(hoverIn.call(doorControl, jest.fn(() => false), {})).toBe(false);
+      expect(await handleDoorPeekKeyDown(manager)).toBe(false);
+      expect(manager.tryStartDoorPeek).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  test('does not wrap right-click door handling', () => {
+    const { registered, restore } = setupDoorPeekInteraction();
+
+    try {
+      expect(
+        registered.has('foundry.canvas.containers.DoorControl.prototype._onRightDown'),
+      ).toBe(false);
+      expect(
+        registered.has('DoorControl.prototype._onRightDown'),
+      ).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe('handleDoorPeekKeyDown', () => {
+  let manager;
+  let originalCanvas;
+  let originalUi;
+
+  beforeEach(() => {
+    manager = { tryStartDoorPeek: jest.fn(async () => true) };
+    originalCanvas = global.canvas;
+    originalUi = global.ui;
+    global.ui = { notifications: { warn: jest.fn() } };
+    const token = createMockToken({ id: 'p', x: -50, y: 50 });
+    token.center = { x: -50, y: 50 };
+    global.canvas = {
+      ...global.canvas,
+      grid: { size: 100 },
+      tokens: { controlled: [token] },
+      mousePosition: { x: 10, y: 20 },
+    };
+  });
+
+  afterEach(() => {
+    clearHoveredDoorControl();
+    global.canvas = originalCanvas;
+    global.ui = originalUi;
+  });
+
+  test('starts door peek from the hovered door when the keybind fires', async () => {
+    setHoveredDoorControl(control('door1'));
+
+    expect(await handleDoorPeekKeyDown(manager)).toBe(true);
+    expect(manager.tryStartDoorPeek).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'p' }),
+      expect.objectContaining({ id: 'door1' }),
+      expect.anything(),
+    );
+  });
+
+  test('does nothing when no door is hovered', async () => {
+    expect(await handleDoorPeekKeyDown(manager)).toBe(false);
+    expect(manager.tryStartDoorPeek).not.toHaveBeenCalled();
   });
 });
 

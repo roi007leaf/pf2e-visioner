@@ -816,6 +816,10 @@
         "name": "Toggle Peek (Corner)",
         "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
       },
+      "HOLD_DOOR_PEEK": {
+        "name": "(FR TODO) Door Peek",
+        "hint": "(FR TODO) Press this configured key while hovering a peek-enabled door to peek through it. No default; configure your own key."
+      },
       "OPEN_TOKEN_MANAGER": {
         "name": "Ouvrir le gestionnaire du jeton",
         "hint": "Ouvre le gestionnaire du jeton pour les jetons sélectionnés"

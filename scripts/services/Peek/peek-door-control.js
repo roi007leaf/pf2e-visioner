@@ -3,17 +3,26 @@ import { isDoorPeekAllowed } from './peek-door-dc.js';
 import { isWithinDoorPeekRange } from './peek-geometry.js';
 
 let _registered = false;
+let _hoveredDoorControl = null;
 
-export function shouldPeekDoor(event) {
-  try {
-    const keyboardManager =
-      globalThis.foundry?.helpers?.interaction?.KeyboardManager ?? globalThis.KeyboardManager;
-    const shiftKey = keyboardManager?.MODIFIER_KEYS?.SHIFT;
-    if (globalThis.game?.keyboard?.isModifierActive && shiftKey) {
-      return globalThis.game.keyboard.isModifierActive(shiftKey);
-    }
-  } catch (_) {}
-  return !!(event?.shiftKey ?? event?.nativeEvent?.shiftKey ?? event?.data?.originalEvent?.shiftKey);
+export function setHoveredDoorControl(control) {
+  _hoveredDoorControl = control ?? null;
+}
+
+export function clearHoveredDoorControl(control = null) {
+  if (!control || _hoveredDoorControl === control) _hoveredDoorControl = null;
+}
+
+export async function handleDoorPeekKeyDown(manager, { control = _hoveredDoorControl } = {}) {
+  return handleDoorRightDown(manager, control);
+}
+
+function doorControlTarget(method) {
+  if (globalThis.foundry?.canvas?.containers?.DoorControl?.prototype) {
+    return `foundry.canvas.containers.DoorControl.prototype.${method}`;
+  }
+  if (typeof DoorControl !== 'undefined') return `DoorControl.prototype.${method}`;
+  return null;
 }
 
 export async function handleDoorRightDown(manager, control) {
@@ -36,29 +45,31 @@ export async function handleDoorRightDown(manager, control) {
   return true;
 }
 
-export function registerDoorPeekInteraction(manager, { libWrapperAdapter } = {}) {
+export function registerDoorPeekInteraction(_manager, { libWrapperAdapter } = {}) {
   if (_registered) return;
   const adapter = libWrapperAdapter || (typeof libWrapper !== 'undefined' ? libWrapper : null);
   if (!adapter) return;
-  const hasNamespaced = !!globalThis.foundry?.canvas?.containers?.DoorControl?.prototype;
-  const target = hasNamespaced
-    ? 'foundry.canvas.containers.DoorControl.prototype._onRightDown'
-    : typeof DoorControl !== 'undefined'
-      ? 'DoorControl.prototype._onRightDown'
-      : null;
-  if (!target) return;
+  const hoverInTarget = doorControlTarget('_onMouseOver');
+  const hoverOutTarget = doorControlTarget('_onMouseOut');
+  if (!hoverInTarget || !hoverOutTarget) return;
   _registered = true;
   adapter.register(
     MODULE_ID,
-    target,
+    hoverInTarget,
     function (wrapped, event, ...args) {
-      try {
-        if (shouldPeekDoor(event)) {
-          handleDoorRightDown(manager, this);
-          return;
-        }
-      } catch (_) {}
-      return wrapped.call(this, event, ...args);
+      const result = wrapped.call(this, event, ...args);
+      if (result !== false) setHoveredDoorControl(this);
+      return result;
+    },
+    'MIXED',
+  );
+  adapter.register(
+    MODULE_ID,
+    hoverOutTarget,
+    function (wrapped, event, ...args) {
+      const result = wrapped.call(this, event, ...args);
+      if (result !== false) clearHoveredDoorControl(this);
+      return result;
     },
     'MIXED',
   );

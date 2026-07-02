@@ -1233,6 +1233,12 @@ export const KEYBINDINGS = {
     editable: [],
     restricted: false,
   },
+  holdDoorPeek: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_DOOR_PEEK.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_DOOR_PEEK.hint',
+    editable: [],
+    restricted: false,
+  },
   showWallCoverLabels: {
     name: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.name',
     hint: 'PF2E_VISIONER.KEYBINDINGS.SHOW_WALL_COVER_LABELS.hint',

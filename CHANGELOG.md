@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.10] - 2026-07-02
+
+### Fixed
+
+- **Door peeking no longer relies on Shift+right-click**: Browsers such as Brave and Firefox can reserve Shift+right-click for their own context menu, so the shortcut could fail or open browser UI instead of peeking. Door Peek is now an unbound configurable keybind: assign a key, hover a peek-enabled door, and press the key. The existing door range, permission, and DC checks still apply.
+
 ## [8.3.9] - 2026-07-01
 
 ### Fixed

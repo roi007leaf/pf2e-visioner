@@ -1327,6 +1327,10 @@
         "name": "Toggle Peek (Corner)",
         "hint": "Press to start peeking a directional cone around the nearest corner toward the cursor; press again to stop. The cone follows the cursor while active."
       },
+      "HOLD_DOOR_PEEK": {
+        "name": "Door Peek",
+        "hint": "Press this configured key while hovering a peek-enabled door to peek through it. No default; configure your own key."
+      },
       "SHOW_WALL_COVER_LABELS": {
         "name": "Show Wall Cover Labels",
         "hint": "Hold this key while the walls tool is active to show cover status labels on walls (AUTO, NONE, LESSER, STANDARD, GREATER)."

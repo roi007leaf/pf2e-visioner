@@ -865,6 +865,14 @@ export function registerKeybindings() {
           mgr.toggleCornerPeek(token, mouse);
         };
         break;
+      case 'holdDoorPeek':
+        keybindingConfig.onDown = async () => {
+          const mgr = game.modules.get(MODULE_ID)?.api?.peekManager;
+          if (!mgr) return;
+          const { handleDoorPeekKeyDown } = await import('./services/Peek/peek-door-control.js');
+          await handleDoorPeekKeyDown(mgr);
+        };
+        break;
       case 'openWallManager':
         keybindingConfig.onDown = async () => {
           const { VisionerWallManager } = await import('./managers/wall-manager/WallManager.js');
