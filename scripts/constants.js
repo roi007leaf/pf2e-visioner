@@ -358,6 +358,18 @@ export const SPECIAL_SENSES = {
     icon: 'fas fa-hat-wizard',
     hasRangeLimit: true,
   },
+  'electromagnetic-sense': {
+    label: 'PF2E_VISIONER.SPECIAL_SENSES.electromagnetic_sense',
+    description: 'PF2E_VISIONER.SPECIAL_SENSES.electromagnetic_sense_description',
+    type: 'imprecise',
+    defaultRange: 30,
+    detectsLiving: true,
+    detectsUndead: true,
+    detectsConstructs: true,
+    canDistinguish: false,
+    icon: 'fas fa-bolt',
+    hasRangeLimit: true,
+  },
   'motion-sense': {
     label: 'PF2E_VISIONER.SPECIAL_SENSES.motion_sense',
     description: 'PF2E_VISIONER.SPECIAL_SENSES.motion_sense_description',

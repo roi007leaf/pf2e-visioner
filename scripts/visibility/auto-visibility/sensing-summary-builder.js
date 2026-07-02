@@ -73,6 +73,13 @@ const addSense = (
             senseType === 'greaterdarkvision' ||
             senseType === 'low-light-vision' ||
             senseType === 'lowlightvision' ||
+            senseType === 'light-perception' ||
+            senseType === 'lightperception' ||
+            senseType === 'see-invisibility' ||
+            senseType === 'seeinvisibility' ||
+            senseType === 'see-all' ||
+            senseType === 'seeall' ||
+            senseType === 'truesight' ||
             senseType.includes('vision') ||
             senseType.includes('sight'))
     ) {

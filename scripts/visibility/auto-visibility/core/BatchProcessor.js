@@ -41,9 +41,13 @@ const VISUAL_SENSE_TYPES = new Set([
   'low-light-vision',
   'lowlightvision',
   'light-perception',
+  'lightperception',
   'see-invisibility',
   'seeinvisibility',
+  'see-all',
+  'seeall',
   'infrared-vision',
+  'infraredvision',
   'truesight',
 ]);
 const NON_VISUAL_SENSE_DEFAULT_RANGES = {
@@ -54,6 +58,7 @@ const NON_VISUAL_SENSE_DEFAULT_RANGES = {
   tremorsense: 30,
   bloodsense: 30,
   magicsense: 30,
+  'electromagnetic-sense': 30,
   'motion-sense': 30,
   spiritsense: 30,
   wavesense: 30,

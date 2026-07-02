@@ -71,6 +71,7 @@ describe('hover tooltip factor overlay', () => {
 
   test('detects sense-related factor reasons', () => {
     expect(isDetectionFactorReason('Detected by thoughtsense')).toBe(true);
+    expect(isDetectionFactorReason('Detected by electromagnetic sense')).toBe(true);
     expect(isDetectionFactorReason('Cover applies')).toBe(false);
   });
 

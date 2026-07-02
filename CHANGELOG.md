@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.3.11] - 2026-07-02
+
+### Added
+
+- **PF2e Electromagnetic Sense is now recognized**: Visioner now includes `electromagnetic-sense` in the special-sense registry, sense parsing aliases, region sense suppression, hover detection factors, and localized sense labels, so the PF2e system sense appears and behaves consistently with other nonvisual special senses.
+
+### Fixed
+
+- **Blinded now suppresses visual special senses consistently**: Visual senses such as truesight, see-all, see-invisibility, and infrared vision no longer continue to observe targets while the observer is blinded. Truesight and see-all still counter invisibility when the observer can see, while sense-invisibility remains nonvisual and only detects invisible targets.
+
 ## [8.3.10] - 2026-07-02
 
 ### Fixed

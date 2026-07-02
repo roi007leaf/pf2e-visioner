@@ -71,6 +71,15 @@ describe('Special Senses Range Detection', () => {
       expect(scent.detectsUndead).toBe(false); // Most undead don't have scent
       expect(scent.detectsConstructs).toBe(false);
     });
+
+    test('electromagnetic sense configuration is correct', () => {
+      const electromagneticSense = SPECIAL_SENSES['electromagnetic-sense'];
+      expect(electromagneticSense.type).toBe('imprecise');
+      expect(electromagneticSense.defaultRange).toBe(30);
+      expect(electromagneticSense.detectsLiving).toBe(true);
+      expect(electromagneticSense.detectsUndead).toBe(true);
+      expect(electromagneticSense.detectsConstructs).toBe(true);
+    });
   });
 
   describe('canDetectWithSpecialSense', () => {
@@ -295,6 +304,31 @@ describe('Special Senses Range Detection', () => {
 
       expect(capabilities.precise.tremorsense).toBeUndefined();
       expect(capabilities.imprecise.tremorsense).toBe(30);
+    });
+
+    test('handles PF2e electromagnetic sense slug and camelCase alias', () => {
+      const freshVisionAnalyzer = new VisionAnalyzer();
+      freshVisionAnalyzer.clearVisionCache();
+      const electromagneticSense = preparedSense('electromagneticSense', {
+        acuity: 'imprecise',
+        range: 45,
+      });
+      const observerToken = {
+        id: 'prepared-electromagnetic-observer-' + Date.now(),
+        center: { x: 100, y: 100 },
+        document: { elevation: 0, detectionModes: [] },
+        actor: {
+          perception: {
+            senses: new Map([['electromagnetic-sense', electromagneticSense]]),
+          },
+          system: { perception: { senses: [] } },
+        },
+      };
+
+      const capabilities = freshVisionAnalyzer.getSensingCapabilities(observerToken);
+
+      expect(capabilities.imprecise['electromagnetic-sense']).toBe(45);
+      expect(capabilities.imprecise.electromagneticSense).toBeUndefined();
     });
 
     test('uses cheap capability cache keys for repeated prepared-sense reads', () => {

@@ -46,6 +46,26 @@ describe('StatelessVisibilityCalculator - Comprehensive Coverage', () => {
             expect(result.state).toBe('hidden');
         });
 
+        test('blinded observer + truesight + hearing -> hidden through hearing', () => {
+            const input = {
+                observer: {
+                    precise: { truesight: { range: 60 } },
+                    imprecise: { hearing: { range: 60 } },
+                    conditions: { blinded: true, deafened: false, dazzled: false }
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                }
+            };
+
+            const result = calculateVisibility(input);
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('hearing');
+        });
+
         test('blinded observer + no senses → undetected', () => {
             const input = {
                 observer: {

@@ -14,6 +14,7 @@ const SENSE_KEY_VARIANTS = {
     'greater-darkvision': ['greater-darkvision', 'greaterDarkvision'],
     'low-light-vision': ['low-light-vision', 'lowLightVision'],
     'see-invisibility': ['see-invisibility', 'seeInvisibility'],
+    'electromagnetic-sense': ['electromagnetic-sense', 'electromagneticSense'],
     'motion-sense': ['motion-sense', 'motionSense'],
     'infrared-vision': ['infrared-vision', 'infraredVision'],
     'light-perception': ['light-perception', 'lightPerception'],

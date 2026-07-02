@@ -26,6 +26,10 @@ const SENSE_TYPE_ALIASES = {
     'lowlightvision': 'low-light-vision',
     'low-light': 'low-light-vision',
 
+    'infrared-vision': 'infrared-vision',
+    'infraredvision': 'infrared-vision',
+    'infrared': 'infrared-vision',
+
     'darkvision': 'darkvision',
     'dark-vision': 'darkvision',
 
@@ -46,6 +50,10 @@ const SENSE_TYPE_ALIASES = {
 
     'lifesense': 'lifesense',
     'life-sense': 'lifesense',
+
+    'electromagnetic-sense': 'electromagnetic-sense',
+    'electromagneticsense': 'electromagnetic-sense',
+    'electromagnetic': 'electromagnetic-sense',
 
     'thoughtsense': 'thoughtsense',
     'thought-sense': 'thoughtsense',

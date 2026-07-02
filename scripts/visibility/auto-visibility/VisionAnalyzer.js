@@ -1790,9 +1790,17 @@ export class VisionAnalyzer {
         'sight',
         'darkvision',
         'greater-darkvision',
+        'greaterdarkvision',
         'low-light-vision',
+        'lowlightvision',
+        'infrared-vision',
+        'infraredvision',
+        'light-perception',
+        'lightperception',
         'see-invisibility',
         'see-all',
+        'seeall',
+        'truesight',
       ];
       for (const senseType of visualSenseTypes) {
         delete enhanced.precise[senseType];

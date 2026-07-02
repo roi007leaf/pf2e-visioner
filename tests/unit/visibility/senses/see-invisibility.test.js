@@ -94,6 +94,77 @@ describe('See-Invisibility Sense', () => {
             expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
         });
+
+        test('observer with truesight should detect invisible target as observed', () => {
+            const input = {
+                observer: {
+                    precise: {
+                        vision: { range: Infinity },
+                        truesight: 60
+                    },
+                    imprecise: {},
+                    conditions: { blinded: false, deafened: false, dazzled: false }
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                hasLineOfSight: true,
+                soundBlocked: false,
+                rayDarkness: null
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('observed');
+            expect(result.detection).toEqual({
+                isPrecise: true,
+                sense: 'truesight'
+            });
+        });
+
+        test('sense-invisibility detects invisible targets but not visible targets', () => {
+            const observer = {
+                precise: {
+                    'sense-invisibility': { range: 60 }
+                },
+                imprecise: {},
+                conditions: { blinded: true, deafened: false, dazzled: false }
+            };
+
+            const invisibleResult = calculateVisibility({
+                observer,
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                hasLineOfSight: false,
+                soundBlocked: false,
+                rayDarkness: null
+            });
+
+            const visibleResult = calculateVisibility({
+                observer,
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                hasLineOfSight: false,
+                soundBlocked: false,
+                rayDarkness: null
+            });
+
+            expect(invisibleResult.state).toBe('observed');
+            expect(invisibleResult.detection.sense).toBe('sense-invisibility');
+            expect(visibleResult.state).toBe('undetected');
+            expect(visibleResult.detection).toBe(null);
+        });
     });
 
     describe('See-invisibility with other conditions', () => {
@@ -207,6 +278,115 @@ describe('See-Invisibility Sense', () => {
             // Blinded prevents all visual senses including see-invisibility
             expect(result.state).toBe('undetected');
             expect(result.detection).toBe(null);
+        });
+
+        test('blinded observer with see-all falls back to hearing for visible target', () => {
+            const input = {
+                observer: {
+                    precise: {
+                        'see-all': { range: 60 }
+                    },
+                    imprecise: {
+                        hearing: { range: 60 }
+                    },
+                    conditions: { blinded: true, deafened: false, dazzled: false }
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                hasLineOfSight: true,
+                soundBlocked: false,
+                rayDarkness: null
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('hearing');
+        });
+
+        test('dazzled observer with see-all treats see-all as visual', () => {
+            const input = {
+                observer: {
+                    precise: {
+                        vision: { range: Infinity },
+                        'see-all': { range: 60 }
+                    },
+                    imprecise: {},
+                    conditions: { blinded: false, deafened: false, dazzled: true }
+                },
+                target: {
+                    lightingLevel: 'bright',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: ['invisible']
+                },
+                hasLineOfSight: true,
+                soundBlocked: false,
+                rayDarkness: null
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('concealed');
+            expect(result.detection.sense).toBe('see-all');
+        });
+
+        test('infrared vision detects heat signatures in darkness', () => {
+            const input = {
+                observer: {
+                    precise: {
+                        'infrared-vision': { range: 60 }
+                    },
+                    imprecise: {},
+                    conditions: { blinded: false, deafened: false, dazzled: false }
+                },
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                hasLineOfSight: true,
+                soundBlocked: false,
+                rayDarkness: null
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('observed');
+            expect(result.detection.sense).toBe('infrared-vision');
+        });
+
+        test('blinded observer with infrared vision falls back to hearing', () => {
+            const input = {
+                observer: {
+                    precise: {
+                        'infrared-vision': { range: 60 }
+                    },
+                    imprecise: {
+                        hearing: { range: 60 }
+                    },
+                    conditions: { blinded: true, deafened: false, dazzled: false }
+                },
+                target: {
+                    lightingLevel: 'darkness',
+                    coverLevel: 'none',
+                    concealment: false,
+                    auxiliary: []
+                },
+                hasLineOfSight: true,
+                soundBlocked: false,
+                rayDarkness: null
+            };
+
+            const result = calculateVisibility(input);
+
+            expect(result.state).toBe('hidden');
+            expect(result.detection.sense).toBe('hearing');
         });
     });
 

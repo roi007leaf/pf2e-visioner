@@ -139,6 +139,8 @@
       "bloodsense_description": "Możesz wykrywać obecność i lokalizację stworzeń, wyczuwając krew w zasięgu.",
       "magicsense": "Wyczucie Magii",
       "magicsense_description": "Możesz wyczuwać magiczne aury lub efekty w zasięgu.",
+      "electromagnetic_sense": "Electromagnetic Sense",
+      "electromagnetic_sense_description": "You can detect electrical and magnetic phenomena within range.",
       "motion_sense": "Wyczucie Ruchu",
       "motion_sense_description": "Możesz wykrywać ruch w swoim otoczeniu w swoim zasięgu.",
       "spiritsense": "Wyczucie Duchów",

@@ -70,6 +70,41 @@ describe('Deafened Condition Support', () => {
     expect(summary.imprecise.hearing).toBe(30);
   });
 
+  test('should exclude truesight from sensing summary when blinded', () => {
+    const token = {
+      actor: {
+        name: 'Blinded Visual Senses Actor',
+        hasCondition: jest.fn((condition) => condition === 'blinded'),
+        system: {
+          perception: {
+            senses: [
+              { type: 'truesight', acuity: 'precise', range: 60 },
+              { type: 'infraredVision', acuity: 'precise', range: 60 },
+            ],
+          },
+        },
+      },
+      document: {
+        detectionModes: [],
+      },
+    };
+
+    const summary = visionAnalyzer.getSensingCapabilities(token);
+    const capabilities = visionAnalyzer.getVisionCapabilities(token);
+
+    expect(token.actor.hasCondition).toHaveBeenCalledWith('blinded');
+    expect(summary.precise.truesight).toBeUndefined();
+    expect(summary.precise['infrared-vision']).toBeUndefined();
+    expect(capabilities.precise.truesight).toBeUndefined();
+    expect(capabilities.precise['infrared-vision']).toBeUndefined();
+    expect(capabilities.sensingSummary.precise.some((sense) => sense.type === 'truesight')).toBe(
+      false,
+    );
+    expect(
+      capabilities.sensingSummary.precise.some((sense) => sense.type === 'infrared-vision'),
+    ).toBe(false);
+  });
+
   test('should prevent imprecise sensing via hearing when deafened', () => {
     const observer = {
       center: { x: 0, y: 0 },

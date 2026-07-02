@@ -57,6 +57,10 @@ export class SeekDialogAdapter {
             t === 'greaterdarkvision' ||
             t === 'low-light-vision' ||
             t === 'lowlightvision' ||
+            t === 'light-perception' ||
+            t === 'lightperception' ||
+            t === 'see-all' ||
+            t === 'seeall' ||
             t === 'truesight' ||
             t.includes('vision') ||
             t.includes('sight')

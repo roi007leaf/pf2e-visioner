@@ -12,6 +12,62 @@ import { getLogger } from '../utils/logger.js';
 import { legacyVisibilityToProfile } from './perception-profile.js';
 const log = getLogger('AVS/StatelessCalculator');
 
+const VISUAL_SENSE_TYPES = new Set([
+  'vision',
+  'sight',
+  'basic-sight',
+  'basicsight',
+  'darkvision',
+  'dark-vision',
+  'greater-darkvision',
+  'greaterdarkvision',
+  'low-light-vision',
+  'lowlightvision',
+  'light-perception',
+  'lightperception',
+  'see-invisibility',
+  'seeinvisibility',
+  'see-all',
+  'seeall',
+  'truesight',
+  'infrared-vision',
+  'infraredvision',
+]);
+
+function normalizeSenseType(senseType) {
+  return String(senseType || '').trim().toLowerCase();
+}
+
+function isVisualSenseType(senseType) {
+  const type = normalizeSenseType(senseType);
+  return VISUAL_SENSE_TYPES.has(type) || type.includes('vision') || type.includes('sight');
+}
+
+function hasPositiveSenseRange(senseData) {
+  if (senseData === undefined || senseData === null) return false;
+  const rawRange = typeof senseData === 'object' ? senseData.range : senseData;
+  return Number(rawRange) > 0;
+}
+
+function hasPreciseSense(precise, senseTypes) {
+  const wanted = new Set(senseTypes.map(normalizeSenseType));
+  return Object.entries(precise || {}).some(
+    ([senseType, senseData]) =>
+      wanted.has(normalizeSenseType(senseType)) && hasPositiveSenseRange(senseData),
+  );
+}
+
+function visualSenseCountersInvisibility(senseType) {
+  const type = normalizeSenseType(senseType);
+  return (
+    type === 'see-invisibility' ||
+    type === 'seeinvisibility' ||
+    type === 'truesight' ||
+    type === 'see-all' ||
+    type === 'seeall'
+  );
+}
+
 function withProfile(result, profileMetadata = {}) {
   if (!result?.state) return result;
   return {
@@ -355,17 +411,6 @@ function selectBestDetection(results) {
     [VisibilityState.UNDETECTED]: 4,
   };
 
-  // Visual senses (preferred when state is equal)
-  const visualSenses = new Set([
-    SenseType.VISION,
-    SenseType.DARKVISION,
-    'greater-darkvision',
-    SenseType.GREATER_DARKVISION,
-    'low-light-vision',
-    SenseType.LOW_LIGHT_VISION,
-    SenseType.LIGHT_PERCEPTION,
-  ]);
-
   // Sort by state priority (best first), then by visual preference
   const sorted = results.sort((a, b) => {
     const aPriority = statePriority[a.state] || 999;
@@ -377,8 +422,8 @@ function selectBestDetection(results) {
     }
 
     // If states are equal, prefer visual senses (vision is the primary sense)
-    const aIsVisual = a.detection?.sense && visualSenses.has(a.detection.sense);
-    const bIsVisual = b.detection?.sense && visualSenses.has(b.detection.sense);
+    const aIsVisual = a.detection?.sense && isVisualSenseType(a.detection.sense);
+    const bIsVisual = b.detection?.sense && isVisualSenseType(b.detection.sense);
 
     if (aIsVisual && !bIsVisual) return -1; // a is visual, prefer it
     if (!aIsVisual && bIsVisual) return 1; // b is visual, prefer it
@@ -396,23 +441,18 @@ function selectBestDetection(results) {
  * @param {Object} observer - Observer state
  * @returns {boolean} True if observer has at least one precise non-visual sense
  */
-function checkHasPreciseNonVisualSense(observer) {
+function checkHasPreciseNonVisualSense(observer, target = null) {
   const { precise } = observer;
-
-  // Visual senses that should be excluded
-  const visualSenses = new Set([
-    SenseType.VISION,
-    SenseType.DARKVISION,
-    'greater-darkvision',
-    SenseType.GREATER_DARKVISION,
-    'low-light-vision',
-    SenseType.LOW_LIGHT_VISION,
-    SenseType.LIGHT_PERCEPTION,
-  ]);
+  const isInvisible = target?.auxiliary?.includes?.('invisible') ?? false;
 
   // Check if there are any precise non-visual senses with range > 0
   for (const [senseType, senseData] of Object.entries(precise)) {
-    if (!visualSenses.has(senseType) && senseData && senseData.range > 0) {
+    const type = normalizeSenseType(senseType);
+    if (type === 'sense-invisibility' || type === 'senseinvisibility') {
+      if (isInvisible && hasPositiveSenseRange(senseData)) return true;
+      continue;
+    }
+    if (!isVisualSenseType(senseType) && hasPositiveSenseRange(senseData)) {
       return true;
     }
   }
@@ -437,20 +477,6 @@ function checkPreciseNonVisualSenses(
   const { precise, conditions } = observer;
   const { auxiliary } = target;
 
-  // Visual senses that should be excluded from non-visual checks
-  // These are affected by lighting conditions and should go through determineVisualDetection
-  const visualSenses = new Set([
-    SenseType.VISION,
-    SenseType.DARKVISION,
-    'greater-darkvision',
-    SenseType.GREATER_DARKVISION,
-    'low-light-vision',
-    SenseType.LOW_LIGHT_VISION,
-    SenseType.LIGHT_PERCEPTION,
-    SenseType.SEE_INVISIBILITY, // Visual sense that counters invisibility
-    'seeInvisibility',
-  ]);
-
   // Check all precise non-visual senses dynamically
   // These senses:
   // - Work in any lighting condition
@@ -459,8 +485,23 @@ function checkPreciseNonVisualSenses(
   // - EXCEPTION: Echolocation requires hearing (blocked by deafened condition or Silence)
 
   for (const [senseType, senseData] of Object.entries(precise)) {
+    const type = normalizeSenseType(senseType);
+
     // Skip visual senses
-    if (visualSenses.has(senseType)) {
+    if (isVisualSenseType(senseType)) {
+      continue;
+    }
+
+    if (type === 'sense-invisibility' || type === 'senseinvisibility') {
+      if (auxiliary.includes('invisible') && hasPositiveSenseRange(senseData)) {
+        return {
+          state: VisibilityState.OBSERVED,
+          detection: {
+            isPrecise: true,
+            sense: 'sense-invisibility',
+          },
+        };
+      }
       continue;
     }
 
@@ -469,7 +510,7 @@ function checkPreciseNonVisualSenses(
       if (conditions.deafened || soundBlocked) {
         continue; // Cannot use echolocation when deafened or sound is blocked
       }
-      if (senseData && senseData.range > 0) {
+      if (hasPositiveSenseRange(senseData)) {
         return {
           state: VisibilityState.OBSERVED,
           detection: {
@@ -484,8 +525,7 @@ function checkPreciseNonVisualSenses(
     // Special handling for lifesense: needs target traits plus open sight and hearing paths.
     if (senseType === SenseType.LIFESENSE) {
       if (
-        senseData &&
-        senseData.range > 0 &&
+        hasPositiveSenseRange(senseData) &&
         canLifesenseReachTarget(target, { hasLineOfSight, soundBlocked })
       ) {
         return {
@@ -500,7 +540,7 @@ function checkPreciseNonVisualSenses(
     }
 
     if (senseType === SenseType.THOUGHTSENSE) {
-      if (senseData && senseData.range > 0 && canThoughtsenseDetect(target)) {
+      if (hasPositiveSenseRange(senseData) && canThoughtsenseDetect(target)) {
         return {
           state: VisibilityState.OBSERVED,
           detection: {
@@ -513,7 +553,7 @@ function checkPreciseNonVisualSenses(
     }
 
     if (senseType === SenseType.TREMORSENSE) {
-      if (senseData && senseData.range > 0 && !tremorsenseGroundContactBroken(observer, target)) {
+      if (hasPositiveSenseRange(senseData) && !tremorsenseGroundContactBroken(observer, target)) {
         return {
           state: VisibilityState.OBSERVED,
           detection: {
@@ -526,7 +566,7 @@ function checkPreciseNonVisualSenses(
     }
 
     // Any other non-visual precise sense allows observation
-    if (senseData && senseData.range > 0) {
+    if (hasPositiveSenseRange(senseData)) {
       return {
         state: VisibilityState.OBSERVED,
         detection: {
@@ -573,12 +613,20 @@ function determineVisualDetection(
   }
 
   // Check if observer has see-invisibility sense BEFORE checking invisibility
-  const hasSeeInvisibility =
-    observer.precise[SenseType.SEE_INVISIBILITY] || observer.precise.seeInvisibility;
+  const hasSeeInvisibility = hasPreciseSense(observer.precise, [
+    SenseType.SEE_INVISIBILITY,
+    'seeInvisibility',
+  ]);
+  const hasTruesight = hasPreciseSense(observer.precise, ['truesight']);
+  const hasSeeAll = hasPreciseSense(observer.precise, ['see-all', 'seeAll']);
+  const hasInfraredVision = hasPreciseSense(observer.precise, [
+    'infrared-vision',
+    'infraredVision',
+  ]);
 
   // CRITICAL: Invisible targets cannot be detected by visual senses UNLESS observer has see-invisibility
   const isInvisible = target.auxiliary.includes('invisible');
-  if (isInvisible && !hasSeeInvisibility) {
+  if (isInvisible && !hasSeeInvisibility && !hasTruesight && !hasSeeAll) {
     return {
       canDetect: false,
       sense: null,
@@ -595,7 +643,7 @@ function determineVisualDetection(
   const isDazzled = conditions.dazzled;
 
   // Check if observer has any precise non-visual senses
-  const hasPreciseNonVisualSense = checkHasPreciseNonVisualSense(observer);
+  const hasPreciseNonVisualSense = checkHasPreciseNonVisualSense(observer, target);
 
   // Dazzled only applies if vision is the ONLY precise sense
   const dazzledApplies = isDazzled && !hasPreciseNonVisualSense;
@@ -635,8 +683,25 @@ function determineVisualDetection(
 
   // Check visual senses in priority order
 
+  if (hasSeeAll) {
+    return {
+      canDetect: true,
+      sense: 'see-all',
+      isPrecise: true,
+      baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
+    };
+  }
+
+  if (hasTruesight && isInvisible) {
+    return {
+      canDetect: true,
+      sense: 'truesight',
+      isPrecise: true,
+      baseState: dazzledApplies ? VisibilityState.CONCEALED : VisibilityState.OBSERVED,
+    };
+  }
+
   // See-invisibility: allows detection of invisible creatures as concealed
-  // This is checked FIRST because it specifically counters invisibility
   if (hasSeeInvisibility && isInvisible) {
     return {
       canDetect: true,
@@ -716,6 +781,19 @@ function determineVisualDetection(
       // Low-light vision doesn't work in any type of darkness
       return { canDetect: false };
     }
+  }
+
+  // Infrared vision: detects heat signatures without relying on ambient light.
+  if (hasInfraredVision) {
+    return {
+      canDetect: true,
+      sense: 'infrared-vision',
+      isPrecise: true,
+      baseState:
+        effectiveLightingLevel === LightingLevel.GREATER_MAGICAL_DARKNESS || dazzledApplies
+          ? VisibilityState.CONCEALED
+          : VisibilityState.OBSERVED,
+    };
   }
 
   // Light-perception and normal vision: work the same way
@@ -925,8 +1003,8 @@ function applyVisualModifiers(visualDetection, observer, target) {
   const { auxiliary, concealment } = target;
 
   // 1. Apply invisibility (most significant modifier)
-  // EXCEPTION: see-invisibility sense already handled invisibility in determineVisualDetection
-  if (auxiliary.includes('invisible') && visualDetection.sense !== SenseType.SEE_INVISIBILITY) {
+  // EXCEPTION: visual senses that counter invisibility are already handled in determineVisualDetection
+  if (auxiliary.includes('invisible') && !visualSenseCountersInvisibility(visualDetection.sense)) {
     // In PF2e, invisible creatures are undetected
     // (they can still be detected by imprecise senses like hearing, tremorsense, etc.,
     // but those are handled separately in the imprecise sense detection logic)

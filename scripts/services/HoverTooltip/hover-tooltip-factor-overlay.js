@@ -41,6 +41,8 @@ export const DETECTION_FACTOR_KEYWORDS = [
   'Blindsight',
   'bloodsense',
   'Bloodsense',
+  'electromagnetic',
+  'Electromagnetic',
   'touch',
   'Touch',
   'tactile',

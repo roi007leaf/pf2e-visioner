@@ -263,6 +263,17 @@ describe('SenseSuppressionRegionBehavior', () => {
       expect(precise).not.toHaveProperty('seeInvisibility');
       expect(precise).not.toHaveProperty('see-invisibility');
     });
+
+    test('should delete electromagnetic-sense variants', () => {
+      const precise = {};
+      const imprecise = {
+        electromagneticSense: { range: 30 },
+        'electromagnetic-sense': { range: 45 },
+      };
+      SenseSuppressionRegionBehavior.deleteSenseFromCapabilities(precise, imprecise, 'electromagnetic-sense');
+      expect(imprecise).not.toHaveProperty('electromagneticSense');
+      expect(imprecise).not.toHaveProperty('electromagnetic-sense');
+    });
   });
 
   describe('applySenseSuppression', () => {

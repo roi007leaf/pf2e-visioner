@@ -11,7 +11,11 @@ export function isVisionSenseType(senseType) {
     type === 'greaterdarkvision' ||
     type === 'low-light-vision' ||
     type === 'lowlightvision' ||
+    type === 'light-perception' ||
+    type === 'lightperception' ||
     type === 'see-invisibility' ||
+    type === 'see-all' ||
+    type === 'seeall' ||
     type === 'truesight' ||
     type.includes('vision') ||
     type.includes('sight')

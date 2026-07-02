@@ -63,12 +63,17 @@ describe('SeekDialogAdapter', () => {
             expect(SeekDialogAdapter.isVisualSenseType('greater-darkvision')).toBe(true);
             expect(SeekDialogAdapter.isVisualSenseType('low-light-vision')).toBe(true);
             expect(SeekDialogAdapter.isVisualSenseType('truesight')).toBe(true);
+            expect(SeekDialogAdapter.isVisualSenseType('see-all')).toBe(true);
+            expect(SeekDialogAdapter.isVisualSenseType('lightPerception')).toBe(true);
+            expect(SeekDialogAdapter.isVisualSenseType('infraredVision')).toBe(true);
 
             expect(SeekDialogAdapter.isVisualSenseType('hearing')).toBe(false);
             expect(SeekDialogAdapter.isVisualSenseType('echolocation')).toBe(false);
             expect(SeekDialogAdapter.isVisualSenseType('lifesense')).toBe(false);
             expect(SeekDialogAdapter.isVisualSenseType('scent')).toBe(false);
             expect(SeekDialogAdapter.isVisualSenseType('tremorsense')).toBe(false);
+            expect(SeekDialogAdapter.isVisualSenseType('sense-invisibility')).toBe(false);
+            expect(SeekDialogAdapter.isVisualSenseType('sense-all')).toBe(false);
         });
 
         test('VISUAL_SENSE_PRIORITY has correct hierarchy', async () => {
