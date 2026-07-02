@@ -139,6 +139,8 @@
       "bloodsense_description": "You can detect the presence and location of creatures by sensing blood within range.",
       "magicsense": "Magicsense",
       "magicsense_description": "You can sense magical auras or effects within range.",
+      "electromagnetic_sense": "Electromagnetic Sense",
+      "electromagnetic_sense_description": "You can detect electrical and magnetic phenomena within range.",
       "motion_sense": "Motion Sense",
       "motion_sense_description": "You can detect motion in your surroundings within range.",
       "spiritsense": "Spiritsense",

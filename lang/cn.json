@@ -1024,6 +1024,8 @@
             "see_the_unseen_description": "你可以感知到范围内原本无形无迹的现象。",
             "spiritsense": "精魂感知",
             "magicsense_description": "你能够感知范围内的魔法区域或效应。",
+            "electromagnetic_sense": "Electromagnetic Sense",
+            "electromagnetic_sense_description": "You can detect electrical and magnetic phenomena within range.",
             "wavesense": "水波感知",
             "thoughtsense_description": "你能够侦测到范围内具备思想的生物。",
             "wavesense_description": "你能够通过范围内的液体介质感知到振波。",
