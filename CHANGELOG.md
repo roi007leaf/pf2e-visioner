@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.12] - 2026-07-04
+
+### Fixed
+
+- **Door peeking no longer reveals creatures from previously explored fog**: When a room had already been explored, Foundry could treat tokens in old fog-of-war history as visible during an active peek, even outside the current slit. Visioner now gates core visibility through the active peek LOS, FOV, and range so peeking only reveals creatures inside the current opening.
+
 ## [8.3.11] - 2026-07-02
 
 ### Added

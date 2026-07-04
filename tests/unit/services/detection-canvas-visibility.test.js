@@ -3,6 +3,7 @@ import '../../setup.js';
 import { wrapCanvasVisibilityTest } from '../../../scripts/services/Detection/detection-canvas-visibility.js';
 import { createCanDetectVisibilityWrapper } from '../../../scripts/services/Detection/detection-can-detect.js';
 import { testDetectionModeVisibility } from '../../../scripts/services/Detection/detection-mode-visibility.js';
+import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 
 function visibilityV2Flags(map) {
@@ -27,6 +28,7 @@ describe('canvas visibility wrapper', () => {
   afterEach(() => {
     global.game.settings.set('pf2e', 'gmVision', false);
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
+    peekRegistry.clearAll();
     global.canvas = originalCanvas;
   });
 
@@ -117,6 +119,74 @@ describe('canvas visibility wrapper', () => {
 
     expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
     expect(target.detectionFilter).toEqual({ id: 'hearing-soundwave-filter' });
+  });
+
+  test('active peek rejects core visibility from explored fog outside the peek polygon', () => {
+    global.game.user.isGM = false;
+    const observer = createMockToken({ id: 'observer' });
+    observer.vision = {
+      los: {
+        containsPoint: jest.fn((point) => point.x < 100),
+      },
+    };
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    peekRegistry.set(
+      'observer',
+      {
+        origin: { x: 0, y: 0 },
+        direction: 0,
+        fov: 30,
+        range: 200,
+        ignoredWallIds: ['door1'],
+      },
+      1000,
+    );
+    const wrapped = jest.fn(() => true);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 250, y: 0 }], { object: target })).toBe(false);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('active peek keeps core visibility for points inside the peek polygon', () => {
+    global.game.user.isGM = false;
+    const observer = createMockToken({ id: 'observer' });
+    observer.vision = {
+      los: {
+        containsPoint: jest.fn((point) => point.x < 100),
+      },
+    };
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    peekRegistry.set(
+      'observer',
+      {
+        origin: { x: 0, y: 0 },
+        direction: 0,
+        fov: 30,
+        range: 200,
+        ignoredWallIds: ['door1'],
+      },
+      1000,
+    );
+    const wrapped = jest.fn(() => true);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 50, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
   test('GM Vision bypass keeps core can-detect result', () => {
