@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.13] - 2026-07-06
+
+### Fixed
+
+- **Creatures seen through an open door at wide angles are no longer hidden**: When a sightline through an open door grazed the corner shared by the door and an adjoining wall, Visioner's wall-aware geometry blocked it on the plain-wall side even though Foundry's own vision saw through the open door — hiding creatures the party should see (until AVS was disabled or the token was reselected). The open-door line-of-sight pass now trusts Foundry's vision polygon as well as Visioner's geometry, so those creatures stay visible.
+
 ## [8.3.12] - 2026-07-04
 
 ### Fixed

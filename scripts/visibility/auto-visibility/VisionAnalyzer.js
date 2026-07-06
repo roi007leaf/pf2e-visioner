@@ -414,7 +414,7 @@ export class VisionAnalyzer {
         }
 
         const openDoorGeometryPass =
-          geometricResult && this.#hasOpenDoorAlongRay(observerCenter, targetPoints);
+          (geometricResult || visible) && this.#hasOpenDoorAlongRay(observerCenter, targetPoints);
         if (openDoorGeometryPass) {
           return true;
         }
