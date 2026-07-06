@@ -31,9 +31,34 @@ describe('applyPeekOverrideToData', () => {
     expect(data.radius).toBe(400);
   });
 
+  test('numeric fov keeps the core source full-angle so the controller can apply a cone without external-radius bleed', () => {
+    const data = applyPeekOverrideToData(
+      { angle: 90 },
+      { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 400 },
+    );
+    expect(data.angle).toBe(360);
+  });
+
+  test('positive range also expands external radius for darkness fallback geometry', () => {
+    const data = applyPeekOverrideToData(
+      { externalRadius: 50 },
+      { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 400 },
+    );
+    expect(data.externalRadius).toBe(400);
+  });
+
   test('range 0 leaves data.radius undefined', () => {
     const data = applyPeekOverrideToData({}, { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 0 });
     expect(data.radius).toBeUndefined();
+  });
+
+  test('range 0 mirrors existing sight radius into external radius for corner peeks', () => {
+    const data = applyPeekOverrideToData(
+      { radius: 1200, externalRadius: 50 },
+      { origin: { x: 1, y: 2 }, direction: 0, fov: null, range: 0 },
+    );
+    expect(data.radius).toBe(1200);
+    expect(data.externalRadius).toBe(1200);
   });
 
   test('missing origin returns data unchanged', () => {

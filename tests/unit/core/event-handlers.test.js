@@ -1689,11 +1689,17 @@ describe('Event Handler Tests', () => {
     let mockSystemState, mockVisibilityState, mockCacheManager;
 
     beforeEach(() => {
+      jest.useFakeTimers();
       mockSystemState = createMockSystemStateProvider();
       mockVisibilityState = createMockVisibilityStateManager();
       mockCacheManager = createMockCacheManager();
 
       wallHandler = new WallEventHandler(mockSystemState, mockVisibilityState, mockCacheManager);
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
     });
 
     test('should initialize hooks correctly', () => {
@@ -1749,6 +1755,8 @@ describe('Event Handler Tests', () => {
       const changes = { c: [0, 0, 100, 100] }; // coordinates change
 
       wallHandler.handleWallUpdate(mockWall, changes);
+      // Non-door wall changes defer the recalculation until Foundry rebuilds vision.
+      jest.runOnlyPendingTimers();
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
@@ -1758,6 +1766,7 @@ describe('Event Handler Tests', () => {
       const changes = { threshold: { sight: 10 } };
 
       wallHandler.handleWallUpdate(mockWall, changes);
+      jest.runOnlyPendingTimers();
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
@@ -1786,6 +1795,7 @@ describe('Event Handler Tests', () => {
       const mockWall = { id: 'wall1' };
 
       wallHandler.handleWallCreate(mockWall);
+      jest.runOnlyPendingTimers();
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
@@ -1794,6 +1804,7 @@ describe('Event Handler Tests', () => {
       const mockWall = { id: 'wall1' };
 
       wallHandler.handleWallDelete(mockWall);
+      jest.runOnlyPendingTimers();
 
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });

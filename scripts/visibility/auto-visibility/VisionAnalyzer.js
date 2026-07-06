@@ -52,6 +52,7 @@ export class VisionAnalyzer {
   #wallSpatialIndexCache = new WeakMap();
   #soundBlockingWallCache = null;
   #soundBlockingWallCacheTimestamp = 0;
+  #onDemandSightPolygonCache = new Map();
 
   #positionManager = null;
 
@@ -303,7 +304,7 @@ export class VisionAnalyzer {
       // If the observer has an los shape, use that for line of sight against the target's circle
       // Darkness sources may affect true LOS, so only return true/false if we can be sure
       stage = 'vision-polygon';
-      const los = observer.vision?.los;
+      let los = observer.vision?.los;
       // CRITICAL: Use PositionManager if available to get correct positions
       // This fixes the issue where token.center is stale during player movements
       let observerPos = { x: observer.center.x, y: observer.center.y };
@@ -342,11 +343,26 @@ export class VisionAnalyzer {
         }
       }
 
+      // Foundry only keeps observer.vision.los fresh for the client's active (controlled) vision
+      // source, so on the GM's client every non-selected token has a missing or stale polygon and
+      // falls back to a wrong answer. Compute the sight polygon on demand whenever the observer's
+      // vision source is not active, so LOS is independent of which token is currently controlled.
+      let usingOnDemandLos = false;
+      const visionSourceActive = observer?.vision?.active === true;
+      if (!los?.points || !visionSourceActive) {
+        const onDemandLos = this.#getOnDemandSightPolygon(observer, observerPos);
+        if (onDemandLos?.points?.length) {
+          los = onDemandLos;
+          usingOnDemandLos = true;
+        }
+      }
+
       // Use vision polygon for LOS check - this is Foundry's accurate pre-computed vision
       // The vision polygon is based on the observer's position and respects all walls
       // HOWEVER: During token movement, the vision polygon may be stale (based on old position)
       // So we check if the observer position has changed significantly
       const visionPolygonStale =
+        !usingOnDemandLos &&
         usingPositionManager &&
         los?.points &&
         (Math.abs(observerPos.x - observer.center.x) > 5 ||
@@ -434,8 +450,19 @@ export class VisionAnalyzer {
           );
           return !!customWallPass;
         } else {
-          // If Foundry's polygon includes the target but Visioner's wall-aware geometry blocks it,
-          // keep the geometric block so custom wall-height/elevation rules still apply.
+          // Foundry's polygon includes the target but Visioner's wall-aware geometry blocks it.
+          // If observer and target share a vertical band, this is a 2D grazing-corner false
+          // negative (Visioner's rays clip a wall endpoint that Foundry's sweep sees past) —
+          // trust Foundry's polygon, which is what actually renders. Keep the geometric block
+          // only when elevation separates them, so wall-height rules still apply.
+          const verticalOverlap =
+            !hybridObserverSpan ||
+            !hybridTargetSpan ||
+            (hybridObserverSpan.bottom <= hybridTargetSpan.top &&
+              hybridTargetSpan.bottom <= hybridObserverSpan.top);
+          if (verticalOverlap && foundryPointVisible !== false) {
+            return true;
+          }
           return geometricResult;
         }
       } else if (visionPolygonStale) {
@@ -616,6 +643,30 @@ export class VisionAnalyzer {
     if (!peek?.ignoredWallIds?.length) return walls;
     const ignore = new Set(peek.ignoredWallIds);
     return walls.filter((w) => !ignore.has(w.document?.id));
+  }
+
+  #getOnDemandSightPolygon(observer, observerPos) {
+    try {
+      const backend = globalThis.CONFIG?.Canvas?.polygonBackends?.sight;
+      if (typeof backend?.create !== 'function') return null;
+      const id = observer?.document?.id ?? observer?.id ?? 'na';
+      const key = `${id}:${Math.round(observerPos.x)}:${Math.round(observerPos.y)}`;
+      if (this.#onDemandSightPolygonCache.has(key)) {
+        return this.#onDemandSightPolygonCache.get(key);
+      }
+      const polygon = backend.create(
+        { x: observerPos.x, y: observerPos.y },
+        { type: 'sight' },
+      );
+      const result = polygon?.points?.length ? polygon : null;
+      if (this.#onDemandSightPolygonCache.size > 512) {
+        this.#onDemandSightPolygonCache.clear();
+      }
+      this.#onDemandSightPolygonCache.set(key, result);
+      return result;
+    } catch {
+      return null;
+    }
   }
 
   #getCachedWalls(elevationRange) {
@@ -1630,6 +1681,7 @@ export class VisionAnalyzer {
       this.#wallSpatialIndexCache = new WeakMap();
       this.#soundBlockingWallCache = null;
       this.#soundBlockingWallCacheTimestamp = 0;
+      this.#onDemandSightPolygonCache.clear();
     }
   }
 
@@ -2448,7 +2500,15 @@ export class VisionAnalyzer {
       echolocationActive: false,
       echolocationRange: 0,
       individualSenses: {},
-      sensingSummary: this.#emptyCapabilities(),
+      sensingSummary: {
+        precise: [],
+        imprecise: [],
+        hearing: null,
+        lifesense: null,
+        echolocationActive: false,
+        echolocationRange: 0,
+        individualSenses: {},
+      },
     };
   }
 }

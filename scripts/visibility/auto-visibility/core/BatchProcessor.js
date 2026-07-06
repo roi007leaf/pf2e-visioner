@@ -137,8 +137,19 @@ function calculateApproximateSenseDistanceInFeet(distanceInGridUnits) {
   return distanceInGridUnits * gridDistance;
 }
 
+function normalizeSenseList(value) {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') {
+    return Object.entries(value).map(([type, range]) => ({ type, range }));
+  }
+  return [];
+}
+
 function shouldUseExactSenseDistance(sensingSummary) {
-  const allSenses = [...(sensingSummary?.precise || []), ...(sensingSummary?.imprecise || [])];
+  const allSenses = [
+    ...normalizeSenseList(sensingSummary?.precise),
+    ...normalizeSenseList(sensingSummary?.imprecise),
+  ];
   if (
     allSenses.some((sense) => {
       const senseType = normalizeSenseType(sense);
@@ -1180,7 +1191,10 @@ export class BatchProcessor {
       ? calculateSenseDistanceInFeet(observer, target, distance)
       : approximateDistanceInFeet;
 
-    const allSenses = [...(sensingSummary.precise || []), ...(sensingSummary.imprecise || [])];
+    const allSenses = [
+      ...normalizeSenseList(sensingSummary.precise),
+      ...normalizeSenseList(sensingSummary.imprecise),
+    ];
     const hasSpecialSense = allSenses.some((sense) =>
       canSpecialSenseBypassLineOfSight(sense, target, distanceInFeet, isDeafened),
     );

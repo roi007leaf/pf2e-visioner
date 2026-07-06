@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.3.14] - 2026-07-06
+
+### Fixed
+
+- **Opening a door now reveals creatures to the players immediately, without the GM reselecting a token**: Auto Visibility leaned on the GM's currently-controlled token for line-of-sight, so a creature made visible through a newly-opened door stayed hidden for other observers until the GM selected that observer — and even then the recompute could run against wall geometry Foundry had not finished rebuilding yet, leaving the creature hidden for several seconds (or indefinitely with custom door meshes). Visioner now computes each observer's line of sight independently of the GM's selection, and rebuilds the wall geometry synchronously when a door opens or closes, so the reveal is correct and immediate for everyone.
+- **Corner and door peeking no longer flicker for non-darkvision actors**: Foundry could treat a non-darkvision peeker in darkness as darkness-blinded at the shifted peek origin, collapsing the active vision source to the token footprint on alternating refreshes. Visioner now keeps the peek source radius stable and applies the door-slit cone itself, so peek vision stays steady without leaking sight outside the slit.
+
 ## [8.3.13] - 2026-07-06
 
 ### Fixed

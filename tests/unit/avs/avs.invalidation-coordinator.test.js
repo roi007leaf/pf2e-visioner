@@ -229,7 +229,9 @@ describe('AvsInvalidationCoordinator wall reasons', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
     global.game.pf2eVisioner = {};
+    global.canvas.edges = { inititalize: jest.fn() };
     systemState = makeSystemState();
     visibilityState = makeVisibilityState();
     cacheManager = makeCacheManager();
@@ -244,7 +246,18 @@ describe('AvsInvalidationCoordinator wall reasons', () => {
     });
   });
 
-  test('wall-updated clears LOS caches and recalculates when LOS-affecting fields change', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function fireVisionRefreshHook() {
+    const call = global.Hooks.once.mock.calls.find(
+      (c) => c[0] === 'sightRefresh' || c[0] === 'initializeVisionSources',
+    );
+    call?.[1]?.();
+  }
+
+  test('wall-updated clears LOS caches synchronously and recalculates after the vision refresh', () => {
     global.foundry.utils.hasProperty.mockImplementation((obj, path) => path === 'threshold.sight');
 
     const result = coordinator.invalidate({
@@ -257,6 +270,25 @@ describe('AvsInvalidationCoordinator wall reasons', () => {
     expect(visionAnalyzer.clearCache).toHaveBeenCalledTimes(1);
     expect(cacheManager.clearGlobalVisibilityCache).toHaveBeenCalledTimes(1);
     expect(batchOrchestrator.clearBurstLosMemo).toHaveBeenCalledTimes(1);
+    // Non-door wall changes defer the recalculation until Foundry has rebuilt vision.
+    expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+
+    fireVisionRefreshHook();
+    expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+  });
+
+  test('wall-updated door change rebuilds edges and recalculates immediately', () => {
+    global.foundry.utils.hasProperty.mockImplementation((obj, path) => path === 'ds');
+
+    const result = coordinator.invalidate({
+      reason: 'wall-updated',
+      changeData: { ds: 1 },
+    });
+
+    expect(result).toBe(true);
+    expect(cacheManager.clearLosCache).toHaveBeenCalled();
+    // Edges are force-rebuilt so the recompute this frame sees the new door geometry.
+    expect(global.canvas.edges.inititalize).toHaveBeenCalled();
     expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
   });
 
@@ -274,7 +306,7 @@ describe('AvsInvalidationCoordinator wall reasons', () => {
   });
 
   test.each(['wall-created', 'wall-deleted'])(
-    '%s always clears LOS caches and recalculates immediately',
+    '%s clears LOS caches synchronously and recalculates after the vision refresh',
     (reason) => {
       const result = coordinator.invalidate({ reason });
 
@@ -283,6 +315,9 @@ describe('AvsInvalidationCoordinator wall reasons', () => {
       expect(visionAnalyzer.clearCache).toHaveBeenCalledTimes(1);
       expect(cacheManager.clearGlobalVisibilityCache).toHaveBeenCalledTimes(1);
       expect(batchOrchestrator.clearBurstLosMemo).toHaveBeenCalledTimes(1);
+      expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+
+      fireVisionRefreshHook();
       expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
     },
   );

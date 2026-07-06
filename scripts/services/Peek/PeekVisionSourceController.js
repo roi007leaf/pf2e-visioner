@@ -71,16 +71,62 @@ export class PeekVisionSourceController {
 
   _clampPeekLosToFov(token) {
     const tokenId = token?.document?.id;
-    if (!this._overrides.has(tokenId)) return;
+    const peek = this._overrides.get(tokenId);
+    if (!peek) return;
     const los = token?.vision?.los;
-    const fov = token?.vision?.fov;
+    const fov = this._createPeekFovPolygon(los, peek) ?? token?.vision?.fov;
     const fovPoints = fov?.points;
     if (!los || !Array.isArray(fovPoints) || fovPoints.length < 6) return;
     const originalLosGeometry = this._captureLosGeometry(los);
+    if (fov !== token?.vision?.fov && token?.vision) {
+      this._assignGeometryProperty(token.vision, 'shape', fov);
+    }
     try {
       los.points = [...fovPoints];
     } catch (_) {}
     this._delegateLosGeometryToFov(los, fov, originalLosGeometry);
+  }
+
+  _createPeekFovPolygon(los, peek) {
+    if (typeof peek?.fov !== 'number') return null;
+    if (typeof los?.applyConstraint !== 'function') return null;
+    const constraint = this._createPeekConeConstraint(peek, this._peekConstraintRadius(los, peek));
+    if (!constraint) return null;
+    try {
+      return los.applyConstraint(constraint);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  _peekConstraintRadius(los, peek) {
+    for (const value of [peek?.range, los?.config?.radius, globalThis.canvas?.dimensions?.maxR]) {
+      if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+    }
+    return 0;
+  }
+
+  _createPeekConeConstraint(peek, radius) {
+    const Polygon = globalThis.PIXI?.Polygon;
+    if (typeof Polygon !== 'function') return null;
+    const origin = peek?.origin;
+    const direction = peek?.direction;
+    const fov = peek?.fov;
+    if (!origin || typeof direction !== 'number' || typeof fov !== 'number') return null;
+    if (!Number.isFinite(radius) || radius <= 0 || !Number.isFinite(direction) || !Number.isFinite(fov)) {
+      return null;
+    }
+    const clampedFov = Math.max(0, Math.min(360, fov));
+    if (clampedFov <= 0 || clampedFov >= 360) return null;
+    const half = (clampedFov * Math.PI) / 360;
+    const start = direction - half;
+    const steps = Math.max(2, Math.ceil(clampedFov / 5));
+    const points = [origin.x, origin.y];
+    for (let i = 0; i <= steps; i += 1) {
+      const angle = start + ((2 * half * i) / steps);
+      points.push(origin.x + Math.cos(angle) * radius, origin.y + Math.sin(angle) * radius);
+    }
+    return new Polygon(points);
   }
 
   _captureLosGeometry(los) {

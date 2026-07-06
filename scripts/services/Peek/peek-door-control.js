@@ -14,6 +14,14 @@ export function clearHoveredDoorControl(control = null) {
 }
 
 export async function handleDoorPeekKeyDown(manager, { control = _hoveredDoorControl } = {}) {
+  const controlled = canvas?.tokens?.controlled ?? [];
+  if (controlled.length === 1) {
+    const id = controlled[0]?.document?.id;
+    if (id && manager?.getActivePeek?.(id)) {
+      manager.endPeek(id, 'toggle');
+      return true;
+    }
+  }
   return handleDoorRightDown(manager, control);
 }
 

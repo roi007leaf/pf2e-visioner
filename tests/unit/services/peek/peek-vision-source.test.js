@@ -73,6 +73,47 @@ describe('PeekVisionSourceController contract', () => {
     expect(token.vision.los.bounds).toBe(token.vision.fov.bounds);
   });
 
+  test('door peek applies its own cone constraint so expanded external radius cannot add full-circle sight', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const constrained = {
+      points: [10, 10, 60, 20, 20, 60],
+      bounds: { x: 10, y: 10, width: 50, height: 50 },
+      contains: jest.fn(() => true),
+    };
+    const los = {
+      points: [0, 0, 500, 0, 500, 500, 0, 500],
+      bounds: { x: 0, y: 0, width: 500, height: 500 },
+      config: { radius: 1200 },
+      applyConstraint: jest.fn(() => constrained),
+      contains: jest.fn(() => true),
+    };
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los,
+        fov: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        shape: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+      },
+      initializeVisionSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 10, range: 400, ignoredWallIds: ['door1'] });
+      expect(los.applyConstraint).toHaveBeenCalledWith(expect.any(Polygon));
+      expect(token.vision.shape).toBe(constrained);
+      expect(token.vision.los.points).toEqual(constrained.points);
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
   test('apply snapshots FOV geometry before overriding shared corner-peek LOS polygon', () => {
     const refresh = jest.fn();
     const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });

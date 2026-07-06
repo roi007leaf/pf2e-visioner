@@ -15,13 +15,20 @@ export function applyPeekOverrideToData(data, override) {
     data.elevation = override.origin.elevation;
   }
   if (typeof override.fov === 'number') {
-    data.angle = override.fov;
+    // Keep Foundry's source full-angle; PeekVisionSourceController applies the actual cone.
+    // This avoids externalRadius becoming a full-circle bleed outside narrow door peeks.
+    data.angle = 360;
   }
   if (typeof override.direction === 'number') {
     data.rotation = radiansToFoundryRotation(override.direction);
   }
   if (typeof override.range === 'number' && override.range > 0) {
     data.radius = override.range;
+    data.externalRadius = override.range;
+  } else if (typeof data.radius === 'number' && data.radius > 0) {
+    // Foundry uses externalRadius when darkness-blinding a non-darkvision source.
+    // Keep peek geometry from collapsing to the token footprint during that path.
+    data.externalRadius = data.radius;
   }
   return data;
 }

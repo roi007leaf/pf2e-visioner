@@ -24,6 +24,8 @@ export { AVS_INVALIDATION_REASON_HANDLERS } from './AvsInvalidationReasonRouter.
 
 export class AvsInvalidationCoordinator {
   static _lastControlTokenTime = 0;
+  static #WALL_RECOMPUTE_RETRY_DELAYS = [300, 900, 2000];
+  static #DOOR_RECOMPUTE_RETRY_DELAYS = [300, 1000, 2500];
 
   #reasonRouter;
   #movementInvalidation;
@@ -254,20 +256,99 @@ export class AvsInvalidationCoordinator {
     this.batchOrchestrator?.clearBurstLosMemo?.();
   }
 
+  #deferAfterVisionRefresh(callback) {
+    const run = () => {
+      try {
+        callback();
+      } catch {
+        /* best-effort */
+      }
+    };
+    let hookRan = false;
+    const runOnHook = () => {
+      if (hookRan) return;
+      hookRan = true;
+      run();
+    };
+    try {
+      globalThis.Hooks?.once?.('sightRefresh', runOnHook);
+    } catch {
+      /* ignore */
+    }
+    try {
+      globalThis.Hooks?.once?.('initializeVisionSources', runOnHook);
+    } catch {
+      /* ignore */
+    }
+    // Foundry (and modules that manage custom door meshes) can rebuild wall edges hundreds of
+    // ms after the vision-source refresh fires, so the hook pass may still see stale geometry.
+    // Retry over a short window so at least one recompute runs against settled edges. Each pass
+    // clears the caches and recomputes; timer passes never self-trigger, so there is no loop.
+    for (const delay of AvsInvalidationCoordinator.#WALL_RECOMPUTE_RETRY_DELAYS) {
+      try {
+        setTimeout(run, delay);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  #recomputeAllAfterWallChange() {
+    this.#clearWallInvalidationCaches();
+    this.visibilityState?.markAllTokensChangedImmediate?.();
+  }
+
   #handleWallUpdated(changeData) {
     if (!this.#shouldProcessEvents()) return false;
     if (!changeAffectsLineOfSight(changeData)) return false;
 
     this.#clearWallInvalidationCaches();
-    this.visibilityState?.markAllTokensChangedImmediate?.();
+    this.#forceEdgeRebuild();
+    if (changeData?.ds !== undefined) {
+      this.#recomputeAfterDoorChange();
+    } else {
+      this.#deferAfterVisionRefresh(() => this.#recomputeAllAfterWallChange());
+    }
     return true;
+  }
+
+  #forceEdgeRebuild() {
+    // Foundry only reflects a door/wall change in canvas.edges after its own perception cycle,
+    // which can lag by seconds (worse when custom door meshes fail to build). Rebuild the edge
+    // set synchronously from the current wall documents so a recompute this frame sees the new
+    // geometry immediately. (CanvasEdges#inititalize is Foundry's real method - note the typo.)
+    try {
+      const edges = globalThis.canvas?.edges;
+      if (typeof edges?.inititalize === 'function') edges.inititalize();
+      else if (typeof edges?.initialize === 'function') edges.initialize();
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  #recomputeAfterDoorChange() {
+    // Edges were force-rebuilt synchronously above, so recompute now for an immediate reveal.
+    this.#recomputeAllAfterWallChange();
+    // Safety net: if Foundry's own (stalled) refresh later re-sets the edges, or vision/lighting
+    // needs another beat, re-force the edges and recompute over a short widening window. Timer
+    // passes never self-trigger, so there is no feedback loop.
+    for (const delay of AvsInvalidationCoordinator.#DOOR_RECOMPUTE_RETRY_DELAYS) {
+      try {
+        setTimeout(() => {
+          this.#forceEdgeRebuild();
+          this.#recomputeAllAfterWallChange();
+        }, delay);
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   #handleWallCreatedOrDeleted() {
     if (!this.#shouldProcessEvents()) return false;
 
     this.#clearWallInvalidationCaches();
-    this.visibilityState?.markAllTokensChangedImmediate?.();
+    this.#deferAfterVisionRefresh(() => this.#recomputeAllAfterWallChange());
     return true;
   }
 
