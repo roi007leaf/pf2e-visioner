@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.15] - 2026-07-07
+
+### Fixed
+
+- **Soundwaves now appear mid-move the instant a creature slips out of sight, instead of at the destination**: When a controlled token moved so that a previously-seen creature lost line of sight, its soundwave (heard-not-seen indicator) only showed up once the move finished and the visibility recompute settled — a noticeable lag. Visioner now tracks each observer's live line of sight during the move and shows the soundwave the moment sight is lost, then hands off cleanly to the settled render at the destination with no flash back to a visible token. Hold-drags stay frozen until release, as before.
+
 ## [8.3.14] - 2026-07-06
 
 ### Fixed

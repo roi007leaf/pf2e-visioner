@@ -1,6 +1,6 @@
 {
   "name": "pf2e-visioner",
-  "version": "8.3.14",
+  "version": "8.3.15",
   "description": "Advanced per-token visibility and cover management for Pathfinder 2E",
   "main": "scripts/main.js",
   "scripts": {

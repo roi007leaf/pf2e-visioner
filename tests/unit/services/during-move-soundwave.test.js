@@ -2,8 +2,12 @@ import { jest } from '@jest/globals';
 import '../../setup.js';
 
 import {
+  clearDuringMoveSoundwaveState,
+  installSoundwaveFilterOverride,
   observerSightContainsTarget,
+  removeSoundwaveFilterOverride,
   setSoundwaveMeshVisible,
+  settleSoundwaveOverrides,
   targetShouldShowSoundwave,
 } from '../../../scripts/services/during-move-soundwave.js';
 
@@ -12,18 +16,42 @@ function observer(seesTarget) {
 }
 const target = { center: { x: 100, y: 100 } };
 const getVisibility = (vis) => () => vis;
+const notSensed = () => false;
+const sensed = () => true;
 
 describe('targetShouldShowSoundwave (during-move live decision)', () => {
   test('no soundwave when an observer sees the target (in sight)', () => {
     expect(targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'))).toBe(false);
   });
 
-  test('no soundwave for an observed target out of sight (precisely sensed, e.g. echolocation — a ring is imprecise-only)', () => {
-    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'))).toBe(false);
+  test('no soundwave for an observed target out of sight when precisely sensed (echolocation — a ring is imprecise-only)', () => {
+    expect(
+      targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'), undefined, notSensed),
+    ).toBe(false);
   });
 
-  test('no soundwave for a concealed target out of sight (concealed is a seen state, not imprecise)', () => {
-    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'))).toBe(false);
+  test('no soundwave for a concealed target out of sight when precisely sensed (echolocation — a ring is imprecise-only)', () => {
+    expect(
+      targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'), undefined, notSensed),
+    ).toBe(false);
+  });
+
+  test('soundwave for an observed target whose sight is lost mid-move but is still sensed imprecisely (heard)', () => {
+    expect(
+      targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'), undefined, sensed),
+    ).toBe(true);
+  });
+
+  test('soundwave for a concealed target whose sight is lost mid-move but is still sensed imprecisely (heard)', () => {
+    expect(
+      targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'), undefined, sensed),
+    ).toBe(true);
+  });
+
+  test('still no soundwave for an in-sight observed target even when imprecisely sensed (sight wins)', () => {
+    expect(
+      targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'), undefined, sensed),
+    ).toBe(false);
   });
 
   test('soundwave for a stored-hidden target out of sight', () => {
@@ -107,6 +135,128 @@ describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
   test('no-ops safely when the target has no detection filter mesh', () => {
     expect(() => setSoundwaveMeshVisible({}, false)).not.toThrow();
     expect(() => setSoundwaveMeshVisible(null, true)).not.toThrow();
+  });
+});
+
+describe('soundwave detectionFilter override (renders the ripple through Foundry per-frame reset)', () => {
+  const mockFilter = { id: 'soundwave-filter' };
+  let savedConfig;
+  beforeEach(() => {
+    savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } } },
+    };
+  });
+  afterEach(() => {
+    clearDuringMoveSoundwaveState();
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('installs an accessor whose getter returns the soundwave filter and absorbs null writes', () => {
+    const t = { document: { id: 'a' }, detectionFilter: null };
+    expect(installSoundwaveFilterOverride(t)).toBe(true);
+    expect(t.detectionFilter).toBe(mockFilter);
+    t.detectionFilter = null; // Foundry's per-frame reset
+    expect(t.detectionFilter).toBe(mockFilter); // still renders the ripple
+  });
+
+  test("getter prefers Foundry's own filter when one is set (genuinely-hidden target keeps its filter)", () => {
+    const t = { document: { id: 'b' }, detectionFilter: null };
+    installSoundwaveFilterOverride(t);
+    const foundryFilter = { id: 'foundry-hearing' };
+    t.detectionFilter = foundryFilter;
+    expect(t.detectionFilter).toBe(foundryFilter);
+  });
+
+  test('is idempotent - installing twice does not double-wrap', () => {
+    const t = { document: { id: 'c' }, detectionFilter: null };
+    expect(installSoundwaveFilterOverride(t)).toBe(true);
+    expect(installSoundwaveFilterOverride(t)).toBe(false);
+  });
+
+  test('remove restores a plain data property carrying Foundry\'s last value', () => {
+    const t = { document: { id: 'd' }, detectionFilter: null };
+    installSoundwaveFilterOverride(t);
+    const foundryFilter = { id: 'foundry-hearing' };
+    t.detectionFilter = foundryFilter;
+    removeSoundwaveFilterOverride(t);
+    expect(Object.getOwnPropertyDescriptor(t, 'detectionFilter').get).toBeUndefined();
+    expect(t.detectionFilter).toBe(foundryFilter);
+  });
+
+  test('remove restores null for a frozen-observed target (Foundry never set a real filter)', () => {
+    const t = { document: { id: 'e' }, detectionFilter: null };
+    installSoundwaveFilterOverride(t);
+    t.detectionFilter = null;
+    removeSoundwaveFilterOverride(t);
+    expect(Object.getOwnPropertyDescriptor(t, 'detectionFilter').get).toBeUndefined();
+    expect(t.detectionFilter).toBeNull();
+  });
+
+  test('clearDuringMoveSoundwaveState removes every override', () => {
+    const t1 = { document: { id: 'f1' }, detectionFilter: null };
+    const t2 = { document: { id: 'f2' }, detectionFilter: null };
+    installSoundwaveFilterOverride(t1);
+    installSoundwaveFilterOverride(t2);
+    clearDuringMoveSoundwaveState();
+    expect(Object.getOwnPropertyDescriptor(t1, 'detectionFilter')?.get).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(t2, 'detectionFilter')?.get).toBeUndefined();
+  });
+
+  test('no-ops for a target without a document id', () => {
+    expect(installSoundwaveFilterOverride({})).toBe(false);
+    expect(removeSoundwaveFilterOverride({})).toBe(false);
+  });
+});
+
+describe('settleSoundwaveOverrides (post-move handoff without an observed flash)', () => {
+  const mockFilter = { id: 'soundwave-filter' };
+  let savedConfig, savedCanvas;
+  beforeEach(() => {
+    savedConfig = globalThis.CONFIG;
+    savedCanvas = globalThis.canvas;
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } } },
+    };
+  });
+  afterEach(() => {
+    clearDuringMoveSoundwaveState();
+    globalThis.CONFIG = savedConfig;
+    globalThis.canvas = savedCanvas;
+  });
+
+  function overriddenTarget(id) {
+    const t = { document: { id }, center: { x: 0, y: 0 }, detectionFilter: null };
+    installSoundwaveFilterOverride(t);
+    return t;
+  }
+  const isOverridden = (t) => !!Object.getOwnPropertyDescriptor(t, 'detectionFilter')?.get;
+
+  test("hands off once Foundry's own recompute has produced a filter (persisted settled to hidden)", () => {
+    const t = overriddenTarget('h1');
+    t.detectionFilter = { id: 'foundry-hearing' }; // Foundry settled a real filter
+    globalThis.canvas = { tokens: { controlled: [], preview: { children: [] } } };
+    settleSoundwaveOverrides();
+    expect(isOverridden(t)).toBe(false);
+    expect(t.detectionFilter).toEqual({ id: 'foundry-hearing' }); // ripple continues, no flash
+  });
+
+  test('keeps the ripple while the target is still out of sight and Foundry has not caught up', () => {
+    const t = overriddenTarget('h2');
+    const observer = { document: { id: 'o' }, vision: { los: { contains: () => false } } };
+    globalThis.canvas = { tokens: { controlled: [observer], preview: { children: [] } } };
+    settleSoundwaveOverrides();
+    expect(isOverridden(t)).toBe(true); // held so there is no observed flash
+    expect(t.detectionFilter).toEqual(mockFilter);
+  });
+
+  test('drops the override once the target is back in an observer sight', () => {
+    const t = overriddenTarget('h3');
+    const observer = { document: { id: 'o' }, vision: { los: { contains: () => true } } };
+    globalThis.canvas = { tokens: { controlled: [observer], preview: { children: [] } } };
+    settleSoundwaveOverrides();
+    expect(isOverridden(t)).toBe(false);
+    expect(t.detectionFilter).toBeNull();
   });
 });
 

@@ -38,7 +38,7 @@ function normalizeSenseType(senseType) {
   return String(senseType || '').trim().toLowerCase();
 }
 
-function isVisualSenseType(senseType) {
+export function isVisualSenseType(senseType) {
   const type = normalizeSenseType(senseType);
   return VISUAL_SENSE_TYPES.has(type) || type.includes('vision') || type.includes('sight');
 }
