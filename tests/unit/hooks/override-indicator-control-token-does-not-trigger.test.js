@@ -217,6 +217,66 @@ describe('Override indicator should not trigger on controlToken', () => {
             .toHaveBeenCalledWith(['t1']);
     });
 
+    test('reselecting the same observer restores hidden Foundry token render state only', async () => {
+        const hiddenTarget = {
+            controlled: false,
+            visible: false,
+            renderable: false,
+            mesh: { visible: false, renderable: false, alpha: 0 },
+            document: { id: 'hidden-target', hidden: true },
+        };
+        const visibleGhost = {
+            controlled: false,
+            visible: true,
+            renderable: true,
+            mesh: { visible: true, renderable: true, alpha: 0.5 },
+            document: { id: 'visible-ghost', hidden: true },
+        };
+        const observer = { name: 'Auchs', document: { id: 'observer' } };
+        global.canvas.tokens.placeables = [observer, hiddenTarget, visibleGhost];
+
+        const { onCanvasReady } = await import('../../../scripts/hooks/lifecycle.js');
+        await onCanvasReady();
+
+        const controlTokenCbs = global.Hooks.on.mock.calls
+            .filter((c) => c?.[0] === 'controlToken')
+            .map((c) => c?.[1])
+            .filter(Boolean);
+        const trackerCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('trackControlTokenSession'),
+        );
+        const recalcCb = controlTokenCbs.find((cb) =>
+            String(cb).includes('avsRecalculateOnControlToken') ||
+            String(cb).includes('recalculateForTokens'),
+        );
+
+        global.canvas.tokens.controlled = [observer];
+        trackerCb(observer, true);
+        recalcCb(observer, true);
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        global.canvas.tokens.controlled = [];
+        trackerCb(observer, false);
+        hiddenTarget.visible = true;
+        hiddenTarget.renderable = true;
+        hiddenTarget.mesh = { visible: true, renderable: true, alpha: 0.5 };
+
+        global.canvas.tokens.controlled = [observer];
+        trackerCb(observer, true);
+        recalcCb(observer, true);
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(hiddenTarget.visible).toBe(false);
+        expect(hiddenTarget.renderable).toBe(false);
+        expect(hiddenTarget.mesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+        expect(visibleGhost.visible).toBe(true);
+        expect(visibleGhost.mesh).toEqual({ visible: true, renderable: true, alpha: 0.5 });
+    });
+
     test('controlToken refreshes system-hidden highlights after AVS recalculation settles', async () => {
         const updateSystemHiddenTokenHighlights = jest.fn().mockResolvedValue(undefined);
         jest.doMock('../../../scripts/services/visual-effects.js', () => ({

@@ -462,6 +462,23 @@ export function removeSystemHiddenIndicator(token, options = {}) {
   try {
     const indicator = token?._pvSystemHiddenIndicator;
     if (!indicator) return false;
+    if (globalThis.game?.ready && token?.document?.hidden) {
+      console.warn(
+        '[DEBUG-hiddentoken-a91f]',
+        JSON.stringify({
+          phase: 'indicator-remove-start',
+          tokenId: token.document.id,
+          tokenName: token.name,
+          indicatorMode: indicator._pvIndicatorMode,
+          options,
+          visible: token.visible,
+          renderable: token.renderable,
+          meshVisible: token.mesh?.visible,
+          meshRenderable: token.mesh?.renderable,
+          meshAlpha: token.mesh?.alpha,
+        }),
+      );
+    }
     unregisterSystemHiddenIndicator(indicator);
 
     if (typeof indicator._pvAnimationFrameId === 'function') {
@@ -512,6 +529,22 @@ export function removeSystemHiddenIndicator(token, options = {}) {
       clearPresenceOnlyTokenRenderSuppression(token, {
         forceTokenVisible: options?.forceTokenVisible === true && !restored,
       });
+    }
+    if (globalThis.game?.ready && token?.document?.hidden) {
+      console.warn(
+        '[DEBUG-hiddentoken-a91f]',
+        JSON.stringify({
+          phase: 'indicator-remove-finish',
+          tokenId: token.document.id,
+          tokenName: token.name,
+          restored,
+          visible: token.visible,
+          renderable: token.renderable,
+          meshVisible: token.mesh?.visible,
+          meshRenderable: token.mesh?.renderable,
+          meshAlpha: token.mesh?.alpha,
+        }),
+      );
     }
     return true;
   } catch (_) {

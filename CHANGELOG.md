@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.16] - 2026-07-10
+
+### Fixed
+
+- **Foundry-hidden tokens no longer flash into view while the GM moves or reselects an observer**: Foundry's movement and control refreshes could render a hidden target at translucent GM alpha until it was hovered. Visioner now preserves the target's prior observer-view render state across movement and deselect/reselect while leaving already-visible GM ghost tokens unchanged. The movement guard runs inside the existing visibility refresh, and reselection restores only the small cached set of hidden targets; neither path adds line-of-sight checks, frame loops, or animation work, so token movement FPS is unaffected.
+
 ## [8.3.15] - 2026-07-07
 
 ### Fixed

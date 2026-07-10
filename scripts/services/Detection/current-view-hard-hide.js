@@ -12,6 +12,30 @@ export function __setStoredVisibilityForTest(map) {
   storedVisibilityOverrideForTest = map;
 }
 
+const foundryHiddenDebugStates = new Map();
+
+function debugFoundryHiddenTarget(token, phase, details = {}) {
+  if (!globalThis.game?.ready || !token?.document?.hidden) return;
+  const state = {
+    phase,
+    tokenId: tokenIdOf(token),
+    tokenName: token.name,
+    activeMovement: hasActivePendingTokenMovement(),
+    visible: token.visible,
+    renderable: token.renderable,
+    meshVisible: token.mesh?.visible,
+    meshRenderable: token.mesh?.renderable,
+    meshAlpha: token.mesh?.alpha,
+    hardHidden: token._pvCurrentViewHardHidden,
+    ...details,
+  };
+  const key = `${state.tokenId}:${phase}`;
+  const signature = JSON.stringify(state);
+  if (foundryHiddenDebugStates.get(key) === signature) return;
+  foundryHiddenDebugStates.set(key, signature);
+  console.warn('[DEBUG-hiddentoken-a91f]', JSON.stringify(state));
+}
+
 function tokenIdOf(token) {
   return token?.document?.id ?? token?.id ?? null;
 }
@@ -122,7 +146,7 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   if (target.controlled) return false;
   if (shouldBypassAvsForGmVision()) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
-  if (foundryHiddenRequiresVisionerRenderLock(target)) return false;
+  if (target.document.hidden) return false;
   if (hiddenStateShouldRenderHideTarget(target)) return false;
 
   const observers = currentViewObservers();
@@ -140,12 +164,24 @@ function shouldDeferRenderingToCoreDuringMove(target) {
 }
 
 export function applyCurrentViewHardHide(token) {
-  if (shouldDeferRenderingToCoreDuringMove(token)) {
+  const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
+  if (shouldDefer) {
+    debugFoundryHiddenTarget(token, 'defer-to-core');
     if (token.visible) releaseCurrentViewHardHide(token);
     token._pvCurrentViewHardHidden = false;
     return false;
   }
-  if (!targetIsHardHiddenFromCurrentView(token)) {
+  const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
+  debugFoundryHiddenTarget(token, 'hard-hide-decision', {
+    shouldDefer,
+    shouldHardHide,
+    observerStates: currentViewObservers().map((observer) => ({
+      observerId: tokenIdOf(observer),
+      observerName: observer.name,
+      state: getStoredVisibilityState(observer, token),
+    })),
+  });
+  if (!shouldHardHide) {
     releaseCurrentViewHardHideIfMarked(token);
     return false;
   }
@@ -159,6 +195,7 @@ export function applyCurrentViewHardHide(token) {
   token.detectionFilter = null;
   hideHardHiddenChromeSurfaces(token);
   token._pvCurrentViewHardHidden = true;
+  debugFoundryHiddenTarget(token, 'hard-hide-applied');
   return true;
 }
 
@@ -183,6 +220,9 @@ export function releaseCurrentViewHardHide(token) {
     if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
   }
   restoreHardHiddenChromeSurfaces(token);
+  debugFoundryHiddenTarget(token, 'hard-hide-released', {
+    caller: new Error().stack?.split('\n').slice(2, 6).join(' | '),
+  });
   return true;
 }
 

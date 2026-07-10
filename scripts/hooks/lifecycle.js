@@ -32,7 +32,13 @@ const controlTokenSessionState = (globalThis.__pf2eVisionerControlTokenSessions 
   sequence: 0,
   tokenId: null,
   timers: new Set(),
+  hiddenRenderObserverId: null,
+  hiddenRenderStateCaptured: false,
+  hiddenRenderStates: [],
 });
+controlTokenSessionState.hiddenRenderObserverId ??= null;
+controlTokenSessionState.hiddenRenderStateCaptured ??= false;
+controlTokenSessionState.hiddenRenderStates ??= [];
 const controlTokenSelectionRecalcState = {
   signatures: new Map(),
 };
@@ -82,6 +88,94 @@ function clearControlTokenSessionTimers() {
   controlTokenSessionState.timers.clear();
 }
 
+function clearControlTokenHiddenRenderStates() {
+  controlTokenSessionState.hiddenRenderObserverId = null;
+  controlTokenSessionState.hiddenRenderStateCaptured = false;
+  controlTokenSessionState.hiddenRenderStates = [];
+}
+
+function captureFoundryHiddenRenderState(token) {
+  if (!token?.document?.hidden || token.controlled) return null;
+  const state = {
+    visible: token.visible,
+    renderable: token.renderable,
+    meshVisible: token.mesh?.visible,
+    meshRenderable: token.mesh?.renderable,
+    meshAlpha: token.mesh?.alpha,
+    hardHidden: token._pvCurrentViewHardHidden,
+  };
+  const isHidden =
+    state.visible === false ||
+    state.renderable === false ||
+    state.meshVisible === false ||
+    state.meshRenderable === false ||
+    state.meshAlpha === 0;
+  return isHidden ? state : null;
+}
+
+function captureControlTokenHiddenRenderStates(observer) {
+  const observerId = observer?.document?.id;
+  if (!observerId) return false;
+  const hiddenRenderStates = [];
+  for (const token of canvas?.tokens?.placeables ?? []) {
+    const state = captureFoundryHiddenRenderState(token);
+    if (state) hiddenRenderStates.push({ token, state });
+  }
+  controlTokenSessionState.hiddenRenderObserverId = observerId;
+  controlTokenSessionState.hiddenRenderStateCaptured = true;
+  controlTokenSessionState.hiddenRenderStates = hiddenRenderStates;
+  if (globalThis.game?.ready) {
+    console.warn(
+      '[DEBUG-hiddentoken-a91f]',
+      JSON.stringify({
+        phase: 'control-hidden-state-captured',
+        observerId,
+        observerName: observer.name,
+        targetCount: hiddenRenderStates.length,
+        targetIds: hiddenRenderStates.map(({ token }) => token.document.id),
+      }),
+    );
+  }
+  return true;
+}
+
+function restoreControlTokenHiddenRenderStates(observer) {
+  const observerId = observer?.document?.id;
+  if (
+    !observerId ||
+    controlTokenSessionState.hiddenRenderObserverId !== observerId ||
+    !controlTokenSessionState.hiddenRenderStateCaptured
+  ) {
+    return false;
+  }
+
+  const restoredTargetIds = [];
+  for (const { token, state } of controlTokenSessionState.hiddenRenderStates) {
+    if (!token?.document?.hidden || token.controlled) continue;
+    if ('visible' in token) token.visible = state.visible;
+    if ('renderable' in token) token.renderable = state.renderable;
+    if (token.mesh) {
+      if ('visible' in token.mesh) token.mesh.visible = state.meshVisible;
+      if ('renderable' in token.mesh) token.mesh.renderable = state.meshRenderable;
+      if ('alpha' in token.mesh) token.mesh.alpha = state.meshAlpha;
+    }
+    token._pvCurrentViewHardHidden = state.hardHidden;
+    restoredTargetIds.push(token.document.id);
+  }
+  if (globalThis.game?.ready && restoredTargetIds.length > 0) {
+    console.warn(
+      '[DEBUG-hiddentoken-a91f]',
+      JSON.stringify({
+        phase: 'control-hidden-state-restored',
+        observerId,
+        observerName: observer.name,
+        targetIds: restoredTargetIds,
+      }),
+    );
+  }
+  return true;
+}
+
 function resetControlTokenSession() {
   clearControlTokenSessionTimers();
   controlTokenSessionState.sequence += 1;
@@ -91,6 +185,9 @@ function resetControlTokenSession() {
 
 function trackControlTokenSession(token, controlled) {
   if (controlled && token?.document?.id) {
+    if (controlTokenSessionState.hiddenRenderObserverId !== token.document.id) {
+      clearControlTokenHiddenRenderStates();
+    }
     clearControlTokenSessionTimers();
     controlTokenSessionState.sequence += 1;
     controlTokenSessionState.tokenId = token.document.id;
@@ -98,6 +195,7 @@ function trackControlTokenSession(token, controlled) {
   }
 
   if ((canvas?.tokens?.controlled?.length ?? 0) === 0) {
+    captureControlTokenHiddenRenderStates(token);
     return resetControlTokenSession();
   }
 
@@ -255,10 +353,12 @@ function scheduleNoObserverVisibilityRefresh() {
 }
 
 function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.controlled?.[0]) {
-  void token;
   try {
     if (isSelectAllTokenVisibilityBypassActive()) {
       restoreVisionerHiddenTokensForSelectAll();
+    }
+    if (!restoreControlTokenHiddenRenderStates(token)) {
+      captureControlTokenHiddenRenderStates(token);
     }
     // Freeze+settle: no per-frame visioner refresh on control — core renders
     // live and AVS settles at move-end.
@@ -771,6 +871,23 @@ export async function onCanvasReady() {
   registerSelectAllTokenVisibilityBypassListener();
   registerHiddenTokenTicker();
 
+  {
+    const tokens = (canvas?.tokens?.placeables ?? []).map((token) => {
+      const screen = canvas?.stage?.worldTransform?.apply?.(token.center) ?? token.center;
+      return {
+        id: token.document?.id,
+        name: token.name,
+        hidden: token.document?.hidden,
+        screenX: Math.round(screen?.x ?? 0),
+        screenY: Math.round(screen?.y ?? 0),
+      };
+    });
+    console.warn(
+      '[DEBUG-hiddentoken-a91f]',
+      JSON.stringify({ phase: 'scene-token-positions', tokens }),
+    );
+  }
+
   try {
     await refreshVisionSharingTokenIds();
   } catch (error) {
@@ -1071,6 +1188,7 @@ export async function onCanvasReady() {
 
   bindHookOnce('resetControlTokenSessionOnCanvasTearDown', 'canvasTearDown', () => {
     resetControlTokenSession();
+    clearControlTokenHiddenRenderStates();
     clearControlTokenSelectionRecalcCache();
   });
 

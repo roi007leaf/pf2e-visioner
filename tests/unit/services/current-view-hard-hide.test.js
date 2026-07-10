@@ -349,7 +349,7 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
   });
 
-  function undetectedToken({ visible, getFlag, actorType = 'npc' } = {}) {
+  function undetectedToken({ visible, getFlag, actorType = 'npc', hidden = false } = {}) {
     return {
       controlled: false,
       visible,
@@ -357,7 +357,7 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
       mesh: { visible: false, renderable: false, alpha: 0 },
       detectionFilter: null,
       _pvCurrentViewHardHidden: true,
-      document: { id: 't', hidden: false, getFlag },
+      document: { id: 't', hidden, getFlag },
       actor: { type: actorType, itemTypes: { condition: [] } },
     };
   }
@@ -393,6 +393,16 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     expect(applyCurrentViewHardHide(t)).toBe(true);
     expect(t.visible).toBe(false);
     expect(t.renderable).toBe(false);
+  });
+
+  it('keeps a Foundry-hidden undetected token hard-hidden during a GM move', () => {
+    globalThis.game = { user: { isGM: true } };
+    const t = undetectedToken({ visible: true, hidden: true });
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t.mesh.alpha).toBe(0);
   });
 
   it('hard-hides a non-sticky undetected token when no move is active', () => {
