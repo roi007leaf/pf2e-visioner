@@ -1,7 +1,7 @@
 import '../../../setup.js';
 import { PeekManager } from '../../../../scripts/services/Peek/PeekManager.js';
 import { PeekRegistry } from '../../../../scripts/services/Peek/PeekRegistry.js';
-import { pullBackOrigin } from '../../../../scripts/services/Peek/peek-geometry.js';
+import { isPointInCone, pullBackOrigin } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 function deps() {
   return {
@@ -10,6 +10,17 @@ function deps() {
     socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
     recompute: jest.fn(),
     now: () => 1000,
+  };
+}
+
+function overridePeekSettings(values) {
+  const previousGet = global.game.settings.get;
+  global.game.settings.get = jest.fn((moduleId, key) => {
+    if (moduleId === 'pf2e-visioner' && Object.hasOwn(values, key)) return values[key];
+    return previousGet(moduleId, key);
+  });
+  return () => {
+    global.game.settings.get = previousGet;
   };
 }
 
@@ -29,17 +40,22 @@ describe('PeekManager door peek', () => {
 
 describe('PeekManager door re-aim and toggle', () => {
   test('updatePeek on a door peek keeps origin fixed but re-sends', () => {
+    const restoreSettings = overridePeekSettings({ peekSweepAngle: 45 });
     const d = deps();
-    const mgr = new PeekManager(d);
-    const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
-    token.center = { x: -50, y: 50 };
-    const door = { id: 'door1', c: [0, 0, 0, 100] };
-    mgr.startDoorPeek(token, door, { x: 100, y: 50 });
-    const originBefore = { ...d.registry.get('peeker').origin };
-    d.socket.sendUpdate.mockClear();
-    mgr.updatePeek('peeker', { x: 100, y: 200 });
-    expect(d.registry.get('peeker').origin).toEqual(originBefore);
-    expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+    try {
+      const mgr = new PeekManager(d);
+      const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
+      token.center = { x: -50, y: 50 };
+      const door = { id: 'door1', c: [0, 0, 0, 100] };
+      mgr.startDoorPeek(token, door, { x: 100, y: 50 });
+      const originBefore = { ...d.registry.get('peeker').origin };
+      d.socket.sendUpdate.mockClear();
+      mgr.updatePeek('peeker', { x: 100, y: 200 });
+      expect(d.registry.get('peeker').origin).toEqual(originBefore);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+    } finally {
+      restoreSettings();
+    }
   });
 
   test('tryStartDoorPeek twice on same token+door toggles the peek off', async () => {
@@ -58,16 +74,76 @@ describe('PeekManager door re-aim and toggle', () => {
 });
 
 describe('PeekManager updatePeek', () => {
-  test('updatePeek re-applies render, socket, and recompute', () => {
+  test('updatePeek always re-applies render, socket, and recompute for a door peek', () => {
+    // Door peeks keep the vision source's own origin fixed and just reapply a stable cone -
+    // cheap and never visibly jumps - so they're never subject to the render throttle below.
+    const restoreSettings = overridePeekSettings({ peekSweepAngle: 45 });
     const d = deps();
+    try {
+      const mgr = new PeekManager(d);
+      const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
+      const door = { id: 'door1', c: [0, 0, 0, 100] };
+      mgr.startDoorPeek(token, door, { x: 100, y: 50 });
+      mgr.updatePeek('peeker', { x: 100, y: 200 });
+      expect(d.renderer.apply).toHaveBeenCalledTimes(2);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(2);
+      expect(d.recompute).toHaveBeenCalledTimes(2);
+      expect(d.registry.has('peeker')).toBe(true);
+    } finally {
+      restoreSettings();
+    }
+  });
+
+  test('updatePeek always advances socket/recompute for a corner peek, but throttles the render rebuild that moves the origin', () => {
+    // Corner peeks move the vision source's own origin every tick, forcing Foundry to rebuild it
+    // from a new vantage point - throttled here to avoid a visible flicker (see _shouldRerender).
+    let now = 1000;
+    const d = {
+      registry: new PeekRegistry(),
+      renderer: { apply: jest.fn(), clear: jest.fn() },
+      socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+      recompute: jest.fn(),
+      now: () => now,
+    };
     const mgr = new PeekManager(d);
     const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
     mgr.startCornerPeek(token, { x: 500, y: 50 });
+    d.renderer.apply.mockClear();
+    d.socket.sendUpdate.mockClear();
+    d.recompute.mockClear();
+
+    // Still within the render-throttle window: reveal data updates, render rebuild is skipped.
+    now = 1050;
     mgr.updatePeek('peeker', { x: 10, y: 600 });
-    expect(d.renderer.apply).toHaveBeenCalledTimes(2);
+    expect(d.renderer.apply).not.toHaveBeenCalled();
+    expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+    expect(d.recompute).toHaveBeenCalledTimes(1);
+
+    // Past the render-throttle window: the rebuild is allowed again.
+    now = 1300;
+    mgr.updatePeek('peeker', { x: 600, y: 10 });
+    expect(d.renderer.apply).toHaveBeenCalledTimes(1);
     expect(d.socket.sendUpdate).toHaveBeenCalledTimes(2);
     expect(d.recompute).toHaveBeenCalledTimes(2);
-    expect(d.registry.has('peeker')).toBe(true);
+  });
+
+  test('updatePeek skips unchanged door geometry', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -100, y: 0, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100] };
+    const aim = { x: 100, y: 50 };
+    mgr.startDoorPeek(token, door, aim);
+    d.renderer.apply.mockClear();
+    d.socket.sendUpdate.mockClear();
+    d.recompute.mockClear();
+
+    const changed = mgr.updatePeek('peeker', aim);
+
+    expect(changed).toBe(false);
+    expect(d.renderer.apply).not.toHaveBeenCalled();
+    expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+    expect(d.recompute).not.toHaveBeenCalled();
   });
 
   test('updatePeek is a no-op for an unknown token', () => {
@@ -245,6 +321,95 @@ describe('PeekManager door DC gate', () => {
   });
 });
 
+describe('PeekManager door GM approval gate', () => {
+  let originalSettingsGet;
+  let originalIsGM;
+  let originalUserId;
+
+  beforeEach(() => {
+    originalSettingsGet = global.game.settings.get;
+    originalIsGM = global.game.user.isGM;
+    originalUserId = global.game.user.id;
+    global.game.user.id = 'player1';
+    global.game.user.isGM = false;
+    global.game.settings.get = jest.fn((_moduleId, key) =>
+      key === 'requireGmApprovalForDoorPeek' ? true : originalSettingsGet(_moduleId, key),
+    );
+  });
+
+  afterEach(() => {
+    global.game.settings.get = originalSettingsGet;
+    global.game.user.isGM = originalIsGM;
+    global.game.user.id = originalUserId;
+  });
+
+  test('player door peek sends approval request instead of starting immediately', async () => {
+    const approvalRequester = jest.fn(() => true);
+    const d = deps();
+    const mgr = new PeekManager({ ...d, approvalRequester });
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+
+    const handled = await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 });
+
+    expect(handled).toBe(true);
+    expect(d.registry.has('peeker')).toBe(false);
+    expect(d.renderer.apply).not.toHaveBeenCalled();
+    expect(approvalRequester).toHaveBeenCalledWith(expect.objectContaining({
+      tokenId: 'peeker',
+      wallId: 'door1',
+      userId: 'player1',
+    }));
+  });
+
+  test('approved door peek starts after the targeted response', async () => {
+    const approvalRequester = jest.fn(() => true);
+    const d = deps();
+    const mgr = new PeekManager({ ...d, approvalRequester });
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+    await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 });
+    const requestId = approvalRequester.mock.calls[0][0].requestId;
+
+    const started = await mgr.handleDoorPeekApprovalResponse({ requestId, approved: true });
+
+    expect(started).toBe(true);
+    expect(d.registry.has('peeker')).toBe(true);
+    expect(d.renderer.apply).toHaveBeenCalledTimes(1);
+  });
+
+  test('denied door peek never starts', async () => {
+    const approvalRequester = jest.fn(() => true);
+    const d = deps();
+    const mgr = new PeekManager({ ...d, approvalRequester });
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+    await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 });
+    const requestId = approvalRequester.mock.calls[0][0].requestId;
+
+    const started = await mgr.handleDoorPeekApprovalResponse({ requestId, approved: false });
+
+    expect(started).toBe(false);
+    expect(d.registry.has('peeker')).toBe(false);
+    expect(d.renderer.apply).not.toHaveBeenCalled();
+  });
+
+  test('GM door peek bypasses approval even when setting is enabled', async () => {
+    global.game.user.isGM = true;
+    const approvalRequester = jest.fn(() => true);
+    const d = deps();
+    const mgr = new PeekManager({ ...d, approvalRequester });
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+
+    const started = await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 });
+
+    expect(started).toBe(true);
+    expect(d.registry.has('peeker')).toBe(true);
+    expect(approvalRequester).not.toHaveBeenCalled();
+  });
+});
+
 describe('PeekManager corner peek wall clamp', () => {
   let prevCanvas;
   beforeEach(() => {
@@ -325,6 +490,14 @@ describe('PeekManager settings-backed geometry', () => {
     mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
     expect(d.registry.get('peeker').range).toBe(400);
   });
+
+  test('startDoorPeek applies the configured slit angle instead of full sight', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
+    expect(d.registry.get('peeker').fov).toBe(30);
+  });
 });
 
 describe('PeekManager reaimFromPointer', () => {
@@ -339,14 +512,60 @@ describe('PeekManager reaimFromPointer', () => {
   }
 
   test('re-aims an active door peek for a controlled token', () => {
+    const restoreSettings = overridePeekSettings({ peekSweepAngle: 45 });
     const d = deps();
-    const mgr = new PeekManager(d);
-    const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
-    token.controlled = true;
-    mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
-    d.socket.sendUpdate.mockClear();
-    mgr.reaimFromPointer({ x: 10, y: 80 });
-    expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.objectContaining({ origin: expect.anything() }));
+    try {
+      const mgr = new PeekManager(d);
+      const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+      token.controlled = true;
+      mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] }, { x: 100, y: 50 });
+      d.socket.sendUpdate.mockClear();
+      mgr.reaimFromPointer({ x: 10, y: 80 });
+      expect(d.socket.sendUpdate).toHaveBeenCalledWith('p', expect.objectContaining({ origin: expect.anything() }));
+    } finally {
+      restoreSettings();
+    }
+  });
+
+  test('throttles rapid pointer re-aims and flushes the last aim', () => {
+    const restoreSettings = overridePeekSettings({ peekSweepAngle: 45 });
+    jest.useFakeTimers();
+    try {
+      let now = 1000;
+      const d = {
+        registry: new PeekRegistry(),
+        renderer: { apply: jest.fn(), clear: jest.fn() },
+        socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+        recompute: jest.fn(),
+        now: () => now,
+        reaimMinIntervalMs: 50,
+      };
+      const mgr = new PeekManager(d);
+      const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+      token.controlled = true;
+      mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] }, { x: 100, y: 50 });
+      d.renderer.apply.mockClear();
+      d.socket.sendUpdate.mockClear();
+      d.recompute.mockClear();
+
+      mgr.reaimFromPointer({ x: 100, y: 80 });
+      now = 1010;
+      mgr.reaimFromPointer({ x: 100, y: 100 });
+
+      expect(d.renderer.apply).toHaveBeenCalledTimes(1);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+      expect(d.recompute).toHaveBeenCalledTimes(1);
+
+      now = 1050;
+      jest.advanceTimersByTime(40);
+
+      expect(d.renderer.apply).toHaveBeenCalledTimes(2);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(2);
+      expect(d.recompute).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+      restoreSettings();
+    }
   });
 
   test('does not re-aim a door peek when token is not controlled', () => {
@@ -386,5 +605,50 @@ describe('PeekManager reaimFromPointer', () => {
     const mgr = new PeekManager(d);
     expect(() => mgr.reaimFromPointer(null)).not.toThrow();
     expect(d.socket.sendUpdate).not.toHaveBeenCalled();
+  });
+
+  test('a fast sweep through a target between two throttled samples is not lost: the flushed aim still covers it', () => {
+    const restoreSettings = overridePeekSettings({ peekSweepAngle: 60, peekSlitAngle: 10 });
+    jest.useFakeTimers();
+    try {
+      let now = 1000;
+      const d = {
+        registry: new PeekRegistry(),
+        renderer: { apply: jest.fn(), clear: jest.fn() },
+        socket: { sendUpdate: jest.fn(), sendEnd: jest.fn() },
+        recompute: jest.fn(),
+        now: () => now,
+        reaimMinIntervalMs: 50,
+      };
+      const mgr = new PeekManager(d);
+      const token = createMockToken({ id: 'p', x: -50, y: 50, width: 1, height: 1 });
+      token.controlled = true;
+      mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] }, { x: 100, y: 50 });
+      const origin = d.registry.get('p').origin;
+
+      // "before" the target, exactly "on" it, then "after" it - all inside one 50ms
+      // throttle window, simulating a fast mouse sweep. Only the last one (after) would
+      // survive under naive "keep only the latest queued sample".
+      const before = { x: origin.x + 200, y: origin.y - 40 };
+      const onTarget = { x: origin.x + 200, y: origin.y };
+      const after = { x: origin.x + 200, y: origin.y + 40 };
+
+      mgr.reaimFromPointer(before); // leading edge - sent immediately, sets lastReaimAt
+      now = 1010;
+      mgr.reaimFromPointer(onTarget); // throttled - accumulated, not sent yet
+      now = 1020;
+      mgr.reaimFromPointer(after); // throttled - merged with the accumulated onTarget sample
+
+      now = 1050;
+      jest.advanceTimersByTime(40);
+
+      const finalPayload = d.socket.sendUpdate.mock.calls.at(-1)[1];
+      expect(
+        isPointInCone(finalPayload.origin, finalPayload.direction, finalPayload.fov, onTarget),
+      ).toBe(true);
+    } finally {
+      jest.useRealTimers();
+      restoreSettings();
+    }
   });
 });

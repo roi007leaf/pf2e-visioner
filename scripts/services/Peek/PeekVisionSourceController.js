@@ -33,6 +33,10 @@ export class PeekVisionSourceController {
     return this._overrides.get(tokenId) ?? null;
   }
 
+  constrainToken(token) {
+    this._clampPeekLosToFov(token);
+  }
+
   _edgeFor(wallId) {
     return globalThis.canvas?.walls?.get?.(wallId)?.edge ?? null;
   }
@@ -65,6 +69,9 @@ export class PeekVisionSourceController {
     try {
       token.initializeVisionSource?.();
     } catch (_) {}
+    try {
+      token.initializeLightSource?.();
+    } catch (_) {}
     this._clampPeekLosToFov(token);
     this._refresh();
   }
@@ -74,29 +81,47 @@ export class PeekVisionSourceController {
     const peek = this._overrides.get(tokenId);
     if (!peek) return;
     const los = token?.vision?.los;
-    const fov = this._createPeekFovPolygon(los, peek) ?? token?.vision?.fov;
+    const generatedFov = this._createPeekFovPolygon(los, peek);
+    const fov = generatedFov ?? token?.vision?.fov;
     const fovPoints = fov?.points;
     if (!los || !Array.isArray(fovPoints) || fovPoints.length < 6) return;
     const originalLosGeometry = this._captureLosGeometry(los);
-    if (fov !== token?.vision?.fov && token?.vision) {
+    if (generatedFov && token?.vision) {
+      this._assignGeometryProperty(token.vision, 'fov', generatedFov);
       this._assignGeometryProperty(token.vision, 'shape', fov);
+      this._assignGeometryProperty(token.vision, 'light', generatedFov);
     }
     try {
       los.points = [...fovPoints];
     } catch (_) {}
     this._delegateLosGeometryToFov(los, fov, originalLosGeometry);
+    if (generatedFov) {
+      this._refreshRenderedGeometry(token.vision);
+      this._clampTokenLightToFov(token, generatedFov);
+    }
+  }
+
+  _clampTokenLightToFov(token, fov) {
+    const light = token?.light;
+    if (!light || !fov) return;
+    this._assignGeometryProperty(light, 'shape', fov);
+    this._assignGeometryProperty(light, '_visualShape', fov);
+    this._refreshRenderedGeometry(light);
   }
 
   _createPeekFovPolygon(los, peek) {
     if (typeof peek?.fov !== 'number') return null;
-    if (typeof los?.applyConstraint !== 'function') return null;
     const constraint = this._createPeekConeConstraint(peek, this._peekConstraintRadius(los, peek));
     if (!constraint) return null;
-    try {
-      return los.applyConstraint(constraint);
-    } catch (_) {
-      return null;
+    if (typeof los?.applyConstraint === 'function') {
+      try {
+        const constrained = los.applyConstraint(constraint);
+        if (Array.isArray(constrained?.points) && constrained.points.length >= 6) {
+          return constrained;
+        }
+      } catch (_) {}
     }
+    return constraint;
   }
 
   _peekConstraintRadius(los, peek) {
@@ -251,10 +276,20 @@ export class PeekVisionSourceController {
       });
     } catch (_) {}
   }
+
+  _refreshRenderedGeometry(source) {
+    if (!source || typeof source._updateGeometry !== 'function') return;
+    try {
+      source._updateGeometry();
+    } catch (_) {}
+    for (const layer of Object.values(source.layers ?? {})) {
+      if (layer) layer.reset = true;
+    }
+  }
 }
 
 function defaultRefresh() {
   try {
-    globalThis.canvas?.perception?.update?.({ initializeVision: true, refreshVision: true });
+    globalThis.canvas?.perception?.update?.({ refreshVision: true, refreshLighting: true });
   } catch (_) {}
 }

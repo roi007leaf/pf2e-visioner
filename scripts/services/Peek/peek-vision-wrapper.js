@@ -35,7 +35,7 @@ export function applyPeekOverrideToData(data, override) {
 
 export function createPeekVisionSourceDataWrapper(controller) {
   return function peekVisionSourceDataWrapper(wrapped, ...args) {
-    const data = wrapped(...args);
+    const data = wrapped.call(this, ...args);
     try {
       const tokenId = this?.document?.id;
       if (!tokenId) return data;
@@ -48,9 +48,28 @@ export function createPeekVisionSourceDataWrapper(controller) {
   };
 }
 
+export function createPeekLightSourceDataWrapper(controller) {
+  return createPeekVisionSourceDataWrapper(controller);
+}
+
+export function createPeekSourceInitializeWrapper(controller) {
+  return function peekSourceInitializeWrapper(wrapped, ...args) {
+    const result = wrapped.call(this, ...args);
+    try {
+      const token = this?.object;
+      const tokenId = token?.document?.id;
+      if (tokenId && controller?.getOverride?.(tokenId)) {
+        controller?.constrainToken?.(token);
+      }
+    } catch (_) {}
+    return result;
+  };
+}
+
 export function registerPeekVisionWrapper(controller) {
   if (_registered) return;
   if (typeof libWrapper === 'undefined' || typeof libWrapper.register !== 'function') return;
+  let registered = false;
   try {
     libWrapper.register(
       MODULE_ID,
@@ -58,8 +77,53 @@ export function registerPeekVisionWrapper(controller) {
       createPeekVisionSourceDataWrapper(controller),
       'WRAPPER',
     );
-    _registered = true;
+    registered = true;
   } catch (error) {
     console.warn('[PF2E-Visioner] Failed to register peek vision wrapper:', error);
   }
+  try {
+    libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._getLightSourceData',
+      createPeekLightSourceDataWrapper(controller),
+      'WRAPPER',
+    );
+    registered = true;
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to register peek light wrapper:', error);
+  }
+  try {
+    libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.sources.PointVisionSource.prototype.initialize',
+      createPeekSourceInitializeWrapper(controller),
+      'WRAPPER',
+    );
+    registered = true;
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to register peek vision-source initializer wrapper:', error);
+  }
+  try {
+    libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.sources.PointLightSource.prototype.initialize',
+      createPeekSourceInitializeWrapper(controller),
+      'WRAPPER',
+    );
+    registered = true;
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to register peek light-source initializer wrapper:', error);
+  }
+  try {
+    libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.sources.PointDarknessSource.prototype.initialize',
+      createPeekSourceInitializeWrapper(controller),
+      'WRAPPER',
+    );
+    registered = true;
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to register peek darkness-source initializer wrapper:', error);
+  }
+  _registered = registered;
 }

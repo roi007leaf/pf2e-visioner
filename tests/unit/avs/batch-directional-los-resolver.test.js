@@ -1,4 +1,5 @@
 import { BatchDirectionalLosResolver } from '../../../scripts/visibility/auto-visibility/core/BatchDirectionalLosResolver.js';
+import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
 
 const token = (id) => ({ document: { id } });
 
@@ -183,6 +184,48 @@ describe('BatchDirectionalLosResolver', () => {
     expect(burstLosMemo.get('A>>B')).toBe(false);
     expect(batchLosCache.get('A>>B')).toBe(true);
     expect(precomputedLOS.get('A-B')).toBe(true);
+  });
+
+  test('bypasses burst and global caches for a peeking observer without disabling the cache for that call site generally', () => {
+    const observer = token('A');
+    const target = token('B');
+    const breakdown = makeBreakdown();
+    const batchLosCache = new Map();
+    const burstLosMemo = new Map([['A>>B', false]]);
+    const globalLosCache = {
+      getWithMeta: jest.fn(),
+      set: jest.fn(),
+    };
+    const visionAnalyzer = { hasLineOfSight: jest.fn(() => true) };
+    const precomputedLOS = new Map();
+
+    peekRegistry.set('A', { origin: { x: 0, y: 0 }, direction: 0, fov: 20, ignoredWallIds: [] }, Date.now());
+    try {
+      const resolver = new BatchDirectionalLosResolver({
+        visionAnalyzer,
+        globalLosCache,
+        batchLosCache,
+        burstLosMemo,
+        precomputedLOS,
+        breakdown,
+      });
+
+      // Observer A is peeking: the stale cached "false" for A>>B must not be served.
+      expect(resolver.get(observer, target, 'A>>B')).toBe(true);
+      expect(visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(observer, target, 'sight');
+      expect(globalLosCache.getWithMeta).not.toHaveBeenCalled();
+      expect(globalLosCache.set).not.toHaveBeenCalled();
+      expect(burstLosMemo.get('A>>B')).toBe(false);
+      expect(batchLosCache.get('A>>B')).toBe(true);
+
+      // Observer B is not peeking: a separately-primed cached value for B>>A is still honored.
+      burstLosMemo.set('B>>A', false);
+      visionAnalyzer.hasLineOfSight.mockClear();
+      expect(resolver.get(target, observer, 'B>>A')).toBe(false);
+      expect(visionAnalyzer.hasLineOfSight).not.toHaveBeenCalled();
+    } finally {
+      peekRegistry.clearAll();
+    }
   });
 
   test('uses movement sight-line resolver when base LOS rejects a pending polygon hit', () => {

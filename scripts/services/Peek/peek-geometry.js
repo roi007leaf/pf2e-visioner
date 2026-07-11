@@ -1,3 +1,17 @@
+// A fast aim can sweep the cone across a target and past it between two processed samples;
+// merging into the union of the cones swept (instead of keeping only the latest sample)
+// keeps the target reachable without widening the settled slit.
+export function mergeSweptCone(a, b) {
+  if (typeof a?.fov !== 'number' || typeof b?.fov !== 'number') return b;
+  if (typeof a?.direction !== 'number' || typeof b?.direction !== 'number') return b;
+  const halfA = (a.fov * Math.PI) / 360;
+  const halfB = (b.fov * Math.PI) / 360;
+  const start = Math.min(a.direction - halfA, b.direction - halfB);
+  const end = Math.max(a.direction + halfA, b.direction + halfB);
+  const fov = Math.min(360, ((end - start) * 180) / Math.PI);
+  return { ...b, direction: (start + end) / 2, fov };
+}
+
 export function isPointInCone(origin, direction, fov, point) {
   const dx = point.x - origin.x;
   const dy = point.y - origin.y;

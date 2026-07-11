@@ -988,6 +988,10 @@
         "name": "Peek Range (ft)",
         "hint": "Maximum length of the peek line of sight in feet. 0 = unlimited."
       },
+      "REQUIRE_GM_APPROVAL_FOR_DOOR_PEEK": {
+        "name": "Require GM Approval for Door Peek",
+        "hint": "Players must ask the GM before a door peek starts. The GM receives an approval dialog; GMs can still peek directly."
+      },
       "CORNER_PEEK_ENABLED": {
         "name": "Enable Corner Peeking",
         "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
@@ -1498,7 +1502,14 @@
       "DC_FIELD_LABEL": "Peek DC",
       "ALLOW_FIELD_LABEL": "Allow Peeking",
       "NOT_ALLOWED": "Peeking is not allowed through this door.",
-      "TOO_FAR": "You are too far from the door to peek through it."
+      "TOO_FAR": "You are too far from the door to peek through it.",
+      "APPROVAL_REQUESTED": "Door peek request sent to the GM.",
+      "APPROVAL_UNAVAILABLE": "Door peek requires GM approval, but the approval socket is unavailable.",
+      "APPROVAL_DENIED": "The GM denied the door peek request.",
+      "APPROVAL_TITLE": "Approve Door Peek",
+      "APPROVE": "Approve",
+      "DENY": "Deny",
+      "PAN_TO_DOOR": "Pan to door"
     }
   }
 }

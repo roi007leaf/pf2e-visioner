@@ -7,6 +7,7 @@ import {
 } from '../../../scripts/visibility/auto-visibility/core/BatchProcessor.js';
 import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
+import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
 
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
@@ -310,6 +311,40 @@ describe('BatchProcessor', () => {
     const res2 = await processor.process(allTokens, changed, {});
     expect(res2.breakdown.losGlobalHits).toBeGreaterThanOrEqual(1);
     expect(res2.breakdown.visGlobalHits).toBeGreaterThanOrEqual(1);
+  });
+
+  test('a changed token with an active peek bypasses the LOS cache only for that observer, not the whole batch', async () => {
+    const allTokens = [...global.canvas.tokens.placeables].slice(0, 2); // A, B only
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+
+    // Prime the global/burst LOS caches with "false" for both directions of the A<->B pair.
+    await processor.process(allTokens, new Set(['A']), {});
+    processor.visionAnalyzer.hasLineOfSight.mockClear();
+
+    // A's position hasn't changed (a peek re-aim never moves the token), so without the fix
+    // the cache key is identical and this would just replay the stale cached "false" for A's
+    // own observer-role check - even though A's peek cone now genuinely has LOS to B.
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(true);
+    peekRegistry.set('A', { origin: { x: 0, y: 0 }, direction: 0, fov: 20, ignoredWallIds: [] }, Date.now());
+
+    try {
+      await processor.process(allTokens, new Set(['A']), {});
+      // A (peeking) as observer must be freshly recomputed, not served a stale cached value.
+      expect(processor.visionAnalyzer.hasLineOfSight).toHaveBeenCalledWith(
+        expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+        expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+        'sight',
+      );
+      // B (not peeking) as observer is unaffected and keeps benefiting from the primed cache -
+      // the bypass must be scoped to the peeking observer, not spill over to the whole batch.
+      expect(processor.visionAnalyzer.hasLineOfSight).not.toHaveBeenCalledWith(
+        expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
+        expect.objectContaining({ document: expect.objectContaining({ id: 'A' }) }),
+        'sight',
+      );
+    } finally {
+      peekRegistry.clearAll();
+    }
   });
 
   test('emits update when document visibility is stale even if canonical map and cache are unchanged', async () => {

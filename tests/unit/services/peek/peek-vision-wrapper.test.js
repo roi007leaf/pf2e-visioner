@@ -1,5 +1,10 @@
 import '../../../setup.js';
-import { applyPeekOverrideToData, radiansToFoundryRotation } from '../../../../scripts/services/Peek/peek-vision-wrapper.js';
+import {
+  applyPeekOverrideToData,
+  createPeekLightSourceDataWrapper,
+  createPeekSourceInitializeWrapper,
+  radiansToFoundryRotation,
+} from '../../../../scripts/services/Peek/peek-vision-wrapper.js';
 
 function coneCenterRadians(rotationDegrees) {
   return (((rotationDegrees + 90) % 360) + 360) % 360;
@@ -64,5 +69,56 @@ describe('applyPeekOverrideToData', () => {
   test('missing origin returns data unchanged', () => {
     const data = applyPeekOverrideToData({}, { direction: 0, fov: 10, range: 400 });
     expect(data).toEqual({});
+  });
+});
+
+describe('createPeekLightSourceDataWrapper', () => {
+  test('applies peek origin and rotation to token light source data', () => {
+    const override = { origin: { x: 10, y: 20 }, direction: 0, fov: 1, range: 400 };
+    const controller = { getOverride: jest.fn(() => override) };
+    const wrapper = createPeekLightSourceDataWrapper(controller);
+    const data = wrapper.call({ document: { id: 't' } }, () => ({ x: 1, y: 2, angle: 90 }));
+
+    expect(data.x).toBe(10);
+    expect(data.y).toBe(20);
+    expect(data.angle).toBe(360);
+    expect(data.radius).toBe(400);
+    expect(data.externalRadius).toBe(400);
+    expect(coneCenterRadians(data.rotation)).toBeCloseTo(0, 5);
+  });
+});
+
+describe('createPeekSourceInitializeWrapper', () => {
+  test('reapplies peek clamp after core reinitializes an active vision source directly', () => {
+    const token = { document: { id: 't' } };
+    const controller = {
+      getOverride: jest.fn(() => ({ origin: { x: 10, y: 20 }, direction: 0, fov: 1 })),
+      constrainToken: jest.fn(),
+    };
+    const wrapper = createPeekSourceInitializeWrapper(controller);
+    const wrapped = jest.fn(function wrappedInitialize() {
+      this.shape = { points: [0, 0, 500, 0, 500, 500, 0, 500] };
+      return this;
+    });
+    const source = { object: token };
+
+    const result = wrapper.call(source, wrapped);
+
+    expect(result).toBe(source);
+    expect(wrapped).toHaveBeenCalled();
+    expect(controller.constrainToken).toHaveBeenCalledWith(token);
+  });
+
+  test('does nothing for sources whose token has no active peek override', () => {
+    const token = { document: { id: 't' } };
+    const controller = {
+      getOverride: jest.fn(() => null),
+      constrainToken: jest.fn(),
+    };
+    const wrapper = createPeekSourceInitializeWrapper(controller);
+
+    wrapper.call({ object: token }, jest.fn());
+
+    expect(controller.constrainToken).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,7 @@ export class VisionerConfirmDialog extends foundry.applications.api.HandlebarsAp
         extra = null,
         variant,
         icon,
+        onRender = null,
     } = {}) {
         // Infer variant if not provided (danger when destructive verbs are used)
         const inferredVariant = variant || (/\b(clear|delete|purge|remove|wipe)\b/i.test(String(yes)) ? 'danger' : 'warning');
@@ -43,6 +44,7 @@ export class VisionerConfirmDialog extends foundry.applications.api.HandlebarsAp
             : null;
         this._variant = inferredVariant;
         this._icon = variantIcon;
+        this._onRenderCallback = typeof onRender === 'function' ? onRender : null;
         this._resolver = null;
     }
 
@@ -77,6 +79,7 @@ export class VisionerConfirmDialog extends foundry.applications.api.HandlebarsAp
         root?.querySelector?.('[data-action="yes"]')?.addEventListener('click', () => this._resolve(this._yesValue));
         root?.querySelector?.('[data-action="no"]')?.addEventListener('click', () => this._resolve(this._noValue));
         root?.querySelector?.('[data-action="extra"]')?.addEventListener('click', () => this._resolve(this._extraAction?.value ?? 'extra'));
+        try { this._onRenderCallback?.(root, this); } catch { }
         // Keyboard affordances: Enter -> Yes, Escape -> No
         root?.addEventListener?.('keydown', (ev) => {
             if (ev.key === 'Enter') { ev.preventDefault(); this._resolve(this._yesValue); }

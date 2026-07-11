@@ -443,6 +443,9 @@ export class VisionAnalyzer {
           // Both systems agree - high confidence result
           return visible;
         } else if (!visible && geometricResult) {
+          if (observerPeek?.ignoredWallIds?.length) {
+            return true;
+          }
           const customWallPass = this.#findNonBlockingCustomSightWallPath(
             observerCenter,
             targetPoints,

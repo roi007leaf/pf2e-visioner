@@ -2,18 +2,44 @@ import '../../../setup.js';
 import { PeekVisionSourceController } from '../../../../scripts/services/Peek/PeekVisionSourceController.js';
 
 describe('PeekVisionSourceController contract', () => {
-  test('apply requests vision re-init and never updates token document', () => {
+  test('apply requests source re-init and never updates token document', () => {
     const refresh = jest.fn();
     const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
     const update = jest.fn();
     const token = {
       document: { id: 't', update, x: 0, y: 0, width: 1, height: 1, elevation: 0 },
       initializeVisionSource: jest.fn(),
+      initializeLightSource: jest.fn(),
     };
     ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 90, ignoredWallIds: [] });
     expect(token.initializeVisionSource).toHaveBeenCalled();
+    expect(token.initializeLightSource).toHaveBeenCalled();
     expect(refresh).toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  test('default refresh does not reinitialize sources after applying the local peek clamp', () => {
+    const originalCanvas = globalThis.canvas;
+    const update = jest.fn();
+    globalThis.canvas = {
+      ...originalCanvas,
+      perception: { update },
+    };
+    try {
+      const ctrl = new PeekVisionSourceController();
+      const token = {
+        document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+        initializeVisionSource: jest.fn(),
+        initializeLightSource: jest.fn(),
+      };
+      ctrl.apply(token, { origin: { x: 10, y: 20 }, direction: 0, fov: 90, ignoredWallIds: [] });
+
+      expect(update).toHaveBeenCalledWith({ refreshVision: true, refreshLighting: true });
+      expect(update.mock.calls[0][0]).not.toHaveProperty('initializeVision');
+      expect(update.mock.calls[0][0]).not.toHaveProperty('initializeLighting');
+    } finally {
+      globalThis.canvas = originalCanvas;
+    }
   });
 
   test('apply clamps LOS points to peek FOV points for roof occlusion consumers', () => {
@@ -109,6 +135,186 @@ describe('PeekVisionSourceController contract', () => {
       expect(los.applyConstraint).toHaveBeenCalledWith(expect.any(Polygon));
       expect(token.vision.shape).toBe(constrained);
       expect(token.vision.los.points).toEqual(constrained.points);
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
+  test('door peek falls back to a generated slit cone when LOS cannot apply constraints', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+
+      contains(x, y) {
+        return x >= 10 && y >= 20 && y <= 120;
+      }
+    }
+    const fullFoundryFov = {
+      points: [0, 0, 500, 0, 500, 500, 0, 500],
+      contains: jest.fn(() => true),
+    };
+    const los = {
+      points: [0, 0, 500, 0, 500, 500, 0, 500],
+      bounds: { x: 0, y: 0, width: 500, height: 500 },
+      config: { radius: 400 },
+      contains: jest.fn(() => true),
+    };
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los,
+        fov: fullFoundryFov,
+        shape: fullFoundryFov,
+      },
+      initializeVisionSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 10,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+
+      expect(token.vision.los.points).not.toEqual(fullFoundryFov.points);
+      expect(token.vision.los.points.slice(0, 2)).toEqual([10, 20]);
+      expect(token.vision.fov).toBeInstanceOf(Polygon);
+      expect(token.vision.shape).toBe(token.vision.fov);
+      expect(token.vision.los.contains(20, 40)).toBe(true);
+      expect(token.vision.los.contains(5, 40)).toBe(false);
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
+  test('door peek clamps light perception and rendered geometry to the slit cone', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const constrained = {
+      points: [10, 20, 410, 18, 410, 22],
+      bounds: { x: 10, y: 18, width: 400, height: 4 },
+      config: { radius: 400 },
+      contains: jest.fn(() => true),
+    };
+    const fullLight = {
+      points: [0, 0, 500, 0, 500, 500, 0, 500],
+      contains: jest.fn(() => true),
+    };
+    const los = {
+      points: [0, 0, 500, 0, 500, 500, 0, 500],
+      bounds: { x: 0, y: 0, width: 500, height: 500 },
+      config: { radius: 400 },
+      applyConstraint: jest.fn(() => constrained),
+      contains: jest.fn(() => true),
+    };
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los,
+        fov: fullLight,
+        shape: fullLight,
+        light: fullLight,
+        _updateGeometry: jest.fn(),
+      },
+      light: {
+        shape: fullLight,
+        _visualShape: fullLight,
+        _updateGeometry: jest.fn(),
+      },
+      initializeVisionSource: jest.fn(),
+      initializeLightSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 1,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+
+      expect(token.vision.shape).toBe(constrained);
+      expect(token.vision.light).toBe(constrained);
+      expect(token.vision._updateGeometry).toHaveBeenCalled();
+      expect(token.initializeLightSource).toHaveBeenCalled();
+      expect(token.light.shape).toBe(constrained);
+      expect(token.light._visualShape).toBe(constrained);
+      expect(token.light._updateGeometry).toHaveBeenCalled();
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
+  test('active door peek reclamps after core rebuilds full source polygons', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los: {
+          points: [0, 0, 500, 0, 500, 500, 0, 500],
+          config: { radius: 400 },
+          contains: jest.fn(() => true),
+        },
+        fov: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        shape: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        light: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        _updateGeometry: jest.fn(),
+      },
+      light: {
+        shape: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        _visualShape: { points: [0, 0, 500, 0, 500, 500, 0, 500] },
+        _updateGeometry: jest.fn(),
+      },
+      initializeVisionSource: jest.fn(),
+      initializeLightSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 1,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+      const firstSlit = token.vision.fov;
+      const rebuiltFull = { points: [0, 0, 500, 0, 500, 500, 0, 500] };
+      token.vision.los = { ...rebuiltFull, config: { radius: 400 }, contains: jest.fn(() => true) };
+      token.vision.fov = rebuiltFull;
+      token.vision.shape = rebuiltFull;
+      token.vision.light = rebuiltFull;
+      token.light.shape = rebuiltFull;
+      token.light._visualShape = rebuiltFull;
+
+      ctrl.constrainToken(token);
+
+      expect(token.vision.fov).toBeInstanceOf(Polygon);
+      expect(token.vision.fov).not.toBe(firstSlit);
+      expect(token.vision.fov.points).not.toEqual(rebuiltFull.points);
+      expect(token.vision.shape).toBe(token.vision.fov);
+      expect(token.vision.light).toBe(token.vision.fov);
+      expect(token.light.shape).toBe(token.vision.fov);
+      expect(token.light._visualShape).toBe(token.vision.fov);
     } finally {
       globalThis.PIXI = originalPixi;
     }

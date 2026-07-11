@@ -1,3 +1,5 @@
+import { peekRegistry } from '../../../services/Peek/PeekRegistry.js';
+
 function increment(counterBag, key, amount = 1) {
   if (!counterBag) return;
   counterBag[key] = (Number(counterBag[key]) || 0) + amount;
@@ -67,7 +69,14 @@ export class BatchDirectionalLosResolver {
 
     increment(this.#breakdown, 'losCacheMisses');
 
-    const burstLos = this.#skipLosCache ? null : this.#burstLosMemo;
+    // A peeking observer's LOS to a target can flip true/false purely from re-aiming, without
+    // its position changing at all - the burst/global caches are keyed on position only, so they
+    // would keep serving whatever result was cached before the peek started aiming at the
+    // target. Bypass them for this specific observer only (not the whole batch), so every other
+    // pair in the batch still benefits from caching even while this one token is peeking.
+    const skipCache = this.#skipLosCache || peekRegistry.has(observerToken?.document?.id);
+
+    const burstLos = skipCache ? null : this.#burstLosMemo;
     if (burstLos?.has?.(cacheKey)) {
       directionalLos = burstLos.get(cacheKey);
       increment(this.#breakdown, 'losCacheHits');
@@ -75,7 +84,7 @@ export class BatchDirectionalLosResolver {
       directionalLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
     }
 
-    if (directionalLos === undefined && this.#globalLosCache && !this.#skipLosCache) {
+    if (directionalLos === undefined && this.#globalLosCache && !skipCache) {
       const globalResult = this.#globalLosCache.getWithMeta(cacheKey);
       if (globalResult.state === 'hit') {
         directionalLos = globalResult.value;
@@ -87,7 +96,7 @@ export class BatchDirectionalLosResolver {
       } else {
         increment(this.#breakdown, 'losGlobalMisses');
       }
-    } else if (directionalLos === undefined && this.#skipLosCache) {
+    } else if (directionalLos === undefined && skipCache) {
       increment(this.#breakdown, 'losGlobalMisses');
     }
 
@@ -95,12 +104,12 @@ export class BatchDirectionalLosResolver {
       directionalLos = this.#visionAnalyzer.hasLineOfSight(observerToken, targetToken, 'sight');
       directionalLos = this.#applyLosOverrides(directionalLos, observerToken, targetToken);
 
-      if (this.#globalLosCache && !this.#skipLosCache) {
+      if (this.#globalLosCache && !skipCache) {
         this.#globalLosCache.set(cacheKey, directionalLos);
       }
 
       try {
-        if (!this.#skipLosCache && this.#burstLosMemo) {
+        if (!skipCache && this.#burstLosMemo) {
           this.#burstLosMemo.set(cacheKey, directionalLos);
         }
       } catch {

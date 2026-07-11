@@ -1064,6 +1064,15 @@ export const DEFAULT_SETTINGS = {
     type: Number,
     default: 0,
   },
+  requireGmApprovalForDoorPeek: {
+    name: 'PF2E_VISIONER.SETTINGS.REQUIRE_GM_APPROVAL_FOR_DOOR_PEEK.name',
+    hint: 'PF2E_VISIONER.SETTINGS.REQUIRE_GM_APPROVAL_FOR_DOOR_PEEK.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
   cornerPeekEnabled: {
     name: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.name',
     hint: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.hint',

@@ -155,6 +155,43 @@ describe('canvas visibility wrapper', () => {
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
+  test('active peek keeps core visibility for a hidden (heard) target outside the peek polygon', () => {
+    global.game.user.isGM = false;
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'hidden' }),
+    });
+    observer.vision = {
+      los: {
+        containsPoint: jest.fn((point) => point.x < 100),
+      },
+    };
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    peekRegistry.set(
+      'observer',
+      {
+        origin: { x: 0, y: 0 },
+        direction: 0,
+        fov: 30,
+        range: 200,
+        ignoredWallIds: ['door1'],
+      },
+      1000,
+    );
+    const wrapped = jest.fn(() => true);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 250, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
   test('active peek keeps core visibility for points inside the peek polygon', () => {
     global.game.user.isGM = false;
     const observer = createMockToken({ id: 'observer' });

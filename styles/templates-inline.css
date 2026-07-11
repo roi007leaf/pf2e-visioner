@@ -451,3 +451,7 @@
 .pvv-confirm-info .pvv-confirm-hero { background: linear-gradient(180deg, rgba(70,90,120,0.25), rgba(40,55,80,0.25)); border-color: rgba(140,180,255,0.45); }
 .pvv-confirm-info .pvv-confirm-hero-icon { background: rgba(140,180,255,0.16); color:#d6e4ff; }
 .pvv-confirm-info .pvv-btn-primary { background: rgba(140,180,255,0.16); border-color: rgba(140,180,255,0.5); }
+.pv-door-approval-meta { display:flex; align-items:center; gap:6px; margin:8px 0 0; font-size: var(--font-size-12, 12px); opacity:.95; }
+.pv-door-approval-pan-link { display:inline-flex; align-items:center; gap:5px; padding:2px 7px; border:1px solid rgba(140,180,255,0.55); border-radius:6px; background: rgba(140,180,255,0.14); color: var(--color-text-hyperlink, #8cb4ff); cursor:pointer; font:inherit; }
+.pv-door-approval-pan-link:hover,
+.pv-door-approval-pan-link:focus-visible { filter:brightness(1.12); outline:1px solid rgba(140,180,255,0.75); outline-offset:1px; }

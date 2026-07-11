@@ -99,11 +99,13 @@ function activePeekObserversForCanvasTest(options) {
 function coreVisibilityAllowedByActivePeek(points, options) {
   const observers = activePeekObserversForCanvasTest(options);
   if (!observers.length) return true;
-  const testPoints = normalizeVisibilityPoints(points, options?.object);
+  const target = options?.object;
+  const testPoints = normalizeVisibilityPoints(points, target);
   if (!testPoints.length) return true;
   return observers.some((observer) => {
     const peek = peekRegistry.get(tokenIdOf(observer));
     if (!peek?.origin) return false;
+    if (getVisionerVisibilityBetweenTokens(observer, target) === 'hidden') return true;
     return testPoints.some((point) => pointWithinPeekBounds(observer, peek, point));
   });
 }

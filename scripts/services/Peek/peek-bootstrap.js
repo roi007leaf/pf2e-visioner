@@ -3,7 +3,7 @@ import { PeekManager } from './PeekManager.js';
 import { PeekVisionSourceController } from './PeekVisionSourceController.js';
 import { registerPeekVisionWrapper } from './peek-vision-wrapper.js';
 import { PeekSocketSender } from './peek-socket.js';
-import { emitPeekUpdate } from '../socket.js';
+import { emitPeekUpdate, requestGMDoorPeekApproval } from '../socket.js';
 import { MODULE_ID } from '../../constants.js';
 import { readPeekDC, rollPeekCheck, defaultPeekRoll } from './peek-door-dc.js';
 import { peekGmOverlay } from './peek-gm-overlay.js';
@@ -28,6 +28,7 @@ export function createPeekManager() {
     now: () => Date.now(),
     readDC: readPeekDC,
     rollPeek: ({ token, dc }) => rollPeekCheck({ token, dc, roll: defaultPeekRoll }),
+    approvalRequester: requestGMDoorPeekApproval,
   });
   manager._visionController = renderer;
   return manager;

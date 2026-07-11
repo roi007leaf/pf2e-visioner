@@ -1,6 +1,8 @@
 import { MODULE_ID } from '../constants.js';
 import { updateCanvasPerception } from '../helpers/perception-refresh.js';
+import { requestFullVisibilityScopeRecalc } from './runtime-state.js';
 import { showNotification } from '../utils.js';
+import { isPointInCone } from './Peek/peek-geometry.js';
 import { peekRegistry } from './Peek/PeekRegistry.js';
 import { peekGmOverlay } from './Peek/peek-gm-overlay.js';
 
@@ -25,6 +27,9 @@ class SocketService {
     this._socket.register(WALL_VISUALS_CHANNEL, updateWallVisualsHandler);
     this._socket.register(PEEK_UPDATE_CHANNEL, peekUpdateHandler);
     this._socket.register(PEEK_END_CHANNEL, peekEndHandler);
+    this._socket.register(PEEK_APPROVAL_REQUEST_CHANNEL, doorPeekApprovalRequestHandler);
+    this._socket.register(PEEK_APPROVAL_RESPONSE_CHANNEL, doorPeekApprovalResponseHandler);
+    this._socket.register(PEEK_REVEAL_REFRESH_CHANNEL, peekRevealRefreshHandler);
     startPeekStalePruner();
     if (typeof Hooks !== 'undefined') Hooks.on('canvasTearDown', () => peekGmOverlay.clearAll());
     return this._socket;
@@ -53,6 +58,9 @@ const TAKE_COVER_REQUEST_CHANNEL = 'TakeCoverRequest';
 const WALL_VISUALS_CHANNEL = 'UpdateWallVisuals';
 const PEEK_UPDATE_CHANNEL = 'PeekUpdate';
 const PEEK_END_CHANNEL = 'PeekEnd';
+const PEEK_APPROVAL_REQUEST_CHANNEL = 'DoorPeekApprovalRequest';
+const PEEK_APPROVAL_RESPONSE_CHANNEL = 'DoorPeekApprovalResponse';
+const PEEK_REVEAL_REFRESH_CHANNEL = 'PeekRevealRefresh';
 
 export function registerSocket() {
   _socketService.register();
@@ -154,6 +162,12 @@ export function requestGMOpenTakeCover(actorTokenId, messageId = null) {
     messageId,
     userId: game.userId,
   });
+  return true;
+}
+
+export function requestGMDoorPeekApproval(payload) {
+  if (!_socketService.socket?.executeAsGM || !payload?.requestId) return false;
+  _socketService.executeAsGM(PEEK_APPROVAL_REQUEST_CHANNEL, payload);
   return true;
 }
 
@@ -410,8 +424,8 @@ async function seekTemplateHandler({
       // Ask the player's client to re-inject the panel so their Remove Template button stays visible
       try {
         const playerUser = game.users?.get?.(userId);
-        if (playerUser && _socketService.socket?.executeForUser) {
-          _socketService.socket.executeForUser(userId, REFRESH_CHANNEL);
+        if (playerUser) {
+          executeSocketForUser(REFRESH_CHANNEL, userId);
         }
       } catch { }
       // Re-render the chat message so the injected panel can be updated/removed appropriately
@@ -479,7 +493,323 @@ export function peekUpdateHandler(payload) {
   }, now);
   peekRegistry.pruneStale(5000, now);
   recalcPeekToken(payload.tokenId);
+  schedulePeekRevealRefresh(payload.userId, {
+    sceneId: payload.sceneId,
+    tokenId: payload.tokenId,
+    targetIds: collectPeekRefreshTokenIds(payload),
+  });
   peekGmOverlay.render();
+}
+
+export function collectPeekRefreshTokenIds(payload, { tokens = globalThis.canvas?.tokens?.placeables } = {}) {
+  const ids = [];
+  const seen = new Set();
+  const add = (id) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  add(payload?.tokenId);
+  const origin = payload?.origin;
+  const direction = payload?.direction;
+  const fov = payload?.fov;
+  const range = Number(payload?.range ?? 0);
+  for (const token of tokens ?? []) {
+    const id = token?.document?.id ?? token?.id;
+    if (!id || id === payload?.tokenId) continue;
+    const center = getTokenCenter(token);
+    if (!center || !origin) continue;
+    if (typeof fov === 'number' && !isPointInCone(origin, direction, fov, center)) continue;
+    if (range > 0 && distance(origin, center) > range + tokenRadius(token)) continue;
+    add(id);
+  }
+  return ids;
+}
+
+function getTokenCenter(token) {
+  if (token?.center && Number.isFinite(token.center.x) && Number.isFinite(token.center.y)) {
+    return { x: token.center.x, y: token.center.y };
+  }
+  const doc = token?.document ?? token;
+  const grid = globalThis.canvas?.grid?.size ?? globalThis.canvas?.dimensions?.size ?? 100;
+  const x = Number(doc?.x);
+  const y = Number(doc?.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return {
+    x: x + ((Number(doc?.width) || 1) * grid) / 2,
+    y: y + ((Number(doc?.height) || 1) * grid) / 2,
+  };
+}
+
+function tokenRadius(token) {
+  const doc = token?.document ?? token;
+  const grid = globalThis.canvas?.grid?.size ?? globalThis.canvas?.dimensions?.size ?? 100;
+  return (Math.max(Number(doc?.width) || 1, Number(doc?.height) || 1) * grid) / 2;
+}
+
+function distance(a, b) {
+  return Math.hypot(Number(b.x) - Number(a.x), Number(b.y) - Number(a.y));
+}
+
+const _pendingPeekRevealRefresh = new Map();
+
+export function schedulePeekRevealRefresh(userId, payload) {
+  if (!userId || userId === globalThis.game?.user?.id) return false;
+  const tokenId = payload?.tokenId;
+  _pendingPeekRevealRefresh.get(tokenId)?.cancel();
+
+  let sent = false;
+  let fallbackTimer = null;
+  let hookFn = null;
+  const clearPending = () => {
+    if (tokenId && _pendingPeekRevealRefresh.get(tokenId) === pending) {
+      _pendingPeekRevealRefresh.delete(tokenId);
+    }
+  };
+  const send = () => {
+    if (sent) return;
+    sent = true;
+    if (fallbackTimer) {
+      try { clearTimeout(fallbackTimer); } catch (_) {}
+      fallbackTimer = null;
+    }
+    if (hookFn) {
+      try { globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn); } catch (_) {}
+    }
+    clearPending();
+    sendPeekRevealRefresh(userId, payload);
+  };
+  const cancel = () => {
+    if (sent) return;
+    sent = true;
+    if (fallbackTimer) {
+      try { clearTimeout(fallbackTimer); } catch (_) {}
+      fallbackTimer = null;
+    }
+    if (hookFn) {
+      try { globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn); } catch (_) {}
+    }
+  };
+  try {
+    if (typeof globalThis.Hooks?.once === 'function') {
+      hookFn = (batch = {}) => {
+        const changed = batch.changedTokens;
+        if (Array.isArray(changed) && payload?.tokenId && !changed.includes(payload.tokenId)) return;
+        send();
+      };
+      globalThis.Hooks.once('pf2eVisionerAvsBatchComplete', hookFn);
+    }
+  } catch (_) {}
+  if (typeof setTimeout === 'function') fallbackTimer = setTimeout(send, 75);
+  else send();
+  const pending = { cancel };
+  if (tokenId) _pendingPeekRevealRefresh.set(tokenId, pending);
+  return true;
+}
+
+export function sendPeekRevealRefresh(userId, payload) {
+  return executeSocketForUser(PEEK_REVEAL_REFRESH_CHANNEL, userId, payload);
+}
+
+export function refreshPeekRevealTargets(
+  targetIds,
+  { tokensLayer = globalThis.canvas?.tokens } = {},
+) {
+  const ids = Array.from(new Set((targetIds ?? []).filter(Boolean)));
+  let refreshed = 0;
+  for (const id of ids) {
+    const token = tokensLayer?.get?.(id);
+    if (!token || token.destroyed) continue;
+    if (token.turnMarker && !token.turnMarker.mesh) continue;
+    token.renderFlags?.set?.({
+      refreshState: true,
+      refreshMesh: true,
+      refreshVisibility: true,
+    });
+    token.refresh?.();
+    refreshed += 1;
+  }
+  return refreshed;
+}
+
+export async function peekRevealRefreshHandler(
+  payload,
+  {
+    refreshTargets = refreshPeekRevealTargets,
+    refreshPerception = refreshLocalPerception,
+    setTimer = globalThis.setTimeout,
+  } = {},
+) {
+  if (!payload || payload.sceneId !== globalThis.canvas?.scene?.id) return false;
+  const targetIds = Array.isArray(payload.targetIds)
+    ? Array.from(new Set(payload.targetIds.filter(Boolean)))
+    : [];
+  const refresh = async () => {
+    try {
+      await refreshTargets(targetIds);
+    } catch (error) {
+      console.warn(`[${MODULE_ID}] peek reveal visual refresh failed`, error);
+    }
+    try {
+      refreshPerception?.();
+    } catch (_) {}
+  };
+  await refresh();
+  for (const delay of [75, 200]) {
+    if (typeof setTimer === 'function') setTimer(() => { void refresh(); }, delay);
+  }
+  return true;
+}
+
+export async function doorPeekApprovalRequestHandler(payload, { confirm = confirmDoorPeekApproval } = {}) {
+  try {
+    if (!globalThis.game?.user?.isGM) return;
+    if (!payload || payload.sceneId !== globalThis.canvas?.scene?.id) return;
+    const approved = await confirm(payload);
+    sendDoorPeekApprovalResponse(payload.userId, {
+      requestId: payload.requestId,
+      sceneId: payload.sceneId,
+      tokenId: payload.tokenId,
+      wallId: payload.wallId,
+      approved: !!approved,
+    });
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Failed to handle door peek approval request:`, error);
+    try {
+      sendDoorPeekApprovalResponse(payload?.userId, {
+        requestId: payload?.requestId,
+        sceneId: payload?.sceneId,
+        tokenId: payload?.tokenId,
+        wallId: payload?.wallId,
+        approved: false,
+      });
+    } catch (_) {}
+  }
+}
+
+export function sendDoorPeekApprovalResponse(userId, payload) {
+  return executeSocketForUser(PEEK_APPROVAL_RESPONSE_CHANNEL, userId, payload);
+}
+
+export async function doorPeekApprovalResponseHandler(payload) {
+  if (!payload || payload.sceneId !== globalThis.canvas?.scene?.id) return false;
+  const manager = globalThis.game?.modules?.get?.(MODULE_ID)?.api?.peekManager;
+  return manager?.handleDoorPeekApprovalResponse?.(payload) ?? false;
+}
+
+export async function confirmDoorPeekApproval(payload) {
+  const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
+  const token = globalThis.canvas?.tokens?.get?.(payload.tokenId);
+  const wall = globalThis.canvas?.walls?.get?.(payload.wallId);
+  const userName = payload.userName || globalThis.game?.users?.get?.(payload.userId)?.name || 'Player';
+  const tokenName =
+    payload.tokenName || token?.name || token?.document?.name || token?.actor?.name || payload.tokenId;
+  const doorName = wall?.document?.name || wall?.name || payload.wallId;
+  return VisionerConfirmDialog.confirm({
+    title: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.APPROVAL_TITLE') ?? 'Approve Door Peek',
+    content: buildDoorPeekApprovalContent({ userName, tokenName, doorName, wallId: payload.wallId }),
+    yes: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.APPROVE') ?? 'Approve',
+    no: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.DENY') ?? 'Deny',
+    variant: 'info',
+    icon: 'fas fa-eye',
+    onRender: (root) => bindDoorPeekApprovalPanLink(root),
+  });
+}
+
+export function buildDoorPeekApprovalContent({ userName, tokenName, doorName, wallId } = {}) {
+  const panLabel =
+    globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.PAN_TO_DOOR') ?? 'Pan to door';
+  const doorText = doorName || wallId;
+  const wallIdText = String(wallId ?? '');
+  return `
+    <p>${escapeHtml(userName)} wants ${escapeHtml(tokenName)} to peek through ${escapeHtml(doorText)}.</p>
+    <p class="pv-door-approval-meta">
+      Door ID:
+      <button type="button"
+              class="pv-door-approval-pan-link"
+              data-action="pan-door"
+              data-wall-id="${escapeHtmlAttribute(wallIdText)}"
+              data-tooltip="${escapeHtmlAttribute(panLabel)}"
+              aria-label="${escapeHtmlAttribute(panLabel)}">
+        <i class="fas fa-location-crosshairs" aria-hidden="true"></i>
+        <span>${escapeHtml(wallIdText)}</span>
+      </button>
+    </p>
+  `;
+}
+
+export function bindDoorPeekApprovalPanLink(root) {
+  const container = root?.querySelector?.('.pv-door-approval-meta') ?? root;
+  container?.querySelectorAll?.('[data-action="pan-door"][data-wall-id]')?.forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      panCanvasToDoor(button.dataset.wallId);
+    });
+  });
+}
+
+export function panCanvasToDoor(wallId) {
+  const wall = resolveCanvasWall(wallId);
+  const c = wall?.document?.c ?? wall?.c;
+  if (!Array.isArray(c) || c.length < 4) return false;
+  const x = (Number(c[0]) + Number(c[2])) / 2;
+  const y = (Number(c[1]) + Number(c[3])) / 2;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  try {
+    globalThis.canvas?.animatePan?.({ x, y, duration: 500 });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function resolveCanvasWall(wallId) {
+  if (!wallId) return null;
+  return (
+    globalThis.canvas?.walls?.get?.(wallId) ||
+    globalThis.canvas?.walls?.placeables?.find?.((wall) => wall?.id === wallId || wall?.document?.id === wallId) ||
+    globalThis.canvas?.scene?.walls?.get?.(wallId) ||
+    globalThis.canvas?.scene?.getEmbeddedDocument?.('Wall', wallId) ||
+    null
+  );
+}
+
+export function executeSocketForUser(channel, userId, ...args) {
+  const targetUserId = userId || null;
+  const socket = _socketService.socket;
+  if (!channel || !targetUserId || !socket) return false;
+  if (typeof socket.executeForUsers === 'function') {
+    socket.executeForUsers(channel, [targetUserId], ...args);
+    return true;
+  }
+  if (typeof socket.executeAsUser === 'function') {
+    socket.executeAsUser(channel, targetUserId, ...args);
+    return true;
+  }
+  if (typeof socket.executeForUser === 'function') {
+    socket.executeForUser(channel, targetUserId, ...args);
+    return true;
+  }
+  return false;
+}
+
+function escapeHtml(value) {
+  const div = globalThis.document?.createElement?.('div');
+  if (div) {
+    div.textContent = String(value ?? '');
+    return div.innerHTML;
+  }
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function escapeHtmlAttribute(value) {
+  return escapeHtml(value).replaceAll('`', '&#96;');
 }
 
 export function peekEndHandler(payload) {
@@ -492,7 +822,10 @@ export function peekEndHandler(payload) {
 
 function recalcPeekToken(tokenId) {
   try {
-    game.modules.get(MODULE_ID)?.api?.autoVisibility?.updateTokens?.([tokenId]);
+    const autoVisibility = game.modules.get(MODULE_ID)?.api?.autoVisibility;
+    if (typeof autoVisibility?.updateTokens !== 'function') return;
+    requestFullVisibilityScopeRecalc();
+    autoVisibility.updateTokens([tokenId]);
   } catch (e) {
     console.warn(`[${MODULE_ID}] peek recalc failed`, e);
   }

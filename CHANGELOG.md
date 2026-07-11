@@ -1,5 +1,25 @@
 # Changelog
 
+## [8.3.17] - 2026-07-11
+
+### Added
+
+- **Door peeking can now require GM approval**: A new world setting lets the GM require player door-peek attempts to open a GM approval dialog first. Approved requests start the same door peek on the player's client; denied requests do not reveal anything, and GMs can still peek directly. The GM approval dialog also shows a clickable door ID that pans the canvas to the requested door.
+
+### Fixed
+
+- **Door peeking now respects the slit settings instead of revealing full sight**: Door peeks now clamp the sight polygon, light-perception mask, and rendered vision mesh to the configured slit, so a 1-degree slit stays a 1-degree peek instead of showing the token's normal field of view on lit maps.
+- **Approved door peeks now resume on the requesting client**: The GM approval response now uses socketlib's targeted-user call correctly, so clicking Approve actually starts the pending peek for the player who requested it.
+- **Door peeking stays slit-only after idle perception refreshes**: Foundry can rebuild active vision, light, or darkness sources after mouse movement stops. Visioner now reclamps those rebuilt sources immediately while a peek is active, so the token's normal full field of view cannot reappear beside the slit.
+- **Player peeks now reveal creatures inside the slit immediately**: GM-authored Auto Visibility updates now trigger a targeted visibility re-evaluation on the requesting player's client. This refresh includes creatures that are currently invisible, so player peeks reveal the same valid targets as GM peeks without exposing anything outside the configured slit.
+- **Aiming a peek no longer causes avoidable FPS drops**: Pointer-driven peeks now throttle geometry updates and skip unchanged directions, reducing repeated vision-source rebuilds, perception refreshes, and Auto Visibility recalculations while preserving responsive aiming.
+- **Player-initiated door peeks revealed nothing at all**: The GM's client checks line of sight for a player's peeking token without that token being its own controlled vision source, which fell back to a sight check that didn't know about the peek's excluded door wall. A disagreement between that fallback and the peek-aware wall check was resolved in favor of an unrelated heuristic instead of the peek, so the door stayed opaque for players even though the same peek worked fine when the GM did it. Player peeks now correctly see through the slit.
+- **Sweeping across a target during a peek could fail to reveal it, even for a moment**: Re-aiming quickly could land several mouse positions inside the same network-send window; only the very latest one was kept, dropping any of the others that actually pointed at the target. A second, earlier throttle inside the peek itself discarded in-between mouse positions the same way before they were ever considered. Both throttles now combine the cones they would have dropped into the full area actually swept, so a target passed through mid-sweep is still caught.
+- **Peeking still needed to "settle" on a target for about a second before it revealed**: Line-of-sight results were cached by position only, with no awareness of an active peek. Since re-aiming a peek never moves the token, the very first (pre-aim) result computed for a pair got cached and kept being replayed for several seconds no matter how the peek's aim changed afterward. An active peek now always computes a fresh line-of-sight result instead of reusing a stale one.
+- **Corner peeking's own view flickered continuously while aiming**: Corner peeks move the vision source's own viewing point with the mouse, so Foundry fully rebuilds it on every re-aim tick; door peeks don't have this problem since their viewpoint stays fixed in place. Corner peeks now rebuild their own rendered vision at a smoother, throttled rate, while what other tokens can see of them still updates at full speed.
+- **A revealed token's turn marker could flash while peeking**: The reveal refresh triggered by peeking forced a token redraw without checking whether that token's turn marker was mid-rebuild, unlike every other refresh path in the module. Revealing the current combatant mid-peek could repeatedly retrigger that rebuild, flashing the marker. The reveal refresh now waits for the turn marker to be ready first, matching the existing guard used everywhere else.
+- **Peeking suppressed soundwaves for creatures only heard, not seen**: A peek's visual cone correctly restricts what the peeking creature can see, but the same gate was also being applied to Foundry's aggregate detection result, which mixes in hearing and other non-visual senses. A creature detected only by hearing outside the peek's cone lost its soundwave entirely instead of keeping it. That gate now steps aside whenever Visioner already considers the target hidden (heard, not seen).
+
 ## [8.3.16] - 2026-07-10
 
 ### Fixed
