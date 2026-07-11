@@ -13,7 +13,10 @@ import {
   setSuppressLightingRefresh,
 } from '../services/runtime-state.js';
 import { updateWallVisuals } from '../services/visual-effects.js';
-import { clearAllDetectionFilterVisuals } from '../stores/visibility-map.js';
+import {
+  clearAllDetectionFilterVisuals,
+  primeHiddenDetectionFilterVisualsForObserver,
+} from '../stores/visibility-map.js';
 import { releaseAllCurrentViewHardHide } from '../services/Detection/current-view-hard-hide.js';
 import {
   isSelectAllTokenVisibilityBypassActive,
@@ -365,6 +368,12 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
     // _onControl; nudge another pass so soundwave rings repaint on reselect
     // instead of waiting for the next move.
     scheduleCanvasPerceptionUpdate({ refreshVision: true });
+    // The nudge above only fixes core's token.detectionFilter flag. The mesh
+    // that actually renders it was zeroed out by clearAllDetectionFilterVisuals()
+    // while nothing was controlled, and only gets re-primed on an actual state
+    // transition to 'hidden' - which doesn't happen here since the stored state
+    // never changed. Re-prime it directly for the reselected observer.
+    primeHiddenDetectionFilterVisualsForObserver(token);
   } catch {
     /* best effort */
   }

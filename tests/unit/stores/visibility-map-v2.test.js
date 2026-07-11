@@ -4,6 +4,7 @@ import {
   getPerceptionProfileMap,
   getVisibilityBetween,
   getVisibilityMap,
+  primeHiddenDetectionFilterVisualsForObserver,
   setVisibilityMap,
   setVisibilityMapsBatch,
   setPerceptionProfileBetween,
@@ -731,5 +732,61 @@ describe('clearAllDetectionFilterVisuals (GM deselect / select-all omniscience)'
   test('tolerates tokens without detection visuals and empty input', () => {
     expect(() => clearAllDetectionFilterVisuals([{}, null])).not.toThrow();
     expect(clearAllDetectionFilterVisuals([])).toBe(0);
+  });
+});
+
+describe('primeHiddenDetectionFilterVisualsForObserver (reselect without a state transition)', () => {
+  let observer;
+  let target;
+
+  beforeEach(() => {
+    observer = global.createMockToken({ id: 'observer' });
+    target = global.createMockToken({ id: 'target' });
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.refresh = jest.fn();
+    target.controlled = false;
+  });
+
+  function stubStoredState(detectionState) {
+    const flags = { 'pf2e-visioner': { visibilityV2: { target: { detectionState } } } };
+    observer.document.getFlag.mockImplementation((moduleId, key) => flags[moduleId]?.[key] ?? null);
+  }
+
+  test('re-primes the mesh for a target already stored as hidden', () => {
+    stubStoredState('hidden');
+
+    const primed = primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
+
+    expect(primed).toBe(1);
+    expect(target.refresh).toHaveBeenCalledTimes(1);
+    expect(target.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
+  });
+
+  test('leaves a target alone when its mesh already shows the ring', () => {
+    stubStoredState('hidden');
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+
+    const primed = primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
+
+    expect(primed).toBe(0);
+    expect(target.refresh).not.toHaveBeenCalled();
+  });
+
+  test('ignores a target that is not stored as hidden', () => {
+    stubStoredState('observed');
+
+    const primed = primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
+
+    expect(primed).toBe(0);
+    expect(target.refresh).not.toHaveBeenCalled();
+    expect(target.detectionFilterMesh).toMatchObject({ visible: false, alpha: 0 });
+  });
+
+  test('returns 0 without an observer', () => {
+    expect(primeHiddenDetectionFilterVisualsForObserver(null, [target])).toBe(0);
   });
 });

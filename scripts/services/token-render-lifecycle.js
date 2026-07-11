@@ -3,6 +3,8 @@ import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
 } from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
+import { scheduleCanvasPerceptionUpdate as defaultScheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
+import { primeHiddenDetectionFilterVisualsForObserver as defaultPrimeHiddenDetectionFilterVisualsForObserver } from '../stores/visibility-map.js';
 import {
   getMatchingControlledTokenForRefresh,
   refreshSystemHiddenHighlightsForMovedToken as defaultRefreshSystemHiddenHighlightsForMovedToken,
@@ -160,10 +162,18 @@ export async function handleAvsBatchCompleteRefresh({
   defaultRefreshSystemHiddenHighlightsForControlledTokens,
   removeSystemHiddenIndicatorsForObservedTargets =
   defaultRemoveSystemHiddenIndicatorsForObservedTargets,
+  scheduleCanvasPerceptionUpdate = defaultScheduleCanvasPerceptionUpdate,
+  primeHiddenDetectionFilterVisualsForObserver =
+  defaultPrimeHiddenDetectionFilterVisualsForObserver,
+  getControlledTokens = getDefaultControlledTokens,
 } = {}) {
   try {
     await refreshSystemHiddenHighlightsForControlledTokens();
     await removeSystemHiddenIndicatorsForObservedTargets();
+    scheduleCanvasPerceptionUpdate({ refreshVision: true });
+    for (const observer of getControlledTokens()) {
+      primeHiddenDetectionFilterVisualsForObserver(observer);
+    }
     return { handled: true };
   } catch {
     return { handled: false, reason: 'error' };

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.20] - 2026-07-11
+
+### Fixed
+
+- **Reselecting an observer still didn't repaint soundwaves for creatures only heard, not seen**: The 8.3.19 fix nudged Foundry into recomputing its own detection flag on reselect, but that flag was never the broken half - the mesh that actually draws the ring gets force-hidden whenever no token is controlled, and only gets re-armed on an actual state change to hidden. Reselecting a target that had been hidden the whole time (before, during, and after the deselect) produces no such change, so the mesh stayed invisible regardless of how many times the underlying flag got recomputed. Reselecting an observer - or switching to another token and back - now re-arms that mesh directly from the currently stored state instead of waiting for a change that was never going to happen.
+
 ## [8.3.19] - 2026-07-11
 
 ### Fixed

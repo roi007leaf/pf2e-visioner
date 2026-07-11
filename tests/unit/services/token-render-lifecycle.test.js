@@ -250,4 +250,17 @@ describe('token render lifecycle service', () => {
     ).resolves.toEqual({ handled: true });
     expect(refreshSystemHiddenHighlightsForControlledTokens).toHaveBeenCalledTimes(1);
   });
+
+  test('nudges core vision refresh after AVS batch completion', async () => {
+    const scheduleCanvasPerceptionUpdate = jest.fn();
+
+    await expect(
+      handleAvsBatchCompleteRefresh({
+        refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
+        removeSystemHiddenIndicatorsForObservedTargets: jest.fn(),
+        scheduleCanvasPerceptionUpdate,
+      }),
+    ).resolves.toEqual({ handled: true });
+    expect(scheduleCanvasPerceptionUpdate).toHaveBeenCalledWith({ refreshVision: true });
+  });
 });

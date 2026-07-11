@@ -316,6 +316,41 @@ function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
   }
 }
 
+/**
+ * Re-prime the detectionFilterMesh for targets already stored as 'hidden' relative to
+ * `observer`, without requiring a fresh state transition. clearAllDetectionFilterVisuals()
+ * zeroes the mesh out while no token is controlled; reselecting an observer whose targets'
+ * stored state never changed produces no transition for refreshHiddenDetectionFilterVisualsForChanges
+ * to react to, so the mesh would otherwise stay invisible forever despite core Foundry
+ * correctly recomputing token.detectionFilter.
+ */
+export function primeHiddenDetectionFilterVisualsForObserver(
+  observer,
+  tokens = globalThis.canvas?.tokens?.placeables ?? [],
+) {
+  if (!observer) return 0;
+
+  let primed = 0;
+  for (const target of tokens ?? []) {
+    if (!target || target === observer || target.controlled) continue;
+    if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
+    if (getVisibilityBetween(observer, target) !== 'hidden') continue;
+
+    refreshCoreDetectionFilterForHiddenTarget(target);
+    if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
+
+    try {
+      if (primeHiddenDetectionFilterVisuals(target)) {
+        target.refresh?.();
+        primed += 1;
+      }
+    } catch {
+      /* best-effort reselect visual refresh */
+    }
+  }
+  return primed;
+}
+
 export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, options = {}) {
   const nextMap = normalizeVisibilityMap(visibilityMap, {
     includeObserved: options?.preserveObserved === true,
