@@ -25,10 +25,17 @@ export function applyPeekOverrideToData(data, override) {
   if (typeof override.range === 'number' && override.range > 0) {
     data.radius = override.range;
     data.externalRadius = override.range;
-  } else if (typeof data.radius === 'number' && data.radius > 0) {
+  } else {
     // Foundry uses externalRadius when darkness-blinding a non-darkvision source.
     // Keep peek geometry from collapsing to the token footprint during that path.
-    data.externalRadius = data.radius;
+    const maxR = globalThis.canvas?.dimensions?.maxR;
+    const floor = Math.max(
+      typeof data.radius === 'number' ? data.radius : 0,
+      typeof maxR === 'number' ? maxR : 0,
+    );
+    if (floor > 0) {
+      data.externalRadius = Math.max(data.externalRadius ?? 0, floor);
+    }
   }
   return data;
 }

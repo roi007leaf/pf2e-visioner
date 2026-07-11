@@ -298,6 +298,8 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
 
 describe('refreshSoundwavesForActiveMovement (only mutates during a committed move)', () => {
   let savedCanvas;
+  let nowSpy;
+  let mockNow;
 
   async function loadWith({ pendingMovement, gmVisionBypass = false }) {
     let mod;
@@ -332,10 +334,16 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
 
   beforeEach(() => {
     savedCanvas = globalThis.canvas;
+    mockNow = 0;
+    nowSpy = jest.spyOn(globalThis.performance, 'now').mockImplementation(() => {
+      mockNow += 10000;
+      return mockNow;
+    });
   });
   afterEach(() => {
     globalThis.canvas = savedCanvas;
     jest.resetModules();
+    nowSpy.mockRestore();
   });
 
   test('leaves soundwaves frozen while only hold-dragging (no pending movement)', async () => {

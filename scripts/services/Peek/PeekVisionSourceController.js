@@ -26,6 +26,7 @@ export class PeekVisionSourceController {
     if (!this._overrides.has(id)) return;
     this._overrides.delete(id);
     if (this._overrides.size === 0) this._restoreEdges();
+    this._clearFovOverride(token);
     this._reinitialize(token);
   }
 
@@ -80,6 +81,10 @@ export class PeekVisionSourceController {
     const tokenId = token?.document?.id;
     const peek = this._overrides.get(tokenId);
     if (!peek) return;
+    if (typeof peek?.fov !== 'number') {
+      this._clearFovOverride(token);
+      return;
+    }
     const los = token?.vision?.los;
     const generatedFov = this._createPeekFovPolygon(los, peek);
     const fov = generatedFov ?? token?.vision?.fov;
@@ -99,6 +104,16 @@ export class PeekVisionSourceController {
       this._refreshRenderedGeometry(token.vision);
       this._clampTokenLightToFov(token, generatedFov);
     }
+  }
+
+  _clearFovOverride(token) {
+    const vision = token?.vision;
+    const los = vision?.los;
+    if (!vision || !los) return;
+    for (const key of ['fov', 'shape', 'light']) {
+      this._assignGeometryProperty(vision, key, los);
+    }
+    this._refreshRenderedGeometry(vision);
   }
 
   _clampTokenLightToFov(token, fov) {

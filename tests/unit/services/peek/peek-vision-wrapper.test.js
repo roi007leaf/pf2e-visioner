@@ -66,6 +66,30 @@ describe('applyPeekOverrideToData', () => {
     expect(data.externalRadius).toBe(1200);
   });
 
+  test('range 0 does not shrink an external radius that is already larger than the sight radius (non-darkvision token in darkness)', () => {
+    const data = applyPeekOverrideToData(
+      { radius: 5, externalRadius: 400 },
+      { origin: { x: 1, y: 2 }, direction: 0, fov: null, range: 0 },
+    );
+    expect(data.radius).toBe(5);
+    expect(data.externalRadius).toBe(400);
+  });
+
+  test('range 0 falls back to the scene max radius when the token has no usable sight radius at all (non-darkvision token blinded by darkness)', () => {
+    const originalCanvas = globalThis.canvas;
+    globalThis.canvas = { ...originalCanvas, dimensions: { ...originalCanvas.dimensions, maxR: 6490 } };
+    try {
+      const data = applyPeekOverrideToData(
+        { radius: 0, externalRadius: 25 },
+        { origin: { x: 1, y: 2 }, direction: 0, fov: null, range: 0 },
+      );
+      expect(data.radius).toBe(0);
+      expect(data.externalRadius).toBe(6490);
+    } finally {
+      globalThis.canvas = originalCanvas;
+    }
+  });
+
   test('missing origin returns data unchanged', () => {
     const data = applyPeekOverrideToData({}, { direction: 0, fov: 10, range: 400 });
     expect(data).toEqual({});

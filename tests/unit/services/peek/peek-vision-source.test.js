@@ -413,4 +413,118 @@ describe('PeekVisionSourceController contract', () => {
       globalThis.canvas = originalCanvas;
     }
   });
+
+  test('switching from a door peek to a corner peek does not leave the door slit stuck on vision.los/fov', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const naturalPoints = [0, 0, 500, 0, 500, 500, 0, 500];
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los: { points: [...naturalPoints], config: { radius: 400 }, contains: jest.fn(() => true) },
+      },
+      initializeVisionSource: jest.fn(() => {
+        token.vision.los.points = [...naturalPoints];
+      }),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 10,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+      expect(token.vision.los.points).not.toEqual(naturalPoints);
+      expect(Object.prototype.hasOwnProperty.call(token.vision, 'fov')).toBe(true);
+
+      ctrl.apply(token, { origin: { x: 5, y: 5 }, direction: 0, fov: null, range: 0, ignoredWallIds: [] });
+
+      expect(token.vision.los.points).toEqual(naturalPoints);
+      expect(token.vision.fov).toBe(token.vision.los);
+      expect(token.vision.shape).toBe(token.vision.los);
+      expect(token.vision.light).toBe(token.vision.los);
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
+  test('clear after a door peek restores fov/shape/light to the natural LOS instead of leaving them undefined', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los: { points: [0, 0, 500, 0, 500, 500, 0, 500], config: { radius: 400 }, contains: jest.fn(() => true) },
+      },
+      initializeVisionSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 10,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+      expect(Object.prototype.hasOwnProperty.call(token.vision, 'fov')).toBe(true);
+
+      ctrl.clear(token);
+
+      expect(token.vision.fov).toBe(token.vision.los);
+      expect(token.vision.shape).toBe(token.vision.los);
+      expect(token.vision.light).toBe(token.vision.los);
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
+
+  test('switching to a corner peek never leaves vision.shape without a config, which crashes core mesh drawing', () => {
+    const refresh = jest.fn();
+    const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });
+    const originalPixi = globalThis.PIXI;
+    class Polygon {
+      constructor(points) {
+        this.points = points;
+      }
+    }
+    const token = {
+      document: { id: 't', update: jest.fn(), x: 0, y: 0, width: 1, height: 1, elevation: 0 },
+      vision: {
+        los: { points: [0, 0, 500, 0, 500, 500, 0, 500], config: { radius: 400 }, contains: jest.fn(() => true) },
+      },
+      initializeVisionSource: jest.fn(),
+    };
+    globalThis.PIXI = { ...originalPixi, Polygon };
+    try {
+      ctrl.apply(token, {
+        origin: { x: 10, y: 20 },
+        direction: 0,
+        fov: 10,
+        range: 400,
+        ignoredWallIds: ['door1'],
+      });
+
+      ctrl.apply(token, { origin: { x: 5, y: 5 }, direction: 0, fov: null, range: 0, ignoredWallIds: [] });
+
+      expect(token.vision.shape).toBeDefined();
+      expect(token.vision.shape.config).toBeDefined();
+    } finally {
+      globalThis.PIXI = originalPixi;
+    }
+  });
 });
