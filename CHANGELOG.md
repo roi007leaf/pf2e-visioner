@@ -6,6 +6,13 @@
 
 - **Reselecting an observer didn't repaint soundwaves for creatures only heard, not seen**: Deselecting and reselecting the same token (without moving it) skipped Visioner's own recalculation, since nothing about the observer had actually changed - correctly so. But that also meant nothing nudged Foundry's own vision refresh, which isn't guaranteed to have picked up the reselected token's active vision source in time to redraw detection rings. Soundwave rings only reappeared once the observer moved a square, triggering a fresh vision refresh incidentally. Reselecting now explicitly nudges that refresh, so soundwaves repaint immediately instead of waiting for the next move.
 
+## [8.3.18] - 2026-07-11
+
+### Fixed
+
+- **Starting a corner peek right after a door peek left the door's slit cone stuck in place**: Door peeks clamp the rendered vision cone to a slit polygon by writing it onto the token's vision source; corner peeks don't need that clamp, but nothing ever cleared it, so the slit polygon silently carried over and got reapplied. Ending a peek entirely had the same gap. Starting a corner peek, or ending any peek, now clears that leftover clamp so the token's vision (and what the GM sees others peeking at) actually reflects the new peek instead of the previous one.
+- **Peeking without darkvision could collapse a token's vision down to a tiny circle**: A corner peek has no explicit range, so it fell back to the peeking token's own current sight radius - which, for a non-darkvision creature standing somewhere dark, can genuinely be near zero, regardless of how well-lit the area being peeked into actually is. Darkvision creatures never noticed since their own radius is already effectively unlimited. Corner peeks (and door peeks configured with no range limit) now fall back to the scene's full radius instead, so what's actually revealed is governed by the walls and lighting at the peeked-at location, not the peeking creature's own current surroundings.
+
 ## [8.3.17] - 2026-07-11
 
 ### Added
@@ -25,13 +32,6 @@
 - **Corner peeking's own view flickered continuously while aiming**: Corner peeks move the vision source's own viewing point with the mouse, so Foundry fully rebuilds it on every re-aim tick; door peeks don't have this problem since their viewpoint stays fixed in place. Corner peeks now rebuild their own rendered vision at a smoother, throttled rate, while what other tokens can see of them still updates at full speed.
 - **A revealed token's turn marker could flash while peeking**: The reveal refresh triggered by peeking forced a token redraw without checking whether that token's turn marker was mid-rebuild, unlike every other refresh path in the module. Revealing the current combatant mid-peek could repeatedly retrigger that rebuild, flashing the marker. The reveal refresh now waits for the turn marker to be ready first, matching the existing guard used everywhere else.
 - **Peeking suppressed soundwaves for creatures only heard, not seen**: A peek's visual cone correctly restricts what the peeking creature can see, but the same gate was also being applied to Foundry's aggregate detection result, which mixes in hearing and other non-visual senses. A creature detected only by hearing outside the peek's cone lost its soundwave entirely instead of keeping it. That gate now steps aside whenever Visioner already considers the target hidden (heard, not seen).
-
-## [8.3.18] - 2026-07-11
-
-### Fixed
-
-- **Starting a corner peek right after a door peek left the door's slit cone stuck in place**: Door peeks clamp the rendered vision cone to a slit polygon by writing it onto the token's vision source; corner peeks don't need that clamp, but nothing ever cleared it, so the slit polygon silently carried over and got reapplied. Ending a peek entirely had the same gap. Starting a corner peek, or ending any peek, now clears that leftover clamp so the token's vision (and what the GM sees others peeking at) actually reflects the new peek instead of the previous one.
-- **Peeking without darkvision could collapse a token's vision down to a tiny circle**: A corner peek has no explicit range, so it fell back to the peeking token's own current sight radius - which, for a non-darkvision creature standing somewhere dark, can genuinely be near zero, regardless of how well-lit the area being peeked into actually is. Darkvision creatures never noticed since their own radius is already effectively unlimited. Corner peeks (and door peeks configured with no range limit) now fall back to the scene's full radius instead, so what's actually revealed is governed by the walls and lighting at the peeked-at location, not the peeking creature's own current surroundings.
 
 ## [8.3.16] - 2026-07-10
 
