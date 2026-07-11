@@ -360,8 +360,11 @@ function refreshPendingVisibilityAfterControlToken(token = canvas?.tokens?.contr
     if (!restoreControlTokenHiddenRenderStates(token)) {
       captureControlTokenHiddenRenderStates(token);
     }
-    // Freeze+settle: no per-frame visioner refresh on control — core renders
-    // live and AVS settles at move-end.
+    // Core's own testVisibility/detectionFilter pass isn't guaranteed to have
+    // seen this token's vision source as active yet when it ran inside
+    // _onControl; nudge another pass so soundwave rings repaint on reselect
+    // instead of waiting for the next move.
+    scheduleCanvasPerceptionUpdate({ refreshVision: true });
   } catch {
     /* best effort */
   }

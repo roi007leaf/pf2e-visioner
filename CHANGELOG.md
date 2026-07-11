@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.19] - 2026-07-11
+
+### Fixed
+
+- **Reselecting an observer didn't repaint soundwaves for creatures only heard, not seen**: Deselecting and reselecting the same token (without moving it) skipped Visioner's own recalculation, since nothing about the observer had actually changed - correctly so. But that also meant nothing nudged Foundry's own vision refresh, which isn't guaranteed to have picked up the reselected token's active vision source in time to redraw detection rings. Soundwave rings only reappeared once the observer moved a square, triggering a fresh vision refresh incidentally. Reselecting now explicitly nudges that refresh, so soundwaves repaint immediately instead of waiting for the next move.
+
 ## [8.3.17] - 2026-07-11
 
 ### Added
