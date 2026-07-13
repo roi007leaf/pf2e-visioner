@@ -69,6 +69,7 @@ export function getSystemHiddenSenseContext(observer) {
   const lifesenseSense = observerSenses.find?.((sense) => sense.type === 'lifesense') ?? null;
   const thoughtsenseSense = observerSenses.find?.((sense) => sense.type === 'thoughtsense') ?? null;
   const echolocationSense = observerSenses.find?.((sense) => sense.type === 'echolocation') ?? null;
+  const scentSense = observerSenses.find?.((sense) => sense.type === 'scent') ?? null;
   const observerIsBlinded = observer?.actor?.hasCondition?.('blinded') ?? false;
   const observerIsDeafened = observer?.actor?.hasCondition?.('deafened') ?? false;
 
@@ -76,10 +77,12 @@ export function getSystemHiddenSenseContext(observer) {
     lifesenseSense,
     thoughtsenseSense,
     echolocationSense,
+    scentSense,
     observerHasLifesense: !!lifesenseSense,
     lifesenseIsPrecise: lifesenseSense?.acuity === 'precise',
     observerHasThoughtsense: !!thoughtsenseSense,
     observerHasEcholocation: !!echolocationSense,
+    observerHasScent: !!scentSense,
     observerIsBlindAndDeaf: observerIsBlinded && observerIsDeafened,
     observerIsDeafened,
   };
@@ -90,6 +93,7 @@ export function shouldEvaluateSystemHiddenIndicators(senseContext) {
     !!senseContext?.observerHasLifesense ||
     !!senseContext?.observerHasThoughtsense ||
     !!senseContext?.observerHasEcholocation ||
+    !!senseContext?.observerHasScent ||
     !!senseContext?.observerIsBlindAndDeaf
   );
 }
@@ -198,6 +202,7 @@ export function buildSystemHiddenIndicatorDecision({
   isSoundBlocked = null,
   canLifesenseDetect = () => false,
   canThoughtsenseDetect = () => false,
+  canScentDetect = () => true,
 } = {}) {
   const isSystemHidden = !token?.visible || token?.renderable === false;
   const targetTraits = token?.actor?.system?.traits?.value || [];
@@ -205,14 +210,17 @@ export function buildSystemHiddenIndicatorDecision({
   const lifesenseRange = senseContext?.lifesenseSense?.range ?? 0;
   const thoughtsenseRange = senseContext?.thoughtsenseSense?.range ?? 0;
   const echolocationRange = senseContext?.echolocationSense?.range ?? 0;
+  const scentRange = senseContext?.scentSense?.range ?? 0;
   const detection = getStoredDetection({ observer, token, getDetectionBetween });
   const canBeDetectedByLifesense = canLifesenseDetect({ traits: targetTraits });
   const canBeDetectedByThoughtsense = canThoughtsenseDetect({ traits: targetTraits });
+  const canBeDetectedByScent = canScentDetect({ traits: targetTraits });
   const isWithinLifesenseRange = lifesenseRange === Infinity || distanceInFeet <= lifesenseRange;
   const isWithinThoughtsenseRange =
     thoughtsenseRange === Infinity || distanceInFeet <= thoughtsenseRange;
   const isWithinEcholocationRange =
     echolocationRange === Infinity || distanceInFeet <= echolocationRange;
+  const isWithinScentRange = scentRange === Infinity || distanceInFeet <= scentRange;
   const visibilityState = getVisibilityState?.(observer, token) ?? null;
   const isHiddenFromObserver = visibilityState === 'hidden';
   const detectedByEcholocation =
@@ -222,6 +230,11 @@ export function buildSystemHiddenIndicatorDecision({
 
   const shouldShowLifesenseIndicator =
     isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+  const shouldShowScentIndicator =
+    isSystemHidden &&
+    !!senseContext?.observerHasScent &&
+    canBeDetectedByScent &&
+    isWithinScentRange;
   const shouldShowThoughtsenseIndicator =
     !!senseContext?.observerHasThoughtsense &&
     canBeDetectedByThoughtsense &&
@@ -239,6 +252,7 @@ export function buildSystemHiddenIndicatorDecision({
     !!senseContext?.observerIsBlindAndDeaf && isHiddenFromObserver;
   const shouldShowIndicator =
     shouldShowLifesenseIndicator ||
+    shouldShowScentIndicator ||
     shouldShowThoughtsenseIndicator ||
     shouldShowEcholocationIndicator ||
     shouldShowBlindDeafIndicator;
@@ -248,12 +262,15 @@ export function buildSystemHiddenIndicatorDecision({
       ? 'thoughtsense'
       : shouldShowEcholocationIndicator
         ? 'echolocation'
-        : 'lifesense';
+        : shouldShowScentIndicator
+          ? 'scent'
+          : 'lifesense';
 
   return {
     shouldShowIndicator,
     indicatorMode,
     shouldShowLifesenseIndicator,
+    shouldShowScentIndicator,
     shouldShowThoughtsenseIndicator,
     shouldShowEcholocationIndicator,
     shouldShowBlindDeafIndicator,

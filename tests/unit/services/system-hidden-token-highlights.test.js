@@ -263,6 +263,17 @@ describe('system-hidden token highlight service', () => {
         }),
       ),
     ).toBe(true);
+
+    expect(
+      shouldEvaluateSystemHiddenIndicators(
+        getSystemHiddenSenseContext({
+          actor: {
+            system: { perception: { senses: [{ type: 'scent', range: 30 }] } },
+            hasCondition: jest.fn((slug) => slug === 'deafened'),
+          },
+        }),
+      ),
+    ).toBe(true);
   });
 
   test('builds lifesense indicator decision from hidden state, traits, and range', () => {
@@ -298,6 +309,74 @@ describe('system-hidden token highlight service', () => {
       indicatorMode: 'lifesense',
       shouldShowLifesenseIndicator: true,
       distanceInFeet: 25,
+    });
+  });
+
+  test('builds scent indicator decision for a deafened observer with no darkvision in the dark', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        system: { perception: { senses: [{ type: 'scent', range: 30 }] } },
+        hasCondition: jest.fn((slug) => slug === 'deafened'),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+    const grid = {
+      size: 50,
+      distance: 5,
+      measurePath: jest.fn(() => ({ distance: 5 })),
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid,
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: true,
+      indicatorMode: 'scent',
+      shouldShowScentIndicator: true,
+      distanceInFeet: 25,
+    });
+  });
+
+  test('does not build scent indicator when the target is outside scent range', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        system: { perception: { senses: [{ type: 'scent', range: 10 }] } },
+        hasCondition: jest.fn((slug) => slug === 'deafened'),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+    const grid = {
+      size: 50,
+      distance: 5,
+      measurePath: jest.fn(() => ({ distance: 5 })),
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid,
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowScentIndicator: false,
     });
   });
 

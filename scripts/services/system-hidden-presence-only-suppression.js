@@ -1,7 +1,7 @@
 export const PRESENCE_ONLY_RENDER_SUPPRESSION_KEY = '_pvPresenceOnlyRenderSuppression';
 
 const PRESENCE_ONLY_RENDER_SUPPRESSION_TTL_MS = 1500;
-const PRESENCE_ONLY_MODES = new Set(['lifesense', 'thoughtsense']);
+const PRESENCE_ONLY_MODES = new Set(['lifesense', 'thoughtsense', 'scent']);
 
 export function isPresenceOnlyIndicatorMode(mode) {
   return PRESENCE_ONLY_MODES.has(mode);

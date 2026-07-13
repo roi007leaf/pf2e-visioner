@@ -2,6 +2,7 @@ import {
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityIndicatorDecision,
   buildTooltipVisibilityRequests,
+  getCoverOverlayTargets,
   normalizeTooltipVisibilityState,
 } from '../../../scripts/services/HoverTooltip/hover-tooltip-visibility-requests.js';
 import { clearPendingTokenMovementPosition } from '../../../scripts/services/movement-tracking.js';
@@ -112,6 +113,53 @@ describe('hover tooltip visibility request planning', () => {
     });
 
     expect(requests.map((r) => r.renderToken.id)).toEqual(['hidden']);
+  });
+
+  test('cover overlay hides undetected/unnoticed targets from non-GM users (no location leak)', () => {
+    const source = makeToken('source');
+    const undetected = makeToken('undetected');
+    const unnoticed = makeToken('unnoticed');
+    const hidden = makeToken('hidden');
+    const getVisibilityState = jest.fn((_, target) => target.id);
+
+    const targets = getCoverOverlayTargets({
+      sourceToken: source,
+      allTokens: [source, undetected, unnoticed, hidden],
+      isGM: false,
+      getVisibilityState,
+    });
+
+    expect(targets.map((t) => t.id)).toEqual(['hidden']);
+  });
+
+  test('cover overlay still shows undetected targets for GM users (omniscience preserved)', () => {
+    const source = makeToken('source');
+    const undetected = makeToken('undetected');
+    const getVisibilityState = jest.fn(() => 'undetected');
+
+    const targets = getCoverOverlayTargets({
+      sourceToken: source,
+      allTokens: [source, undetected],
+      isGM: true,
+      getVisibilityState,
+    });
+
+    expect(targets.map((t) => t.id)).toEqual(['undetected']);
+    expect(getVisibilityState).not.toHaveBeenCalled();
+  });
+
+  test('cover overlay still respects Foundry render state (core-hidden tokens excluded)', () => {
+    const source = makeToken('source');
+    const coreHidden = makeToken('core-hidden', { isVisible: false });
+
+    const targets = getCoverOverlayTargets({
+      sourceToken: source,
+      allTokens: [source, coreHidden],
+      isGM: false,
+      getVisibilityState: () => 'observed',
+    });
+
+    expect(targets).toEqual([]);
   });
 
   test('GM observer mode still shows undetected targets (omniscience preserved)', () => {

@@ -317,6 +317,7 @@ export async function updateSystemHiddenTokenHighlights(
         indicatorMode,
         shouldShowThoughtsenseIndicator,
         shouldShowEcholocationIndicator,
+        shouldShowScentIndicator,
       } =
         buildSystemHiddenIndicatorDecision({
           observer,
@@ -365,6 +366,7 @@ export async function updateSystemHiddenTokenHighlights(
             observerIsBlindAndDeaf,
             shouldShowThoughtsenseIndicator,
             shouldShowEcholocationIndicator,
+            shouldShowScentIndicator,
           });
         } catch (error) {
           console.warn(

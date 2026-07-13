@@ -67,7 +67,7 @@ import {
   SENSE_BADGE_BLOCKED_VISIBILITY_STATES,
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityRequests,
-  canRenderTooltipToken,
+  getCoverOverlayTargets,
 } from './HoverTooltip/hover-tooltip-visibility-requests.js';
 
 function getExplicitVisibilityStateLabel(state) {
@@ -953,9 +953,12 @@ export function showAutoCoverComputedOverlay(sourceToken) {
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
 
-    const others = (canvas.tokens?.placeables || []).filter(
-      (t) => t && t !== sourceToken && canRenderTooltipToken(t),
-    );
+    const others = getCoverOverlayTargets({
+      sourceToken,
+      allTokens: canvas.tokens?.placeables || [],
+      isGM: !!game.user?.isGM,
+      getVisibilityState: getVisibilityBetween,
+    });
 
     for (const target of others) {
       const cover = getCoverOverlayState(sourceToken, target);

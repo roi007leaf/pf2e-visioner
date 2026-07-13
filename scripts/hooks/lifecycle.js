@@ -127,18 +127,7 @@ function captureControlTokenHiddenRenderStates(observer) {
   controlTokenSessionState.hiddenRenderObserverId = observerId;
   controlTokenSessionState.hiddenRenderStateCaptured = true;
   controlTokenSessionState.hiddenRenderStates = hiddenRenderStates;
-  if (globalThis.game?.ready) {
-    console.warn(
-      '[DEBUG-hiddentoken-a91f]',
-      JSON.stringify({
-        phase: 'control-hidden-state-captured',
-        observerId,
-        observerName: observer.name,
-        targetCount: hiddenRenderStates.length,
-        targetIds: hiddenRenderStates.map(({ token }) => token.document.id),
-      }),
-    );
-  }
+
   return true;
 }
 
@@ -165,17 +154,7 @@ function restoreControlTokenHiddenRenderStates(observer) {
     token._pvCurrentViewHardHidden = state.hardHidden;
     restoredTargetIds.push(token.document.id);
   }
-  if (globalThis.game?.ready && restoredTargetIds.length > 0) {
-    console.warn(
-      '[DEBUG-hiddentoken-a91f]',
-      JSON.stringify({
-        phase: 'control-hidden-state-restored',
-        observerId,
-        observerName: observer.name,
-        targetIds: restoredTargetIds,
-      }),
-    );
-  }
+
   return true;
 }
 
@@ -541,13 +520,6 @@ async function refreshVisionSharingTokenIds() {
           await token.document.setFlag(MODULE_ID, 'visionMasterTokenId', newSceneTokenId);
           hasVisionSharingTokenIdChanges = true;
         }
-      } else {
-        log.warn(() => ({
-          msg: 'Could not find master actor token in current scene',
-          tokenName: token.name,
-          masterActorUuid,
-          scene: canvas.scene?.name,
-        }));
       }
     } catch (error) {
       log.warn(() => ({
@@ -882,23 +854,6 @@ export async function onCanvasReady() {
   registerPendingMovementPointerIntentListeners();
   registerSelectAllTokenVisibilityBypassListener();
   registerHiddenTokenTicker();
-
-  {
-    const tokens = (canvas?.tokens?.placeables ?? []).map((token) => {
-      const screen = canvas?.stage?.worldTransform?.apply?.(token.center) ?? token.center;
-      return {
-        id: token.document?.id,
-        name: token.name,
-        hidden: token.document?.hidden,
-        screenX: Math.round(screen?.x ?? 0),
-        screenY: Math.round(screen?.y ?? 0),
-      };
-    });
-    console.warn(
-      '[DEBUG-hiddentoken-a91f]',
-      JSON.stringify({ phase: 'scene-token-positions', tokens }),
-    );
-  }
 
   try {
     await refreshVisionSharingTokenIds();

@@ -31,6 +31,21 @@ export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {
   );
 }
 
+export function getCoverOverlayTargets({
+  sourceToken,
+  allTokens = [],
+  isGM = false,
+  getVisibilityState = () => null,
+} = {}) {
+  return getVisibleOtherTokens(allTokens, sourceToken).filter((target) => {
+    if (isGM) return true;
+    // Foundry's own render state (canRenderTooltipToken) doesn't know about AVS-computed
+    // undetected/unnoticed targets - without this, cover badges leak positions of enemies
+    // the player hasn't actually detected (unrestricted vision scenes, already-explored fog).
+    return !SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(getVisibilityState(sourceToken, target));
+  });
+}
+
 export function getTooltipSenseUsed(
   observerToken,
   targetToken,

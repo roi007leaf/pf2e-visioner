@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.3.21] - 2026-07-13
+
+### Fixed
+
+- **A deafened observer with only scent (no darkvision, in the dark) couldn't sense anything at all**: The system-hidden indicator - the marker shown for creatures Foundry's own renderer hides entirely but a special sense can still detect - only recognized lifesense, thoughtsense, and echolocation. Scent was never wired in, so a creature relying on scent alone (deafened, or otherwise unable to hear) got no indicator for targets it should have sensed as hidden, and appeared to detect nothing at all. Scent now gets the same treatment as lifesense: range-gated, unconditional detection, with its own indicator color.
+- **The cover tooltip could reveal enemy positions a player hadn't actually detected**: Holding the cover-overlay keybind showed cover badges for every token Foundry's own renderer happened to draw, without checking whether the player's controlled token had actually detected that target. On scenes where core Foundry doesn't restrict rendering by itself (unrestricted vision, already-explored fog), this leaked the exact location of undetected and unnoticed enemies, including ones outside the current encounter. The cover overlay now also checks Auto Visibility's own detection state for non-GM users, matching the guard already used by the regular hover badges; GMs keep seeing cover for every token as before.
+- Removed debug logs leftover
+
 ## [8.3.20] - 2026-07-11
 
 ### Fixed
