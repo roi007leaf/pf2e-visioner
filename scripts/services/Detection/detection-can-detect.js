@@ -12,6 +12,7 @@ import {
   VISIBILITY_DETECTION_THRESHOLDS,
 } from './detection-visibility-context.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
+import { isPartyActorToken } from '../../utils/token-actor.js';
 
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
@@ -72,6 +73,7 @@ function hasUndetectedAvsOverride(observer, target) {
 }
 
 function resolveDetectionDuringMovement(observer, target, visibility, modeId, canDetect) {
+  if (isPartyActorToken(observer) || isPartyActorToken(target)) return false;
   if (visibility === 'undetected' || visibility === 'unnoticed') {
     if (targetIsLootOrHazard(target)) return false;
     if (hasUndetectedAvsOverride(observer, target)) return false;

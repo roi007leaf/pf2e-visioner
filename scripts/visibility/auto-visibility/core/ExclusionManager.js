@@ -1,6 +1,7 @@
 
 import { isTokenInEncounter } from '../../../chat/services/infra/shared-utils.js';
 import { MODULE_ID } from '../../../constants.js';
+import { isPartyActorToken } from '../../../utils/token-actor.js';
 
 /**
  * Manages token exclusion logic for the auto-visibility system.
@@ -43,6 +44,7 @@ export class ExclusionManager {
         try {
             if (!token?.document) return true;
             if (token.document.hidden) return true;
+            if (isPartyActorToken(token)) return true;
 
             // Skip loot tokens and hazards - they don't have vision capabilities
             if (this._isLootOrHazardToken(token)) {

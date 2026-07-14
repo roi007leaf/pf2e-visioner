@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.23] - 2026-07-14
+
+### Fixed
+
+- **PF2e Party actor tokens were treated like ordinary combatants by Auto Visibility and move-time detection**: A token whose actor is the special "party" sheet type has no vision or stealth of its own, but Auto Visibility still evaluated it as an observer and target, and the during-move soundwave engine still scanned it for hearing-based indicators. Party actor tokens are now excluded from both roles in Auto Visibility, from movement-time detection, and from soundwave scans; ordinary characters and NPCs that merely belong to the party (by alliance or ownership) are unaffected.
+
 ## [8.3.22] - 2026-07-14
 
 ### Added

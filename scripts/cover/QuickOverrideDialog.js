@@ -23,6 +23,7 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
   };
 
   constructor(initialState = 'none', manualCover, options = {}) {
+    options.id = `pv-cover-quick-override-${foundry?.utils?.randomID?.() ?? `${Date.now()}-${Math.random()}`}`;
     if (options.title) {
       options.window = { ...(options.window || {}), title: options.title };
     }

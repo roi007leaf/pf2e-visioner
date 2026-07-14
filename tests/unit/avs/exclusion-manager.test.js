@@ -44,6 +44,24 @@ describe('ExclusionManager observer/target role split', () => {
     expect(mgr.isExcludedAsTarget(loot)).toBe(true);
   });
 
+  test('Party actor token is excluded as observer', () => {
+    const party = npcToken({ id: 'party-observer', type: 'party' });
+    expect(mgr.isExcludedToken(party)).toBe(true);
+  });
+
+  test('Party actor token is excluded as target', () => {
+    const party = npcToken({ id: 'party-target', type: 'party' });
+    expect(mgr.isExcludedAsTarget(party)).toBe(true);
+  });
+
+  test('ordinary party-allied character remains eligible', () => {
+    const member = npcToken({ id: 'member', type: 'character' });
+    member.actor.alliance = 'party';
+    member.actor.hasPlayerOwner = true;
+    expect(mgr.isExcludedToken(member)).toBe(false);
+    expect(mgr.isExcludedAsTarget(member)).toBe(false);
+  });
+
   test('token without a document is excluded in both roles', () => {
     expect(mgr.isExcludedToken({})).toBe(true);
     expect(mgr.isExcludedAsTarget({})).toBe(true);

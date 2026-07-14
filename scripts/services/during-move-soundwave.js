@@ -10,6 +10,7 @@ import {
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
+import { isPartyActorToken } from '../utils/token-actor.js';
 
 let running = false;
 let cachedSoundwaveFilter = null;
@@ -214,7 +215,7 @@ export function removeSoundwaveFilterOverride(target) {
 
 export function settleSoundwaveOverrides() {
   if (filterOverrides.size === 0) return;
-  const observers = currentViewObservers();
+  const observers = currentViewObservers().filter((observer) => !isPartyActorToken(observer));
   for (const entry of [...filterOverrides.values()]) {
     const target = entry.target;
     // Foundry's own visibility recompute has produced a real filter (persisted settled to a
@@ -271,10 +272,10 @@ export function refreshSoundwavesForActiveMovement() {
     }
     return;
   }
-  const observers = currentViewObservers();
-  if (!observers.length) return;
+  const observers = currentViewObservers().filter((observer) => !isPartyActorToken(observer));
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
     if (target.controlled) continue;
+    if (isPartyActorToken(target)) continue;
     if (targetIsHardHiddenFromCurrentView(target)) continue;
     const wantsSoundwave = targetShouldShowSoundwave(
       target,

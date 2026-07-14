@@ -258,6 +258,21 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
     expect(isOverridden(t)).toBe(false);
     expect(t.detectionFilter).toBeNull();
   });
+
+  test('Party observer sight does not drop a settling override', () => {
+    const t = overriddenTarget('h4');
+    const partyObserver = {
+      actor: { type: 'party' },
+      document: { id: 'party-observer' },
+      vision: { los: { contains: () => true } },
+    };
+    globalThis.canvas = { tokens: { controlled: [partyObserver], preview: { children: [] } } };
+
+    settleSoundwaveOverrides();
+
+    expect(isOverridden(t)).toBe(true);
+    expect(t.detectionFilter).toEqual(mockFilter);
+  });
 });
 
 describe('observerSightContainsTarget (live vision polygon contains the target center)', () => {
@@ -301,18 +316,23 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
   let nowSpy;
   let mockNow;
 
-  async function loadWith({ pendingMovement, gmVisionBypass = false }) {
+  async function loadWith({
+    pendingMovement,
+    gmVisionBypass = false,
+    observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
+    getVisibility = () => 'hidden',
+  }) {
     let mod;
     await jest.isolateModulesAsync(async () => {
       jest.doMock('../../../scripts/services/movement-tracking.js', () => ({
         hasActivePendingTokenMovement: () => pendingMovement,
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
-        currentViewObservers: () => [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
+        currentViewObservers: () => observers,
         targetIsHardHiddenFromCurrentView: () => false,
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
-        getVisionerVisibilityBetweenTokens: () => 'hidden',
+        getVisionerVisibilityBetweenTokens: getVisibility,
       }));
       jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
         shouldBypassAvsForGmVision: () => gmVisionBypass,
@@ -377,6 +397,75 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
 
     expect(target.detectionFilter).toBeNull();
     expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  test('omits Party observers from visibility lookup', async () => {
+    const partyObserver = { actor: { type: 'party' }, document: { id: 'party-observer' } };
+    const characterObserver = {
+      actor: { type: 'character' },
+      document: { id: 'character-observer' },
+      vision: { los: { contains: () => false } },
+    };
+    const target = makeTarget();
+    const getVisibility = jest.fn(() => 'hidden');
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers: [partyObserver, characterObserver],
+      getVisibility,
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(getVisibility).not.toHaveBeenCalledWith(partyObserver, target);
+    expect(getVisibility).toHaveBeenCalledWith(characterObserver, target);
+  });
+
+  test('omits Party targets from visibility lookup while processing ordinary targets', async () => {
+    const observer = {
+      actor: { type: 'character' },
+      document: { id: 'observer' },
+      vision: { los: { contains: () => false } },
+    };
+    const partyTarget = { ...makeTarget(), actor: { type: 'party' }, document: { id: 'party-target' } };
+    const npcTarget = { ...makeTarget(), actor: { type: 'npc' }, document: { id: 'npc-target' } };
+    const getVisibility = jest.fn(() => 'hidden');
+    globalThis.canvas = { tokens: { placeables: [partyTarget, npcTarget], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, observers: [observer], getVisibility });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(getVisibility).not.toHaveBeenCalledWith(observer, partyTarget);
+    expect(getVisibility).toHaveBeenCalledWith(observer, npcTarget);
+  });
+
+  test('clears active soundwaves when only Party observers remain', async () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } },
+    };
+    const characterObserver = {
+      actor: { type: 'character' },
+      document: { id: 'character-observer' },
+      vision: { los: { contains: () => false } },
+    };
+    const observers = [characterObserver];
+    const target = makeTarget();
+    target.detectionFilter = null;
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, observers });
+
+    mod.refreshSoundwavesForActiveMovement();
+    expect(Object.getOwnPropertyDescriptor(target, 'detectionFilter').get).toBeDefined();
+    expect(target.detectionFilterMesh.visible).toBe(true);
+
+    observers.splice(0, 1, { actor: { type: 'party' }, document: { id: 'party-observer' } });
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(Object.getOwnPropertyDescriptor(target, 'detectionFilter').get).toBeUndefined();
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+    globalThis.CONFIG = savedConfig;
   });
 });
 

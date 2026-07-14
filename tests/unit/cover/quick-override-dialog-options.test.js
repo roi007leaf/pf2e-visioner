@@ -51,4 +51,15 @@ describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
     CoverQuickOverrideDialog._onCancel.call(dialogA, {}, {});
     expect(await resolvedA).toBeNull();
   });
+
+  test('gives each concurrently-open instance a distinct window id', async () => {
+    const { CoverQuickOverrideDialog } = await import('../../../scripts/cover/QuickOverrideDialog.js');
+
+    const dialogA = new CoverQuickOverrideDialog('standard', 'none');
+    const dialogB = new CoverQuickOverrideDialog('greater', 'none');
+
+    expect(dialogA.options.id).toBeTruthy();
+    expect(dialogB.options.id).toBeTruthy();
+    expect(dialogA.options.id).not.toBe(dialogB.options.id);
+  });
 });

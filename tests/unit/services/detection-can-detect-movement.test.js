@@ -45,15 +45,24 @@ async function loadWrapper({
   return wrapper;
 }
 
-function callWrapper(wrapper, modeId, coreResult, target = {}) {
+function callWrapper(wrapper, modeId, coreResult, target = {}, observer) {
   const wrapped = jest.fn(() => coreResult);
-  const visionSource = { object: { document: { id: 'observer', getFlag: jest.fn() } } };
+  const visionSource = {
+    object: observer ?? { document: { id: 'observer', getFlag: jest.fn() } },
+  };
   const result = wrapper.call({ id: modeId }, wrapped, visionSource, target);
   return { result, wrapped };
 }
 
 function npcTarget() {
   return { actor: { type: 'npc' }, document: { id: 'target' } };
+}
+
+function partyToken(id) {
+  return {
+    actor: { type: 'party' },
+    document: { id, getFlag: jest.fn() },
+  };
 }
 
 function lootTarget() {
@@ -87,6 +96,32 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
   });
 
   describe('during an active pending token movement', () => {
+    test('Party actor observer cannot detect during movement', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'observed',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(
+        wrapper,
+        'basicSight',
+        true,
+        npcTarget(),
+        partyToken('party-observer'),
+      );
+      expect(result).toBe(false);
+    });
+
+    test('Party actor target cannot be detected during movement', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'observed',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, partyToken('party-target'));
+      expect(result).toBe(false);
+    });
+
     test("undetected + hearing + core true -> false (stays unheard mid-move; only sight reveals)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: true,
@@ -257,6 +292,32 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
   });
 
   describe('with no active pending token movement', () => {
+    test('stationary Party actor observer preserves core detection', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: false,
+        visibility: 'observed',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(
+        wrapper,
+        'basicSight',
+        true,
+        npcTarget(),
+        partyToken('party-observer'),
+      );
+      expect(result).toBe(true);
+    });
+
+    test('stationary Party actor target preserves core detection', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: false,
+        visibility: 'observed',
+        threshold: 'hidden',
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, partyToken('party-target'));
+      expect(result).toBe(true);
+    });
+
     test("stationary path runs: hidden + undetected threshold + hearing -> true (visioner hidden detection)", async () => {
       const wrapper = await loadWrapper({
         hasActivePendingTokenMovement: false,
