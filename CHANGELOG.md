@@ -2,11 +2,16 @@
 
 ## [8.3.22] - 2026-07-14
 
+### Added
+
+- **Stealth-initiative cover is now set by the GM, not auto-applied or left to the rolling player**: When a token rolls Stealth for initiative, the module used to silently auto-detect cover - or let the rolling player pick it themselves via buttons in their own roll dialog - and apply the resulting bonus directly. The GM now sees a dialog, reusing the module's existing cover-button styling, to confirm or override the cover state before the roll's dice are cast, whether the GM is rolling directly or a connected player is. A player waiting on a remote GM's decision now sees a small "Waiting for GM" dialog instead of a toast that could be missed, and the roll falls back to the auto-detected cover after 30 seconds if the GM never responds, so it can never hang indefinitely.
+
 ### Fixed
 
 - **Auto Visibility kept enforcing hidden/undetected states and move-time soundwave rings outside encounters, even with "AVS Only Active in Combat" enabled**: The setting correctly paused the main recalculation engine between encounters, but the core detection override and the during-move soundwave engine never checked it at all, so previously-stored states and move-time rings kept being enforced regardless of combat state. Both now step aside for Foundry's native vision whenever the setting is on and no encounter is active.
 - **A second connected GM could see "Item ... does not exist!" errors while tokens moved**: The automatic effect writes that Auto Visibility performs on every token move ran on every connected GM client at once instead of just one, letting two clients race to create, update, or delete the same ephemeral effect on a moved token's target. Only the elected primary GM now performs these writes; other GM clients still see the result through Foundry's normal document sync.
 - **A creature could stay invisible for good even while fully observed, with no move in progress**: Foundry's own token rendering can independently leave a token in an inconsistent partial-invisible state - visible off while renderable and its mesh stay on, or any other mismatched combination - for reasons that have nothing to do with Visioner's own hide/reveal logic. Visioner only ever restored render state it had personally hidden, so a token Foundry left invisible on its own had nothing to bring it back; it stayed that way until something unrelated happened to jog it loose, if anything ever did. Restoring a token's render state after a move also reset its mesh but never its own visibility flag, and a separate guard against Foundry prematurely revealing a still-moving hidden target could run twice per frame against a stale snapshot, undoing its own correct decision. Visioner now forces a token's render state back to visible whenever every observer agrees it's fully observed (or it's a GM-hidden ghost token), regardless of who left it invisible or why.
+- **Stealth-initiative cover could be granted by tokens that weren't even part of the encounter**: Auto-detected cover for a stealth-initiative roll scanned every token on the canvas by alliance alone, so a non-combatant token elsewhere on the map could still grant, or fail to block, cover. Cover detection now only considers tokens that are actual combatants in the current encounter.
 
 ## [8.3.21] - 2026-07-13
 
