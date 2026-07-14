@@ -1,13 +1,13 @@
 import '../../setup.js';
 
 describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
-  test('defaults to the localized Roll label and unset window title override when no options given', async () => {
+  test('defaults to the localized Roll label and no window title override when no options given', async () => {
     const { CoverQuickOverrideDialog } = await import('../../../scripts/cover/QuickOverrideDialog.js');
 
     const dialog = new CoverQuickOverrideDialog('none', 'none');
     const html = await dialog._renderHTML({}, {});
 
-    expect(dialog.title).toBeNull();
+    expect(dialog.options.window?.title).toBeUndefined();
     expect(html).toContain('PF2E_VISIONER.UI.ROLL');
   });
 
@@ -20,7 +20,6 @@ describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
     });
     const html = await dialog._renderHTML({}, {});
 
-    expect(dialog.title).toBe("Set Cover — Aria's Stealth Roll");
     expect(dialog.options.window.title).toBe("Set Cover — Aria's Stealth Roll");
     expect(html).toContain('Confirm');
     expect(html).not.toContain('>PF2E_VISIONER.UI.ROLL<');

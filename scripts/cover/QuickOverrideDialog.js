@@ -25,16 +25,15 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
   };
 
   constructor(initialState = 'none', manualCover, options = {}) {
+    if (options.title) {
+      options.window = { ...(options.window || {}), title: options.title };
+    }
     super(options);
     this.selected = initialState;
     this._resolver = null;
     this.isStealthContext = options.isStealthContext || false;
     this.manualCover = manualCover;
-    this.title = options.title || null;
     this.confirmLabel = options.confirmLabel || null;
-    if (this.title) {
-      this.options.window = { ...(this.options.window || {}), title: this.title };
-    }
     currentCoverQuickDialog = this;
   }
 
