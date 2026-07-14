@@ -354,14 +354,17 @@ describe('stealth-initiative cover socket channels', () => {
 
   test('stealthInitiativeCoverRequestHandler does nothing when the current user is not GM', async () => {
     global.game.user.isGM = false;
+    const handleIncomingGMRequest = jest.fn();
 
     jest.doMock(
       '../../../scripts/cover/auto-cover/StealthInitiativeCoverCoordinator.js',
-      () => ({ __esModule: true, default: { handleIncomingGMRequest: jest.fn() } }),
+      () => ({ __esModule: true, default: { handleIncomingGMRequest } }),
       { virtual: true },
     );
 
     await stealthInitiativeCoverRequestHandler({ requestId: 'req-1' });
+
+    expect(handleIncomingGMRequest).not.toHaveBeenCalled();
 
     global.game.user.isGM = true;
   });
@@ -491,7 +494,7 @@ export async function stealthInitiativeCoverResponseHandler(payload = {}) {
     const { default: stealthInitiativeCoverCoordinator } = await import(
       '../cover/auto-cover/StealthInitiativeCoverCoordinator.js'
     );
-    stealthInitiativeCoverCoordinator.handleGMResponse(payload);
+    await stealthInitiativeCoverCoordinator.handleGMResponse(payload);
   } catch (error) {
     console.error(`[${MODULE_ID}] Failed to handle stealth-initiative cover response:`, error);
   }
