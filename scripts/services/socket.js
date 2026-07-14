@@ -887,7 +887,7 @@ export async function stealthInitiativeCoverResponseHandler(payload = {}) {
     const { default: stealthInitiativeCoverCoordinator } = await import(
       '../cover/auto-cover/StealthInitiativeCoverCoordinator.js'
     );
-    stealthInitiativeCoverCoordinator.handleGMResponse(payload);
+    await stealthInitiativeCoverCoordinator.handleGMResponse(payload);
   } catch (error) {
     console.error(`[${MODULE_ID}] Failed to handle stealth-initiative cover response:`, error);
   }
