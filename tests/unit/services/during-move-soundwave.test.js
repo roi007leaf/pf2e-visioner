@@ -379,3 +379,55 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
   });
 });
+
+describe('ensureDuringMoveSoundwaveRefresh (avsOnlyInCombat gate)', () => {
+  async function loadWith({ avsActiveGivenCombatGate }) {
+    let mod;
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('../../../scripts/services/movement-tracking.js', () => ({
+        hasActivePendingTokenMovement: () => false,
+      }));
+      jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
+        currentViewObservers: () => [],
+        targetIsHardHiddenFromCurrentView: () => false,
+      }));
+      jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
+        getVisionerVisibilityBetweenTokens: () => 'observed',
+        isAvsActiveGivenCombatGate: () => avsActiveGivenCombatGate,
+      }));
+      jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
+        shouldBypassAvsForGmVision: () => false,
+      }));
+      mod = await import('../../../scripts/services/during-move-soundwave.js');
+    });
+    return mod;
+  }
+
+  afterEach(() => {
+    jest.resetModules();
+  });
+
+  test('does not start the soundwave render loop when out of the combat gate', async () => {
+    const raf = jest.fn();
+    const savedRaf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = raf;
+
+    const mod = await loadWith({ avsActiveGivenCombatGate: false });
+    mod.ensureDuringMoveSoundwaveRefresh();
+
+    expect(raf).not.toHaveBeenCalled();
+    globalThis.requestAnimationFrame = savedRaf;
+  });
+
+  test('starts the soundwave render loop when the combat gate is active', async () => {
+    const raf = jest.fn();
+    const savedRaf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = raf;
+
+    const mod = await loadWith({ avsActiveGivenCombatGate: true });
+    mod.ensureDuringMoveSoundwaveRefresh();
+
+    expect(raf).toHaveBeenCalledTimes(1);
+    globalThis.requestAnimationFrame = savedRaf;
+  });
+});

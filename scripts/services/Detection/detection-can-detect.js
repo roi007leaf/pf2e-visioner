@@ -6,6 +6,7 @@ import { isExplicitVisiblePair } from '../ExplicitVisibilityPairs.js';
 import {
   detectionFrameCache,
   getVisionerVisibilityBetweenTokens,
+  isAvsActiveGivenCombatGate,
   NON_VISUAL_DETECTION_MODE_IDS,
   reachesVisibilityThreshold,
   VISIBILITY_DETECTION_THRESHOLDS,
@@ -17,6 +18,7 @@ export function createCanDetectVisibilityWrapper(threshold) {
     const canDetect = wrapped(visionSource, target, ...args);
     if (shouldBypassAvsForGmVision()) return canDetect;
     if (isSelectAllTokenVisibilityBypassActive()) return canDetect;
+    if (!isAvsActiveGivenCombatGate()) return canDetect;
     const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
 

@@ -49,7 +49,7 @@ describe('detection token refresh', () => {
     expect(token.visible).toBe(false);
     expect(token.renderable).toBe(true);
     expect(token.mesh).toEqual({ visible: false, renderable: true, alpha: 0.5 });
-    expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
+    expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token, { sourceMethod: '_refreshVisibility' });
   });
 
   it('keeps an already-visible GM ghost visible during movement', () => {

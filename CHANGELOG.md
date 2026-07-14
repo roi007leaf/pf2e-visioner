@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.3.22] - 2026-07-14
+
+### Fixed
+
+- **Auto Visibility kept enforcing hidden/undetected states and move-time soundwave rings outside encounters, even with "AVS Only Active in Combat" enabled**: The setting correctly paused the main recalculation engine between encounters, but the core detection override and the during-move soundwave engine never checked it at all, so previously-stored states and move-time rings kept being enforced regardless of combat state. Both now step aside for Foundry's native vision whenever the setting is on and no encounter is active.
+- **A second connected GM could see "Item ... does not exist!" errors while tokens moved**: The automatic effect writes that Auto Visibility performs on every token move ran on every connected GM client at once instead of just one, letting two clients race to create, update, or delete the same ephemeral effect on a moved token's target. Only the elected primary GM now performs these writes; other GM clients still see the result through Foundry's normal document sync.
+- **A creature could stay invisible for good even while fully observed, with no move in progress**: Foundry's own token rendering can independently leave a token in an inconsistent partial-invisible state - visible off while renderable and its mesh stay on, or any other mismatched combination - for reasons that have nothing to do with Visioner's own hide/reveal logic. Visioner only ever restored render state it had personally hidden, so a token Foundry left invisible on its own had nothing to bring it back; it stayed that way until something unrelated happened to jog it loose, if anything ever did. Restoring a token's render state after a move also reset its mesh but never its own visibility flag, and a separate guard against Foundry prematurely revealing a still-moving hidden target could run twice per frame against a stale snapshot, undoing its own correct decision. Visioner now forces a token's render state back to visible whenever every observer agrees it's fully observed (or it's a GM-hidden ghost token), regardless of who left it invisible or why.
+
 ## [8.3.21] - 2026-07-13
 
 ### Fixed

@@ -250,6 +250,37 @@ describe('canvas visibility wrapper', () => {
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
+  test('avsOnlyInCombat + not in combat: canvas visibility bypasses AVS ring-clearing logic entirely', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    global.game.settings.set('pf2e-visioner', 'avsOnlyInCombat', true);
+    global.game.combat = null;
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'observed' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'hearing-soundwave-filter' };
+      return true;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    // Out of combat with the gate on, the ring must stay untouched - AVS never clears it.
+    expect(target.detectionFilter).toEqual({ id: 'hearing-soundwave-filter' });
+
+    global.game.settings.set('pf2e-visioner', 'avsOnlyInCombat', false);
+    global.game.combat = undefined;
+  });
+
   test('GM Vision bypass keeps core detection-mode visibility result', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

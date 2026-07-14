@@ -9,6 +9,7 @@ import {
   flushDetectionBatch,
   startDetectionBatch,
 } from '../../../stores/detection-map.js';
+import { isPrimaryGM } from '../../../services/gm-election.js';
 import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/movement-tracking.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
@@ -1019,7 +1020,7 @@ export class BatchOrchestrator {
    * @private
    */
   async _syncEphemeralEffectsForUpdates(updates) {
-    if (!game.user.isGM || !updates || updates.length === 0) {
+    if (!isPrimaryGM() || !updates || updates.length === 0) {
       return;
     }
 

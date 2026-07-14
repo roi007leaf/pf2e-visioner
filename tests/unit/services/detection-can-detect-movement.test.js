@@ -8,6 +8,7 @@ async function loadWrapper({
   coreResult,
   threshold = 'hidden',
   reachesThreshold = false,
+  avsActiveGivenCombatGate = true,
 }) {
   let wrapper;
   await jest.isolateModulesAsync(async () => {
@@ -25,6 +26,7 @@ async function loadWrapper({
     }));
     jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
       getVisionerVisibilityBetweenTokens: jest.fn(() => visibility),
+      isAvsActiveGivenCombatGate: jest.fn(() => avsActiveGivenCombatGate),
       NON_VISUAL_DETECTION_MODE_IDS: new Set(['hearing', 'tremorsense']),
       reachesVisibilityThreshold: jest.fn(() => reachesThreshold),
       VISIBILITY_DETECTION_THRESHOLDS: { hidden: 'hidden', undetected: 'undetected' },
@@ -263,6 +265,41 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       });
       const { result } = callWrapper(wrapper, 'hearing', true, npcTarget());
       expect(result).toBe(true);
+    });
+  });
+
+  describe('avsOnlyInCombat gate (not in combat)', () => {
+    test('hidden target + basicSight + core true -> passes through core result untouched, ignoring the sticky hidden override', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: false,
+        visibility: 'hidden',
+        threshold: 'hidden',
+        avsActiveGivenCombatGate: false,
+      });
+      const { result } = callWrapper(wrapper, 'basicSight', true, overrideHiddenTarget());
+      expect(result).toBe(true);
+    });
+
+    test('undetected target mid-move + hearing + core true -> passes through core result (during-move override disabled)', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'undetected',
+        threshold: 'hidden',
+        avsActiveGivenCombatGate: false,
+      });
+      const { result } = callWrapper(wrapper, 'hearing', true, npcTarget());
+      expect(result).toBe(true);
+    });
+
+    test('core false -> stays false (gate never forces detection on)', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: false,
+        visibility: 'hidden',
+        threshold: 'undetected',
+        avsActiveGivenCombatGate: false,
+      });
+      const { result } = callWrapper(wrapper, 'hearing', false, npcTarget());
+      expect(result).toBe(false);
     });
   });
 });

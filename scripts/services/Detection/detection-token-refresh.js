@@ -1,6 +1,7 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { applyCurrentViewHardHide } from './current-view-hard-hide.js';
+import { pushDebugLogEntry } from './debug-log-buffer.js';
 
 const foundryHiddenRefreshDebugStates = new Map();
 
@@ -16,7 +17,7 @@ function debugFoundryHiddenRefresh(token, phase, details) {
   const signature = JSON.stringify(state);
   if (foundryHiddenRefreshDebugStates.get(key) === signature) return;
   foundryHiddenRefreshDebugStates.set(key, signature);
-  console.warn('[DEBUG-hiddentoken-a91f]', signature);
+  pushDebugLogEntry({ src: 'token-refresh', ...state });
 }
 
 function renderState(token) {
@@ -31,11 +32,23 @@ function renderState(token) {
   };
 }
 
-function debugCoreRefreshChange(token, method, before) {
-  if (!globalThis.game?.ready || !before) return;
-  const after = renderState(token);
-  if (JSON.stringify(before) === JSON.stringify(after)) return;
-  debugFoundryHiddenRefresh(token, 'core-refresh-write', { method, before, after });
+function debugRenderState(token) {
+  return {
+    foundryHidden: !!token?.document?.hidden,
+    visible: token?.visible,
+    renderable: token?.renderable,
+    meshVisible: token?.mesh?.visible,
+    meshRenderable: token?.mesh?.renderable,
+    meshAlpha: token?.mesh?.alpha,
+    hardHidden: token?._pvCurrentViewHardHidden,
+  };
+}
+
+function debugCoreRefreshChange(token, method, debugBefore) {
+  if (!globalThis.game?.ready || !debugBefore) return;
+  const after = debugRenderState(token);
+  if (JSON.stringify(debugBefore) === JSON.stringify(after)) return;
+  debugFoundryHiddenRefresh(token, 'core-refresh-write', { method, before: debugBefore, after });
 }
 
 function restoreRenderState(token, state) {
@@ -47,42 +60,47 @@ function restoreRenderState(token, state) {
   if ('alpha' in token.mesh) token.mesh.alpha = state.meshAlpha;
 }
 
-function suppressNewFoundryHiddenVisibilityDuringMove(token, before) {
+function suppressNewFoundryHiddenVisibilityDuringMove(token, before, method) {
   if (!before) return false;
   if (!globalThis.game?.user?.isGM || !hasActivePendingTokenMovement()) return false;
   if (token.controlled || before.visible !== false || token.visible !== true) return false;
+  if (token._pvCurrentViewHardHidden === false) return false;
   restoreRenderState(token, before);
-  debugFoundryHiddenRefresh(token, 'movement-reveal-suppressed', { restored: before });
+  debugFoundryHiddenRefresh(token, 'movement-reveal-suppressed', { method, restored: before });
   return true;
 }
 
-function afterCoreRefresh(token, method, before) {
-  debugCoreRefreshChange(token, method, before);
-  suppressNewFoundryHiddenVisibilityDuringMove(token, before);
+function afterCoreRefresh(token, method, before, debugBefore) {
+  debugCoreRefreshChange(token, method, debugBefore);
+  suppressNewFoundryHiddenVisibilityDuringMove(token, before, method);
   try {
-    applyCurrentViewHardHide(token);
+    applyCurrentViewHardHide(token, { sourceMethod: method });
   } catch {
     /* keep Foundry visibility if the guard fails */
   }
+  debugFoundryHiddenRefresh(token, 'tick-final-state', { method, after: debugRenderState(token) });
 }
 
 export function wrapTokenRefreshState(wrapped, ...args) {
   const before = renderState(this);
+  const debugBefore = debugRenderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_refreshState', before);
+  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_refreshState', before, debugBefore);
   return result;
 }
 
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   const before = renderState(this);
+  const debugBefore = debugRenderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_applyRenderFlags', before);
+  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_applyRenderFlags', before, debugBefore);
   return result;
 }
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
   const before = renderState(this);
+  const debugBefore = debugRenderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_refreshVisibility', before);
+  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, '_refreshVisibility', before, debugBefore);
   return result;
 }

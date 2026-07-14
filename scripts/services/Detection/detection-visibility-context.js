@@ -81,3 +81,12 @@ export function getVisionerVisibilityBetweenTokens(observer, target) {
 
   return detectionFrameCache.getVisibility(observer, target);
 }
+
+export function isAvsActiveGivenCombatGate() {
+  try {
+    if (!game.settings.get(MODULE_ID, 'avsOnlyInCombat')) return true;
+    return !!(game.combat?.started && game.combat?.combatants?.size > 0);
+  } catch {
+    return true;
+  }
+}

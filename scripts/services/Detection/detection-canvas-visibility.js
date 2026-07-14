@@ -1,6 +1,9 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { currentViewObservers } from './current-view-hard-hide.js';
-import { getVisionerVisibilityBetweenTokens } from './detection-visibility-context.js';
+import {
+  getVisionerVisibilityBetweenTokens,
+  isAvsActiveGivenCombatGate,
+} from './detection-visibility-context.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import { peekRegistry } from '../Peek/PeekRegistry.js';
 import { isPointInCone } from '../Peek/peek-geometry.js';
@@ -125,6 +128,9 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
     return wrapped(points, options);
   }
   if (shouldBypassAvsForGmVision()) {
+    return wrapped(points, options);
+  }
+  if (!isAvsActiveGivenCombatGate()) {
     return wrapped(points, options);
   }
   const result = wrapped(points, options);

@@ -754,6 +754,26 @@ describe('BatchOrchestrator', () => {
     expect(order).toEqual(['effects', 'post-perception']);
   });
 
+  test('_syncEphemeralEffectsForUpdates skips ephemeral effect sync on a non-primary GM client', async () => {
+    const savedUser = global.game.user;
+    const savedUsers = global.game.users;
+    global.game.user = { ...savedUser, id: 'gm-2', isGM: true };
+    global.game.users = { activeGM: { id: 'gm-1' } };
+
+    const ephemeralModule = await import('../../../scripts/visibility/ephemeral.js');
+    const spy = jest.spyOn(ephemeralModule, 'batchUpdateVisibilityEffects');
+
+    await orchestrator._syncEphemeralEffectsForUpdates([
+      { observer: global.canvas.tokens.placeables[0], target: global.canvas.tokens.placeables[1], visibility: 'hidden' },
+    ]);
+
+    expect(spy).not.toHaveBeenCalled();
+
+    spy.mockRestore();
+    global.game.user = savedUser;
+    global.game.users = savedUsers;
+  });
+
   test('defers non-movement post-batch perception refresh while pending movement is active', async () => {
     const [observer] = global.canvas.tokens.placeables;
     orchestrator._performPostBatchPerceptionRefresh = jest.fn(async () => {});

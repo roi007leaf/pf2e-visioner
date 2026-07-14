@@ -3,7 +3,10 @@ import {
   currentViewObservers,
   targetIsHardHiddenFromCurrentView,
 } from './Detection/current-view-hard-hide.js';
-import { getVisionerVisibilityBetweenTokens } from './Detection/detection-visibility-context.js';
+import {
+  getVisionerVisibilityBetweenTokens,
+  isAvsActiveGivenCombatGate,
+} from './Detection/detection-visibility-context.js';
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
@@ -297,6 +300,7 @@ export function refreshSoundwavesForActiveMovement() {
 
 export function ensureDuringMoveSoundwaveRefresh() {
   if (running) return;
+  if (!isAvsActiveGivenCombatGate()) return;
   const raf = globalThis.requestAnimationFrame;
   if (typeof raf !== 'function') return;
   running = true;

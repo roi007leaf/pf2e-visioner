@@ -279,6 +279,44 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.visible).toBe(true);
   });
 
+  it('restores a Foundry-hidden token that core itself left invisible, even with no hard-hide marker set', () => {
+    globalThis.game = { user: { isGM: true } };
+    const t = { controlled: false, visible: false, renderable: true,
+      mesh: { visible: false, renderable: true, alpha: 0.5 },
+      document: { id: 't', hidden: true }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(t._pvCurrentViewHardHidden).toBeUndefined();
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+    expect(t.mesh.alpha).toBe(0.5);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('restores a plain (non-Foundry-hidden) token that core itself left in a broken invisible state while fully observed', () => {
+    globalThis.game = { user: { isGM: true } };
+    const t = { controlled: false, visible: false, renderable: true,
+      mesh: { visible: false, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(t._pvCurrentViewHardHidden).toBeUndefined();
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('does not force-restore a plain token merely hidden (heard-not-seen) with no hard-hide marker set - presence-only stays untouched', () => {
+    globalThis.game = { user: { isGM: true } };
+    const t = { controlled: false, visible: false, renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+  });
+
   it('hides token chrome surfaces (condition icons, nameplate, bars) when hard-hidden', () => {
     const t = { controlled: false, visible: true, renderable: true,
       mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
@@ -322,9 +360,11 @@ describe('applyCurrentViewHardHide', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
     applyCurrentViewHardHide(t);
     expect(t.mesh.visible).toBe(false);
+    expect(t.visible).toBe(false);
 
     __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
     expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
     expect(t.mesh.visible).toBe(true);
     expect(t.renderable).toBe(true);
     expect(t._pvCurrentViewHardHidden).toBe(false);
@@ -423,7 +463,7 @@ describe('releaseCurrentViewHardHideIfMarked', () => {
   });
 
   function markedHidden() {
-    return { controlled: false, renderable: false, _pvCurrentViewHardHidden: true,
+    return { controlled: false, visible: false, renderable: false, _pvCurrentViewHardHidden: true,
       mesh: { visible: false, renderable: false, alpha: 0 },
       document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
   }
@@ -432,6 +472,7 @@ describe('releaseCurrentViewHardHideIfMarked', () => {
     const t = markedHidden();
     __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
     expect(releaseCurrentViewHardHideIfMarked(t)).toBe(true);
+    expect(t.visible).toBe(true);
     expect(t.mesh.visible).toBe(true);
     expect(t._pvCurrentViewHardHidden).toBe(false);
   });
@@ -457,6 +498,7 @@ describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', ()
   function hardHidden() {
     return {
       controlled: false,
+      visible: false,
       renderable: false,
       mesh: { visible: false, renderable: false, alpha: 0 },
       document: { id: 't', hidden: false },
@@ -466,6 +508,7 @@ describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', ()
   it('restores a hard-hidden token render state', () => {
     const t = hardHidden();
     expect(releaseCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(true);
     expect(t.renderable).toBe(true);
     expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
   });
@@ -494,6 +537,7 @@ describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', ()
     const c = { controlled: false, renderable: true, mesh: { visible: true, alpha: 1 }, document: { id: 'c', hidden: false } };
     const released = releaseAllCurrentViewHardHide([a, b, c]);
     expect(released).toBe(2);
+    expect(a.visible).toBe(true);
     expect(a.renderable).toBe(true);
     expect(b.mesh.visible).toBe(true);
   });
