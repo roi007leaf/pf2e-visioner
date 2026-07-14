@@ -272,7 +272,7 @@ function forEachSystemHiddenIndicator(callback) {
         continue;
       }
       callback(indicator);
-    } catch (_) {}
+    } catch (_) { }
   }
   releaseSystemHiddenIndicatorHooksIfIdle();
 }
@@ -305,7 +305,7 @@ function ensureSystemHiddenIndicatorHooks() {
         } else if (indicator._pvFactorsActive) {
           removeSystemHiddenFactorsBadge(indicator);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     releaseSystemHiddenIndicatorHooksIfIdle();
   });
@@ -324,7 +324,7 @@ function ensureSystemHiddenIndicatorHooks() {
       forEachSystemHiddenIndicator(removeSystemHiddenFactorsBadge);
       hideAllVisibilityIndicators?.();
       hideAllCoverIndicators?.();
-    } catch (_) {}
+    } catch (_) { }
   });
 
   registerSystemHiddenHook('canvasTearDown', () => {
@@ -467,29 +467,12 @@ export function removeSystemHiddenIndicator(token, options = {}) {
   try {
     const indicator = token?._pvSystemHiddenIndicator;
     if (!indicator) return false;
-    if (globalThis.game?.ready && token?.document?.hidden) {
-      console.warn(
-        '[DEBUG-hiddentoken-a91f]',
-        JSON.stringify({
-          phase: 'indicator-remove-start',
-          tokenId: token.document.id,
-          tokenName: token.name,
-          indicatorMode: indicator._pvIndicatorMode,
-          options,
-          visible: token.visible,
-          renderable: token.renderable,
-          meshVisible: token.mesh?.visible,
-          meshRenderable: token.mesh?.renderable,
-          meshAlpha: token.mesh?.alpha,
-        }),
-      );
-    }
     unregisterSystemHiddenIndicator(indicator);
 
     if (typeof indicator._pvAnimationFrameId === 'function') {
       try {
         indicator._pvAnimationFrameId();
-      } catch (_) {}
+      } catch (_) { }
       indicator._pvAnimationFrameId = null;
     }
     if (indicator._pvTargetHookId !== undefined) {
@@ -521,8 +504,8 @@ export function removeSystemHiddenIndicator(token, options = {}) {
     const shouldRestoreRenderState = options?.restoreRenderState !== false;
     const restored = shouldRestoreRenderState
       ? restoreCapturedPresenceOnlyRenderState(token, {
-          forceTokenVisible: options?.forceTokenVisible === true,
-        })
+        forceTokenVisible: options?.forceTokenVisible === true,
+      })
       : discardCapturedPresenceOnlyRenderState(token);
     if (options?.preservePresenceOnlyRenderSuppression === true) {
       suppressPresenceOnlyTokenRender(token, {
@@ -535,22 +518,7 @@ export function removeSystemHiddenIndicator(token, options = {}) {
         forceTokenVisible: options?.forceTokenVisible === true && !restored,
       });
     }
-    if (globalThis.game?.ready && token?.document?.hidden) {
-      console.warn(
-        '[DEBUG-hiddentoken-a91f]',
-        JSON.stringify({
-          phase: 'indicator-remove-finish',
-          tokenId: token.document.id,
-          tokenName: token.name,
-          restored,
-          visible: token.visible,
-          renderable: token.renderable,
-          meshVisible: token.mesh?.visible,
-          meshRenderable: token.mesh?.renderable,
-          meshAlpha: token.mesh?.alpha,
-        }),
-      );
-    }
+
     return true;
   } catch (_) {
     return false;
@@ -619,7 +587,7 @@ async function buildSystemHiddenFactorsBadge({ indicator, observer, token, canva
 
     indicator._pvFactorsBadgeEl = badgeEl;
     indicator._pvFactorsTooltipEl = tooltipEl;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function updateIndicatorColor({
@@ -739,7 +707,7 @@ function clearInactiveFactorsBadge(indicator) {
     if (HoverTooltips?.isShowingFactorsOverlay) return;
     removeSystemHiddenFactorsBadge(indicator);
     delete indicator._pvFactorsActive;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function addDisplayName({ indicator, token, size, pixi }) {

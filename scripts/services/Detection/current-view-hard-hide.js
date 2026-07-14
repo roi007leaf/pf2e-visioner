@@ -3,7 +3,6 @@ import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import { getVisionerVisibilityBetweenTokens } from './detection-visibility-context.js';
-import { pushDebugLogEntry } from './debug-log-buffer.js';
 
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
@@ -11,31 +10,6 @@ const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
 let storedVisibilityOverrideForTest = null;
 export function __setStoredVisibilityForTest(map) {
   storedVisibilityOverrideForTest = map;
-}
-
-const foundryHiddenDebugStates = new Map();
-
-function debugFoundryHiddenTarget(token, phase, details = {}) {
-  if (!globalThis.game?.ready) return;
-  const state = {
-    phase,
-    tokenId: tokenIdOf(token),
-    tokenName: token.name,
-    foundryHidden: !!token?.document?.hidden,
-    activeMovement: hasActivePendingTokenMovement(),
-    visible: token.visible,
-    renderable: token.renderable,
-    meshVisible: token.mesh?.visible,
-    meshRenderable: token.mesh?.renderable,
-    meshAlpha: token.mesh?.alpha,
-    hardHidden: token._pvCurrentViewHardHidden,
-    ...details,
-  };
-  const key = `${state.tokenId}:${phase}`;
-  const signature = JSON.stringify(state);
-  if (foundryHiddenDebugStates.get(key) === signature) return;
-  foundryHiddenDebugStates.set(key, signature);
-  pushDebugLogEntry({ src: 'hard-hide', ...state });
 }
 
 function tokenIdOf(token) {
@@ -165,37 +139,29 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   return deferrable;
 }
 
-export function applyCurrentViewHardHide(token, context = {}) {
-  const sourceMethod = context.sourceMethod;
+function isFullyVisibleToEveryObserver(token) {
+  const observers = currentViewObservers();
+  if (observers.length === 0) return false;
+  return observers.every((observer) => {
+    const state = getStoredVisibilityState(observer, token);
+    return state === 'observed' || state === 'concealed';
+  });
+}
+
+export function applyCurrentViewHardHide(token) {
   const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
   if (shouldDefer) {
-    debugFoundryHiddenTarget(token, 'defer-to-core', { sourceMethod });
-    if (token.visible) releaseCurrentViewHardHide(token, { sourceMethod });
+    if (token.visible) releaseCurrentViewHardHide(token);
     token._pvCurrentViewHardHidden = false;
     return false;
   }
   const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
-  const observerStates = currentViewObservers().map((observer) => ({
-    observerId: tokenIdOf(observer),
-    observerName: observer.name,
-    state: getStoredVisibilityState(observer, token),
-  }));
-  debugFoundryHiddenTarget(token, 'hard-hide-decision', {
-    sourceMethod,
-    shouldDefer,
-    shouldHardHide,
-    observerStates,
-  });
   if (!shouldHardHide) {
-    const fullyVisibleToEveryObserver =
-      observerStates.length > 0 &&
-      observerStates.every(({ state }) => state === 'observed' || state === 'concealed');
-    if (token.document?.hidden || fullyVisibleToEveryObserver) {
-      const released = releaseCurrentViewHardHide(token, { sourceMethod });
+    if (token.document?.hidden || isFullyVisibleToEveryObserver(token)) {
+      releaseCurrentViewHardHide(token);
       token._pvCurrentViewHardHidden = false;
-      debugFoundryHiddenTarget(token, 'forced-release-attempt', { sourceMethod, released });
     } else {
-      releaseCurrentViewHardHideIfMarked(token, { sourceMethod });
+      releaseCurrentViewHardHideIfMarked(token);
     }
     return false;
   }
@@ -209,19 +175,18 @@ export function applyCurrentViewHardHide(token, context = {}) {
   token.detectionFilter = null;
   hideHardHiddenChromeSurfaces(token);
   token._pvCurrentViewHardHidden = true;
-  debugFoundryHiddenTarget(token, 'hard-hide-applied', { sourceMethod });
   return true;
 }
 
-export function releaseCurrentViewHardHideIfMarked(token, context = {}) {
+export function releaseCurrentViewHardHideIfMarked(token) {
   if (!token?._pvCurrentViewHardHidden) return false;
   if (targetIsHardHiddenFromCurrentView(token)) return false;
-  const released = releaseCurrentViewHardHide(token, context);
+  const released = releaseCurrentViewHardHide(token);
   token._pvCurrentViewHardHidden = false;
   return released;
 }
 
-export function releaseCurrentViewHardHide(token, context = {}) {
+export function releaseCurrentViewHardHide(token) {
   if (!token || token.controlled) return false;
   const mesh = token.mesh;
   const wasHardHidden =
@@ -235,10 +200,6 @@ export function releaseCurrentViewHardHide(token, context = {}) {
     if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
   }
   restoreHardHiddenChromeSurfaces(token);
-  debugFoundryHiddenTarget(token, 'hard-hide-released', {
-    sourceMethod: context.sourceMethod,
-    caller: new Error().stack?.split('\n').slice(2, 6).join(' | '),
-  });
   return true;
 }
 
