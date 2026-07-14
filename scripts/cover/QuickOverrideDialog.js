@@ -30,6 +30,11 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
     this._resolver = null;
     this.isStealthContext = options.isStealthContext || false;
     this.manualCover = manualCover;
+    this.title = options.title || null;
+    this.confirmLabel = options.confirmLabel || null;
+    if (this.title) {
+      this.options.window = { ...(this.options.window || {}), title: this.title };
+    }
     currentCoverQuickDialog = this;
   }
 
@@ -58,6 +63,7 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
       </button>`;
     };
     const rollLabel =
+      this.confirmLabel ??
       game.i18n?.localize?.('PF2E_VISIONER.UI.ROLL') ??
       game.i18n?.localize?.('PF2E.Roll') ??
       'Roll';
