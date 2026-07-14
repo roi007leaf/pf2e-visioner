@@ -2,6 +2,7 @@ import '../../setup.js';
 
 describe('StealthInitiativeCoverCoordinator', () => {
   let mockDialogInstances;
+  let mockWaitingDialogInstances;
   let requestGMStealthInitiativeCover;
   let sendStealthInitiativeCoverResponse;
   let coordinator;
@@ -9,6 +10,7 @@ describe('StealthInitiativeCoverCoordinator', () => {
   beforeEach(async () => {
     jest.resetModules();
     mockDialogInstances = [];
+    mockWaitingDialogInstances = [];
 
     jest.doMock('../../../scripts/cover/QuickOverrideDialog.js', () => ({
       __esModule: true,
@@ -24,6 +26,18 @@ describe('StealthInitiativeCoverCoordinator', () => {
           render: jest.fn(),
         };
         mockDialogInstances.push(instance);
+        return instance;
+      }),
+    }));
+
+    jest.doMock('../../../scripts/cover/StealthInitiativeCoverWaitingDialog.js', () => ({
+      __esModule: true,
+      StealthInitiativeCoverWaitingDialog: jest.fn().mockImplementation(() => {
+        const instance = {
+          render: jest.fn(),
+          close: jest.fn(),
+        };
+        mockWaitingDialogInstances.push(instance);
         return instance;
       }),
     }));
@@ -117,10 +131,12 @@ describe('StealthInitiativeCoverCoordinator', () => {
         userId: 'player-1',
       }),
     );
+    expect(mockWaitingDialogInstances).toHaveLength(1);
 
     coordinator.handleGMResponse({ requestId: 'request-id-1', chosenState: 'standard' });
 
     expect(await promise).toBe('standard');
+    expect(mockWaitingDialogInstances[0].close).toHaveBeenCalled();
   });
 
   test('falls back to the suggestion when the socket request cannot be sent', async () => {
@@ -131,6 +147,7 @@ describe('StealthInitiativeCoverCoordinator', () => {
     const result = await coordinator.resolveCoverState({ hider, suggestedState: 'lesser' });
 
     expect(result).toBe('lesser');
+    expect(mockWaitingDialogInstances).toHaveLength(0);
   });
 
   test('falls back to the suggestion when the GM never responds before the timeout', async () => {
@@ -139,9 +156,11 @@ describe('StealthInitiativeCoverCoordinator', () => {
     const hider = global.createMockToken({ id: 'hider', name: 'Aria' });
 
     const promise = coordinator.resolveCoverState({ hider, suggestedState: 'lesser' });
+    expect(mockWaitingDialogInstances).toHaveLength(1);
     jest.advanceTimersByTime(30000);
 
     expect(await promise).toBe('lesser');
+    expect(mockWaitingDialogInstances[0].close).toHaveBeenCalled();
     jest.useRealTimers();
   });
 

@@ -305,6 +305,7 @@
       "TAKE_COVER_RESULTS": "Take Cover Results",
       "COVER_OVERRIDE": "Cover Override",
       "STEALTH_INITIATIVE_COVER": "Set Cover — {NAME}'s Stealth Roll",
+      "STEALTH_INITIATIVE_COVER_WAITING": "Waiting for GM",
       "WALL_SETTINGS": "PF2E Visioner: Wall Settings",
       "TOGGLE_HIDDEN_WALL": "Toggle Hidden Wall (Selected Walls)",
       "QUICK_EDIT": "PF2E Visioner: Quick Edit (Selected ↔ Targeted)",

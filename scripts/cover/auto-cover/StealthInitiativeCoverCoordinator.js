@@ -1,4 +1,5 @@
 import { CoverQuickOverrideDialog } from '../QuickOverrideDialog.js';
+import { StealthInitiativeCoverWaitingDialog } from '../StealthInitiativeCoverWaitingDialog.js';
 import {
   requestGMStealthInitiativeCover,
   sendStealthInitiativeCoverResponse,
@@ -52,13 +53,21 @@ class StealthInitiativeCoverCoordinator {
   _requestFromGM(hider, suggestedState) {
     return new Promise((resolve) => {
       const requestId = foundry?.utils?.randomID?.() ?? `${Date.now()}-${Math.random()}`;
+      let waitingDialog = null;
+
+      const resolveAndClose = (state) => {
+        try {
+          waitingDialog?.close();
+        } catch (_) { }
+        resolve(state);
+      };
 
       const timeoutHandle = setTimeout(() => {
         this._pending.delete(requestId);
-        resolve(suggestedState);
+        resolveAndClose(suggestedState);
       }, GM_RESPONSE_TIMEOUT_MS);
 
-      this._pending.set(requestId, { resolve, timeoutHandle });
+      this._pending.set(requestId, { resolve: resolveAndClose, timeoutHandle });
 
       const sent = requestGMStealthInitiativeCover({
         requestId,
@@ -76,10 +85,8 @@ class StealthInitiativeCoverCoordinator {
       }
 
       try {
-        const waitingMsg =
-          game.i18n?.localize?.('PF2E_VISIONER.UI.STEALTH_INITIATIVE_COVER_WAITING') ??
-          'Waiting for GM to set cover…';
-        ui.notifications?.info?.(waitingMsg);
+        waitingDialog = new StealthInitiativeCoverWaitingDialog();
+        waitingDialog.render(true);
       } catch (_) { }
     });
   }
