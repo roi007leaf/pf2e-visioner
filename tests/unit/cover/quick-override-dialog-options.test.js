@@ -24,4 +24,31 @@ describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
     expect(html).toContain('Confirm');
     expect(html).not.toContain('>PF2E_VISIONER.UI.ROLL<');
   });
+
+  test('resolves the pending promise to null when closed without clicking Roll or Cancel', async () => {
+    const { CoverQuickOverrideDialog } = await import('../../../scripts/cover/QuickOverrideDialog.js');
+
+    const dialog = new CoverQuickOverrideDialog('standard', 'none');
+    const resolved = new Promise((resolve) => dialog.setResolver(resolve));
+
+    await dialog.close();
+
+    expect(await resolved).toBeNull();
+  });
+
+  test('_onRoll and _onCancel resolve only the instance bound via this, not a shared dialog', async () => {
+    const { CoverQuickOverrideDialog } = await import('../../../scripts/cover/QuickOverrideDialog.js');
+
+    const dialogA = new CoverQuickOverrideDialog('standard', 'none');
+    const dialogB = new CoverQuickOverrideDialog('greater', 'none');
+
+    const resolvedA = new Promise((resolve) => dialogA.setResolver(resolve));
+    const resolvedB = new Promise((resolve) => dialogB.setResolver(resolve));
+
+    CoverQuickOverrideDialog._onRoll.call(dialogB, {}, {});
+    expect(await resolvedB).toBe('greater');
+
+    CoverQuickOverrideDialog._onCancel.call(dialogA, {}, {});
+    expect(await resolvedA).toBeNull();
+  });
 });

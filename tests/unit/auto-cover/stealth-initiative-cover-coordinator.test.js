@@ -63,6 +63,19 @@ describe('StealthInitiativeCoverCoordinator', () => {
     expect(requestGMStealthInitiativeCover).not.toHaveBeenCalled();
   });
 
+  test('clamps manual cover up to the higher auto-detected suggestion in mixed manual/auto scenarios', async () => {
+    const hider = global.createMockToken({ id: 'hider', name: 'Aria' });
+
+    const result = await coordinator.resolveCoverState({
+      hider,
+      suggestedState: 'greater',
+      manualCoverState: 'lesser',
+    });
+
+    expect(result).toBe('greater');
+    expect(mockDialogInstances).toHaveLength(0);
+  });
+
   test('opens the dialog locally and resolves with the GM choice when the current client is GM', async () => {
     global.game.user.isGM = true;
     const hider = global.createMockToken({ id: 'hider', name: 'Aria' });

@@ -283,6 +283,11 @@ global.foundry = {
         bringToFront() {
           // Mock implementation
         }
+
+        close(options) {
+          this.rendered = false;
+          return Promise.resolve(this);
+        }
       },
       HandlebarsApplicationMixin: (Base) =>
         class MockHandlebarsApplication extends Base {

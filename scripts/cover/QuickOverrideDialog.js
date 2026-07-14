@@ -5,8 +5,6 @@ import {
   getCoverStealthBonusByState,
 } from '../helpers/cover-helpers.js';
 
-let currentCoverQuickDialog = null;
-
 export class CoverQuickOverrideDialog extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     id: 'pv-cover-quick-override',
@@ -34,7 +32,6 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
     this.isStealthContext = options.isStealthContext || false;
     this.manualCover = manualCover;
     this.confirmLabel = options.confirmLabel || null;
-    currentCoverQuickDialog = this;
   }
 
   setResolver(fn) {
@@ -113,7 +110,7 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
   }
 
   static _onRoll(event, button) {
-    const app = currentCoverQuickDialog;
+    const app = this;
     if (!app) return;
     try {
       app._resolver?.(app.selected);
@@ -122,7 +119,7 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
   }
 
   static _onCancel(event, button) {
-    const app = currentCoverQuickDialog;
+    const app = this;
     if (!app) return;
     try {
       app._resolver?.(null);
@@ -131,7 +128,9 @@ export class CoverQuickOverrideDialog extends foundry.applications.api.Applicati
   }
 
   close(options) {
-    currentCoverQuickDialog = null;
+    try {
+      this._resolver?.(null);
+    } catch (_) {}
     return super.close(options);
   }
 }

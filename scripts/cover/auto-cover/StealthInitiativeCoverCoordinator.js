@@ -3,6 +3,7 @@ import {
   requestGMStealthInitiativeCover,
   sendStealthInitiativeCoverResponse,
 } from '../../services/socket.js';
+import { higherStealthCoverState } from './usecases/stealth-observer-analysis.js';
 
 const GM_RESPONSE_TIMEOUT_MS = 30000;
 
@@ -12,7 +13,9 @@ class StealthInitiativeCoverCoordinator {
   }
 
   async resolveCoverState({ hider, suggestedState, manualCoverState = 'none' }) {
-    if (manualCoverState && manualCoverState !== 'none') return manualCoverState;
+    if (manualCoverState && manualCoverState !== 'none') {
+      return higherStealthCoverState(manualCoverState, suggestedState);
+    }
 
     if (game.user?.isGM) {
       return this._openCoverDialog(hider?.name ?? '', suggestedState);
