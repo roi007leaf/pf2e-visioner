@@ -30,6 +30,14 @@ class SocketService {
     this._socket.register(PEEK_APPROVAL_REQUEST_CHANNEL, doorPeekApprovalRequestHandler);
     this._socket.register(PEEK_APPROVAL_RESPONSE_CHANNEL, doorPeekApprovalResponseHandler);
     this._socket.register(PEEK_REVEAL_REFRESH_CHANNEL, peekRevealRefreshHandler);
+    this._socket.register(
+      STEALTH_INITIATIVE_COVER_REQUEST_CHANNEL,
+      stealthInitiativeCoverRequestHandler,
+    );
+    this._socket.register(
+      STEALTH_INITIATIVE_COVER_RESPONSE_CHANNEL,
+      stealthInitiativeCoverResponseHandler,
+    );
     startPeekStalePruner();
     if (typeof Hooks !== 'undefined') Hooks.on('canvasTearDown', () => peekGmOverlay.clearAll());
     return this._socket;
@@ -61,6 +69,8 @@ const PEEK_END_CHANNEL = 'PeekEnd';
 const PEEK_APPROVAL_REQUEST_CHANNEL = 'DoorPeekApprovalRequest';
 const PEEK_APPROVAL_RESPONSE_CHANNEL = 'DoorPeekApprovalResponse';
 const PEEK_REVEAL_REFRESH_CHANNEL = 'PeekRevealRefresh';
+const STEALTH_INITIATIVE_COVER_REQUEST_CHANNEL = 'StealthInitiativeCoverRequest';
+const STEALTH_INITIATIVE_COVER_RESPONSE_CHANNEL = 'StealthInitiativeCoverResponse';
 
 export function registerSocket() {
   _socketService.register();
@@ -848,4 +858,37 @@ export function startPeekStalePruner() {
     }
     peekGmOverlay.render();
   }, 1000);
+}
+
+export function requestGMStealthInitiativeCover(payload) {
+  if (!_socketService.socket) return false;
+  _socketService.executeAsGM(STEALTH_INITIATIVE_COVER_REQUEST_CHANNEL, payload);
+  return true;
+}
+
+export async function stealthInitiativeCoverRequestHandler(payload = {}) {
+  try {
+    if (!game.user?.isGM) return;
+    const { default: stealthInitiativeCoverCoordinator } = await import(
+      '../cover/auto-cover/StealthInitiativeCoverCoordinator.js'
+    );
+    await stealthInitiativeCoverCoordinator.handleIncomingGMRequest(payload);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Failed to handle stealth-initiative cover request:`, error);
+  }
+}
+
+export function sendStealthInitiativeCoverResponse(userId, payload) {
+  return executeSocketForUser(STEALTH_INITIATIVE_COVER_RESPONSE_CHANNEL, userId, payload);
+}
+
+export async function stealthInitiativeCoverResponseHandler(payload = {}) {
+  try {
+    const { default: stealthInitiativeCoverCoordinator } = await import(
+      '../cover/auto-cover/StealthInitiativeCoverCoordinator.js'
+    );
+    stealthInitiativeCoverCoordinator.handleGMResponse(payload);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Failed to handle stealth-initiative cover response:`, error);
+  }
 }
