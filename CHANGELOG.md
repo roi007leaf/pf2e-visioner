@@ -5,6 +5,7 @@
 ### Fixed
 
 - **PF2e Party actor tokens were treated like ordinary combatants by Auto Visibility and move-time detection**: A token whose actor is the special "party" sheet type has no vision or stealth of its own, but Auto Visibility still evaluated it as an observer and target, and the during-move soundwave engine still scanned it for hearing-based indicators. Party actor tokens are now excluded from both roles in Auto Visibility, from movement-time detection, and from soundwave scans; ordinary characters and NPCs that merely belong to the party (by alliance or ownership) are unaffected.
+- **Rolling initiative for multiple combatants at once ("Roll All"/"Roll NPCs") could roll the dice but never save anyone's initiative**: PF2e commits a batch roll's initiative values in a single write, only after every individual roll in the batch finishes. The GM's stealth-initiative cover dialog reused one fixed window id across every open instance, so two or more Stealth-rolling combatants in the same batch collided on that id and left at least one dialog impossible to resolve, stalling the whole batch indefinitely - even for combatants who weren't using Stealth at all. Each cover dialog now gets its own unique window id.
 
 ## [8.3.22] - 2026-07-14
 
