@@ -173,7 +173,7 @@ git commit -m "fix: restrict stealth-initiative cover observers to encounter com
 - Test: `tests/unit/cover/quick-override-dialog-options.test.js` (new)
 
 **Interfaces:**
-- Produces: `new CoverQuickOverrideDialog(initialState, manualCover, { isStealthContext, title, confirmLabel })` — `title` (string, optional) sets `this.options.window.title`; `confirmLabel` (string, optional) overrides the confirm button's text (falls back to today's "Roll" behavior when omitted). Existing call sites (`CoverUIManager.openCoverQuickOverrideDialog`) don't pass these and are unaffected.
+- Produces: `new CoverQuickOverrideDialog(initialState, manualCover, { isStealthContext, title, confirmLabel })` — `title` (string, optional) is merged into `options.window.title` *before* `super(options)` runs (matching this codebase's existing convention in `scripts/ui/OverrideValidationDialog.js:104-110` for setting an ApplicationV2 window title — `ApplicationV2.prototype.title` is a getter-only computed accessor, so it must never be assigned directly as `this.title = ...`); `confirmLabel` (string, optional) overrides the confirm button's text (falls back to today's "Roll" behavior when omitted). Existing call sites (`CoverUIManager.openCoverQuickOverrideDialog`) don't pass these and are unaffected.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -183,13 +183,13 @@ Create `tests/unit/cover/quick-override-dialog-options.test.js`:
 import '../../setup.js';
 
 describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
-  test('defaults to the localized Roll label and unset window title override when no options given', async () => {
+  test('defaults to the localized Roll label and no window title override when no options given', async () => {
     const { CoverQuickOverrideDialog } = await import('../../../scripts/cover/QuickOverrideDialog.js');
 
     const dialog = new CoverQuickOverrideDialog('none', 'none');
     const html = await dialog._renderHTML({}, {});
 
-    expect(dialog.title).toBeNull();
+    expect(dialog.options.window?.title).toBeUndefined();
     expect(html).toContain('PF2E_VISIONER.UI.ROLL');
   });
 
@@ -202,7 +202,6 @@ describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
     });
     const html = await dialog._renderHTML({}, {});
 
-    expect(dialog.title).toBe("Set Cover — Aria's Stealth Roll");
     expect(dialog.options.window.title).toBe("Set Cover — Aria's Stealth Roll");
     expect(html).toContain('Confirm');
     expect(html).not.toContain('>PF2E_VISIONER.UI.ROLL<');
@@ -213,7 +212,7 @@ describe('CoverQuickOverrideDialog title/confirmLabel options', () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `npx jest tests/unit/cover/quick-override-dialog-options.test.js`
-Expected: FAIL — `dialog.title` is `undefined` (not `null`), and the second test's `confirmLabel` never makes it into the rendered HTML since the constructor and `_renderHTML` don't support it yet.
+Expected: FAIL — `dialog.options.window` is `undefined` (the constructor doesn't merge a title in yet), and the second test's `confirmLabel` never makes it into the rendered HTML since the constructor and `_renderHTML` don't support it yet.
 
 - [ ] **Step 3: Implement the options**
 
@@ -234,16 +233,15 @@ Replace with:
 
 ```js
   constructor(initialState = 'none', manualCover, options = {}) {
+    if (options.title) {
+      options.window = { ...(options.window || {}), title: options.title };
+    }
     super(options);
     this.selected = initialState;
     this._resolver = null;
     this.isStealthContext = options.isStealthContext || false;
     this.manualCover = manualCover;
-    this.title = options.title || null;
     this.confirmLabel = options.confirmLabel || null;
-    if (this.title) {
-      this.options.window = { ...(this.options.window || {}), title: this.title };
-    }
     currentCoverQuickDialog = this;
   }
 ```
