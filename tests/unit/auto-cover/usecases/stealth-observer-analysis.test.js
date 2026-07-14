@@ -69,4 +69,35 @@ describe('stealth observer analysis', () => {
     expect(higherStealthCoverState('standard', 'lesser')).toBe('standard');
     expect(higherStealthCoverState('standard', 'greater')).toBe('greater');
   });
+
+  test('excludes an observer that matches alliance but is not a combatant in the active encounter', () => {
+    const hider = token('hider', 'party');
+    const enemyCombatant = token('enemyCombatant', 'opposition');
+    const enemyBystander = token('enemyBystander', 'opposition');
+    global.canvas.tokens.placeables = [hider, enemyCombatant, enemyBystander];
+
+    const combat = { combatants: [{ tokenId: 'hider' }, { tokenId: 'enemyCombatant' }] };
+
+    const result = collectStealthObservers(hider, { mode: 'non-party', combat });
+
+    expect(result).toEqual([enemyCombatant]);
+  });
+
+  test('includes an observer that is a combatant in the active encounter', () => {
+    const hider = token('hider', 'opposition');
+    const enemy = token('enemy', 'party');
+    global.canvas.tokens.placeables = [hider, enemy];
+
+    const combat = { combatants: [{ tokenId: 'hider' }, { tokenId: 'enemy' }] };
+
+    expect(collectStealthObservers(hider, { combat })).toEqual([enemy]);
+  });
+
+  test('keeps existing alliance-only behavior when no combat is active', () => {
+    const hider = token('hider', 'opposition');
+    const enemy = token('enemy', 'party');
+    global.canvas.tokens.placeables = [hider, enemy];
+
+    expect(collectStealthObservers(hider, { combat: null })).toEqual([enemy]);
+  });
 });

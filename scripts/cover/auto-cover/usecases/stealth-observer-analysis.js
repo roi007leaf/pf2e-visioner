@@ -20,19 +20,45 @@ function isNonPartyObserver(token) {
   return alliance !== 'party' && alliance !== 'neutral';
 }
 
-function shouldIncludeObserver(token, hider, mode) {
+function getCombatantTokenId(combatant) {
+  return combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.object?.id ?? null;
+}
+
+function combatantsToArray(combat) {
+  const collection = combat?.combatants;
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (Array.isArray(collection.contents)) return collection.contents;
+  try {
+    return Array.from(collection);
+  } catch {
+    return [];
+  }
+}
+
+function isEncounterCombatant(token, combat) {
+  const tokenId = token?.id;
+  if (!tokenId) return false;
+  return combatantsToArray(combat).some((combatant) => getCombatantTokenId(combatant) === tokenId);
+}
+
+function shouldIncludeObserver(token, hider, mode, combat) {
   if (!token?.actor || token.id === hider?.id) return false;
+  if (combat && !isEncounterCombatant(token, combat)) return false;
   if (mode === 'all-actors') return true;
   if (mode === 'non-party') return isNonPartyObserver(token);
   return isHostileToHider(token, hider);
 }
 
-export function collectStealthObservers(hider, { mode = 'hostile-relative' } = {}) {
+export function collectStealthObservers(
+  hider,
+  { mode = 'hostile-relative', combat = game?.combat } = {},
+) {
   const tokens = canvas?.tokens?.placeables || [];
   const observers = [];
 
   for (const token of tokens) {
-    if (shouldIncludeObserver(token, hider, mode)) observers.push(token);
+    if (shouldIncludeObserver(token, hider, mode, combat)) observers.push(token);
   }
 
   return observers;
