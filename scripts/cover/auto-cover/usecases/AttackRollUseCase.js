@@ -695,14 +695,13 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             effectiveTarget,
           );
           try {
-            if (attacker && target && manualCover === 'none' && chosen !== state) {
-              // Use the correctly resolved token objects from outer scope
-              this.autoCoverSystem.setDialogOverride(attacker, target, chosen, state);
-            } else {
+            if (!attacker || !target) {
               console.warn('PF2E Visioner | Could not resolve token objects for dialog override', {
                 hasAttacker: !!attacker,
                 hasTarget: !!target,
               });
+            } else if (manualCover === 'none' && chosen !== state) {
+              this.autoCoverSystem.setDialogOverride(attacker, target, chosen, state);
             }
           } catch (e) {
             console.warn('PF2E Visioner | Failed to set dialog override:', e);

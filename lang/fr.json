@@ -864,7 +864,6 @@
       "STATE_LABEL": "(FR TODO) State",
       "LIGHTING_LABEL": "(FR TODO) Lighting",
       "UNKNOWN_STATE": "(FR TODO) Unknown State",
-      "STORED_STATE": "(FR TODO) Visibility state is {state} (stored state - reason not captured)",
       "LIGHTING": {
         "bright": "(FR TODO) Bright Light",
         "dim": "(FR TODO) Dim Light",
@@ -876,6 +875,7 @@
         "OBSERVER_BLINDED": "(FR TODO) Observer is blinded (cannot use visual senses)",
         "OBSERVER_DEAFENED_INVISIBLE": "(FR TODO) Observer is deafened (cannot hear invisible target)",
         "OBSERVER_DAZZLED": "(FR TODO) Observer is dazzled in bright light",
+        "STORED_STATE": "(FR TODO) Visibility state is {state} (stored state - reason not captured)",
         "TARGET_INVISIBLE": "(FR TODO) Target is invisible",
         "TARGET_UNDETECTED_CONDITION": "(FR TODO) Target has undetected condition",
         "TARGET_HIDDEN_CONDITION": "(FR TODO) Target has hidden condition",

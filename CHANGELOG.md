@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.3.24] - 2026-07-15
+
+### Fixed
+
+- **The Visibility Factors tooltip never explained why a dazzled observer saw a target as concealed**: The reason-lookup loop meant to check the observer's other precise senses read a sense array as if it were a lookup object, so its "does this observer have another precise sense besides vision" check always came back true - even for an observer with no other precise sense at all. This silently blocked the dazzled explanation from ever being recorded, leaving the tooltip's fallback "reason not captured" text instead. Also fixed: the reason's own translation string was misplaced outside the block other reason strings live in, so an untranslated key showed up in place of the message even once the logic was fixed.
+- **A benign "could not resolve token objects for dialog override" warning logged on nearly every attack roll**: The check meant to guard against unresolved attacker/target tokens also caught two completely normal, non-error cases - a manual cover override already in place, or the player accepting the auto-detected cover unchanged - and logged the same warning for all three situations. The warning now only fires when the tokens are actually unresolved.
+- **A deafened observer never got credit for being deafened in the Visibility Factors tooltip**: The list of an observer's own conditions only ever checked for blinded, so a deafened observer trying to pinpoint an invisible target by hearing alone never saw that explanation, and was silently treated as having full hearing even while deafened. Deafened is now recognized alongside blinded.
+
 ## [8.3.23] - 2026-07-14
 
 ### Fixed

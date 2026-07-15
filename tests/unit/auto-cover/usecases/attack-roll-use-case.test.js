@@ -440,6 +440,10 @@ describe('AttackRollUseCase', () => {
       });
 
       expect(attackRollUseCase.autoCoverSystem.setDialogOverride).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Could not resolve token objects for dialog override'),
+        expect.anything(),
+      );
     });
 
     test('should not set dialog override when choice equals detected state', async () => {
@@ -467,6 +471,10 @@ describe('AttackRollUseCase', () => {
       });
 
       expect(attackRollUseCase.autoCoverSystem.setDialogOverride).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('Could not resolve token objects for dialog override'),
+        expect.anything(),
+      );
     });
 
     test('should handle UI injection errors gracefully', async () => {

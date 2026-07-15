@@ -1063,6 +1063,7 @@
                 "OBSERVER_BLINDED": "观察者陷入目盲（无法使用视觉）",
                 "OBSERVER_DEAFENED_INVISIBLE": "观察者陷入耳聋（无法侦测隐形目标）",
                 "OBSERVER_DAZZLED": "观察者在明亮光照下陷入目眩",
+                "STORED_STATE": "能见度状态为{state}（已存储状态 - 未获取原因）",
                 "TARGET_INVISIBLE": "目标处于隐形",
                 "TARGET_HIDDEN_CONDITION": "目标处于藏匿状态",
                 "TARGET_CONCEALED_CONDITION": "目标处于隐蔽状态",
@@ -1122,8 +1123,7 @@
                 "darkness": "黑暗",
                 "magicalDarkness": "魔法黑暗",
                 "greaterMagicalDarkness": "高等魔法黑暗"
-            },
-            "STORED_STATE": "能见度状态为{state}（已存储状态 - 未获取原因）"
+            }
         },
         "SNEAKY_FEAT": {
             "VISIBILITY_CAPPED": "鬼祟专长",

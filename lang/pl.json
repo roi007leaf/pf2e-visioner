@@ -1310,7 +1310,6 @@
       "STATE_LABEL": "Stan",
       "LIGHTING_LABEL": "Oświetlenie",
       "UNKNOWN_STATE": "Nieznany stan",
-      "STORED_STATE": "Stan widoczności to {state} (stan zapisany – przyczyna nie została zarejestrowana)",
       "LIGHTING": {
         "bright": "Jasne światło",
         "dim": "Słabe światło",
@@ -1327,6 +1326,7 @@
         "TARGET_HIDDEN_CONDITION": "Cel ma stan ukryty",
         "TARGET_CONCEALED_CONDITION": "Cel ma stan przysłonięty",
         "RULE_ELEMENT_OVERRIDE": "Element reguły zastępuje stan",
+        "STORED_STATE": "Stan widoczności to {state} (stan zapisany – przyczyna nie została zarejestrowana)",
         "TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}), ale obserwator ma większe widzenie w ciemności",
         "TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}) – przysłonięty nawet dla postaci posiadających widzenie w ciemności",
         "TARGET_IN_GREATER_DARKNESS_NO_DARKVISION": "Cel znajduje się w większej magicznej ciemności ({templates}), obserwator nie posiada widzenia w ciemności",

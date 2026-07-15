@@ -186,7 +186,7 @@ async function unsetTokenFlagsDirectly(token, flagKeys = []) {
   for (const flagKey of flagKeys) {
     try {
       await unsetFlag.call(token.document, MODULE_ID, flagKey);
-    } catch {}
+    } catch { }
   }
 }
 
@@ -233,7 +233,7 @@ async function clearHoverIndicatorsAfterPurge() {
     } = await import('./services/HoverTooltips.js');
     hideAllVisibilityIndicators?.();
     hideAllCoverIndicators?.();
-  } catch {}
+  } catch { }
 }
 
 /**
@@ -326,7 +326,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) {}
+    } catch (_) { }
     return manager;
   }
 
@@ -381,7 +381,7 @@ export class Pf2eVisionerApi {
     await manager.render({ force: true });
     try {
       if (manager.element || manager.window) manager.bringToFront();
-    } catch (_) {}
+    } catch (_) { }
     return manager;
   }
 
@@ -670,6 +670,7 @@ export class Pf2eVisionerApi {
       if (observerToken.actor?.itemTypes?.condition) {
         const conditionSlugs = observerToken.actor.itemTypes.condition.map((c) => c.slug);
         if (conditionSlugs.includes('blinded')) observerConditions.push('blinded');
+        if (conditionSlugs.includes('deafened')) observerConditions.push('deafened');
       }
 
       // Check vision capabilities
@@ -814,16 +815,19 @@ export class Pf2eVisionerApi {
       const isDazzled = observerToken.actor?.itemTypes?.condition?.some(
         (c) => c.slug === 'dazzled',
       );
-      if (isDazzled && (visibility === 'concealed' || lightingFactor === 'bright')) {
-        // Dazzled causes concealment in bright light if vision is the only precise sense
+      if (isDazzled) {
+        // Dazzled causes concealment of all creatures unless vision is not the only precise sense
         const hasNonVisualPreciseSense =
           detection.lifesense ||
           detection.tremorsense ||
-          Object.entries(sensingSummary.precise || []).some(
-            ([type]) =>
-              !['vision', 'darkvision', 'low-light-vision', 'greater-darkvision'].includes(type),
+          (sensingSummary.precise || []).some(
+            (sense) =>
+              !['vision', 'darkvision', 'low-light-vision', 'greater-darkvision'].includes(
+                sense?.type,
+              ),
           );
-        if (!hasNonVisualPreciseSense && lightingFactor === 'bright') {
+
+        if (!hasNonVisualPreciseSense) {
           reasons.push(
             game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DAZZLED'),
           );
@@ -1282,7 +1286,7 @@ export class Pf2eVisionerApi {
           sensingSummary.hearing &&
           !isDeafened &&
           hearingDistance <=
-            (applyActiveSceneHearingRangeLimit(sensingSummary.hearing.range ?? null) ?? Infinity);
+          (applyActiveSceneHearingRangeLimit(sensingSummary.hearing.range ?? null) ?? Infinity);
         const hasScent = sensingSummary.scent && distance <= (sensingSummary.scent?.range || 0);
 
         if (hasHearing && targetConditions.includes('invisible')) {
@@ -2253,7 +2257,7 @@ export class Pf2eVisionerApi {
       // 1.5) Clear sneak flags
       try {
         await this.clearAllSneakFlags();
-      } catch {}
+      } catch { }
 
       // 2) Clear ALL scene-level flags used by the module
       try {
@@ -2270,10 +2274,10 @@ export class Pf2eVisionerApi {
             if (flagKey === 'disableAVS') continue;
             try {
               await scene.unsetFlag(MODULE_ID, flagKey);
-            } catch {}
+            } catch { }
           }
         }
-      } catch {}
+      } catch { }
 
       // 3) Remove module-created effects from all actors and token-actors (handles unlinked tokens)
       try {
@@ -2298,7 +2302,7 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch {}
+            } catch { }
           }
         }
 
@@ -2327,15 +2331,15 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await a.deleteEmbeddedDocuments('Item', toDelete);
-            } catch {}
+            } catch { }
           }
 
           // Remove actor-level flags (like echolocation)
           try {
             await a.unsetFlag(MODULE_ID, 'echolocation');
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
 
       // 4) Clear AVS overrides from the new map-based system and hide the override indicator
       try {
@@ -2347,7 +2351,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/OverrideValidationIndicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch {}
+        } catch { }
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides:', error);
       }
@@ -2356,7 +2360,7 @@ export class Pf2eVisionerApi {
       try {
         const { cleanupAllCoverEffects } = await import('./cover/ephemeral.js');
         await cleanupAllCoverEffects();
-      } catch {}
+      } catch { }
 
       // 5.5) Clean up chat message flags that might contain Visioner data
       try {
@@ -2366,23 +2370,23 @@ export class Pf2eVisionerApi {
           if (Object.keys(flags).length > 0) {
             try {
               await message.unsetFlag(MODULE_ID);
-            } catch {}
+            } catch { }
           }
         }
-      } catch {}
+      } catch { }
 
       // 6) Rebuild effects and refresh visuals/perception
       await clearHoverIndicatorsAfterPurge();
       // Removed effects-coordinator: bulk rebuild handled elsewhere
       try {
         await updateTokenVisuals();
-      } catch {}
+      } catch { }
       try {
         refreshEveryonesPerception();
-      } catch {}
+      } catch { }
       try {
         scheduleCanvasPerceptionUpdate({ refreshVision: true });
-      } catch {}
+      } catch { }
 
       ui.notifications.info(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.SCENE_DATA_CLEARED'));
       return true;
@@ -2540,7 +2544,7 @@ export class Pf2eVisionerApi {
             updateCount: flagUpdates.length,
           });
         }
-      } catch {}
+      } catch { }
 
       // 2) Clear scene-level caches used by the module (only if clearing all tokens)
       try {
@@ -2551,7 +2555,7 @@ export class Pf2eVisionerApi {
           await scene.unsetFlag(MODULE_ID, 'partyTokenStateCache');
           await scene.unsetFlag(MODULE_ID, 'deferredPartyUpdates');
         }
-      } catch {}
+      } catch { }
 
       // 3) Remove module-created effects ONLY from selected tokens' actors
       try {
@@ -2579,15 +2583,15 @@ export class Pf2eVisionerApi {
           if (toDelete.length) {
             try {
               await actor.deleteEmbeddedDocuments('Item', toDelete);
-            } catch {}
+            } catch { }
           }
 
           // Remove actor-level flags (like echolocation) from this selected token's actor
           try {
             await actor.unsetFlag(MODULE_ID, 'echolocation');
-          } catch {}
+          } catch { }
         }
-      } catch {}
+      } catch { }
 
       // 4) Clean up any remaining effects related to the selected tokens specifically
       try {
@@ -2597,7 +2601,7 @@ export class Pf2eVisionerApi {
           // Clean up this token from all other tokens' maps and effects
           await cleanupDeletedToken(token.document);
         }
-      } catch {}
+      } catch { }
 
       // 5) Remove the selected tokens from ALL other tokens' visibility/cover maps and clean up references
       try {
@@ -2680,7 +2684,7 @@ export class Pf2eVisionerApi {
             });
           }
         }
-      } catch {}
+      } catch { }
 
       // 5.5) Clean up AVS override flags that reference the purged tokens from ALL tokens
       try {
@@ -2715,7 +2719,7 @@ export class Pf2eVisionerApi {
         if (batchUpdates.length > 0 && scene.updateEmbeddedDocuments) {
           await scene.updateEmbeddedDocuments('Token', batchUpdates, { diff: false });
         }
-      } catch {}
+      } catch { }
 
       // 6) Clear AVS overrides involving these tokens from the new map-based system and hide the override indicator
       try {
@@ -2731,7 +2735,7 @@ export class Pf2eVisionerApi {
                 try {
                   await autoVis.removeOverride(selectedToken.id, otherToken.id);
                   await autoVis.removeOverride(otherToken.id, selectedToken.id);
-                } catch {}
+                } catch { }
               }
             }
           }
@@ -2740,7 +2744,7 @@ export class Pf2eVisionerApi {
         try {
           const { default: indicator } = await import('./ui/OverrideValidationIndicator.js');
           if (indicator && typeof indicator.hide === 'function') indicator.hide(true);
-        } catch {}
+        } catch { }
       } catch (error) {
         console.warn('PF2E Visioner | Error clearing AVS overrides for selected tokens:', error);
       }
@@ -2768,22 +2772,22 @@ export class Pf2eVisionerApi {
           if (hasUpdates) {
             try {
               await message.update({ [`flags.${MODULE_ID}`]: { ...flags, ...updates } });
-            } catch {}
+            } catch { }
           }
         }
-      } catch {}
+      } catch { }
 
       // 8) Rebuild effects and refresh visuals/perception
       await clearHoverIndicatorsAfterPurge();
       try {
         await updateTokenVisuals();
-      } catch {}
+      } catch { }
       try {
         refreshEveryonesPerception();
-      } catch {}
+      } catch { }
       try {
         scheduleCanvasPerceptionUpdate({ refreshVision: true });
-      } catch {}
+      } catch { }
 
       ui.notifications.info(
         `PF2E Visioner: Cleared all data for ${tokens.length} selected token${tokens.length === 1 ? '' : 's'}.`,
