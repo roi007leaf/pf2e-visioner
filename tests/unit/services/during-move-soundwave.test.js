@@ -328,7 +328,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
         hasActivePendingTokenMovement: () => pendingMovement,
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
-        currentViewObservers: () => observers,
+        currentViewVisionerObserversForTarget: () => (gmVisionBypass ? [] : observers),
         targetIsHardHiddenFromCurrentView: () => false,
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
@@ -390,6 +390,37 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
   test('GM vision bypass paints no soundwaves and clears existing ones during move', async () => {
     const target = makeTarget();
     target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, gmVisionBypass: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  test('GM vision bypass clears a core-repainted soundwave inside the recompute throttle window', async () => {
+    const target = makeTarget();
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, gmVisionBypass: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    target.detectionFilter = 'CORE-REPAINTED';
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    nowSpy.mockReturnValue(10001);
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  test('GM vision bypass clears an explicit hidden pair soundwave during movement', async () => {
+    const target = makeTarget();
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.document.getFlag = (_moduleId, key) =>
+      key === 'avs-override-from-obs' ? { state: 'hidden', source: 'manual_action' } : null;
     globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
     const mod = await loadWith({ pendingMovement: true, gmVisionBypass: true });
 
@@ -477,7 +508,7 @@ describe('ensureDuringMoveSoundwaveRefresh (avsOnlyInCombat gate)', () => {
         hasActivePendingTokenMovement: () => false,
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
-        currentViewObservers: () => [],
+        currentViewVisionerObserversForTarget: () => [],
         targetIsHardHiddenFromCurrentView: () => false,
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({

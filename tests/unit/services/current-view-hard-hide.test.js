@@ -193,6 +193,13 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
   });
 
+  it('GM-vision bypass ignores an explicit undetected pair state', () => {
+    shouldBypassAvsForGmVision.mockReturnValue(true);
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
   it('select-all bypass active → not hard-hidden', () => {
     isSelectAllTokenVisibilityBypassActive.mockReturnValue(true);
     const t = target('t');

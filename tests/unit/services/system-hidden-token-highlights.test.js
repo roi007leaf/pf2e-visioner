@@ -733,6 +733,78 @@ describe('system-hidden indicator render lifecycle', () => {
     expect(hiddenTarget._pvSystemHiddenIndicator).toBe(existingIndicator);
   });
 
+  test('GM Vision removes existing Visioner token indicators and restores normal rendering', async () => {
+    const { updateSystemHiddenTokenHighlights } = await import(
+      '../../../scripts/services/visual-effects.js'
+    );
+
+    global.canvas.ready = false;
+    global.game.user.isGM = true;
+    global.pf2eVisionerTestState.settings.pf2e = { gmVision: true };
+
+    const parent = { removeChild: jest.fn() };
+    const indicator = {
+      _pvObserverId: 'observer',
+      _pvIndicatorMode: 'lifesense',
+      parent,
+      destroy: jest.fn(),
+    };
+    const hiddenEcho = {
+      parent,
+      destroy: jest.fn(),
+    };
+    const target = {
+      id: 'target',
+      document: { id: 'target', hidden: false },
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      _pvCurrentViewHardHidden: true,
+      _pvSystemHiddenIndicator: indicator,
+      _pvHiddenEcho: hiddenEcho,
+    };
+    global.canvas.tokens.placeables = [target];
+
+    await updateSystemHiddenTokenHighlights('observer');
+
+    expect(indicator.destroy).toHaveBeenCalledTimes(1);
+    expect(hiddenEcho.destroy).toHaveBeenCalledTimes(1);
+    expect(target._pvSystemHiddenIndicator).toBeNull();
+    expect(target._pvHiddenEcho).toBeNull();
+    expect(target._pvCurrentViewHardHidden).toBe(false);
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  test('AVS off with GM Vision off preserves manual Visioner hard-hide rendering', async () => {
+    const { updateSystemHiddenTokenHighlights } = await import(
+      '../../../scripts/services/visual-effects.js'
+    );
+
+    global.canvas.ready = false;
+    global.game.user.isGM = true;
+    global.pf2eVisionerTestState.settings['pf2e-visioner'].autoVisibilityEnabled = false;
+    global.pf2eVisionerTestState.settings.pf2e = { gmVision: false };
+
+    const target = {
+      id: 'target',
+      document: { id: 'target', hidden: false },
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      _pvCurrentViewHardHidden: true,
+    };
+    global.canvas.tokens.placeables = [target];
+
+    await updateSystemHiddenTokenHighlights('observer');
+
+    expect(target._pvCurrentViewHardHidden).toBe(true);
+    expect(target.visible).toBe(false);
+    expect(target.renderable).toBe(false);
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+  });
+
   test('shares one hook set across multiple rendered system-hidden indicators', async () => {
     const { removeSystemHiddenIndicator, updateSystemHiddenTokenHighlights } = await import(
       '../../../scripts/services/visual-effects.js'

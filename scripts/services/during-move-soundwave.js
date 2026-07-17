@@ -1,6 +1,6 @@
 import { hasActivePendingTokenMovement } from './movement-tracking.js';
 import {
-  currentViewObservers,
+  currentViewVisionerObserversForTarget,
   targetIsHardHiddenFromCurrentView,
 } from './Detection/current-view-hard-hide.js';
 import {
@@ -215,9 +215,11 @@ export function removeSoundwaveFilterOverride(target) {
 
 export function settleSoundwaveOverrides() {
   if (filterOverrides.size === 0) return;
-  const observers = currentViewObservers().filter((observer) => !isPartyActorToken(observer));
   for (const entry of [...filterOverrides.values()]) {
     const target = entry.target;
+    const observers = currentViewVisionerObserversForTarget(target).filter(
+      (observer) => !isPartyActorToken(observer),
+    );
     // Foundry's own visibility recompute has produced a real filter (persisted settled to a
     // hidden-render state) -> hand off; the getter was already returning `stored`, so the ripple
     // continues seamlessly with no 'observed' frame.
@@ -256,12 +258,16 @@ export function refreshSoundwavesForActiveMovement() {
   // Only mutate soundwaves during an actual committed move. While merely hold-dragging
   // (a drag preview exists but nothing has committed yet) the visuals stay frozen.
   if (!hasActivePendingTokenMovement()) return;
-  const now = globalThis.performance?.now?.() ?? 0;
-  if (now - lastWaveComputeAt < WAVE_RECOMPUTE_INTERVAL_MS) return;
-  lastWaveComputeAt = now;
-  if (shouldBypassAvsForGmVision()) {
-    for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-      if (target.controlled) continue;
+  const gmVisionBypass = shouldBypassAvsForGmVision();
+  const targetsWithObservers = [];
+  for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
+    if (target.controlled) continue;
+    if (isPartyActorToken(target)) continue;
+    if (targetIsHardHiddenFromCurrentView(target)) continue;
+    const observers = currentViewVisionerObserversForTarget(target).filter(
+      (observer) => !isPartyActorToken(observer),
+    );
+    if (gmVisionBypass && observers.length === 0) {
       try {
         removeSoundwaveFilterOverride(target);
         if (target.detectionFilter) target.detectionFilter = null;
@@ -269,14 +275,15 @@ export function refreshSoundwavesForActiveMovement() {
       } catch {
         /* keep core filter state if the clear fails */
       }
+      continue;
     }
-    return;
+    targetsWithObservers.push({ target, observers });
   }
-  const observers = currentViewObservers().filter((observer) => !isPartyActorToken(observer));
-  for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-    if (target.controlled) continue;
-    if (isPartyActorToken(target)) continue;
-    if (targetIsHardHiddenFromCurrentView(target)) continue;
+  if (targetsWithObservers.length === 0) return;
+  const now = globalThis.performance?.now?.() ?? 0;
+  if (now - lastWaveComputeAt < WAVE_RECOMPUTE_INTERVAL_MS) return;
+  lastWaveComputeAt = now;
+  for (const { target, observers } of targetsWithObservers) {
     const wantsSoundwave = targetShouldShowSoundwave(
       target,
       observers,

@@ -30,6 +30,11 @@ export function currentViewObservers() {
   return observers;
 }
 
+export function currentViewVisionerObserversForTarget(target) {
+  if (shouldBypassAvsForGmVision()) return [];
+  return currentViewObservers();
+}
+
 function actorOf(target) {
   return target?.actor ?? null;
 }
@@ -120,12 +125,11 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   if (!hasActivePendingTokenMovement()) return false;
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
-  if (shouldBypassAvsForGmVision()) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.document.hidden) return false;
   if (hiddenStateShouldRenderHideTarget(target)) return false;
 
-  const observers = currentViewObservers();
+  const observers = currentViewVisionerObserversForTarget(target);
   if (observers.length === 0) return false;
 
   let deferrable = false;
@@ -140,7 +144,7 @@ function shouldDeferRenderingToCoreDuringMove(target) {
 }
 
 function isFullyVisibleToEveryObserver(token) {
-  const observers = currentViewObservers();
+  const observers = currentViewVisionerObserversForTarget(token);
   if (observers.length === 0) return false;
   return observers.every((observer) => {
     const state = getStoredVisibilityState(observer, token);
@@ -213,12 +217,11 @@ export function releaseAllCurrentViewHardHide(tokens = globalThis.canvas?.tokens
 
 export function targetIsHardHiddenFromCurrentView(target) {
   if (!target?.document?.id) return false;
-  if (shouldBypassAvsForGmVision()) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
   if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
 
-  const observers = currentViewObservers();
+  const observers = currentViewVisionerObserversForTarget(target);
   if (observers.length === 0) {
     if (globalThis.game?.user?.isGM) return false;
     return !!target._pvCurrentViewHardHidden;

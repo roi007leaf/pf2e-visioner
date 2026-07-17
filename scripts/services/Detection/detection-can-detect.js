@@ -17,10 +17,10 @@ import { isPartyActorToken } from '../../utils/token-actor.js';
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
     const canDetect = wrapped(visionSource, target, ...args);
+    const observerToken = visionSource?.object;
     if (shouldBypassAvsForGmVision()) return canDetect;
     if (isSelectAllTokenVisibilityBypassActive()) return canDetect;
     if (!isAvsActiveGivenCombatGate()) return canDetect;
-    const observerToken = visionSource?.object;
     const modeId = this?.id ?? args?.[0]?.id ?? null;
 
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);

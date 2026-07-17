@@ -2,6 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import {
     clearGmVisionBypassCache,
     isGmVisionModeActive,
+    shouldBypassAvsForGmVision,
 } from '../services/gm-vision-bypass.js';
 import { getSystemId } from '../system-adapter.js';
 
@@ -214,6 +215,13 @@ export function updateAvsGmVisionWarning() {
     if (!game.user?.isGM) return;
 
     clearGmVisionBypassCache();
+    if (shouldBypassAvsForGmVision()) {
+        void import('../services/visual-effects.js')
+            .then(({ clearVisionerTokenVisibilityEffects }) =>
+                clearVisionerTokenVisibilityEffects(),
+            )
+            .catch(() => { });
+    }
     const state = warningState();
     const active = isGmVisionModeActive();
     if (!active) state.dismissed = false;

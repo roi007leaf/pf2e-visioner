@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.3.25] - 2026-07-17
+
+### Fixed
+
+- **GM Vision could still apply Visioner visibility states and effects**: GM Vision now leaves token rendering entirely to Foundry Core, ignoring both automatic and manual Visioner visibility states and clearing Visioner hard-hide, soundwave, filter, sharing, and system-hidden indicator effects.
+- **Manual Visioner states stopped working with GM Vision off when Auto Visibility was disabled**: Auto Visibility's highlight cleanup incorrectly released manually hidden tokens during refreshes, making target tokens flash when hovered. Manual states now remain active whenever GM Vision is off, including with Auto Visibility disabled.
+
 ## [8.3.24] - 2026-07-15
 
 ### Fixed

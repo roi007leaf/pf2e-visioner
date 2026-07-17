@@ -250,6 +250,73 @@ describe('canvas visibility wrapper', () => {
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
+  test('AVS off + GM Vision on keeps core can-detect result for automatic stored state', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    const wrapped = jest.fn(() => true);
+    const wrapper = createCanDetectVisibilityWrapper(2);
+
+    expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
+  });
+
+  test('AVS off + GM Vision on ignores explicit undetected pair state', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({
+      id: 'target',
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-observer': { state: 'undetected', source: 'manual_action' },
+        },
+      },
+    });
+    const wrapped = jest.fn(() => true);
+    const wrapper = createCanDetectVisibilityWrapper(2);
+
+    expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
+  });
+
+  test('AVS off + GM Vision on keeps core soundwave despite explicit observed pair state', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
+    global.game.settings.set('pf2e', 'gmVision', true);
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({
+      id: 'target',
+      flags: {
+        'pf2e-visioner': {
+          'avs-override-from-observer': { state: 'observed', source: 'manual_action' },
+        },
+      },
+    });
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'core-soundwave-filter' };
+      return true;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
+    expect(target.detectionFilter).toEqual({ id: 'core-soundwave-filter' });
+  });
+
   test('avsOnlyInCombat + not in combat: canvas visibility bypasses AVS ring-clearing logic entirely', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

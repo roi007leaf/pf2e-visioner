@@ -25,6 +25,8 @@ import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
+import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
+import { clearHiddenTokenEchoes } from './hidden-token-echoes.js';
 import {
   buildSystemHiddenIndicatorDecision,
   getSystemHiddenIndicatorCandidates,
@@ -89,9 +91,31 @@ function hasSystemHiddenIndicators(tokens) {
   return tokens.some((token) => !!token?._pvSystemHiddenIndicator);
 }
 
-function removeSystemHiddenIndicators(tokens) {
+function removeSystemHiddenIndicators(tokens, { forceTokenVisible = false } = {}) {
   for (const token of tokens) {
-    removeSystemHiddenIndicator(token);
+    removeSystemHiddenIndicator(token, { forceTokenVisible });
+  }
+}
+
+export function clearVisionerTokenVisibilityEffects(
+  tokens = globalThis.canvas?.tokens?.placeables || [],
+) {
+  removeSystemHiddenIndicators(tokens, { forceTokenVisible: true });
+  clearHiddenTokenEchoes(tokens);
+  for (const token of tokens) {
+    if (!token?._pvCurrentViewHardHidden) continue;
+    if ('visible' in token) token.visible = true;
+    if ('renderable' in token) token.renderable = true;
+    if (token.mesh) {
+      if ('visible' in token.mesh) token.mesh.visible = true;
+      if ('renderable' in token.mesh) token.mesh.renderable = true;
+      if ('alpha' in token.mesh) token.mesh.alpha = token.document?.hidden ? 0.5 : 1;
+    }
+    for (const entry of token._pvHardHiddenChromeVisibility || []) {
+      if (entry?.surface && 'visible' in entry.surface) entry.surface.visible = entry.visible;
+    }
+    delete token._pvHardHiddenChromeVisibility;
+    token._pvCurrentViewHardHidden = false;
   }
 }
 
@@ -271,12 +295,17 @@ export async function updateSystemHiddenTokenHighlights(
   options = {},
 ) {
   try {
-    if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
+    const tokens = canvas?.tokens?.placeables || [];
+    if (!tokens.length) {
       return;
     }
 
-    const tokens = canvas?.tokens?.placeables || [];
-    if (!tokens.length) {
+    if (shouldBypassAvsForGmVision()) {
+      clearVisionerTokenVisibilityEffects(tokens);
+      return;
+    }
+
+    if (!game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled')) {
       return;
     }
 

@@ -68,4 +68,23 @@ describe('detection vision sharing wrappers', () => {
     expect(wrapTokenVisionSource.call(minion, wrapped)).toBe(true);
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
+
+  test('AVS off + GM Vision on still leaves prepareBaseData sight state to core', () => {
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
+    const tokenDocument = createMockToken({
+      id: 'minion',
+      flags: {
+        [MODULE_ID]: {
+          visionMasterTokenId: 'master',
+          visionSharingMode: 'replace',
+        },
+      },
+    }).document;
+    tokenDocument.sight = { enabled: true };
+    const wrapped = jest.fn();
+
+    wrapTokenDocumentPrepareBaseData.call(tokenDocument, wrapped);
+
+    expect(tokenDocument.sight.enabled).toBe(true);
+  });
 });

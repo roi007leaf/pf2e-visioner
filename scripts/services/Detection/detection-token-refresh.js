@@ -33,7 +33,9 @@ function suppressNewFoundryHiddenVisibilityDuringMove(token, before) {
 }
 
 function afterCoreRefresh(token, before) {
-  suppressNewFoundryHiddenVisibilityDuringMove(token, before);
+  if (!shouldBypassAvsForGmVision()) {
+    suppressNewFoundryHiddenVisibilityDuringMove(token, before);
+  }
   try {
     applyCurrentViewHardHide(token);
   } catch {
@@ -44,20 +46,20 @@ function afterCoreRefresh(token, before) {
 export function wrapTokenRefreshState(wrapped, ...args) {
   const before = renderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, before);
+  afterCoreRefresh(this, before);
   return result;
 }
 
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   const before = renderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, before);
+  afterCoreRefresh(this, before);
   return result;
 }
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
   const before = renderState(this);
   const result = wrapped(...args);
-  if (!shouldBypassAvsForGmVision()) afterCoreRefresh(this, before);
+  afterCoreRefresh(this, before);
   return result;
 }

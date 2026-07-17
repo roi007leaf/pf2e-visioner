@@ -103,18 +103,30 @@ export function isGmVisionModeActive() {
   return gmVisionEnabled();
 }
 
+function isGmCoreVisionActive() {
+  if (!globalThis.game?.user?.isGM) return false;
+  return gmVisionEnabled();
+}
+
 export function shouldBypassAvsForGmVision() {
-  if (globalThis.canvas?.ready !== true) return isGmVisionModeActive();
+  let gmCoreVisionActive;
+  if (globalThis.canvas?.ready !== true) {
+    gmCoreVisionActive = isGmCoreVisionActive();
+  } else {
+    const now = nowMs();
+    if (bypassCache.expiresAt > now) {
+      gmCoreVisionActive = bypassCache.value;
+    } else {
+      gmCoreVisionActive = isGmCoreVisionActive();
+      bypassCache = {
+        expiresAt: now + GM_VISION_BYPASS_CACHE_MS,
+        value: gmCoreVisionActive,
+      };
+    }
+  }
 
-  const now = nowMs();
-  if (bypassCache.expiresAt > now) return bypassCache.value;
-
-  const value = isGmVisionModeActive();
-  bypassCache = {
-    expiresAt: now + GM_VISION_BYPASS_CACHE_MS,
-    value,
-  };
-  return value;
+  if (!gmCoreVisionActive) return false;
+  return true;
 }
 
 export function clearGmVisionBypassCache() {
