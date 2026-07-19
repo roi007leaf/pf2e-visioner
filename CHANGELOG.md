@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- **Loot and hazard tokens could remain visible through walls in a GM's selected-token view**: Non-hidden loot and hazards remain available to the GM, but now obey the selected observer's line of sight through solid walls and closed doors like regular tokens. Foundry-hidden and Visioner-hidden states continue to hide them normally.
 - **Accept All could leave other AVS validations queued and immediately reopen the indicator**: Accept All now collects every pending validation, closes the indicator immediately, removes the accepted overrides as one batch, and performs one final AVS recalculation instead of repeatedly refreshing and re-queuing work between individual changes.
 
 ## [8.3.25] - 2026-07-17
