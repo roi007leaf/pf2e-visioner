@@ -161,7 +161,11 @@ export function applyCurrentViewHardHide(token) {
   }
   const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
   if (!shouldHardHide) {
-    if (token.document?.hidden || isFullyVisibleToEveryObserver(token)) {
+    const gmMayOverrideCoreVisibility = !!globalThis.game?.user?.isGM;
+    if (
+      gmMayOverrideCoreVisibility &&
+      (token.document?.hidden || isFullyVisibleToEveryObserver(token))
+    ) {
       releaseCurrentViewHardHide(token);
       token._pvCurrentViewHardHidden = false;
     } else {

@@ -258,6 +258,26 @@ describe('hover tooltip visibility request planning', () => {
     ]);
   });
 
+  test('player target-mode hover does not reveal an undetected observer location', () => {
+    const player = makeToken('player');
+    const undetectedNpc = makeToken('undetected-npc');
+    const getVisibilityState = jest.fn((observer, target) => {
+      if (observer === player && target === undetectedNpc) return 'undetected';
+      if (observer === undetectedNpc && target === player) return 'hidden';
+      return 'observed';
+    });
+
+    const requests = buildTooltipVisibilityRequests({
+      subjectToken: player,
+      allTokens: [player, undetectedNpc],
+      mode: 'target',
+      isGM: false,
+      getVisibilityState,
+    });
+
+    expect(requests).toEqual([]);
+  });
+
   test('builds target-mode requests with pair visibility reads instead of full map reads', () => {
     const subject = makeToken('subject');
     const observers = Array.from({ length: 20 }, (_, index) =>

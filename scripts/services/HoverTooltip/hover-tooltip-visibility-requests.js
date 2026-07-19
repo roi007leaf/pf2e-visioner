@@ -157,6 +157,7 @@ function readPairVisibilityState(observerToken, targetToken, getVisibilityState)
 export function buildTargetTooltipVisibilityRequests({
   subjectToken,
   observerTokens = [],
+  isGM = false,
   getVisibilityMap = () => ({}),
   getVisibilityState = null,
   getDetectionBetween = () => null,
@@ -165,6 +166,14 @@ export function buildTargetTooltipVisibilityRequests({
 
   return observerTokens
     .map((observerToken) => {
+      if (!isGM) {
+        const observerVisibilityState = readPairVisibilityState(
+          subjectToken,
+          observerToken,
+          getVisibilityState,
+        );
+        if (SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(observerVisibilityState)) return null;
+      }
       const visibilityState = readPairVisibilityState(
         observerToken,
         subjectToken,
@@ -217,6 +226,7 @@ export function buildTooltipVisibilityRequests({
   return buildTargetTooltipVisibilityRequests({
     subjectToken,
     observerTokens: otherTokens,
+    isGM,
     getVisibilityMap,
     getVisibilityState,
     getDetectionBetween,

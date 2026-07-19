@@ -286,6 +286,21 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.visible).toBe(true);
   });
 
+  it('leaves a core-LOS-hidden observed NPC invisible for players when AVS is off', () => {
+    globalThis.game = {
+      user: { isGM: false },
+      settings: { get: jest.fn((_module, key) => key !== 'autoVisibilityEnabled') },
+    };
+    const t = { controlled: false, visible: false, renderable: true,
+      mesh: { visible: false, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+  });
+
   it('restores a Foundry-hidden token that core itself left invisible, even with no hard-hide marker set', () => {
     globalThis.game = { user: { isGM: true } };
     const t = { controlled: false, visible: false, renderable: true,

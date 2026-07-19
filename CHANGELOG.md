@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.3.28] - 2026-07-19
+
+### Fixed
+
+- **Players could see NPCs through walls after previously seeing them when Auto Visibility was disabled**: A stored Observed state could make Visioner force a Core-hidden NPC mesh visible even though Visioner had not hidden it, overriding Foundry's current wall line of sight. Player rendering now remains under Foundry Core unless Visioner is releasing one of its own hard-hidden states; GM visibility behavior is unchanged.
+- **Hovering an owned token could reveal an undetected NPC's location while Auto Visibility was enabled**: Target-mode hover badges checked how the NPC saw the hovered character without first checking whether that character knew the NPC existed. Player hover overlays now suppress observers that are Undetected or Unnoticed from the hovered character's perspective, while GMs and known-location Hidden targets remain unaffected.
+
 ## [8.3.27] - 2026-07-19
 
 ### Added
