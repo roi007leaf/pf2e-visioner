@@ -918,6 +918,89 @@
   color: var(--color-text-dark-secondary);
 }
 
+/* Tile Config cover controls live outside the .pf2e-visioner app scope. */
+.pf2e-visioner-tile-cover-settings .form-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.pf2e-visioner-tile-cover-settings .cover-override-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn {
+  --pvv-tile-cover-color: #9ca3af;
+  --pvv-tile-cover-bg: rgba(156, 163, 175, 0.14);
+  flex: 0 0 42px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 36px;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--pvv-tile-cover-color) !important;
+  background: var(--pvv-tile-cover-bg) !important;
+  border: 1px solid var(--pvv-tile-cover-color) !important;
+  border-radius: 6px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn[data-cover-override='auto'] {
+  --pvv-tile-cover-color: #9ca3af;
+  --pvv-tile-cover-bg: rgba(156, 163, 175, 0.14);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn[data-cover-override='none'] {
+  --pvv-tile-cover-color: #4caf50;
+  --pvv-tile-cover-bg: rgba(76, 175, 80, 0.14);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn[data-cover-override='lesser'] {
+  --pvv-tile-cover-color: #ffc107;
+  --pvv-tile-cover-bg: rgba(255, 193, 7, 0.14);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn[data-cover-override='standard'] {
+  --pvv-tile-cover-color: #ff6600;
+  --pvv-tile-cover-bg: rgba(255, 102, 0, 0.14);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn[data-cover-override='greater'] {
+  --pvv-tile-cover-color: #f44336;
+  --pvv-tile-cover-bg: rgba(244, 67, 54, 0.14);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn i {
+  color: inherit !important;
+  font-size: 1.1rem;
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn:hover {
+  filter: brightness(1.25);
+  transform: translateY(-1px);
+}
+
+.pf2e-visioner-tile-cover-settings .visioner-icon-btn.active {
+  background: var(--pvv-tile-cover-bg) !important;
+  outline: 2px solid var(--pvv-tile-cover-color);
+  outline-offset: 1px;
+  box-shadow: 0 0 8px var(--pvv-tile-cover-color);
+}
+
+.pf2e-visioner-tile-cover-settings .notes {
+  margin: 2px 0 0;
+}
+
 .pf2e-visioner-stealth-tracker-hidden {
   display: none !important;
 }

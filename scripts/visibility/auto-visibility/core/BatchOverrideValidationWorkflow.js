@@ -30,8 +30,13 @@ export class BatchOverrideValidationWorkflow {
       return { queued: false, tokenId };
     }
 
+    const hasQueuedMovementValidation =
+      this.#overrideValidationManager.hasQueuedValidation?.(tokenId) === true;
+    if (!hasQueuedMovementValidation) {
+      return { queued: false, tokenId, skipped: 'non-movement-batch' };
+    }
+
     try {
-      this.#overrideValidationManager.queueOverrideValidation(tokenId);
       await this.#overrideValidationManager.processQueuedValidations();
       return { queued: true, tokenId };
     } catch (error) {

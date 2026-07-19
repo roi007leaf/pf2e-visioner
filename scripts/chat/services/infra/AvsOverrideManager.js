@@ -449,6 +449,7 @@ export class AvsOverrideManager {
     if (!game.user?.isGM) return false;
 
     try {
+      const deferAvsRefresh = options.deferAvsRefresh === true;
       const targetToken = canvas.tokens?.get(targetId);
       if (!targetToken) return false;
       const flagKey = `avs-override-from-${observerId}`;
@@ -460,14 +461,16 @@ export class AvsOverrideManager {
           flagData.coverOnly !== true
         ) {
           await this.#convertToTakeCoverOnlyOverride(observerId, targetId, flagData, targetToken);
-          await this.clearGlobalCaches();
-          await this.#syncPairVisibilityToAvs(observerId, targetId);
-          try {
-            const { eventDrivenVisibilitySystem } = await import(
-              '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
-            );
-            await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
-          } catch {}
+          if (!deferAvsRefresh) {
+            await this.clearGlobalCaches();
+            await this.#syncPairVisibilityToAvs(observerId, targetId);
+            try {
+              const { eventDrivenVisibilitySystem } = await import(
+                '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+              );
+              await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
+            } catch {}
+          }
           this.#notifyVisibilityControlReleased(observerId, targetId);
           return true;
         }
@@ -476,17 +479,19 @@ export class AvsOverrideManager {
           await this.#clearTakeCoverMapEntry(observerId, targetId, options);
         }
         await targetToken.document.unsetFlag(MODULE_ID, flagKey);
-        await this.clearGlobalCaches();
-        if (wasVisibilityOverride) {
-          await this.#syncPairVisibilityToAvs(observerId, targetId);
+        if (!deferAvsRefresh) {
+          await this.clearGlobalCaches();
+          if (wasVisibilityOverride) {
+            await this.#syncPairVisibilityToAvs(observerId, targetId);
+          }
+          try {
+            const { eventDrivenVisibilitySystem } = await import(
+              '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
+            );
+            // Recalc both sides to be thorough
+            await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
+          } catch {}
         }
-        try {
-          const { eventDrivenVisibilitySystem } = await import(
-            '../../../visibility/auto-visibility/EventDrivenVisibilitySystem.js'
-          );
-          // Recalc both sides to be thorough
-          await eventDrivenVisibilitySystem.recalculateForTokens([observerId, targetId]);
-        } catch {}
         if (wasVisibilityOverride) {
           this.#notifyVisibilityControlReleased(observerId, targetId);
         }

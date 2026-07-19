@@ -2,6 +2,7 @@ import '../../setup.js';
 
 import {
   addTokenBorder,
+  computeTokenLabelZoomScale,
   removeTokenBorder,
 } from '../../../scripts/managers/token-manager/borders.js';
 
@@ -148,6 +149,13 @@ describe('Token Border Management', () => {
     test('handles null token gracefully', () => {
       expect(() => addTokenBorder(null, false)).not.toThrow();
       expect(global.PIXI.Graphics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('token label zoom scaling', () => {
+    test('grows labels while zooming out and shrinks them while zooming in', () => {
+      expect(computeTokenLabelZoomScale(0.5)).toBeGreaterThan(computeTokenLabelZoomScale(1));
+      expect(computeTokenLabelZoomScale(1)).toBeGreaterThan(computeTokenLabelZoomScale(2));
     });
   });
 

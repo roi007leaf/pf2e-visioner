@@ -12,11 +12,26 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     document.head.querySelector('#pf2e-visioner-override-indicator-styles')?.remove();
 
     graphicsCreated = [];
+    const makeContainer = () => ({
+      children: [],
+      addChild(...children) {
+        this.children.push(...children);
+        return children.at(-1);
+      },
+      destroy: jest.fn(function destroy() {
+        for (const child of this.children) child.destroy?.();
+      }),
+      position: { set: jest.fn() },
+      scale: { set: jest.fn() },
+      parent: null,
+    });
     global.PIXI = {
       Graphics: jest.fn(() => {
         const graphics = {
           clear: jest.fn(),
           lineStyle: jest.fn(),
+          beginFill: jest.fn(),
+          endFill: jest.fn(),
           drawRoundedRect: jest.fn(),
           destroy: jest.fn(),
           parent: null,
@@ -24,6 +39,16 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
         graphicsCreated.push(graphics);
         return graphics;
       }),
+      Container: jest.fn(makeContainer),
+      TextStyle: jest.fn((options) => options),
+      Text: jest.fn((text, style) => ({
+        text,
+        style,
+        width: text.length * 7,
+        height: 16,
+        anchor: { set: jest.fn() },
+        destroy: jest.fn(),
+      })),
     };
 
     global.canvas.tokens.addChild = jest.fn((child) => {
@@ -32,6 +57,13 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
     global.canvas.tokens.removeChild = jest.fn((child) => {
       child.parent = null;
     });
+    global.canvas.stage = { scale: { x: 1 } };
+    global.canvas.app = {
+      ticker: {
+        add: jest.fn(),
+        remove: jest.fn(),
+      },
+    };
 
     const observer = global.createMockToken({ id: 'observer-1', name: 'Observer' });
     const target = global.createMockToken({ id: 'target-1', name: 'Target' });
@@ -86,13 +118,28 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
       0xffd54f,
       0.95,
     );
+    expect(
+      observer._pf2eVisionerObserverHoverLabel.children.find((child) => child.text)?.text,
+    ).toBe('OBSERVER · SEES');
+    expect(
+      target._pf2eVisionerTargetHoverLabel.children.find((child) => child.text)?.text,
+    ).toBe('TARGET · HIDDEN → OBSERVED');
+    const observerLabel = observer._pf2eVisionerObserverHoverLabel;
+    expect(observerLabel.scale.set).toHaveBeenLastCalledWith(1);
+    const zoomUpdater = global.canvas.app.ticker.add.mock.calls[0][0];
+    global.canvas.stage.scale.x = 0.5;
+    zoomUpdater();
+    expect(observerLabel.scale.set.mock.calls.at(-1)[0]).toBeGreaterThan(1);
 
     row.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
 
     expect(observer._pf2eVisionerObserverHoverBorder).toBeUndefined();
     expect(target._pf2eVisionerTargetHoverBorder).toBeUndefined();
+    expect(observer._pf2eVisionerObserverHoverLabel).toBeUndefined();
+    expect(target._pf2eVisionerTargetHoverLabel).toBeUndefined();
     expect(graphicsCreated[0].destroy).toHaveBeenCalled();
     expect(graphicsCreated[1].destroy).toHaveBeenCalled();
+    expect(global.canvas.app.ticker.remove).toHaveBeenCalledTimes(2);
   });
 
   test('explains grouped sections and hover border colors in tooltip', () => {
@@ -157,6 +204,55 @@ describe('OverrideValidationIndicator row hover highlighting', () => {
       '.pf2e-visioner-override-tooltip .tip-group[data-group="target"] .tip-subheader',
     );
     expect(targetHeader?.dataset.tooltip).toContain('how other tokens see this token');
+  });
+
+  test('cycles queued AVS items without resolving current item', () => {
+    const observer = global.canvas.tokens.get('observer-1');
+    const firstTarget = global.canvas.tokens.get('target-1');
+    const secondTarget = global.createMockToken({ id: 'target-2', name: 'Second Target' });
+    global.canvas.tokens.placeables.push(secondTarget);
+
+    indicator.show(
+      [{
+        observerId: observer.id,
+        targetId: firstTarget.id,
+        observerName: observer.name,
+        targetName: firstTarget.name,
+        state: 'hidden',
+        currentVisibility: 'observed',
+      }],
+      firstTarget.name,
+      firstTarget.id,
+    );
+    indicator.show(
+      [{
+        observerId: observer.id,
+        targetId: secondTarget.id,
+        observerName: observer.name,
+        targetName: secondTarget.name,
+        state: 'undetected',
+        currentVisibility: 'observed',
+      }],
+      secondTarget.name,
+      secondTarget.id,
+    );
+
+    document
+      .querySelector('.pf2e-visioner-override-indicator')
+      .dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+    expect(document.querySelector('.tip-row .who')?.textContent).toContain('Second Target');
+    const next = document.querySelector('[data-action="queue-next"]');
+    const previous = document.querySelector('[data-action="queue-previous"]');
+    expect(next).toBeTruthy();
+    expect(previous).toBeTruthy();
+
+    next.click();
+    expect(document.querySelector('.tip-row .who')?.textContent).toContain(firstTarget.name);
+
+    previous.click();
+    expect(document.querySelector('.tip-row .who')?.textContent).toContain('Second Target');
+    expect(indicator.hasQueuedTokens()).toBe(true);
   });
 
   test('clears active row highlights when tooltip hides', () => {

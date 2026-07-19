@@ -608,20 +608,13 @@ export class OverrideValidationDialog extends foundry.applications.api.Handlebar
     // Close dialog first
     await this.close();
 
-    // Remove all invalid overrides
-    for (const override of this.invalidOverrides) {
-      try {
-        await this._removeAcceptedOverride(override);
-      } catch (error) {
-        console.error('PF2E Visioner | Error removing override:', error);
-      }
-    }
-
-    ui.notifications.info(game.i18n.format('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPTED_COUNT', { count: this.invalidOverrides.length }));
     try {
       const { default: indicator } = await import('./OverrideValidationIndicator.js');
-      indicator.hide(true);
-    } catch { }
+      await indicator.clearAll(this.invalidOverrides);
+    } catch (error) {
+      console.error('PF2E Visioner | Error accepting all overrides:', error);
+      ui.notifications.error(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.AVS_ACCEPT_FAILED'));
+    }
   }
 
   async _onRejectAll() {

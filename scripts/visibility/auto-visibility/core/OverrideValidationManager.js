@@ -186,6 +186,10 @@ export class OverrideValidationManager {
     this.queue(tokenId, options);
   }
 
+  hasQueuedValidation(tokenId) {
+    return !!tokenId && this.pendingValidations.has(tokenId);
+  }
+
   queue(tokenId, { force = false } = {}) {
     // GM-only; EVS already guards enabled
     if (!game.user?.isGM) {

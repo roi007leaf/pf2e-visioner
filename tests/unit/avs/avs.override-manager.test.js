@@ -737,6 +737,42 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     expect(B.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'avs-override-from-A');
   });
 
+  test('removeOverride can defer cache clearing and AVS recalculation for bulk acceptance', async () => {
+    const A = mkToken('A');
+    const B = mkToken('B');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? { state: 'hidden', source: 'manual_action' }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const recalculateForTokens = jest.fn(async () => undefined);
+    jest.doMock(
+      '../../../scripts/visibility/auto-visibility/EventDrivenVisibilitySystem.js',
+      () => ({
+        __esModule: true,
+        eventDrivenVisibilitySystem: { recalculateForTokens },
+      }),
+    );
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+    const clearGlobalCaches = jest
+      .spyOn(AvsOverrideManager, 'clearGlobalCaches')
+      .mockResolvedValue(undefined);
+
+    const result = await AvsOverrideManager.removeOverride('A', 'B', {
+      deferAvsRefresh: true,
+    });
+
+    expect(result).toBe(true);
+    expect(B.document.unsetFlag).toHaveBeenCalledWith('pf2e-visioner', 'avs-override-from-A');
+    expect(clearGlobalCaches).not.toHaveBeenCalled();
+    expect(recalculateForTokens).not.toHaveBeenCalled();
+  });
+
   test('removeOverride clears manual cover when removing a Take Cover cover-only marker', async () => {
     const A = mkToken('A');
     const B = mkToken('B');

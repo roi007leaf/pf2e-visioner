@@ -1,10 +1,32 @@
 import { BatchOverrideValidationWorkflow } from '../../../scripts/visibility/auto-visibility/core/BatchOverrideValidationWorkflow.js';
 
 describe('BatchOverrideValidationWorkflow', () => {
-  test('queues the last moved token and awaits queued validation processing', async () => {
-    const deferred = {};
+  test('does not treat stale movement memory as movement during a selection recalculation', async () => {
     const overrideValidationManager = {
       queueOverrideValidation: jest.fn(),
+      processQueuedValidations: jest.fn(),
+    };
+    const workflow = new BatchOverrideValidationWorkflow({
+      getLastMovedTokenId: () => 'previously-moved-token',
+      isTokenMovementActive: () => false,
+      overrideValidationManager,
+    });
+
+    await expect(
+      workflow.runBeforeResultApplication({ isMovementBatch: false }),
+    ).resolves.toEqual({
+      queued: false,
+      tokenId: 'previously-moved-token',
+      skipped: 'non-movement-batch',
+    });
+    expect(overrideValidationManager.queueOverrideValidation).not.toHaveBeenCalled();
+    expect(overrideValidationManager.processQueuedValidations).not.toHaveBeenCalled();
+  });
+
+  test('awaits validation already queued by the movement workflow', async () => {
+    const deferred = {};
+    const overrideValidationManager = {
+      hasQueuedValidation: jest.fn(() => true),
       processQueuedValidations: jest.fn(
         () =>
           new Promise((resolve) => {
@@ -25,7 +47,7 @@ describe('BatchOverrideValidationWorkflow', () => {
     });
     await Promise.resolve();
 
-    expect(overrideValidationManager.queueOverrideValidation).toHaveBeenCalledWith('mover');
+    expect(overrideValidationManager.hasQueuedValidation).toHaveBeenCalledWith('mover');
     expect(overrideValidationManager.processQueuedValidations).toHaveBeenCalledTimes(1);
     expect(settled).toBe(false);
 
@@ -105,7 +127,7 @@ describe('BatchOverrideValidationWorkflow', () => {
     const error = new Error('validation failed');
     const warn = jest.fn();
     const overrideValidationManager = {
-      queueOverrideValidation: jest.fn(),
+      hasQueuedValidation: jest.fn(() => true),
       processQueuedValidations: jest.fn(async () => {
         throw error;
       }),

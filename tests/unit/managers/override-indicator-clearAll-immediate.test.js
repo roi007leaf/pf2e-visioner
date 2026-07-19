@@ -65,7 +65,11 @@ describe('override-validation-indicator clearAll immediate recompute', () => {
 
         // Assert: removed override once
         expect(mockRemoveOverride).toHaveBeenCalledTimes(1);
-        expect(mockRemoveOverride).toHaveBeenCalledWith(observer.id, target.id);
+        expect(mockRemoveOverride).toHaveBeenCalledWith(
+            observer.id,
+            target.id,
+            expect.objectContaining({ deferAvsRefresh: true }),
+        );
 
         // Assert: global AVS recalc and visual refresh invoked
         expect(mockRecalculateAll).toHaveBeenCalledTimes(1);

@@ -11,11 +11,13 @@ import {
   setSuppressLightingRefresh,
 } from '../services/runtime-state.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
+import { onRenderTileConfig } from '../ui/tile-cover-config.js';
 
 export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
   Hooks.on('getTokenDirectoryEntryContext', onGetTokenDirectoryEntryContext);
   Hooks.on('renderWallConfig', onRenderWallConfig);
+  Hooks.on('renderTileConfig', onRenderTileConfig);
   // Light config injection: add Heightened Darkness (rank 4+) checkbox
   Hooks.on('renderLightConfig', onRenderLightConfig);
   Hooks.on('renderAmbientLightConfig', onRenderLightConfig);

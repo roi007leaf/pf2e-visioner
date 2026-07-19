@@ -1,5 +1,20 @@
 # Changelog
 
+## [8.3.26] - 2026-07-19
+
+### Added
+
+- **Tiles can now provide cover**: Tile Configuration now includes Visioner cover controls matching wall cover states. A tile can provide lesser, standard, or greater cover whenever an attack line crosses it, or explicitly provide no cover.
+
+### Changed
+
+- **AVS validation now makes observer and target roles clear on the canvas**: Hovering a validation row adds readable `OBSERVER · SEES` and `TARGET · state change` labels alongside the existing blue and yellow borders. Label size adapts to canvas zoom so the text remains readable when zoomed out without overwhelming tokens when zoomed in.
+- **Queued AVS validations can now be reviewed in any order**: The validation tooltip now has Previous and Next buttons plus a queue-position counter. GMs can browse every pending token change without accepting or rejecting the currently displayed item first.
+
+### Fixed
+
+- **Accept All could leave other AVS validations queued and immediately reopen the indicator**: Accept All now collects every pending validation, closes the indicator immediately, removes the accepted overrides as one batch, and performs one final AVS recalculation instead of repeatedly refreshing and re-queuing work between individual changes.
+
 ## [8.3.25] - 2026-07-17
 
 ### Fixed

@@ -32,7 +32,7 @@ describe('OverrideValidationDialog - accept forces hide', () => {
         OverrideValidationDialog = dialogModule.OverrideValidationDialog;
     });
 
-    it('should have _onAcceptAll method that imports and calls indicator.hide', async () => {
+    it('should have _onAcceptAll method that drains the indicator queue', async () => {
         const dialog = new OverrideValidationDialog({
             invalidOverrides: [],
             tokenName: 'TestToken',
@@ -42,7 +42,7 @@ describe('OverrideValidationDialog - accept forces hide', () => {
         expect(typeof dialog._onAcceptAll).toBe('function');
 
         const methodSource = dialog._onAcceptAll.toString();
-        expect(methodSource).toContain('indicator.hide(true)');
+        expect(methodSource).toContain('indicator.clearAll(this.invalidOverrides)');
     });
 
     it('should have _onRejectAll method that imports and calls indicator.hide', async () => {

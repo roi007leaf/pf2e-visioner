@@ -133,6 +133,17 @@ export class CoverDetector {
         // If we can't get elevation, don't filter by it
       }
 
+      let tileCover = this._checkTileCoverOverrides(p1, p2, elevationRange) || 'none';
+      if (tileCover !== 'none') {
+        tileCover = this._applyLevelsCoverAdjustment(attacker, target, tileCover);
+        if (
+          tileCover === 'greater' &&
+          !game.settings.get('pf2e-visioner', 'wallCoverAllowGreater')
+        ) {
+          tileCover = 'standard';
+        }
+      }
+
       // FIRST: Check for wall cover overrides - these take precedence regardless of natural blocking
       const wallOverride = this._checkWallCoverOverrides(p1, p2, elevationRange);
       if (wallOverride !== null) {
@@ -141,7 +152,7 @@ export class CoverDetector {
         if (!allowGreaterOverride && adjusted === 'greater') {
           adjusted = 'standard';
         }
-        return adjusted;
+        return this._applyRegionCover(p1, p2, this._highestCoverState(adjusted, tileCover));
       }
 
       // Check if there's any blocking terrain (walls) in the way
@@ -236,6 +247,7 @@ export class CoverDetector {
         calculatedCover = adjustedWallCover;
       }
 
+      calculatedCover = this._highestCoverState(calculatedCover, tileCover);
       const finalCover = this._applyRegionCover(p1, p2, calculatedCover);
       return finalCover;
     } catch (error) {
@@ -419,6 +431,89 @@ export class CoverDetector {
       console.warn('PF2E Visioner | Error checking region cover:', error);
       return calculatedCover;
     }
+  }
+
+  _highestCoverState(first, second) {
+    const coverOrder = ['none', 'lesser', 'standard', 'greater'];
+    return coverOrder.indexOf(second) > coverOrder.indexOf(first) ? second : first;
+  }
+
+  _getSceneTiles() {
+    const tiles = canvas?.tiles;
+    if (!tiles) return [];
+    const placeables = Array.isArray(tiles.placeables) ? tiles.placeables : [];
+    const objectChildren = Array.isArray(tiles.objects?.children) ? tiles.objects.children : [];
+    if (!placeables.length) return objectChildren;
+    if (!objectChildren.length) return placeables;
+
+    const seen = new Set();
+    const merged = [];
+    for (const tile of [...placeables, ...objectChildren]) {
+      const key = tile?.document?.id || tile?.id || tile;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(tile);
+    }
+    return merged;
+  }
+
+  _checkTileCoverOverrides(p1, p2, elevationRange = null) {
+    const allowed = new Set(['lesser', 'standard', 'greater']);
+    let highest = null;
+
+    for (const tile of this._getSceneTiles()) {
+      const document = tile?.document || tile;
+      const coverOverride = document?.getFlag?.(MODULE_ID, 'coverOverride');
+      if (!allowed.has(coverOverride)) continue;
+
+      const x = Number(document.x);
+      const y = Number(document.y);
+      const width = Number(document.width);
+      const height = Number(document.height);
+      if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) continue;
+
+      if (elevationRange) {
+        const elevation = Number(document.elevation ?? 0);
+        if (
+          Number.isFinite(elevation) &&
+          (elevation < elevationRange.bottom || elevation > elevationRange.top)
+        ) {
+          continue;
+        }
+      }
+
+      let segmentStart = p1;
+      let segmentEnd = p2;
+      const rotation = Number(document.rotation ?? 0);
+      if (Number.isFinite(rotation) && rotation % 360 !== 0) {
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        const radians = (-rotation * Math.PI) / 180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+        const unrotate = (point) => {
+          const dx = point.x - centerX;
+          const dy = point.y - centerY;
+          return {
+            x: centerX + dx * cos - dy * sin,
+            y: centerY + dx * sin + dy * cos,
+          };
+        };
+        segmentStart = unrotate(p1);
+        segmentEnd = unrotate(p2);
+      }
+
+      const intersectionLength = segmentRectIntersectionLength(segmentStart, segmentEnd, {
+        x1: x,
+        y1: y,
+        x2: x + width,
+        y2: y + height,
+      });
+      if (intersectionLength <= 0) continue;
+      highest = highest ? this._highestCoverState(highest, coverOverride) : coverOverride;
+    }
+
+    return highest;
   }
 
   _hasSceneWalls() {
