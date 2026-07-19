@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.27] - 2026-07-19
+
+### Added
+
+- **Distracting Performance can now apply Create a Diversion to an ally**: When the performer has Distracting Performance, targeting exactly one allied token before opening or applying the diversion results makes that ally Hidden from observers beaten by the Performance check instead of hiding the performer. Failed checks leave the ally's existing visibility unchanged, and no valid ally target (or multiple allied targets) safely falls back to the normal self-benefit. Preview, apply, and revert all preserve the chosen beneficiary.
+
 ## [8.3.26] - 2026-07-19
 
 ### Added

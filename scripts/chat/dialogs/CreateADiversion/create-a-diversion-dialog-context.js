@@ -12,6 +12,11 @@ export async function prepareCreateADiversionDialogContext(app, context) {
   context.outcomes = processedOutcomes;
   context.ignoreAllies = !!app.ignoreAllies;
   context.hideFoundryHidden = !!app.hideFoundryHidden;
+  context.hasDistractingPerformance = !!app.hasDistractingPerformance;
+  const beneficiary = app.actionData?.diversionTarget || app.divertingToken;
+  context.diversionBeneficiary = beneficiary
+    ? { ...beneficiary, image: app.resolveTokenImage(beneficiary) }
+    : null;
 
   app.processedOutcomes = processedOutcomes;
 
@@ -45,9 +50,13 @@ export async function getProcessedCreateADiversionOutcomes(app) {
 function filterCreateADiversionSelf(app, outcomes) {
   try {
     const actorId = app.divertingToken?.id || app.divertingToken?.document?.id;
-    if (!actorId) return outcomes;
+    const beneficiary = app.actionData?.diversionTarget;
+    const beneficiaryId = beneficiary?.id || beneficiary?.document?.id;
+    if (!actorId && !beneficiaryId) return outcomes;
 
-    return outcomes.filter((outcome) => outcome?.observer?.id !== actorId);
+    return outcomes.filter(
+      (outcome) => outcome?.observer?.id !== actorId && outcome?.observer?.id !== beneficiaryId,
+    );
   } catch {
     return outcomes;
   }
@@ -69,7 +78,7 @@ async function filterCreateADiversionDetection(app, outcomes) {
     const { filterOutcomesByDetection } = await import('../../services/infra/shared-utils.js');
     return filterOutcomesByDetection(
       outcomes,
-      app.divertingToken,
+      app.actionData?.diversionTarget || app.divertingToken,
       'observer',
       false,
       true,
@@ -121,9 +130,7 @@ function buildCreateADiversionOutcomeContext(app, outcome) {
 
 function resolveCreateADiversionObserverImage(outcome) {
   return (
-    outcome.observer.document?.texture?.src ||
-    outcome.observer.img ||
-    'icons/svg/mystery-man.svg'
+    outcome.observer.document?.texture?.src || outcome.observer.img || 'icons/svg/mystery-man.svg'
   );
 }
 

@@ -12,6 +12,7 @@ import {
   revertDiversionChange,
 } from './CreateADiversion/create-a-diversion-dialog-actions.js';
 import { prepareCreateADiversionDialogContext } from './CreateADiversion/create-a-diversion-dialog-context.js';
+import { FeatsHandler } from '../services/FeatsHandler.js';
 
 // Store reference to current create a diversion dialog
 let currentDiversionDialog = null;
@@ -20,7 +21,9 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
   constructor(divertingToken, outcomes, changes, diversionData, options = {}) {
     // Set localized title before calling super
     if (!options.window) options.window = {};
-    options.window.title = game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.CREATE_DIVERSION_RESULTS') || 'Create a Diversion Results';
+    options.window.title =
+      game?.i18n?.localize('PF2E_VISIONER.DIALOG_TITLES.CREATE_DIVERSION_RESULTS') ||
+      'Create a Diversion Results';
 
     super(options);
 
@@ -28,6 +31,10 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
     this.outcomes = outcomes;
     this.changes = changes;
     this.diversionData = diversionData;
+    this.hasDistractingPerformance = FeatsHandler.hasFeat(
+      divertingToken,
+      'distracting-performance',
+    );
     // Ensure services can resolve the correct handler
     this.actionData = {
       ...(diversionData || {}),
@@ -170,11 +177,11 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.hideFoundryHidden = !!cbh.checked;
           try {
             await game.settings.set(MODULE_ID, 'hideFoundryHiddenTokens', this.hideFoundryHidden);
-          } catch { }
+          } catch {}
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Wire ignore-allies checkbox if present
     try {
@@ -187,7 +194,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           this.render({ force: true });
         });
       }
-    } catch { }
+    } catch {}
 
     // Initialize bulk action buttons and handlers
     this.updateBulkActionButtons();
@@ -230,7 +237,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
           inline: 'nearest',
         });
       }
-    } catch { }
+    } catch {}
   }
 
   /**
@@ -322,7 +329,7 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
    * @param {Token} observerToken - The observer token
    * @param {string} newVisibility - The new visibility state
    */
-  async applyVisibilityChange() { }
+  async applyVisibilityChange() {}
 
   /**
    * Update row buttons to applied state
@@ -380,40 +387,38 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       const icon = event.target?.closest?.('.state-icon');
       if (!icon || !this.element?.contains?.(icon)) return;
 
-        // Only handle clicks within override selection container
-        const overrideIcons = icon.closest('.override-icons');
-        if (!overrideIcons) return;
+      // Only handle clicks within override selection container
+      const overrideIcons = icon.closest('.override-icons');
+      if (!overrideIcons) return;
 
-        // Robustly resolve target id from data attributes or row
-        let targetId = icon.dataset.target || icon.dataset.tokenId;
-        if (!targetId) {
-          const row = icon.closest('tr[data-token-id]');
-          targetId = row?.dataset?.tokenId;
-        }
-        const newState = icon.dataset.state;
-        overrideIcons
-          .querySelectorAll('.state-icon')
-          .forEach((i) => i.classList.remove('selected'));
-        icon.classList.add('selected');
-        const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
-        if (hiddenInput) hiddenInput.value = newState;
-        let outcome = this.outcomes?.find?.(
-          (o) => String(this.getOutcomeTokenId(o)) === String(targetId),
-        );
-        if (outcome) {
-          outcome.overrideState = newState;
+      // Robustly resolve target id from data attributes or row
+      let targetId = icon.dataset.target || icon.dataset.tokenId;
+      if (!targetId) {
+        const row = icon.closest('tr[data-token-id]');
+        targetId = row?.dataset?.tokenId;
+      }
+      const newState = icon.dataset.state;
+      overrideIcons.querySelectorAll('.state-icon').forEach((i) => i.classList.remove('selected'));
+      icon.classList.add('selected');
+      const hiddenInput = overrideIcons?.querySelector('input[type="hidden"]');
+      if (hiddenInput) hiddenInput.value = newState;
+      let outcome = this.outcomes?.find?.(
+        (o) => String(this.getOutcomeTokenId(o)) === String(targetId),
+      );
+      if (outcome) {
+        outcome.overrideState = newState;
 
-          // Use our AVS-aware calculation method
-          const hasActionableChange = this.calculateHasActionableChange(outcome);
+        // Use our AVS-aware calculation method
+        const hasActionableChange = this.calculateHasActionableChange(outcome);
 
-          // Persist actionable state on outcome so templates and bulk ops reflect immediately
-          outcome.hasActionableChange = hasActionableChange;
-          try {
-            this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
-              row: icon.closest('tr'),
-            });
-          } catch { }
-        }
+        // Persist actionable state on outcome so templates and bulk ops reflect immediately
+        outcome.hasActionableChange = hasActionableChange;
+        try {
+          this.updateActionButtonsForToken(targetId || null, hasActionableChange, {
+            row: icon.closest('tr'),
+          });
+        } catch {}
+      }
     });
   }
 
@@ -430,13 +435,13 @@ export class CreateADiversionPreviewDialog extends BaseActionDialog {
       const observer = outcome.target || outcome.observer;
       if (!observer) return false;
 
-      const divertingToken = this.divertingToken;
-      if (!divertingToken) return false;
+      const beneficiary = this.actionData?.diversionTarget || this.divertingToken;
+      if (!beneficiary) return false;
 
       const observerId = observer.document?.id || observer.id;
       const flagKey = `avs-override-from-${observerId}`;
 
-      if (divertingToken.document?.getFlag('pf2e-visioner', flagKey)) {
+      if (beneficiary.document?.getFlag('pf2e-visioner', flagKey)) {
         return false;
       }
 

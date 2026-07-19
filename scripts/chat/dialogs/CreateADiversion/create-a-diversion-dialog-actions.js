@@ -41,9 +41,10 @@ export async function revertDiversionChange(app, button) {
   try {
     const { applyVisibilityChanges } = await import('../../services/infra/shared-utils.js');
     const revertVisibility = outcome.oldVisibility || outcome.currentVisibility;
-    const changes = [{ target: outcome.observer, newVisibility: revertVisibility }];
+    const beneficiary = app.actionData?.diversionTarget || app.actionData?.actor;
+    const changes = [{ target: beneficiary, newVisibility: revertVisibility }];
 
-    await applyVisibilityChanges(app.actionData.actor, changes, {
+    await applyVisibilityChanges(outcome.observer, changes, {
       direction: 'observer_to_target',
     });
   } catch {
@@ -179,7 +180,8 @@ function getChangedDiversionOutcomes(app) {
   const filteredOutcomes = app.processedOutcomes || app.outcomes || [];
 
   return filteredOutcomes.filter(
-    (outcome) => outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs'),
+    (outcome) =>
+      outcome.hasActionableChange || (outcome.changed && outcome.newVisibility !== 'avs'),
   );
 }
 

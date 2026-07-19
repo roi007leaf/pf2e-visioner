@@ -15,6 +15,14 @@
     </div>
   </div>
 
+  {{#if hasDistractingPerformance}}
+  <div class="diversion-beneficiary form-group">
+    <label>{{localize "PF2E_VISIONER.CREATE_A_DIVERSION_AUTOMATION.BENEFICIARY"}}</label>
+    <strong>{{diversionBeneficiary.name}}</strong>
+    <p class="hint">{{localize "PF2E_VISIONER.CREATE_A_DIVERSION_AUTOMATION.DISTRACTING_PERFORMANCE_HINT"}}</p>
+  </div>
+  {{/if}}
+
   {{!-- Encounter Filter + Ignore Allies --}}
   <div class="encounter-filter-section">
     {{#if showEncounterFilter}}

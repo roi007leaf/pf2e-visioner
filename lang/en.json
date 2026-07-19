@@ -696,6 +696,8 @@
       "ROLL_VS_DC": "Roll vs Perception DC",
       "OUTCOME": "Outcome",
       "VISIBILITY_CHANGE": "Visibility Change",
+      "BENEFICIARY": "Diversion benefits",
+      "DISTRACTING_PERFORMANCE_HINT": "Distracting Performance uses your single targeted ally; without one, the performer receives the diversion benefits.",
       "OPEN_RESULTS": "Open Diversion Results",
       "OPEN_RESULTS_TOOLTIP": "Open the Create a Diversion results dialog to apply individual or bulk visibility changes",
       "ENCOUNTER_ONLY": "Show only encounter tokens",

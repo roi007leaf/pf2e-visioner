@@ -78,12 +78,27 @@ describe('create a diversion dialog actions', () => {
     await revertDiversionChange(app, { dataset: { tokenId: 'observer-1' } });
 
     expect(applyVisibilityChanges).toHaveBeenCalledWith(
-      app.actionData.actor,
-      [{ target: app.outcomes[0].observer, newVisibility: 'observed' }],
+      app.outcomes[0].observer,
+      [{ target: app.actionData.actor, newVisibility: 'observed' }],
       { direction: 'observer_to_target' },
     );
     expect(app.bulkActionState).toBe('initial');
     expect(app.updateRowButtonsToReverted).toHaveBeenCalled();
+  });
+
+  test('per-row revert restores chosen Distracting Performance beneficiary', async () => {
+    const beneficiary = { id: 'ally' };
+    const app = buildApp({
+      actionData: { actor: { id: 'diverter' }, diversionTarget: beneficiary },
+    });
+
+    await revertDiversionChange(app, { dataset: { tokenId: 'observer-1' } });
+
+    expect(applyVisibilityChanges).toHaveBeenCalledWith(
+      app.outcomes[0].observer,
+      [{ target: beneficiary, newVisibility: 'observed' }],
+      { direction: 'observer_to_target' },
+    );
   });
 
   test('apply all uses processed visible outcomes', async () => {
@@ -110,7 +125,9 @@ describe('create a diversion dialog actions', () => {
   });
 
   test('revert all delegates to diversion service for visible changes', async () => {
-    const app = buildApp({ processedOutcomes: [{ observer: buildObserver('observer-2'), hasActionableChange: true }] });
+    const app = buildApp({
+      processedOutcomes: [{ observer: buildObserver('observer-2'), hasActionableChange: true }],
+    });
 
     await revertAllDiversionChanges(app);
 

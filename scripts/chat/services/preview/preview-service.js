@@ -38,7 +38,8 @@ export async function previewActionResults(actionData) {
               const controlled = canvas?.tokens?.controlled?.[0];
               if (controlled) {
                 // Check if the controlled token belongs to the same actor
-                const actorId = tokenOrActor?.actor?.id || tokenOrActor?.document?.actor?.id || tokenOrActor?.id;
+                const actorId =
+                  tokenOrActor?.actor?.id || tokenOrActor?.document?.actor?.id || tokenOrActor?.id;
                 const controlledActorId = controlled?.actor?.id;
 
                 if (actorId && controlledActorId && actorId === controlledActorId) {
@@ -55,7 +56,7 @@ export async function previewActionResults(actionData) {
                 const tokens = actor.getActiveTokens(true);
                 if (tokens?.length) return tokens[0];
               }
-            } catch { }
+            } catch {}
             return null;
           };
           const seekerToken = resolveToken(actionData?.actor);
@@ -110,16 +111,15 @@ export async function previewActionResults(actionData) {
                 );
                 return;
               }
-            } catch { }
+            } catch {}
           }
 
           // Do NOT pre-filter allies at discovery time; let the dialog control it live
           let subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
           if (actionData.searchExploration) {
-            const {
-              filterSearchExplorationSubjects,
-              getSearchExplorationRangeFeet,
-            } = await import('../search-exploration-service.js');
+            const { filterSearchExplorationSubjects, getSearchExplorationRangeFeet } = await import(
+              '../search-exploration-service.js'
+            );
             const rangeFeet = Number(
               actionData.searchExplorationRadiusFeet ?? getSearchExplorationRangeFeet(),
             );
@@ -186,7 +186,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch { }
+        } catch {}
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
@@ -219,7 +219,7 @@ export async function previewActionResults(actionData) {
             previewActionData.context = previewActionData.context || {};
             previewActionData.context._visionerRollId = rollId;
           }
-        } catch { }
+        } catch {}
         // RAW enforcement gate: do not open dialog if prerequisites fail
         try {
           const { checkForValidTargets } = await import('../infra/target-checker.js');
@@ -231,7 +231,7 @@ export async function previewActionResults(actionData) {
             );
             return;
           }
-        } catch { }
+        } catch {}
         // Do NOT pre-filter allies; let dialog control it
         const subjects = await handler.discoverSubjects({
           ...previewActionData,
@@ -279,6 +279,7 @@ export async function previewActionResults(actionData) {
           '../../dialogs/CreateADiversionPreviewDialog.js'
         );
         const handler = new DiversionActionHandler();
+        await handler.ensurePrerequisites(actionData);
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
           subjects.map((s) => handler.analyzeOutcome(actionData, s)),
@@ -298,19 +299,16 @@ export async function previewActionResults(actionData) {
           return;
         }
 
-        const {
-          notifyTakeCoverAlreadyActive,
-          tokenHasActiveTakeCoverState,
-        } = await import('../take-cover-expiration-service.js');
+        const { notifyTakeCoverAlreadyActive, tokenHasActiveTakeCoverState } = await import(
+          '../take-cover-expiration-service.js'
+        );
         const actorToken = actionData.actorToken || actionData.actor;
         if (tokenHasActiveTakeCoverState(actorToken)) {
           notifyTakeCoverAlreadyActive(actorToken);
           return;
         }
         const { TakeCoverActionHandler } = await import('../actions/TakeCoverAction.js');
-        const { TakeCoverPreviewDialog } = await import(
-          '../../dialogs/TakeCoverPreviewDialog.js'
-        );
+        const { TakeCoverPreviewDialog } = await import('../../dialogs/TakeCoverPreviewDialog.js');
         const handler = new TakeCoverActionHandler();
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
@@ -340,12 +338,10 @@ export async function previewActionResults(actionData) {
           });
           if (!canShowConsequences) {
             const { notify } = await import('../infra/notifications.js');
-            notify.warn(
-              game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_VALID_CONSEQUENCES'),
-            );
+            notify.warn(game.i18n.localize('PF2E_VISIONER.NOTIFICATIONS.NO_VALID_CONSEQUENCES'));
             return;
           }
-        } catch { }
+        } catch {}
 
         const subjects = await handler.discoverSubjects({ ...actionData, ignoreAllies: false });
         const outcomes = await Promise.all(
