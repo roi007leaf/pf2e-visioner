@@ -143,15 +143,6 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   return deferrable;
 }
 
-function isFullyVisibleToEveryObserver(token) {
-  const observers = currentViewVisionerObserversForTarget(token);
-  if (observers.length === 0) return false;
-  return observers.every((observer) => {
-    const state = getStoredVisibilityState(observer, token);
-    return state === 'observed' || state === 'concealed';
-  });
-}
-
 export function applyCurrentViewHardHide(token) {
   const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
   if (shouldDefer) {
@@ -161,11 +152,7 @@ export function applyCurrentViewHardHide(token) {
   }
   const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
   if (!shouldHardHide) {
-    const gmMayOverrideCoreVisibility = !!globalThis.game?.user?.isGM;
-    if (
-      gmMayOverrideCoreVisibility &&
-      (token.document?.hidden || isFullyVisibleToEveryObserver(token))
-    ) {
+    if (globalThis.game?.user?.isGM && token.document?.hidden) {
       releaseCurrentViewHardHide(token);
       token._pvCurrentViewHardHidden = false;
     } else {

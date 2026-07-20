@@ -315,7 +315,7 @@ describe('applyCurrentViewHardHide', () => {
     expect(t._pvCurrentViewHardHidden).toBe(false);
   });
 
-  it('restores a plain (non-Foundry-hidden) token that core itself left in a broken invisible state while fully observed', () => {
+  it('does not override Core-hidden token visibility in a GM selected-token view', () => {
     globalThis.game = { user: { isGM: true } };
     const t = { controlled: false, visible: false, renderable: true,
       mesh: { visible: false, renderable: true, alpha: 1 },
@@ -323,9 +323,9 @@ describe('applyCurrentViewHardHide', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
     expect(t._pvCurrentViewHardHidden).toBeUndefined();
     expect(applyCurrentViewHardHide(t)).toBe(false);
-    expect(t.visible).toBe(true);
-    expect(t.mesh.visible).toBe(true);
-    expect(t._pvCurrentViewHardHidden).toBe(false);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBeUndefined();
   });
 
   it('does not force-restore a plain token merely hidden (heard-not-seen) with no hard-hide marker set - presence-only stays untouched', () => {

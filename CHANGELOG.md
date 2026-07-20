@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.29] - 2026-07-20
+
+### Fixed
+
+- **Tokens could still remain visible and targetable through walls with Auto Visibility disabled**: The 8.3.28 safeguard did not cover GM selected-token view, where a stored Observed state could still override Foundry Core's current wall line of sight. Visioner now releases only render state it explicitly hard-hid, while Foundry-hidden tokens retain their normal GM ghost visibility.
+
 ## [8.3.28] - 2026-07-19
 
 ### Fixed
