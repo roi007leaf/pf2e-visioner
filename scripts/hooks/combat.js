@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { combatStartCoverService } from '../services/CombatStartCoverService.js';
 import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
 
@@ -111,7 +112,7 @@ async function handleCombatStart(combat) {
 
 let combatEndCleanupInProgress = false;
 
-async function handleCombatEnd(combat = null) {
+export async function handleCombatEnd(combat = null) {
   try {
     const deferredSeekManager = (await import('../chat/services/infra/DeferredSeekManager.js')).default;
     await deferredSeekManager.clearAll();
@@ -148,6 +149,7 @@ async function handleCombatEnd(combat = null) {
     }
 
     let clearedCount = 0;
+    const tokenUpdates = [];
 
     for (const tokenId of combatantTokens) {
       const token = canvas.tokens.get(tokenId);
@@ -156,6 +158,7 @@ async function handleCombatEnd(combat = null) {
       try {
         const currentFlags = token.document.flags?.[MODULE_ID];
         if (!currentFlags) continue;
+        let tokenChanged = false;
 
         try {
           const effects = token.actor.itemTypes.effect;
@@ -168,25 +171,46 @@ async function handleCombatEnd(combat = null) {
           if (visibilityEffects.length > 0) {
             const ids = visibilityEffects.map((e) => e.id).filter((id) => !!id);
             if (ids.length > 0) {
-              await token.actor.deleteEmbeddedDocuments('Item', ids);
+              await token.actor.deleteEmbeddedDocuments('Item', ids, { render: false });
+              tokenChanged = true;
             }
           }
         } catch {
           /* ignore individual effect clearing errors */
         }
 
+        const update = { _id: token.document.id };
         if (currentFlags.visibilityV2) {
-          await token.document.unsetFlag(MODULE_ID, 'visibilityV2');
+          update[`flags.${MODULE_ID}.-=visibilityV2`] = null;
+          tokenChanged = true;
         }
 
         if (currentFlags.detection) {
-          await token.document.unsetFlag(MODULE_ID, 'detection');
+          update[`flags.${MODULE_ID}.-=detection`] = null;
+          tokenChanged = true;
         }
 
-        clearedCount++;
+        if (Object.keys(update).length > 1) tokenUpdates.push(update);
+        if (tokenChanged) clearedCount++;
       } catch (error) {
         console.error(`PF2E Visioner: Error clearing flags for token ${token.document.name}:`, error);
       }
+    }
+
+    if (tokenUpdates.length > 0) {
+      await canvas.scene?.updateEmbeddedDocuments?.('Token', tokenUpdates, {
+        diff: false,
+        render: false,
+        animate: false,
+      });
+    }
+
+    if (clearedCount > 0) {
+      await updateCanvasPerception({
+        initializeVision: true,
+        refreshLighting: true,
+        refreshVision: true,
+      });
     }
 
     if (clearedCount > 0) {

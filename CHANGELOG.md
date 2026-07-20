@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.30] - 2026-07-20
+
+### Fixed
+
+- **Living tokens could briefly flicker into view when an encounter ended with AVS Only Active in Combat enabled**: Combat-end visibility and detection state cleanup now runs as one non-rendering batch, suppresses rendering while temporary AVS effects are removed, then performs a single Foundry Core perception refresh after cleanup is complete.
+
 ## [8.3.29] - 2026-07-20
 
 ### Fixed
