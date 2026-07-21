@@ -105,6 +105,7 @@ class HoverTooltipsImpl {
     this.isShowingFactorsOverlay = false;
     this.keyTooltipTokens = new Set();
     this.factorsOverlayTokens = new Set();
+    this._factorsOverlayGeneration = 0;
     this.tooltipFontSize = 16;
     this.tooltipIconSize = 14;
     this.badgeTicker = null;
@@ -617,6 +618,8 @@ export function initializeHoverTooltips() {
 
   // Clean up tooltips when tearing down canvas (leaving a scene)
   Hooks.on('canvasTearDown', () => {
+    clearVisibilityFactorOverlayState();
+
     // Aggressively destroy all PIXI containers and DOM elements
 
     // Destroy all visibility indicators with full cleanup
@@ -691,6 +694,7 @@ export function initializeHoverTooltips() {
   // Clean up tooltips when changing scenes
   Hooks.on('canvasReady', () => {
     // Clean up all tooltips and reset state
+    clearVisibilityFactorOverlayState();
     hideAllVisibilityIndicators();
     hideAllCoverIndicators();
     HoverTooltips.currentHoveredToken = null;
@@ -778,6 +782,10 @@ function onTokenHover(hoveredToken) {
 function onTokenHoverEnd(token) {
   // Clear any pending hover debounce
   clearPendingHoverDebounce();
+
+  if (HoverTooltips._savedHoveredToken === token) {
+    delete HoverTooltips._savedHoveredToken;
+  }
 
   if (HoverTooltips.currentHoveredToken === token) {
     HoverTooltips.currentHoveredToken = null;
@@ -1102,6 +1110,14 @@ function addVisibilityIndicator(
 ) {
   const config = VISIBILITY_STATES[visibilityState];
   if (!config) return;
+
+  const existingIndicator = HoverTooltips.visibilityIndicators.get(targetToken.id);
+  if (existingIndicator) {
+    try {
+      destroyVisibilityTooltipIndicator(existingIndicator);
+    } catch (_) { }
+    HoverTooltips.visibilityIndicators.delete(targetToken.id);
+  }
 
   // Check if AVS is enabled - only show sense badges if AVS is on
   const avsEnabled = game.settings?.get?.(MODULE_ID, 'autoVisibilityEnabled') ?? false;
@@ -1443,6 +1459,15 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   const config = COVER_STATES[coverState];
   if (!config) return;
 
+  const indicatorKey = `${targetToken.id}|cover`;
+  const existingIndicator = HoverTooltips.coverIndicators.get(indicatorKey);
+  if (existingIndicator) {
+    try {
+      destroyCoverTooltipIndicator(existingIndicator);
+    } catch (_) { }
+    HoverTooltips.coverIndicators.delete(indicatorKey);
+  }
+
   // Use DOM badge with icon only (no large text), consistent with visibility badges
   const indicator = new PIXI.Container();
   const tokenWidth = targetToken.document.width * canvas.grid.size;
@@ -1496,7 +1521,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
 
   addBadgeClickHandler(el, observerToken, targetToken, 'target');
 
-  HoverTooltips.coverIndicators.set(targetToken.id + '|cover', indicator);
+  HoverTooltips.coverIndicators.set(indicatorKey, indicator);
   ensureBadgeTicker();
 }
 
@@ -1566,6 +1591,7 @@ function hideAllCoverIndicators() {
  * Cleanup hover tooltips
  */
 export function cleanupHoverTooltips() {
+  clearVisibilityFactorOverlayState();
   hideAllVisibilityIndicators();
   hideAllCoverIndicators();
   clearPendingHoverDebounce();
@@ -1597,6 +1623,7 @@ export function showVisibilityFactorsOverlay() {
 
   HoverTooltips.isShowingFactorsOverlay = true;
   HoverTooltips.factorsOverlayTokens = new Set();
+  const requestGeneration = ++HoverTooltips._factorsOverlayGeneration;
   try {
     Hooks.call('pf2e-visioner:visibilityFactorsOverlay', { active: true });
   } catch (_) { }
@@ -1606,7 +1633,7 @@ export function showVisibilityFactorsOverlay() {
 
   controlledTokens.forEach((observer) => {
     HoverTooltips.factorsOverlayTokens.add(observer.id);
-    showFactorIndicatorsForToken(observer);
+    showFactorIndicatorsForToken(observer, requestGeneration);
   });
 }
 
@@ -1643,6 +1670,7 @@ function clearVisibilityFactorOverlayState() {
     HoverTooltips.factorsOverlayTokens.size > 0 ||
     hasVisibilityFactorBadges();
 
+  HoverTooltips._factorsOverlayGeneration++;
   if (!wasActive) return false;
 
   HoverTooltips.isShowingFactorsOverlay = false;
@@ -1666,7 +1694,7 @@ function clearVisibilityFactorOverlayState() {
  * Show factor indicators for a specific token
  * @param {Token} observerToken - The observer token
  */
-async function showFactorIndicatorsForToken(observerToken) {
+async function showFactorIndicatorsForToken(observerToken, requestGeneration) {
   const otherTokens = getVisibilityFactorTargets(canvas.tokens.placeables, observerToken);
   if (otherTokens.length === 0) return;
 
@@ -1690,6 +1718,14 @@ async function showFactorIndicatorsForToken(observerToken) {
       console.error('[Visibility Factors Error]', error);
     },
   });
+
+  if (
+    requestGeneration !== HoverTooltips._factorsOverlayGeneration ||
+    !HoverTooltips.isShowingFactorsOverlay ||
+    !HoverTooltips.factorsOverlayTokens.has(observerToken.id)
+  ) {
+    return;
+  }
 
   requests.forEach(({ targetToken, observerToken, factorText, factorLines, state }) => {
     addFactorIndicator(targetToken, observerToken, factorText, state, factorLines);

@@ -54,7 +54,7 @@ export default class RegionHelper {
             // Prefer RegionDocument#testPoint with ElevatedPoint in v13+
             if (typeof region?.document?.testPoint === 'function') {
                 const elev = (p) => ({ x: p.x, y: p.y, z: p.z ?? p.elevation ?? 0 });
-                try { if (region.document.testPoint(elev(point))) return true; } catch { }
+                try { return Boolean(region.document.testPoint(elev(point))); } catch { }
             }
             // Some regions expose containsPoint in different signatures
             if (typeof region?.containsPoint === 'function') {

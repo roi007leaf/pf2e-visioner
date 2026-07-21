@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.3.31] - 2026-07-21
+
+### Fixed
+
+- **Cover regions could apply cover outside their drawn shapes**: Concave regions and regions made from separated shapes could treat empty space inside their overall bounding box as covered. Region cover now respects the exact drawn shape boundaries.
+- **Visibility and cover icons could remain stranded on the map after hovering, zooming, or changing scenes**: Replacing an indicator now destroys its previous DOM and PIXI elements, leaving a token during pan or zoom cancels deferred hover restoration, and pending visibility-factor requests are discarded when their overlay or canvas is torn down.
+
 ## [8.3.30] - 2026-07-20
 
 ### Fixed

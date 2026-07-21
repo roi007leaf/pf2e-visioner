@@ -397,4 +397,64 @@ describe('HoverTooltips keybind state', () => {
       1,
     );
   });
+
+  test('canvas pan does not restore hover badges after pointer leaves during pan', async () => {
+    jest.useFakeTimers();
+    const observer = makeToken('observer', 0);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [observer, target];
+    mockGetVisibilityMap.mockImplementation((token) =>
+      token?.id === 'target' ? { observer: 'hidden' } : {},
+    );
+
+    const { HoverTooltips, initializeHoverTooltips } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    initializeHoverTooltips();
+    getHookHandler('hoverToken')(observer, true);
+    jest.advanceTimersByTime(60);
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      1,
+    );
+
+    getHookHandler('canvasPan')();
+    getHookHandler('hoverToken')(observer, false);
+    jest.advanceTimersByTime(150);
+
+    expect(HoverTooltips.currentHoveredToken).toBeNull();
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      0,
+    );
+  });
+
+  test('replacing an indicator for the same token does not orphan its previous DOM badge', async () => {
+    const observerA = makeToken('observer-a', 0);
+    const observerB = makeToken('observer-b', 50);
+    const target = makeToken('target', 100);
+    global.canvas.tokens.controlled = [observerA, observerB];
+    global.canvas.tokens.placeables = [observerA, observerB, target];
+    mockGetVisibilityMap.mockImplementation((token) =>
+      token?.id === 'target'
+        ? { 'observer-a': 'hidden', 'observer-b': 'hidden' }
+        : {},
+    );
+
+    const { HoverTooltips, onHighlightObjects, showControlledTokenVisibility } = await import(
+      '../../../scripts/services/HoverTooltips.js'
+    );
+
+    showControlledTokenVisibility();
+
+    expect(HoverTooltips.visibilityIndicators.size).toBe(1);
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      1,
+    );
+
+    onHighlightObjects(false);
+    expect(document.querySelectorAll('.pf2e-visioner-tooltip-badge.visibility-hidden')).toHaveLength(
+      0,
+    );
+  });
 });
