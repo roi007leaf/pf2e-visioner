@@ -38,6 +38,9 @@ jest.mock('../../../scripts/utils.js', () => ({
 }));
 
 const { Pf2eVisionerApi } = require('../../../scripts/api.js');
+const {
+  optimizedVisibilityCalculator,
+} = require('../../../scripts/visibility/auto-visibility/VisibilityCalculator.js');
 
 function makeDazzledObserver() {
   return {
@@ -63,6 +66,7 @@ function makeTarget() {
 
 describe('getVisibilityFactors - dazzled reason not gated on bright light', () => {
   beforeEach(() => {
+    optimizedVisibilityCalculator.calculateVisibility.mockResolvedValue('concealed');
     global.canvas.tokens.placeables = [makeDazzledObserver(), makeTarget()];
   });
 
@@ -72,5 +76,21 @@ describe('getVisibilityFactors - dazzled reason not gated on bright light', () =
     expect(factors).not.toBeNull();
     expect(factors.slugs).toContain('dazzled');
     expect(factors.reasons.length).toBeGreaterThan(0);
+  });
+
+  test('does not report dazzled as a factor when hidden takes precedence', async () => {
+    optimizedVisibilityCalculator.calculateVisibility.mockResolvedValue('hidden');
+    const target = makeTarget();
+    target.actor.itemTypes.condition.push({ slug: 'hidden' });
+    global.canvas.tokens.placeables = [makeDazzledObserver(), target];
+
+    const factors = await Pf2eVisionerApi.getVisibilityFactors('observer', 'target');
+
+    expect(factors.state).toBe('hidden');
+    expect(factors.slugs).toContain('hidden');
+    expect(factors.slugs).not.toContain('dazzled');
+    expect(factors.reasons).not.toContain(
+      'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DAZZLED',
+    );
   });
 });

@@ -1,6 +1,26 @@
 import { CoverRegionBehavior } from '../../../scripts/regions/CoverRegionBehavior.js';
 
 describe('CoverRegionBehavior region shape containment', () => {
+  test('uses RegionDocument point testing instead of its bounding box', () => {
+    const region = {
+      bounds: { x: 0, y: 0, width: 300, height: 100 },
+      testPoint: jest.fn(() => false),
+    };
+    const behavior = {
+      system: { mode: 'override', coverLevel: 'standard' },
+    };
+
+    const cover = CoverRegionBehavior._checkRegionCover(
+      region,
+      behavior,
+      { x: -50, y: 50 },
+      { x: 150, y: 50 },
+    );
+
+    expect(region.testPoint).toHaveBeenCalledWith({ x: 150, y: 50, elevation: 0 });
+    expect(cover).toBeNull();
+  });
+
   test('does not apply override cover in the bounding-box gap between region shapes', () => {
     const region = {
       bounds: { x: 0, y: 0, width: 300, height: 100 },
@@ -23,7 +43,7 @@ describe('CoverRegionBehavior region shape containment', () => {
       { x: 150, y: 50 },
     );
 
-    expect(region.document.testPoint).toHaveBeenCalledWith({ x: 150, y: 50, z: 0 });
+    expect(region.document.testPoint).toHaveBeenCalledWith({ x: 150, y: 50, elevation: 0 });
     expect(cover).toBeNull();
   });
 

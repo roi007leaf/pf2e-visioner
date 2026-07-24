@@ -515,6 +515,7 @@ export class Pf2eVisionerApi {
       // Check for manual overrides
       const visibilityMap = getVisibilityMap(observerToken) || {};
       const manualState = visibilityMap[targetToken.id];
+      const resolvedVisibility = manualState || visibility;
 
       // Get lighting at target
       const lightingCalc = optimizedVisibilityCalculator.getComponents().lightingCalculator;
@@ -815,7 +816,7 @@ export class Pf2eVisionerApi {
       const isDazzled = observerToken.actor?.itemTypes?.condition?.some(
         (c) => c.slug === 'dazzled',
       );
-      if (isDazzled) {
+      if (isDazzled && (resolvedVisibility === 'observed' || resolvedVisibility === 'concealed')) {
         // Dazzled causes concealment of all creatures unless vision is not the only precise sense
         const hasNonVisualPreciseSense =
           detection.lifesense ||
@@ -1442,7 +1443,7 @@ export class Pf2eVisionerApi {
       }
 
       return {
-        state: manualState || visibility,
+        state: resolvedVisibility,
         lighting: lightingFactor,
         reasons: dedupedReasons,
         slugs: dedupedSlugs,
