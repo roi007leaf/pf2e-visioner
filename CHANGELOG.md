@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **Hidden targets could be reported as Concealed when the observer was Dazzled**: Dazzled now adds concealment only when the target would otherwise be Observed or Concealed, preserving Hidden, Undetected, and Unnoticed precedence and reporting the correct visibility reason.
+- **Dazzled could be shown as the visibility reason when the target was already Hidden**: Dazzled now appears only when the target would otherwise be Observed or Concealed, so Hidden, Undetected, and Unnoticed keep precedence and the attack card reports the relevant visibility factor.
 - **Cover regions could still apply cover in empty areas inside their bounding box on Foundry v14**: Exact containment checks now use the real v14 `RegionDocument` API and its required elevation coordinate, so separated, concave, and diagonal region shapes grant cover only inside their drawn geometry.
 
 ## [8.3.31] - 2026-07-21
