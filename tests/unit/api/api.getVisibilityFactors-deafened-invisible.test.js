@@ -34,10 +34,12 @@ jest.mock('../../../scripts/services/scene-hearing-range.js', () => ({
 }));
 
 jest.mock('../../../scripts/utils.js', () => ({
+  getVisibilityBetween: jest.fn(() => 'hidden'),
   getVisibilityMap: jest.fn(() => ({})),
 }));
 
 const { Pf2eVisionerApi } = require('../../../scripts/api.js');
+const { getVisibilityBetween } = require('../../../scripts/utils.js');
 
 function makeDeafenedObserver() {
   return {
@@ -61,8 +63,15 @@ function makeInvisibleTarget() {
   };
 }
 
+function makeTarget() {
+  const target = makeInvisibleTarget();
+  target.actor.itemTypes.condition = [];
+  return target;
+}
+
 describe('getVisibilityFactors - deafened observer condition is detected', () => {
   beforeEach(() => {
+    getVisibilityBetween.mockReturnValue('hidden');
     global.canvas.tokens.placeables = [makeDeafenedObserver(), makeInvisibleTarget()];
   });
 
@@ -73,5 +82,20 @@ describe('getVisibilityFactors - deafened observer condition is detected', () =>
     expect(factors.reasons).toContain(
       'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DEAFENED_INVISIBLE',
     );
+  });
+
+  test('explains blinded and deafened Undetected as loss of vision and hearing', async () => {
+    getVisibilityBetween.mockReturnValue('undetected');
+    const observer = makeDeafenedObserver();
+    observer.actor.itemTypes.condition.push({ slug: 'blinded' });
+    global.canvas.tokens.placeables = [observer, makeTarget()];
+
+    const factors = await Pf2eVisionerApi.getVisibilityFactors('observer', 'target');
+
+    expect(factors.state).toBe('undetected');
+    expect(factors.reasons).toEqual([
+      'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_BLINDED_DEAFENED',
+    ]);
+    expect(factors.slugs).toEqual(['blinded + deafened']);
   });
 });

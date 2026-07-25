@@ -1380,6 +1380,7 @@
       },
       "REASONS": {
         "OBSERVER_BLINDED": "Observer is blinded (cannot use visual senses)",
+        "OBSERVER_BLINDED_DEAFENED": "Observer is blinded and deafened (cannot use vision or hearing)",
         "OBSERVER_DEAFENED_INVISIBLE": "Observer is deafened (cannot hear invisible target)",
         "OBSERVER_DAZZLED": "Observer is dazzled in bright light",
         "TARGET_INVISIBLE": "Target is invisible",
@@ -1387,6 +1388,8 @@
         "TARGET_HIDDEN_CONDITION": "Target has hidden condition",
         "TARGET_CONCEALED_CONDITION": "Target has concealed condition",
         "RULE_ELEMENT_OVERRIDE": "Rule element overrides state",
+        "MANUAL_OVERRIDE": "Manual override",
+        "CONVERTED_SYSTEM_CONDITION": "PF2e {state} condition was converted into a Visioner override",
         "STORED_STATE": "Visibility state is {state} (stored state - reason not captured)",
         "TARGET_IN_GREATER_DARKNESS_WITH_GREATER_DARKVISION": "Target is in greater magical darkness ({templates}), but observer has greater darkvision",
         "TARGET_IN_GREATER_DARKNESS_WITH_DARKVISION": "Target is in greater magical darkness ({templates}) - concealed even with darkvision",

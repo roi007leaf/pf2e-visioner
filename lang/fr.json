@@ -873,8 +873,11 @@
       },
       "REASONS": {
         "OBSERVER_BLINDED": "(FR TODO) Observer is blinded (cannot use visual senses)",
+        "OBSERVER_BLINDED_DEAFENED": "L'observateur est aveuglé et assourdi (il ne peut utiliser ni la vision ni l'ouïe)",
         "OBSERVER_DEAFENED_INVISIBLE": "(FR TODO) Observer is deafened (cannot hear invisible target)",
         "OBSERVER_DAZZLED": "(FR TODO) Observer is dazzled in bright light",
+        "MANUAL_OVERRIDE": "Remplacement manuel",
+        "CONVERTED_SYSTEM_CONDITION": "La condition PF2e {state} a été convertie en remplacement Visioner",
         "STORED_STATE": "(FR TODO) Visibility state is {state} (stored state - reason not captured)",
         "TARGET_INVISIBLE": "(FR TODO) Target is invisible",
         "TARGET_UNDETECTED_CONDITION": "(FR TODO) Target has undetected condition",

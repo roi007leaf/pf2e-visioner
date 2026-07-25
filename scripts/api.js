@@ -19,6 +19,7 @@ import {
 import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { applyActiveSceneHearingRangeLimit } from './services/scene-hearing-range.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
+import { CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE } from './services/system-condition-overrides.js';
 import {
   setMovementPerformanceDiagnosticsEnabled,
   setSuppressPendingMovementVisualRefresh,
@@ -31,6 +32,7 @@ import {
   getCoverBetween,
   getPerceptionProfileBetween as getPerceptionProfileBetweenStore,
   getPerceptionProfileMap as getPerceptionProfileMapStore,
+  getVisibilityBetween,
   getVisibilityMap,
   getVisibility,
   setCoverBetween,
@@ -505,17 +507,22 @@ export class Pf2eVisionerApi {
       const { VisionAnalyzer } = await import('./visibility/auto-visibility/VisionAnalyzer.js');
       const visionAnalyzer = VisionAnalyzer.getInstance();
 
-      // Calculate current visibility - skip LOS check for diagnostic purposes
-      const visibility = await optimizedVisibilityCalculator.calculateVisibility(
-        observerToken,
-        targetToken,
-        { skipLOS: true },
+      // The canonical map is sparse: an absent target entry means Observed.
+      // Read through the pair accessor so factors always match the state shown by Visioner.
+      const resolvedVisibility = getVisibilityBetween(observerToken, targetToken);
+      const observerDocumentId = observerToken.document?.id || observerToken.id;
+      const visibilityOverride = targetToken.document?.getFlag?.(
+        MODULE_ID,
+        `avs-override-from-${observerDocumentId}`,
       );
-
-      // Check for manual overrides
-      const visibilityMap = getVisibilityMap(observerToken) || {};
-      const manualState = visibilityMap[targetToken.id];
-      const resolvedVisibility = manualState || visibility;
+      const isManualVisibilityOverride =
+        visibilityOverride?.source === 'manual_action' &&
+        visibilityOverride.coverOnly !== true &&
+        overrideToLegacyVisibility(visibilityOverride) === resolvedVisibility;
+      const isConvertedSystemConditionOverride =
+        visibilityOverride?.source === CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE &&
+        visibilityOverride.coverOnly !== true &&
+        overrideToLegacyVisibility(visibilityOverride) === resolvedVisibility;
 
       // Get lighting at target
       const lightingCalc = optimizedVisibilityCalculator.getComponents().lightingCalculator;
@@ -795,15 +802,31 @@ export class Pf2eVisionerApi {
       const slugs = [];
 
       // 1. OBSERVER CONDITIONS (highest priority - completely override senses)
-      if (observerConditions.includes('blinded')) {
+      const isBlinded = observerConditions.includes('blinded');
+      const isDeafened = observerConditions.includes('deafened');
+      const isBlindedAndDeafenedUndetected =
+        isBlinded && isDeafened && resolvedVisibility === 'undetected';
+
+      if (isBlindedAndDeafenedUndetected) {
+        reasons.push(
+          game.i18n.localize(
+            'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_BLINDED_DEAFENED',
+          ),
+        );
+        // Flat Check Helper uses this primary factor as its card sublabel.
+        slugs.push('blinded + deafened');
+      } else if (isBlinded) {
         reasons.push(
           game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_BLINDED'),
         );
         slugs.push('blinded');
       }
 
-      const isDeafened = observerConditions.includes('deafened');
-      if (isDeafened && targetConditions.includes('invisible')) {
+      if (
+        !isBlindedAndDeafenedUndetected &&
+        isDeafened &&
+        targetConditions.includes('invisible')
+      ) {
         reasons.push(
           game.i18n.localize(
             'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.OBSERVER_DEAFENED_INVISIBLE',
@@ -903,7 +926,7 @@ export class Pf2eVisionerApi {
       }
 
       // 3. LIGHTING CONDITIONS (main cause of concealment/hidden for most cases)
-      if (visibility === 'concealed' || visibility === 'hidden') {
+      if (resolvedVisibility === 'concealed' || resolvedVisibility === 'hidden') {
         // Check for darkness templates first (most common cause)
         if (darknessTemplates.length > 0) {
           const affectsTarget = darknessTemplates.some((t) => t.affectsTarget);
@@ -1280,7 +1303,7 @@ export class Pf2eVisionerApi {
       }
 
       // Imprecise senses (provide hidden state, not observed)
-      if (visibility === 'hidden') {
+      if (resolvedVisibility === 'hidden') {
         // Check if detection is via imprecise senses
         const hearingDistance = calculateRealDistanceInFeet(observerToken, targetToken);
         const hasHearing =
@@ -1340,7 +1363,7 @@ export class Pf2eVisionerApi {
       }
 
       // 5. NORMAL VISIBILITY (explain why target IS visible)
-      if (visibility === 'observed' && reasons.length === 0) {
+      if (resolvedVisibility === 'observed' && reasons.length === 0) {
         // Explain why they can see the target
         if (lightingFactor === 'bright') {
           reasons.push(
@@ -1387,7 +1410,7 @@ export class Pf2eVisionerApi {
       }
 
       // 6. UNDETECTED - explain why completely undetected
-      if (visibility === 'undetected' && reasons.length === 0) {
+      if (resolvedVisibility === 'undetected' && reasons.length === 0) {
         if (targetConditions.includes('invisible')) {
           if (isDeafened) {
             reasons.push(
@@ -1413,15 +1436,39 @@ export class Pf2eVisionerApi {
       }
 
       // 7. FALLBACK - if we still have no reasons but visibility is not observed, add generic explanation
-      if (reasons.length === 0 && visibility !== 'observed') {
+      if (reasons.length === 0 && resolvedVisibility !== 'observed') {
         // Check if there's a stored visibility state (could be from AVS or manual override)
         // But we can't tell if it's manual or automatic, so use generic wording
         reasons.push(
           game.i18n.format('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.STORED_STATE', {
-            state: visibility,
+            state: resolvedVisibility,
           }),
         );
         slugs.push('stored-state');
+      }
+
+      // A Token Manager/API manual state is authoritative. Environmental factors may explain
+      // what AVS would calculate, but they are not the reason for the displayed manual state.
+      if (isManualVisibilityOverride) {
+        reasons.splice(
+          0,
+          reasons.length,
+          game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.MANUAL_OVERRIDE'),
+        );
+        slugs.splice(0, slugs.length, 'manual-override');
+      } else if (isConvertedSystemConditionOverride) {
+        const stateLabel = game.i18n.localize(
+          `PF2E_VISIONER.VISIBILITY_STATES.${resolvedVisibility}`,
+        );
+        reasons.splice(
+          0,
+          reasons.length,
+          game.i18n.format(
+            'PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.CONVERTED_SYSTEM_CONDITION',
+            { state: stateLabel },
+          ),
+        );
+        slugs.splice(0, slugs.length, 'system conversion');
       }
 
       const dedupedReasons = [];

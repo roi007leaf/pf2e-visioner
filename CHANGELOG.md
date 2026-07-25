@@ -1,5 +1,14 @@
 # Changelog
 
+## [8.3.33] - 2026-07-25
+
+### Fixed
+
+- **Attack cards could report Hidden or Undetected while Visioner Manager showed Observed**: The visibility-factor API now reads the canonical observer-target state, including the sparse Observed default, and uses that same state for its explanation, preventing contradictions such as Undetected with Bright Light.
+- **Manually set visibility states could be attributed to darkness or another automatic factor**: Visibility explanations now identify Token Manager and API manual states as a Manual Override instead of presenting an environmental condition as their cause.
+- **Blinded and Deafened observers could show only Blinded as the reason for an Undetected target**: Combined sensory loss now displays Blinded + Deafened and explains that both vision and hearing are unavailable.
+- **Converted PF2e visibility conditions could appear as an unexplained Stored State**: Hidden, Concealed, and Undetected conditions converted into permanent Visioner overrides now display System Conversion, while the tooltip identifies the original PF2e condition.
+
 ## [8.3.32] - 2026-07-24
 
 ### Fixed
