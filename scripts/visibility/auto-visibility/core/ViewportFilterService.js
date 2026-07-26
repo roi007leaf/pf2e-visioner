@@ -48,6 +48,7 @@ export class ViewportFilterService {
                 // Use quadtree to get candidates quickly
                 const pts = spatialIndex.queryRect(rect);
                 for (const pt of pts) {
+                    if (pt?.token?.document?.hidden) continue;
                     if (pt?.token?.document?.id) tokenIdSet.add(pt.token.document.id);
                 }
             } else {
@@ -55,6 +56,7 @@ export class ViewportFilterService {
                 const tokens = canvas.tokens?.placeables || [];
                 const getter = posProvider || (this.#positionManager ? (t) => this.#positionManager.getTokenPosition(t) : (t) => ({ x: t.x, y: t.y }));
                 for (const token of tokens) {
+                    if (token?.document?.hidden) continue;
                     const pos = getter(token);
                     if (!pos) continue;
                     if (pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY) {

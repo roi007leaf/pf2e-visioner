@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.36] - 2026-07-26
+
+### Fixed
+
+- **Foundry-hidden tokens could still add movement-processing overhead on token-heavy scenes**: Visioner now excludes tokens hidden with Foundry Core's token toggle before viewport position resolution and movement spatial-index construction, preventing irrelevant hidden tokens from consuming position and indexing work.
+
 ## [8.3.35] - 2026-07-26
 
 ### Fixed

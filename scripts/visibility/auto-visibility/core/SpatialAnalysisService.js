@@ -281,7 +281,9 @@ export class SpatialAnalysisService {
         // Build a transient grid index and sweep an expanded AABB over the movement path
         try {
             const index = new HashGridIndex();
-            const tokens = canvas.tokens?.placeables || [];
+            const tokens = (canvas.tokens?.placeables || []).filter(
+                (token) => !token?.document?.hidden,
+            );
             index.build(tokens, (t) => this.#positionManager.getTokenPosition(t));
 
             const gridSize = canvas.grid?.size || 1;
