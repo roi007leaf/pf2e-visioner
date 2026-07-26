@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../../constants.js';
 import {
   getVisionerVisibilityBetweenTokens,
+  isAvsActiveGivenCombatGate,
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
@@ -14,6 +15,9 @@ function testDetectionPoints(detectionMode, visionSource, mode, config) {
 
 export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+  if (!isAvsActiveGivenCombatGate()) {
+    return testDetectionPoints(this, visionSource, mode, config);
+  }
   if (shouldBypassAvsForGmVision()) {
     return testDetectionPoints(this, visionSource, mode, config);
   }

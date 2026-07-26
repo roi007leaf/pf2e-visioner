@@ -348,6 +348,31 @@ describe('canvas visibility wrapper', () => {
     global.game.combat = undefined;
   });
 
+  test('avsOnlyInCombat + not in combat: detection-mode visibility bypasses Visioner token state', () => {
+    global.game.settings.set('pf2e-visioner', 'avsOnlyInCombat', true);
+    global.game.combat = undefined;
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({ id: 'target' });
+    target.document.getFlag = jest.fn(() => true);
+    const detectionMode = {
+      id: 'basicSight',
+      _canDetect: jest.fn(() => false),
+      _testPoint: jest.fn(() => true),
+    };
+
+    expect(
+      testDetectionModeVisibility.call(detectionMode, { object: observer }, { id: 'basicSight', enabled: true }, {
+        object: target,
+        tests: [{ x: 0, y: 0 }],
+      }),
+    ).toBe(true);
+    expect(target.document.getFlag).not.toHaveBeenCalled();
+    expect(detectionMode._canDetect).not.toHaveBeenCalled();
+    expect(detectionMode._testPoint).toHaveBeenCalledTimes(1);
+
+    global.game.settings.set('pf2e-visioner', 'avsOnlyInCombat', false);
+  });
+
   test('GM Vision bypass keeps core detection-mode visibility result', () => {
     global.game.user.isGM = true;
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);

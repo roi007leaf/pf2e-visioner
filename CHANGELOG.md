@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.35] - 2026-07-26
+
+### Fixed
+
+- **Visioner could reduce performance outside combat with AVS Only Active in Combat enabled**: Detection-mode visibility now bypasses Visioner token-state processing while the combat gate is closed, preserving Foundry Core detection behavior and avoiding repeated Visioner work on token-heavy scenes.
+
 ## [8.3.34] - 2026-07-26
 
 ### Fixed
