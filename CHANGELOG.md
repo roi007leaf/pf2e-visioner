@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.34] - 2026-07-26
+
+### Fixed
+
+- **Line of Sight Cover Regions could grant cover through empty areas inside their bounding box**: Boundary checks now use Foundry's canonical RegionDocument polygons, so diagonal, rotated, concave, separated, and holed regions grant cover only when the line of sight crosses their drawn geometry.
+
 ## [8.3.33] - 2026-07-25
 
 ### Fixed

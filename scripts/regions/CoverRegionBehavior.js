@@ -142,9 +142,17 @@ export class CoverRegionBehavior extends RegionBehaviorBase {
         const segments = [];
 
         try {
-            // V13: regions have a shapes collection with typed shape documents
-            const shapes = region.shapes ?? region?.document?.shapes;
-            if (shapes && shapes.size > 0) {
+            const regionDocument = region?.document ?? region;
+
+            // V14 exposes the exact composite geometry, including rotation,
+            // separated shapes, concavity, and holes, as canonical polygons.
+            if (CoverRegionBehavior._extractPolygonCollectionSegments(regionDocument?.polygons, segments)) {
+                return segments;
+            }
+
+            // V13 uses an iterable collection; V14 RegionData uses an array.
+            const shapes = regionDocument?.shapes ?? region?.shapes;
+            if (shapes && typeof shapes[Symbol.iterator] === 'function') {
                 for (const shape of shapes) {
                     CoverRegionBehavior._extractShapeSegments(shape, segments);
                 }
@@ -154,6 +162,13 @@ export class CoverRegionBehavior extends RegionBehaviorBase {
             const pts = region.points ?? region.geometry?.points ?? region.boundary ?? region?.document?.shape?.points ?? null;
 
             if (!Array.isArray(pts) || pts.length < 3) {
+                // Exact point testing proves bounds are only an optimization,
+                // not the Region boundary. Never turn them into geometry.
+                const hasExactPointTest =
+                    typeof regionDocument?.testPoint === 'function' ||
+                    typeof region?.testPoint === 'function';
+                if (hasExactPointTest) return segments;
+
                 const bounds = RegionHelper.getBounds(region);
                 if (bounds) {
                     const { x, y, width, height } = bounds;
@@ -189,8 +204,62 @@ export class CoverRegionBehavior extends RegionBehaviorBase {
         return segments;
     }
 
+    static _extractPolygonCollectionSegments(polygons, segments) {
+        if (!polygons || typeof polygons[Symbol.iterator] !== 'function') {
+            return false;
+        }
+
+        const initialLength = segments.length;
+        for (const polygon of polygons) {
+            CoverRegionBehavior._extractPolygonSegments(polygon, segments);
+        }
+        return segments.length > initialLength;
+    }
+
+    static _extractPolygonSegments(polygon, segments) {
+        const rawPoints = polygon?.points ?? polygon?.path ?? polygon;
+        if (!rawPoints || typeof rawPoints[Symbol.iterator] !== 'function') {
+            return;
+        }
+
+        const values = Array.from(rawPoints);
+        let points;
+        if (values.length >= 6 && values.every((value) => Number.isFinite(Number(value)))) {
+            points = [];
+            for (let index = 0; index < values.length; index += 2) {
+                points.push({ x: Number(values[index]), y: Number(values[index + 1]) });
+            }
+        } else {
+            points = values.map((point) => ({
+                x: Number(Array.isArray(point) ? point[0] : point?.x),
+                y: Number(Array.isArray(point) ? point[1] : point?.y),
+            }));
+        }
+
+        points = points.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+        if (
+            points.length > 1 &&
+            points[0].x === points[points.length - 1].x &&
+            points[0].y === points[points.length - 1].y
+        ) {
+            points.pop();
+        }
+        if (points.length < 3) return;
+
+        for (let index = 0; index < points.length; index++) {
+            segments.push({
+                p1: points[index],
+                p2: points[(index + 1) % points.length],
+            });
+        }
+    }
+
     static _extractShapeSegments(shape, segments) {
         try {
+            if (CoverRegionBehavior._extractPolygonCollectionSegments(shape?.polygons, segments)) {
+                return;
+            }
+
             const type = shape.type;
             if (type === 'rectangle') {
                 const { x, y, width, height } = shape;
