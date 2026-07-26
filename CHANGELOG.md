@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.37] - 2026-07-26
+
+### Fixed
+
+- **Tokens heard through sight-blocking walls could appear fully visible instead of as soundwaves**: When a wall blocks sight but allows sound, Visioner now keeps Foundry's hearing filter unless the observer currently has precise visual line of sight. Precise nonvisual senses such as echolocation continue to reveal the full token.
+
 ## [8.3.36] - 2026-07-26
 
 ### Fixed

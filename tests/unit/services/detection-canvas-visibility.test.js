@@ -76,7 +76,13 @@ describe('canvas visibility wrapper', () => {
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
     const observer = createMockToken({
       id: 'observer',
-      flags: visibilityV2Flags({ target: 'observed' }),
+      flags: {
+        'pf2e-visioner': {
+          visibilityV2: {
+            target: legacyVisibilityToProfile('observed', { detectionSense: 'echolocation' }),
+          },
+        },
+      },
     });
     const target = createMockToken({ id: 'target' });
     global.canvas = {
@@ -94,6 +100,39 @@ describe('canvas visibility wrapper', () => {
 
     expect(wrapCanvasVisibilityTest(wrapped, [{ x: 0, y: 0 }], { object: target })).toBe(true);
     expect(target.detectionFilter).toBeNull();
+  });
+
+  test('keeps hearing soundwave when saved visual observation is blocked by current sight wall', () => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: {
+        'pf2e-visioner': {
+          visibilityV2: {
+            target: legacyVisibilityToProfile('observed', { detectionSense: 'basic-sight' }),
+          },
+        },
+      },
+    });
+    observer.vision = { los: { contains: jest.fn(() => false) } };
+    const target = createMockToken({ id: 'target' });
+    target.center = { x: 100, y: 100 };
+    global.canvas = {
+      ...global.canvas,
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    const wrapped = jest.fn(() => {
+      target.detectionFilter = { id: 'hearing-soundwave-filter' };
+      return true;
+    });
+
+    expect(wrapCanvasVisibilityTest(wrapped, [target.center], { object: target })).toBe(true);
+    expect(target.detectionFilter).toEqual({ id: 'hearing-soundwave-filter' });
   });
 
   test('keeps the detection ring when the current-view observer only hears the target (hidden)', () => {

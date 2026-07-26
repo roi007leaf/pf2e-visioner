@@ -1,12 +1,14 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { currentViewObservers } from './current-view-hard-hide.js';
 import {
+  detectionFrameCache,
   getVisionerVisibilityBetweenTokens,
   isAvsActiveGivenCombatGate,
 } from './detection-visibility-context.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import { peekRegistry } from '../Peek/PeekRegistry.js';
 import { isPointInCone } from '../Peek/peek-geometry.js';
+import { isVisualSenseType } from '../../visibility/StatelessVisibilityCalculator.js';
 
 function tokenIdOf(token) {
   return token?.document?.id ?? token?.id ?? null;
@@ -118,7 +120,16 @@ function currentViewObservesTargetPrecisely(target) {
   if (!observers.length) return false;
   for (const observer of observers) {
     if (observer === target) continue;
-    if (getVisionerVisibilityBetweenTokens(observer, target) === 'observed') return true;
+    if (getVisionerVisibilityBetweenTokens(observer, target) !== 'observed') continue;
+
+    const detectionSense =
+      detectionFrameCache.getPerceptionProfile(observer, target)?.detectionSense ?? null;
+    if (detectionSense && !isVisualSenseType(detectionSense)) return true;
+
+    const targetCenter = pointFrom(target?.center);
+    if (targetCenter && geometryContainsPoint(observer?.vision?.los, targetCenter) === true) {
+      return true;
+    }
   }
   return false;
 }
