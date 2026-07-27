@@ -1,6 +1,12 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { applyCurrentViewHardHide } from './current-view-hard-hide.js';
+import {
+  ensureDuringMoveSoundwaveRefresh,
+  refreshSoundwavesForActiveMovement,
+  rememberSoundwaveDetectionBeforeCoreRefresh,
+} from '../during-move-soundwave.js';
+import { withDetectionSettingCache } from './detection-setting-cache.js';
 
 function renderState(token) {
   if (!token?.document?.hidden) return null;
@@ -41,6 +47,10 @@ function afterCoreRefresh(token, before) {
   } catch {
     /* keep Foundry visibility if the guard fails */
   }
+  rememberSoundwaveDetectionBeforeCoreRefresh(token);
+  // Token#_refreshVisibility forces a controlled token's primary mesh visible. Reassert the
+  // remembered soundwave after Core has applied those flags so no full-art frame leaks through.
+  refreshSoundwavesForActiveMovement();
 }
 
 export function wrapTokenRefreshState(wrapped, ...args) {
@@ -58,8 +68,19 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
 }
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
-  const before = renderState(this);
+  return withDetectionSettingCache(() => {
+    rememberSoundwaveDetectionBeforeCoreRefresh(this);
+    const before = renderState(this);
+    const result = wrapped(...args);
+    afterCoreRefresh(this, before);
+    return result;
+  });
+}
+
+export function wrapTokenControl(wrapped, ...args) {
+  rememberSoundwaveDetectionBeforeCoreRefresh(this);
   const result = wrapped(...args);
-  afterCoreRefresh(this, before);
+  refreshSoundwavesForActiveMovement();
+  ensureDuringMoveSoundwaveRefresh();
   return result;
 }

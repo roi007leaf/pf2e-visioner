@@ -58,6 +58,22 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
     expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('hidden'))).toBe(true);
   });
 
+  test('soundwave stays during movement in complete darkness despite geometric LOS', () => {
+    const darknessBlindedObserver = {
+      vision: {
+        blinded: { darkness: true },
+        los: { contains: () => true },
+      },
+    };
+    expect(
+      targetShouldShowSoundwave(
+        target,
+        [darknessBlindedObserver],
+        getVisibility('hidden'),
+      ),
+    ).toBe(true);
+  });
+
   test('no soundwave for undetected target (not sensed)', () => {
     expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('undetected'))).toBe(false);
   });
@@ -320,6 +336,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     pendingMovement,
     gmVisionBypass = false,
     observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
+    getObservers = () => (gmVisionBypass ? [] : observers),
     getVisibility = () => 'hidden',
   }) {
     let mod;
@@ -328,7 +345,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
         hasActivePendingTokenMovement: () => pendingMovement,
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
-        currentViewVisionerObserversForTarget: () => (gmVisionBypass ? [] : observers),
+        currentViewVisionerObserversForTarget: getObservers,
         targetIsHardHiddenFromCurrentView: () => false,
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
@@ -385,6 +402,129 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     mod.refreshSoundwavesForActiveMovement();
 
     expect(target.detectionFilterMesh.visible).toBe(true);
+  });
+
+  test('skips observer discovery inside the expensive-decision throttle window', async () => {
+    const target = makeTarget();
+    const getObservers = jest.fn(() => [
+      { document: { id: 'obs' }, vision: { los: { contains: () => false } } },
+    ]);
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, getObservers });
+
+    nowSpy.mockReturnValue(10_000);
+    mod.refreshSoundwavesForActiveMovement();
+    getObservers.mockClear();
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(getObservers).not.toHaveBeenCalled();
+  });
+
+  test('reasserts an active soundwave mesh after core repaint inside the throttle window', async () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } },
+    };
+    const target = makeTarget();
+    target.detectionFilter = null;
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    target.visible = false;
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false };
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    nowSpy.mockReturnValue(10001);
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target).toMatchObject({
+      visible: true,
+      renderable: true,
+      mesh: { visible: false, renderable: false },
+    });
+    expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('preserves a previously-heard target through the control-to-committed-move gap', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.controlled = false;
+    target.detectionFilter = soundwaveFilter;
+    target.visible = true;
+    target.renderable = true;
+    target.mesh = { visible: true, renderable: true };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: false });
+    mod.rememberSoundwaveDetectionBeforeCoreRefresh(target);
+
+    target.controlled = true;
+    target.detectionFilter = null;
+    target.visible = false;
+    target.renderable = false;
+    target.mesh.visible = false;
+    target.mesh.renderable = false;
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target).toMatchObject({
+      visible: true,
+      renderable: true,
+      mesh: { visible: false, renderable: false },
+      detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
+    });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('renders the soundwave on the moving preview clone instead of its full token art', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.detectionFilter = soundwaveFilter;
+    target.mesh = { visible: true, renderable: true };
+    const preview = {
+      ...makeTarget(),
+      _original: target,
+      detectionFilter: null,
+      visible: false,
+      renderable: false,
+      mesh: { visible: true, renderable: true },
+    };
+    globalThis.canvas = {
+      tokens: { placeables: [target], preview: { children: [preview] } },
+    };
+    const mod = await loadWith({ pendingMovement: false });
+    mod.rememberSoundwaveDetectionBeforeCoreRefresh(target);
+
+    target.controlled = true;
+    target.detectionFilter = null;
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(preview.detectionFilter).toBe(soundwaveFilter);
+    expect(preview).toMatchObject({
+      visible: true,
+      renderable: true,
+      mesh: { visible: false, renderable: false },
+      detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
+    });
+    globalThis.CONFIG = savedConfig;
   });
 
   test('GM vision bypass paints no soundwaves and clears existing ones during move', async () => {

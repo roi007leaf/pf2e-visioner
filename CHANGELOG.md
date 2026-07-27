@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.3.38] - 2026-07-27
+
+### Fixed
+
+- **Soundwaves could disappear or reveal full token art while moving in complete darkness**: Heard tokens now retain their soundwave-only rendering across control, drag-preview, and committed-movement refreshes, including observers blinded by darkness.
+- **Manual cover could be recorded with the wrong original state on attack rolls**: Attack-roll overrides now preserve existing manual cover as their base state instead of treating it as undetected automatic cover.
+
+### Performance
+
+- **Reduced repeated work during token visibility refreshes**: Visioner now reads each detection setting once per refresh instead of repeatedly invoking Foundry's validated settings lookup for every nested detection check.
+- **Moved soundwave observer discovery behind its movement throttle**: Active soundwaves still render every frame, while expensive observer and visibility work runs only when due; GM Vision cleanup remains immediate.
+
 ## [8.3.37] - 2026-07-26
 
 ### Fixed

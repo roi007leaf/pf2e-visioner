@@ -35,6 +35,7 @@ const senseMemo = new Map();
 // genuinely-hidden target on Foundry's own filter and only falls back for the frozen-observed case.
 // Overrides are removed when the target regains sight or the move ends, restoring normal rendering.
 const filterOverrides = new Map();
+let previouslySoundwaveDetectedTargets = new WeakSet();
 
 // After a move ends the AVS recompute of the persisted state (observed -> hidden) is async. If we
 // dropped the filter overrides the instant the move stopped, the target would render 'observed' for
@@ -68,7 +69,9 @@ export function observerSightContainsTarget(observer, target) {
     if (globalThis.canvas?.scene?.tokenVision === false) return true;
     const center = target?.center;
     if (!center) return false;
-    const los = previewForObserver(observer)?.vision?.los || observer?.vision?.los;
+    const vision = previewForObserver(observer)?.vision || observer?.vision;
+    if (vision?.isBlinded || vision?.blinded?.darkness) return false;
+    const los = vision?.los;
     return !!(los && los.contains(center.x, center.y));
   } catch {
     return false;
@@ -174,11 +177,37 @@ export function setSoundwaveMeshVisible(target, visible) {
   }
 }
 
+function showSoundwaveRenderSurface(target) {
+  if (!target) return;
+  if ('visible' in target) target.visible = true;
+  if ('renderable' in target) target.renderable = true;
+  if (target.mesh) {
+    // A detection-filter mesh renders the waves. Showing the primary mesh here reveals the full
+    // token art in darkness underneath/over the waves.
+    if ('visible' in target.mesh) target.mesh.visible = false;
+    if ('renderable' in target.mesh) target.mesh.renderable = false;
+  }
+  setSoundwaveMeshVisible(target, true);
+}
+
+export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
+  if (!target) return;
+  if (target.detectionFilter === getSoundwaveFilter()) {
+    previouslySoundwaveDetectedTargets.add(target);
+  } else if (!target.controlled) {
+    const visuallyObserved = currentViewVisionerObserversForTarget(target).some(
+      (observer) => observer !== target && observerSightContainsTarget(observer, target),
+    );
+    if (visuallyObserved) previouslySoundwaveDetectedTargets.delete(target);
+  }
+}
+
 export function installSoundwaveFilterOverride(target) {
   const id = target?.document?.id;
-  if (!id || filterOverrides.has(id)) return false;
   const filter = getSoundwaveFilter();
-  if (!filter) return false;
+  if (!id || !filter) return false;
+  previouslySoundwaveDetectedTargets.add(target);
+  if (filterOverrides.has(target)) return false;
   const state = { stored: target.detectionFilter ?? null };
   try {
     Object.defineProperty(target, 'detectionFilter', {
@@ -194,16 +223,15 @@ export function installSoundwaveFilterOverride(target) {
   } catch {
     return false;
   }
-  filterOverrides.set(id, { target, state });
+  filterOverrides.set(target, { target, state });
   return true;
 }
 
 export function removeSoundwaveFilterOverride(target) {
-  const id = target?.document?.id;
-  if (!id) return false;
-  const entry = filterOverrides.get(id);
+  if (!target) return false;
+  const entry = filterOverrides.get(target);
   if (!entry) return false;
-  filterOverrides.delete(id);
+  filterOverrides.delete(target);
   try {
     delete entry.target.detectionFilter;
     entry.target.detectionFilter = entry.state.stored ?? null;
@@ -255,14 +283,56 @@ export function clearDuringMoveSoundwaveState() {
 }
 
 export function refreshSoundwavesForActiveMovement() {
+  // Core clears a token's detection filter as soon as it becomes controlled, before the
+  // committed-movement tracker is populated. Preserve an already-heard moving token through that
+  // control/drag gap without recomputing visibility for any other target.
+  for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
+    if (!target.controlled || !previouslySoundwaveDetectedTargets.has(target)) continue;
+    installSoundwaveFilterOverride(target);
+    showSoundwaveRenderSurface(target);
+  }
+  // Foundry moves a preview clone, not the controlled placeable. Render the same soundwave on that
+  // clone or Core's fully-visible controlled-token preview leaks the token art during the drag.
+  for (const preview of globalThis.canvas?.tokens?.preview?.children ?? []) {
+    const original = preview?._original;
+    if (
+      !previouslySoundwaveDetectedTargets.has(preview) &&
+      !previouslySoundwaveDetectedTargets.has(original)
+    ) {
+      continue;
+    }
+    installSoundwaveFilterOverride(preview);
+    showSoundwaveRenderSurface(preview);
+  }
+
   // Only mutate soundwaves during an actual committed move. While merely hold-dragging
   // (a drag preview exists but nothing has committed yet) the visuals stay frozen.
   if (!hasActivePendingTokenMovement()) return;
   const gmVisionBypass = shouldBypassAvsForGmVision();
+
+  // Foundry can replace or hide the detection-filter mesh every frame. Reassert existing
+  // soundwaves cheaply without rediscovering observers for every token.
+  for (const { target } of filterOverrides.values()) {
+    showSoundwaveRenderSurface(target);
+  }
+
+  const now = globalThis.performance?.now?.() ?? 0;
+  const recomputeDue = now - lastWaveComputeAt >= WAVE_RECOMPUTE_INTERVAL_MS;
+
+  // Observer discovery is expensive. GM Vision cleanup stays unthrottled because Core can
+  // repaint a soundwave during the throttle window and it must be removed immediately.
+  if (!recomputeDue && !gmVisionBypass) return;
+
   const targetsWithObservers = [];
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-    if (target.controlled) continue;
     if (isPartyActorToken(target)) continue;
+    if (target.controlled) {
+      if (previouslySoundwaveDetectedTargets.has(target)) {
+        installSoundwaveFilterOverride(target);
+        showSoundwaveRenderSurface(target);
+      }
+      continue;
+    }
     if (targetIsHardHiddenFromCurrentView(target)) continue;
     const observers = currentViewVisionerObserversForTarget(target).filter(
       (observer) => !isPartyActorToken(observer),
@@ -279,9 +349,7 @@ export function refreshSoundwavesForActiveMovement() {
     }
     targetsWithObservers.push({ target, observers });
   }
-  if (targetsWithObservers.length === 0) return;
-  const now = globalThis.performance?.now?.() ?? 0;
-  if (now - lastWaveComputeAt < WAVE_RECOMPUTE_INTERVAL_MS) return;
+  if (targetsWithObservers.length === 0 || !recomputeDue) return;
   lastWaveComputeAt = now;
   for (const { target, observers } of targetsWithObservers) {
     const wantsSoundwave = targetShouldShowSoundwave(
@@ -294,7 +362,7 @@ export function refreshSoundwavesForActiveMovement() {
     try {
       if (wantsSoundwave) {
         installSoundwaveFilterOverride(target);
-        setSoundwaveMeshVisible(target, true);
+        showSoundwaveRenderSurface(target);
       } else {
         removeSoundwaveFilterOverride(target);
         if (target.detectionFilter) target.detectionFilter = null;

@@ -11,6 +11,7 @@ import {
   legacyVisibilityToProfile,
 } from '../../visibility/perception-profile.js';
 import { DetectionFrameCache } from './detection-frame-cache.js';
+import { getDetectionSetting } from './detection-setting-cache.js';
 
 export const VISIBILITY_DETECTION_THRESHOLDS = {
   observed: 0,
@@ -41,7 +42,7 @@ export const detectionFrameCache = new DetectionFrameCache({
   getPerceptionProfileBetween,
   getControlledObserverTokens: getDetectionAggregationObserverTokens,
   getBestVisibilityState,
-  getSetting: (key) => game.settings.get(MODULE_ID, key),
+  getSetting: getDetectionSetting,
   getTokens: () => canvas?.tokens?.placeables || [],
   getInvalidationRevision: getCacheInvalidationRevision,
 });
@@ -84,7 +85,7 @@ export function getVisionerVisibilityBetweenTokens(observer, target) {
 
 export function isAvsActiveGivenCombatGate() {
   try {
-    if (!game.settings.get(MODULE_ID, 'avsOnlyInCombat')) return true;
+    if (!getDetectionSetting('avsOnlyInCombat')) return true;
     return !!(game.combat?.started && game.combat?.combatants?.size > 0);
   } catch {
     return true;

@@ -2562,9 +2562,6 @@ export class Pf2eVisionerApi {
         });
 
         // Also clear any AVS override flags
-        const allTokens = canvas.tokens?.placeables ?? [];
-        const selectedTokenIds = tokens.map((t) => t.id);
-
         for (const token of tokens) {
           const flags = token.document.flags?.[MODULE_ID] || {};
           const additionalUpdates = {};
@@ -2774,7 +2771,6 @@ export class Pf2eVisionerApi {
         const autoVis = autoVisibilitySystem;
         if (autoVis && autoVis.removeOverride) {
           const allTokens = canvas.tokens?.placeables ?? [];
-          const selectedTokenIds = tokens.map((t) => t.id);
 
           // Remove overrides between selected tokens and all other tokens
           for (const selectedToken of tokens) {

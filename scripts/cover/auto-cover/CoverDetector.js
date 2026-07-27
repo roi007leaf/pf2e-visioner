@@ -2320,10 +2320,10 @@ export class CoverDetector {
 
   /**
    * Calculate coverage percentage by a single blocker
-   * @param {Object} blocker - The blocker token
-   * @param {Ray} ray - The ray from attacker to target
-   * @param {number} rayLength - The length of the ray
-   * @returns {number} - Coverage percentage (0-100)
+   * @param {Object} p1 - Ray start point
+   * @param {Object} p2 - Ray end point
+   * @param {Object[]} blockers - Blocking tokens
+   * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    * @private
    */
   _calculateCoverageByBlocker(p1, p2, blockers) {

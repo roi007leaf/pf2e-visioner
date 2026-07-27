@@ -10,9 +10,24 @@ jest.mock('../../../scripts/services/Detection/current-view-hard-hide.js', () =>
   applyCurrentViewHardHide: jest.fn(),
 }));
 
-import { wrapTokenRefreshVisibility } from '../../../scripts/services/Detection/detection-token-refresh.js';
+jest.mock('../../../scripts/services/during-move-soundwave.js', () => ({
+  ensureDuringMoveSoundwaveRefresh: jest.fn(),
+  refreshSoundwavesForActiveMovement: jest.fn(),
+  rememberSoundwaveDetectionBeforeCoreRefresh: jest.fn(),
+}));
+
+import {
+  wrapTokenControl,
+  wrapTokenRefreshVisibility,
+} from '../../../scripts/services/Detection/detection-token-refresh.js';
 import { applyCurrentViewHardHide } from '../../../scripts/services/Detection/current-view-hard-hide.js';
+import {
+  ensureDuringMoveSoundwaveRefresh,
+  refreshSoundwavesForActiveMovement,
+  rememberSoundwaveDetectionBeforeCoreRefresh,
+} from '../../../scripts/services/during-move-soundwave.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
+import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 
 function foundryHiddenToken({ visible = false } = {}) {
   return {
@@ -30,6 +45,7 @@ describe('detection token refresh', () => {
     globalThis.game = { ready: true, user: { isGM: true } };
     hasActivePendingTokenMovement.mockReturnValue(true);
     applyCurrentViewHardHide.mockClear();
+    rememberSoundwaveDetectionBeforeCoreRefresh.mockClear();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -74,5 +90,31 @@ describe('detection token refresh', () => {
 
     expect(token.visible).toBe(true);
     expect(token.mesh.visible).toBe(true);
+  });
+
+  it('reads each detection setting once across one token visibility refresh', () => {
+    const token = foundryHiddenToken({ visible: true });
+    globalThis.game.settings = { get: jest.fn(() => false) };
+    const wrapped = jest.fn(() => {
+      for (let index = 0; index < 20; index += 1) {
+        getDetectionSetting('avsOnlyInCombat');
+      }
+    });
+
+    wrapTokenRefreshVisibility.call(token, wrapped);
+
+    expect(globalThis.game.settings.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('captures soundwave detection before core controls the token', () => {
+    const token = foundryHiddenToken();
+    const wrapped = jest.fn(() => 'controlled');
+
+    expect(wrapTokenControl.call(token, wrapped, { releaseOthers: true })).toBe('controlled');
+
+    expect(rememberSoundwaveDetectionBeforeCoreRefresh).toHaveBeenCalledWith(token);
+    expect(wrapped).toHaveBeenCalledWith({ releaseOthers: true });
+    expect(refreshSoundwavesForActiveMovement).toHaveBeenCalled();
+    expect(ensureDuringMoveSoundwaveRefresh).toHaveBeenCalled();
   });
 });

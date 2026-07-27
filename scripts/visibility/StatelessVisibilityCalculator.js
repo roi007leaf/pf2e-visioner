@@ -97,7 +97,7 @@ function profileMetadataForResult(result, target) {
  * @param {boolean} input.target.concealment - Whether target has concealment
  * @param {string[]} input.target.auxiliary - Additional conditions like ["invisible"]
  * @param {string[]} input.target.traits - Target traits like ["undead", "construct"]
- * @param {number} input.target.movementAction - Target's movement action (for tremorsense checks)
+ * @param {string} input.target.movementAction - Target's movement action (for tremorsense checks)
  * @param {Object} input.observer - Observer state
  * @param {Object} input.observer.precise - Precise senses with ranges
  * @param {Object} input.observer.precise.vision - {range: number|"Infinity"}
@@ -113,7 +113,7 @@ function profileMetadataForResult(result, target) {
  * @param {boolean} input.observer.conditions.blinded - Is observer blinded
  * @param {boolean} input.observer.conditions.deafened - Is observer deafened
  * @param {boolean} input.observer.conditions.dazzled - Is observer dazzled
- * @param {number} input.observer.movementAction - Observer's movement action (for tremorsense checks)
+ * @param {string} input.observer.movementAction - Observer's movement action (for tremorsense checks)
  * @param {Object|null} input.rayDarkness - Ray darkness information (if ray passes through darkness)
  * @param {boolean} input.rayDarkness.passesThroughDarkness - Whether ray passes through darkness
  * @param {number} input.rayDarkness.rank - Darkness rank along the ray (1-3 = magical, 4+ = greater magical)

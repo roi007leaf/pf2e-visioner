@@ -828,16 +828,6 @@ export class BatchOrchestrator {
       const wasReused = !!previous;
       const result = await LightingPrecomputer.precompute(allTokens, undefined, previous);
 
-      // Check if lighting environment changed
-      // Note: We don't clear caches here because:
-      // 1. Visibility calculations use precomputedLights, so they naturally handle lighting changes
-      // 2. LOS is not affected by lighting
-      // 3. Event handlers (LightingEventHandler, TokenEventHandler) already clear appropriate caches
-      const lightingChanged =
-        result.lightingHash &&
-        this._lastPrecompute.lightingHash &&
-        result.lightingHash !== this._lastPrecompute.lightingHash;
-      // Lighting changes are handled by event handlers clearing appropriate caches
       precomputedLights = result.map;
       precomputeStats = result.stats || precomputeStats;
       // Add cache reuse stats to precompute stats

@@ -556,7 +556,6 @@ export async function applyCurrent(event, button) {
   try {
     const { batchUpdateVisibilityEffects } = await import('../../../visibility/ephemeral.js');
     const { batchUpdateCoverEffects } = await import('../../../cover/ephemeral.js');
-    const { updateWallVisuals } = await import('../../../services/visual-effects.js');
     const isVisibility = app.activeTab === 'visibility';
     const isCover = app.activeTab === 'cover';
 
@@ -861,13 +860,11 @@ export async function applyBoth(_event, _button) {
     if (!app._savedModeData[app.mode])
       app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
     visibilityInputs.forEach((input) => {
-      const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
       const tokenId = input.name.replace('visibility.', '');
       if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
       app._savedModeData[app.mode].visibility[tokenId] = input.value;
     });
     coverInputs.forEach((input) => {
-      const row = typeof input?.closest === 'function' ? input.closest('tr.token-row') : null;
       const tokenId = input.name.replace('cover.', '');
       if (allowedTokenIds && !allowedTokenIds.has(tokenId)) return;
       app._savedModeData[app.mode].cover[tokenId] = input.value;

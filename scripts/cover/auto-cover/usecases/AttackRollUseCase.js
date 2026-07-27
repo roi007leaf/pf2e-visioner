@@ -525,11 +525,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this._storeOffGuardSuppressionChatInfo(data, doc, attacker, target);
 
     // Determine base cover state (manual token cover first, then auto-detection)
-    let state = null;
+    const manualCover = getCoverBetween(attacker, target);
+    let state = manualCover;
 
     // Fallback to auto-detection if no manual cover
-    const manualCover = getCoverBetween(attacker, target);
-    if (!state && manualCover === 'none') {
+    if (manualCover === 'none') {
       state = this._detectCover(attacker, target, data?.flags?.pf2e?.context);
     }
 

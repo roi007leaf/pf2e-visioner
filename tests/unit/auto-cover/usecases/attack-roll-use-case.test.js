@@ -164,6 +164,23 @@ describe('AttackRollUseCase', () => {
       expect(attackRollUseCase._detectCover).not.toHaveBeenCalled();
     });
 
+    test('uses manual cover as the base state when recording an override', async () => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('standard');
+      attackRollUseCase.autoCoverSystem.getOverrideManager.mockReturnValue({
+        consumeOverride: jest.fn().mockReturnValue({ state: 'greater', source: 'popup' }),
+      });
+      speakerToken.name = 'Attacker';
+      targetToken.name = 'Target';
+
+      await attackRollUseCase.handlePreCreateChatMessage(mockData);
+
+      expect(mockData.flags['pf2e-visioner'].coverOverride).toMatchObject({
+        originalDetected: 'standard',
+        finalState: 'greater',
+      });
+    });
+
     test('should store override information in flags when overridden', async () => {
       const { getCoverBetween } = await import('../../../../scripts/utils.js');
       getCoverBetween.mockReturnValue('none');
