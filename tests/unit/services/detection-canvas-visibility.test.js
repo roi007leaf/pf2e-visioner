@@ -4,6 +4,7 @@ import { wrapCanvasVisibilityTest } from '../../../scripts/services/Detection/de
 import { createCanDetectVisibilityWrapper } from '../../../scripts/services/Detection/detection-can-detect.js';
 import { testDetectionModeVisibility } from '../../../scripts/services/Detection/detection-mode-visibility.js';
 import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
+import { clearSettingValueCache } from '../../../scripts/utils/setting-value-cache.js';
 import { legacyVisibilityToProfile } from '../../../scripts/visibility/perception-profile.js';
 
 function visibilityV2Flags(map) {
@@ -20,12 +21,14 @@ describe('canvas visibility wrapper', () => {
   let originalCanvas;
 
   beforeEach(() => {
+    clearSettingValueCache();
     originalCanvas = global.canvas;
     global.game.settings.set('pf2e', 'gmVision', false);
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
   });
 
   afterEach(() => {
+    clearSettingValueCache();
     global.game.settings.set('pf2e', 'gmVision', false);
     global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', false);
     peekRegistry.clearAll();

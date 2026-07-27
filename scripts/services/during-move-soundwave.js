@@ -177,6 +177,16 @@ export function setSoundwaveMeshVisible(target, visible) {
   }
 }
 
+function hasActiveCoreSoundwaveSurface(target) {
+  const mesh = target?.detectionFilterMesh;
+  return (
+    target?.detectionFilter === getSoundwaveFilter() &&
+    mesh?.visible === true &&
+    mesh?.renderable === true &&
+    Number(mesh.alpha) > 0
+  );
+}
+
 function showSoundwaveRenderSurface(target) {
   if (!target) return;
   if ('visible' in target) target.visible = true;
@@ -188,6 +198,23 @@ function showSoundwaveRenderSurface(target) {
     if ('renderable' in target.mesh) target.mesh.renderable = false;
   }
   setSoundwaveMeshVisible(target, true);
+}
+
+function showControlledTokenFullArt(target) {
+  if (!target) return;
+  removeSoundwaveFilterOverride(target);
+  try {
+    target.detectionFilter = null;
+  } catch {
+    /* leave Core's filter state intact if assignment fails */
+  }
+  if ('visible' in target) target.visible = true;
+  if ('renderable' in target) target.renderable = true;
+  if (target.mesh) {
+    if ('visible' in target.mesh) target.mesh.visible = true;
+    if ('renderable' in target.mesh) target.mesh.renderable = true;
+  }
+  setSoundwaveMeshVisible(target, false);
 }
 
 export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
@@ -283,31 +310,20 @@ export function clearDuringMoveSoundwaveState() {
 }
 
 export function refreshSoundwavesForActiveMovement() {
-  // Core clears a token's detection filter as soon as it becomes controlled, before the
-  // committed-movement tracker is populated. Preserve an already-heard moving token through that
-  // control/drag gap without recomputing visibility for any other target.
+  const pendingMovementActive = hasActivePendingTokenMovement();
+  // Controlled movers are interaction surfaces, not detection results. Keep their primary art
+  // visible during selection, drag, and committed movement; soundwaves only describe other tokens.
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-    if (!target.controlled || !previouslySoundwaveDetectedTargets.has(target)) continue;
-    installSoundwaveFilterOverride(target);
-    showSoundwaveRenderSurface(target);
+    if (target.controlled) showControlledTokenFullArt(target);
   }
-  // Foundry moves a preview clone, not the controlled placeable. Render the same soundwave on that
-  // clone or Core's fully-visible controlled-token preview leaks the token art during the drag.
+  // Foundry moves a preview clone during drag. It follows the same full-art controlled-token rule.
   for (const preview of globalThis.canvas?.tokens?.preview?.children ?? []) {
-    const original = preview?._original;
-    if (
-      !previouslySoundwaveDetectedTargets.has(preview) &&
-      !previouslySoundwaveDetectedTargets.has(original)
-    ) {
-      continue;
-    }
-    installSoundwaveFilterOverride(preview);
-    showSoundwaveRenderSurface(preview);
+    if (preview?._original?.controlled) showControlledTokenFullArt(preview);
   }
 
   // Only mutate soundwaves during an actual committed move. While merely hold-dragging
   // (a drag preview exists but nothing has committed yet) the visuals stay frozen.
-  if (!hasActivePendingTokenMovement()) return;
+  if (!pendingMovementActive) return;
   const gmVisionBypass = shouldBypassAvsForGmVision();
 
   // Foundry can replace or hide the detection-filter mesh every frame. Reassert existing
@@ -327,10 +343,7 @@ export function refreshSoundwavesForActiveMovement() {
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
     if (isPartyActorToken(target)) continue;
     if (target.controlled) {
-      if (previouslySoundwaveDetectedTargets.has(target)) {
-        installSoundwaveFilterOverride(target);
-        showSoundwaveRenderSurface(target);
-      }
+      showControlledTokenFullArt(target);
       continue;
     }
     if (targetIsHardHiddenFromCurrentView(target)) continue;
@@ -352,6 +365,20 @@ export function refreshSoundwavesForActiveMovement() {
   if (targetsWithObservers.length === 0 || !recomputeDue) return;
   lastWaveComputeAt = now;
   for (const { target, observers } of targetsWithObservers) {
+    // Core already has the correct filtered render surface for stored-hidden targets in darkness.
+    // Geometric LOS can still contain them even though no visual sense detects them; rebuilding the
+    // surface hides the primary mesh, while clearing it swaps the ripple for full art. Preserve the
+    // valid Core result unchanged until a real observer visibility state says otherwise.
+    if (
+      !gmVisionBypass &&
+      hasActiveCoreSoundwaveSurface(target) &&
+      observers.length > 0 &&
+      observers.every(
+        (observer) => getVisionerVisibilityBetweenTokens(observer, target) === 'hidden',
+      )
+    ) {
+      continue;
+    }
     const wantsSoundwave = targetShouldShowSoundwave(
       target,
       observers,

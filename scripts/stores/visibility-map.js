@@ -6,6 +6,7 @@ import { MODULE_ID } from '../constants.js';
 import { getNativeVisibilityReplacement } from '../chat/services/feats/native-visibility-replacement.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getLogger } from '../utils/logger.js';
+import { getCachedSettingValue } from '../utils/setting-value-cache.js';
 import { autoVisibilitySystem } from '../visibility/auto-visibility/index.js';
 import { updateEphemeralEffectsForVisibility } from '../visibility/ephemeral.js';
 import {
@@ -866,7 +867,7 @@ function getVisibilityBetweenWithAggregation(observer, target) {
 
   // Check if camera vision aggregation is enabled
   try {
-    const aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
+    const aggregationEnabled = getCachedSettingValue('enableCameraVisionAggregation', false);
     if (!aggregationEnabled) {
       return getVisibilityBetween(observer, target);
     }

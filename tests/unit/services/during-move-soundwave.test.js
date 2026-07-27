@@ -448,7 +448,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     globalThis.CONFIG = savedConfig;
   });
 
-  test('preserves a previously-heard target through the control-to-committed-move gap', async () => {
+  test('keeps a previously-heard controlled mover full art through the drag gap', async () => {
     const savedConfig = globalThis.CONFIG;
     const soundwaveFilter = {};
     globalThis.CONFIG = {
@@ -464,29 +464,85 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     target.visible = true;
     target.renderable = true;
     target.mesh = { visible: true, renderable: true };
+    globalThis.canvas = {
+      tokens: { placeables: [target], preview: { children: [] }, _draggedToken: target },
+    };
+    const mod = await loadWith({ pendingMovement: false });
+    mod.rememberSoundwaveDetectionBeforeCoreRefresh(target);
+
+    target.controlled = true;
+    target.detectionFilter = null;
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target).toMatchObject({
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true },
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('plain selection of a previously-heard token keeps its primary art renderable', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.detectionFilter = soundwaveFilter;
+    target.mesh = { visible: true, renderable: true };
     globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
     const mod = await loadWith({ pendingMovement: false });
     mod.rememberSoundwaveDetectionBeforeCoreRefresh(target);
 
     target.controlled = true;
     target.detectionFilter = null;
-    target.visible = false;
-    target.renderable = false;
-    target.mesh.visible = false;
-    target.mesh.renderable = false;
     mod.refreshSoundwavesForActiveMovement();
 
-    expect(target.detectionFilter).toBe(soundwaveFilter);
-    expect(target).toMatchObject({
-      visible: true,
-      renderable: true,
-      mesh: { visible: false, renderable: false },
-      detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
-    });
+    expect(target.detectionFilter).toBeNull();
+    expect(target.mesh).toEqual({ visible: true, renderable: true });
     globalThis.CONFIG = savedConfig;
   });
 
-  test('renders the soundwave on the moving preview clone instead of its full token art', async () => {
+  test('preserves an existing core soundwave when geometric LOS crosses complete darkness', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.mesh = { visible: true, renderable: true };
+    const observers = [
+      { document: { id: 'obs' }, vision: { los: { contains: () => true } } },
+    ];
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers,
+      getVisibility: () => 'hidden',
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.mesh).toEqual({ visible: true, renderable: true });
+    expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('keeps the moving preview clone on full art', async () => {
     const savedConfig = globalThis.CONFIG;
     const soundwaveFilter = {};
     globalThis.CONFIG = {
@@ -517,12 +573,12 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     target.detectionFilter = null;
     mod.refreshSoundwavesForActiveMovement();
 
-    expect(preview.detectionFilter).toBe(soundwaveFilter);
+    expect(preview.detectionFilter).toBeNull();
     expect(preview).toMatchObject({
       visible: true,
       renderable: true,
-      mesh: { visible: false, renderable: false },
-      detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
+      mesh: { visible: true, renderable: true },
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
     });
     globalThis.CONFIG = savedConfig;
   });

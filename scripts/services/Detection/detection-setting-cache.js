@@ -1,4 +1,4 @@
-import { MODULE_ID } from '../../constants.js';
+import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 
 let activeCache = null;
 let scopeDepth = 0;
@@ -6,7 +6,7 @@ let scopeDepth = 0;
 export function getDetectionSetting(key) {
   if (activeCache?.has(key)) return activeCache.get(key);
 
-  const value = globalThis.game?.settings?.get?.(MODULE_ID, key);
+  const value = getCachedSettingValue(key);
   activeCache?.set(key, value);
   return value;
 }

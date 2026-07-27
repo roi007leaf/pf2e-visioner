@@ -142,6 +142,22 @@ describe('AutoCoverSystem', () => {
   });
 
   describe('active pair cleanup', () => {
+    test('ignores deletion hooks for non-token documents', async () => {
+      const cleanup = jest.spyOn(autoCoverSystem, 'removeAllCoverInvolving');
+
+      await autoCoverSystem.onDeleteDocument({ documentName: 'ActiveEffect', id: 'effect' });
+
+      expect(cleanup).not.toHaveBeenCalled();
+    });
+
+    test('cleans active pairs when a token document is deleted', async () => {
+      const cleanup = jest.spyOn(autoCoverSystem, 'removeAllCoverInvolving');
+
+      await autoCoverSystem.onDeleteDocument({ documentName: 'Token', id: 'target' });
+
+      expect(cleanup).toHaveBeenCalledWith('target');
+    });
+
     test('returns active pairs as attacker-target records for movement cleanup', () => {
       autoCoverSystem.recordPair('attacker', 'target');
 

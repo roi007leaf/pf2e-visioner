@@ -5,6 +5,7 @@
 import { reinjectChatAutomationStyles } from './chat/chat-automation-styles.js';
 import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
 import { loadSharedUICSS } from './css-loader.js';
+import { setCachedSettingValue } from './utils/setting-value-cache.js';
 
 // Grouped layout per redesign spec.
 // Each category contains an ordered list of group objects with a title & keys.
@@ -737,6 +738,12 @@ export function registerSettings() {
           }
         };
       }
+
+      const configuredOnChange = settingConfig.onChange;
+      settingConfig.onChange = (value, ...args) => {
+        setCachedSettingValue(key, value);
+        return configuredOnChange?.(value, ...args);
+      };
 
       try {
         game.settings.register(MODULE_ID, key, settingConfig);

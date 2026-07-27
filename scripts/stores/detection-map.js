@@ -13,6 +13,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
+import { getCachedSettingValue } from '../utils/setting-value-cache.js';
 import { getVisibilityBetween } from './visibility-map.js';
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import {
@@ -203,7 +204,7 @@ function getDetectionBetweenWithAggregation(observer, target) {
 
   // Check if camera vision aggregation is enabled
   try {
-    const aggregationEnabled = game.settings.get(MODULE_ID, 'enableCameraVisionAggregation');
+    const aggregationEnabled = getCachedSettingValue('enableCameraVisionAggregation', false);
     if (!aggregationEnabled) {
       return getDetectionBetween(observer, target);
     }

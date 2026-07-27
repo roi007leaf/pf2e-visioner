@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.3.39] - 2026-07-27
+
+### Fixed
+
+- **Selected tokens could disappear or remain soundwave-only while moving in complete darkness**: Controlled tokens and their drag previews now remain visible as full token art throughout selection and movement, while soundwaves continue to apply only to other heard tokens.
+- **Heard tokens could lose their soundwaves during movement through complete darkness**: Visioner now preserves Foundry's valid soundwave render surface when geometric line of sight crosses darkness but the observer-target state remains Hidden.
+- **Non-token deletions could trigger unnecessary Auto Cover cleanup**: The deletion hook now exits for effects, actors, and other non-token documents instead of running token-pair cleanup for every document type.
+
+### Performance
+
+- **Reduced validated settings work during movement and visibility rendering**: Frequently used Visioner setting values are now cached and updated immediately when settings change, avoiding hundreds of repeated Foundry validation calls along a token path.
+
 ## [8.3.38] - 2026-07-27
 
 ### Fixed

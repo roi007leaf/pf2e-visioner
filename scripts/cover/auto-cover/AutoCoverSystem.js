@@ -400,7 +400,7 @@ export class AutoCoverSystem {
 
   async onDeleteDocument(document) {
     // Handle token deletion
-    if (!document?.documentName === 'Token') return;
+    if (document?.documentName !== 'Token') return;
     const tokenId = document.id;
     this.removeAllCoverInvolving(tokenId);
   }

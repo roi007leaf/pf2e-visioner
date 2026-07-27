@@ -1,6 +1,7 @@
 
 import { MODULE_ID } from "../../../constants.js";
 import { getLogger } from "../../../utils/logger.js";
+import { getCachedSettingValue } from "../../../utils/setting-value-cache.js";
 /**
  * SystemStateProvider - Provides access to system state information
  * 
@@ -130,7 +131,7 @@ export class SystemStateProvider {
      */
     isDebugMode() {
         try {
-            return !!game.settings.get(MODULE_ID, 'autoVisibilityDebugMode');
+            return !!getCachedSettingValue('autoVisibilityDebugMode', false);
         } catch {
             return false;
         }
@@ -152,7 +153,7 @@ export class SystemStateProvider {
      */
     getSetting(settingName, defaultValue = false) {
         try {
-            return game.settings.get(MODULE_ID, settingName);
+            return getCachedSettingValue(settingName, defaultValue);
         } catch {
             return defaultValue;
         }
