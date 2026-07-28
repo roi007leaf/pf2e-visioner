@@ -1,6 +1,7 @@
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
+import { AttackQualifiedVisibility } from './operations/AttackQualifiedVisibility.js';
 import { AuraVisibility } from './operations/AuraVisibility.js';
 import { CoverAdjustment } from './operations/CoverAdjustment.js';
 import { CoverOverride } from './operations/CoverOverride.js';
@@ -271,6 +272,13 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         return `item-${this.item.id}`;
       }
       return this.ruleElementId;
+    }
+
+    afterPrepareData() {
+      super.afterPrepareData?.();
+      for (const operation of this.operations || []) {
+        AttackQualifiedVisibility.register(operation, this);
+      }
     }
 
     async onCreate(actorUpdates) {
@@ -783,6 +791,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideVisibility':
+          if (AttackQualifiedVisibility.isOperation(operation)) break;
           await VisibilityOverride.applyVisibilityOverride(
             {
               ...operation,
@@ -865,6 +874,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
+      const persistentOperations = (this.operations || []).filter(
+        (operation) => !AttackQualifiedVisibility.isOperation(operation),
+      );
+      if (!persistentOperations.length) return;
 
       const registryKey = this.ruleElementRegistryKey;
 
@@ -875,7 +888,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         // Both 'overrideVisibility' and 'conditionalState' use the same cleanup function
         let hasCleanedUpVisibilityOverride = false;
 
-        for (const operation of this.operations) {
+        for (const operation of persistentOperations) {
           try {
             // For visibility overrides, only clean up once per rule element (not per operation)
             // The cleanup removes all sources for the rule element ID regardless of direction
@@ -952,10 +965,14 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const log = getLogger('RuleElements/Effect');
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
+      const persistentOperations = (this.operations || []).filter(
+        (operation) => !AttackQualifiedVisibility.isOperation(operation),
+      );
+      if (!persistentOperations.length) return;
 
       const registryKey = this.ruleElementRegistryKey;
       for (const token of tokens) {
-        for (const operation of this.operations) {
+        for (const operation of persistentOperations) {
           try {
             await this.removeOperation(operation, token);
           } catch (error) {
@@ -978,6 +995,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeOperation(operation, token) {
+      if (AttackQualifiedVisibility.isOperation(operation)) return;
+
       // Try to get ruleElementId from various sources
       let ruleElementId = this.ruleElementId;
 

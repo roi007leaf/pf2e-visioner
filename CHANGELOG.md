@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.3.40] - 2026-07-28
+
+### Added
+
+- **Effects can now make their actor Concealed only against ranged attacks**: An `overrideVisibility` operation using the `origin:item:ranged` predicate now supplies Concealed only to incoming ranged attack rolls, covering Elemental Rage's visibility benefit without a distance approximation or persistent token concealment.
+
+### Performance
+
+- **Large combats no longer repeat full combat-tracker row searches for every participant**: Visioner now indexes Foundry and PF2e HUD combatant rows once per tracker visibility pass, reuses unchanged Stealth initiative markers, and skips redundant DOM writes to reduce pan stutter in encounters with many participants.
+
 ## [8.3.39] - 2026-07-27
 
 ### Fixed

@@ -155,3 +155,24 @@ Every other creature continues to use its normally detected cover. `"targeted"` 
 ## Additional Operations
 
 Additional operations like `overrideVisibility`, `modifyDetectionModes`, `modifySenses`, `modifyActionQualification`, `conditionalState`, `distanceBasedVisibility`, and `offGuardSuppression` are supported. For detailed documentation on those, refer to the PF2E Visioner wiki or inline schema definitions.
+
+### Concealed Against Ranged Attacks
+
+An effect on the defender can apply Concealed only during incoming ranged attack rolls:
+
+```json
+{
+  "key": "PF2eVisionerEffect",
+  "operations": [
+    {
+      "type": "overrideVisibility",
+      "state": "concealed",
+      "predicate": ["origin:item:ranged"],
+      "direction": "from",
+      "observers": "all"
+    }
+  ]
+}
+```
+
+This is roll-context visibility: it supplies `target:condition:concealed` for ranged attacks while leaving the token's normal observer-target state unchanged. It does not use distance as a substitute for whether an attack is ranged.

@@ -832,6 +832,29 @@ describe('EncounterStealthInitiativeService', () => {
     expect(row.classList.contains('pf2e-visioner-stealth-tracker-hidden')).toBe(false);
   });
 
+  test('indexes all combatant tracker rows once per visibility pass', async () => {
+    const { encounterStealthInitiativeService } = await importService();
+    const combatants = Array.from({ length: 24 }, (_, index) =>
+      makeCombatant(`combatant-${index}`, observerLow, index),
+    );
+    const combat = makeCombat(combatants, { id: 'tracker-row-index-performance' });
+    const rows = combatants
+      .map(({ id }) => `<li class="combatant" data-combatant-id="${id}"></li>`)
+      .join('');
+    document.body.innerHTML = `
+      <ol id="combat-tracker">${rows}</ol>
+      <section id="pf2e-hud-tracker"><ol class="combatants">${rows}</ol></section>
+    `;
+    const querySelectorAllSpy = jest.spyOn(document, 'querySelectorAll');
+
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    const combatantRowQueries = querySelectorAllSpy.mock.calls
+      .map(([selector]) => selector)
+      .filter((selector) => String(selector).includes('data-combatant-id'));
+    expect(combatantRowQueries).toEqual(['[data-combatant-id]']);
+  });
+
   test('keeps active stealther tracker row forcibly hidden until the initial override is removed', async () => {
     setSetting(true);
     global.game.user.isGM = false;
@@ -1012,6 +1035,12 @@ describe('EncounterStealthInitiativeService', () => {
     expect(document.querySelector('.token-name h4 [data-pf2e-visioner-stealth-initiative-marker]')).toBeTruthy();
     expect(document.querySelector('.combatant > [data-pf2e-visioner-stealth-initiative-marker]')).toBeNull();
     expect(document.querySelector('.token-initiative [data-pf2e-visioner-stealth-initiative-marker]')).toBeNull();
+
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    const stableMarkers = Array.from(document.querySelectorAll('[data-pf2e-visioner-stealth-initiative-marker]'));
+    expect(stableMarkers).toHaveLength(1);
+    expect(stableMarkers[0]).toBe(markers[0]);
 
     stealthCombatant.flags.pf2e.initiativeStatistic = 'perception';
     encounterStealthInitiativeService.applyTrackerVisibility(combat);

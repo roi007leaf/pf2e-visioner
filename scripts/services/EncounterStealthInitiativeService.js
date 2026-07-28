@@ -254,19 +254,22 @@ export class EncounterStealthInitiativeService {
 
   applyTrackerVisibility(combat = game.combat) {
     const combatants = collectionToArray(combat?.combatants ?? combat?.turns);
+    const combatantRowsById = this._indexCombatantRows();
     const seenIds = new Set();
 
     for (const combatant of combatants) {
       const combatantId = combatant?.id;
       if (!combatantId) continue;
       seenIds.add(combatantId);
+      const rows = combatantRowsById.get(combatantId) ?? [];
       const hidden = this.shouldHideCombatantFromCurrentUser(combatant, combat);
       const masked = !hidden && this.shouldMaskCombatantDetailsFromCurrentUser(combatant, combat);
-      this._setCombatantRowsHidden(combatantId, hidden);
-      this._setCombatantRowsMasked(combatantId, masked);
+      this._setCombatantRowsHidden(combatantId, hidden, rows);
+      this._setCombatantRowsMasked(combatantId, masked, rows);
       this._setStealthInitiativeMarker(
         combatantId,
         this.isEnabled() && this.isStealthInitiativeCombatant(combatant) && hasNumericInitiative(combatant),
+        rows,
       );
       this._restoreExpiredInitialOverridesForCombatant(combatant, combat);
     }
@@ -614,14 +617,14 @@ export class EncounterStealthInitiativeService {
     return true;
   }
 
-  _setCombatantRowsHidden(combatantId, hidden) {
-    const rows = this._getCombatantRows(combatantId);
-
+  _setCombatantRowsHidden(combatantId, hidden, rows = this._getCombatantRows(combatantId)) {
     for (const row of rows) {
       if (hidden) {
-        row.hidden = true;
-        row.classList.add(TRACKER_HIDDEN_CLASS);
-        row.dataset.pf2eVisionerStealthHidden = 'true';
+        if (!row.hidden) row.hidden = true;
+        if (!row.classList.contains(TRACKER_HIDDEN_CLASS)) row.classList.add(TRACKER_HIDDEN_CLASS);
+        if (row.dataset.pf2eVisionerStealthHidden !== 'true') {
+          row.dataset.pf2eVisionerStealthHidden = 'true';
+        }
       } else if (row.dataset.pf2eVisionerStealthHidden === 'true') {
         row.hidden = false;
         row.classList.remove(TRACKER_HIDDEN_CLASS);
@@ -630,13 +633,13 @@ export class EncounterStealthInitiativeService {
     }
   }
 
-  _setCombatantRowsMasked(combatantId, masked) {
-    const rows = this._getCombatantRows(combatantId);
-
+  _setCombatantRowsMasked(combatantId, masked, rows = this._getCombatantRows(combatantId)) {
     for (const row of rows) {
       if (masked) {
-        row.classList.add(TRACKER_MASKED_CLASS);
-        row.dataset.pf2eVisionerStealthMasked = 'true';
+        if (!row.classList.contains(TRACKER_MASKED_CLASS)) row.classList.add(TRACKER_MASKED_CLASS);
+        if (row.dataset.pf2eVisionerStealthMasked !== 'true') {
+          row.dataset.pf2eVisionerStealthMasked = 'true';
+        }
         this._maskCombatantRowName(row);
       } else if (row.dataset.pf2eVisionerStealthMasked === 'true') {
         row.classList.remove(TRACKER_MASKED_CLASS);
@@ -652,7 +655,7 @@ export class EncounterStealthInitiativeService {
     if (!anchor.dataset.pf2eVisionerOriginalHtml) {
       anchor.dataset.pf2eVisionerOriginalHtml = anchor.innerHTML;
     }
-    anchor.textContent = MASKED_COMBATANT_LABEL;
+    if (anchor.textContent !== MASKED_COMBATANT_LABEL) anchor.textContent = MASKED_COMBATANT_LABEL;
   }
 
   _restoreCombatantRowName(row) {
@@ -663,25 +666,58 @@ export class EncounterStealthInitiativeService {
     }
   }
 
-  _setStealthInitiativeMarker(combatantId, show) {
-    const rows = this._getCombatantRows(combatantId);
-
+  _setStealthInitiativeMarker(combatantId, show, rows = this._getCombatantRows(combatantId)) {
+    const tooltip = game.i18n?.localize?.('PF2E_VISIONER.ENCOUNTER_STEALTH.STEALTH_INITIATIVE_TOOLTIP')
+      || 'Rolled Stealth for initiative';
     for (const row of rows) {
-      this._removeStealthInitiativeMarkersFromRow(row);
-      if (!show) continue;
+      const markers = Array.from(row.querySelectorAll?.(TRACKER_STEALTH_MARKER_SELECTOR) ?? []);
+      if (!show) {
+        for (const marker of markers) marker.remove();
+        continue;
+      }
 
-      const marker = document.createElement('span');
-      marker.className = 'pf2e-visioner-stealth-initiative-marker';
-      marker.dataset.pf2eVisionerStealthInitiativeMarker = 'true';
-      marker.dataset.combatantId = combatantId;
-      const tooltip = game.i18n?.localize?.('PF2E_VISIONER.ENCOUNTER_STEALTH.STEALTH_INITIATIVE_TOOLTIP')
-        || 'Rolled Stealth for initiative';
-      marker.dataset.tooltip = tooltip;
-      marker.setAttribute('aria-label', tooltip);
-      marker.innerHTML = '<i class="fas fa-user-secret"></i>';
+      const anchor = this._getTrackerMarkerAnchor(row);
+      if (!anchor) {
+        for (const marker of markers) marker.remove();
+        continue;
+      }
 
-      this._getTrackerMarkerAnchor(row)?.appendChild(marker);
+      const marker = markers.shift() ?? document.createElement('span');
+      for (const duplicate of markers) duplicate.remove();
+      if (marker.className !== 'pf2e-visioner-stealth-initiative-marker') {
+        marker.className = 'pf2e-visioner-stealth-initiative-marker';
+      }
+      if (marker.dataset.pf2eVisionerStealthInitiativeMarker !== 'true') {
+        marker.dataset.pf2eVisionerStealthInitiativeMarker = 'true';
+      }
+      if (marker.dataset.combatantId !== combatantId) marker.dataset.combatantId = combatantId;
+      if (marker.dataset.tooltip !== tooltip) marker.dataset.tooltip = tooltip;
+      if (marker.getAttribute('aria-label') !== tooltip) marker.setAttribute('aria-label', tooltip);
+      const icon = marker.querySelector?.('i');
+      if (!icon) {
+        marker.innerHTML = '<i class="fas fa-user-secret"></i>';
+      } else if (icon.className !== 'fas fa-user-secret') {
+        icon.className = 'fas fa-user-secret';
+      }
+      if (marker.parentElement !== anchor) anchor.appendChild(marker);
     }
+  }
+
+  _indexCombatantRows() {
+    const rowsByCombatantId = new Map();
+    const candidates = Array.from(document?.querySelectorAll?.('[data-combatant-id]') ?? []);
+
+    for (const element of candidates) {
+      const combatantId = element.dataset?.combatantId;
+      if (!combatantId) continue;
+      const selector = `[data-combatant-id="${escapeAttributeValue(combatantId)}"]`;
+      if (element.parentElement?.closest?.(selector)) continue;
+
+      if (!rowsByCombatantId.has(combatantId)) rowsByCombatantId.set(combatantId, []);
+      rowsByCombatantId.get(combatantId).push(element);
+    }
+
+    return rowsByCombatantId;
   }
 
   _getCombatantRows(combatantId) {
