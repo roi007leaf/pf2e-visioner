@@ -1,7 +1,6 @@
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { getLogger } from '../utils/logger.js';
 import { ActionQualifier } from './operations/ActionQualifier.js';
-import { AttackQualifiedVisibility } from './operations/AttackQualifiedVisibility.js';
 import { AuraVisibility } from './operations/AuraVisibility.js';
 import { CoverAdjustment } from './operations/CoverAdjustment.js';
 import { CoverOverride } from './operations/CoverOverride.js';
@@ -9,6 +8,7 @@ import { DetectionModeModifier } from './operations/DetectionModeModifier.js';
 import { DistanceBasedVisibility } from './operations/DistanceBasedVisibility.js';
 import { LightingModifier } from './operations/LightingModifier.js';
 import { OffGuardSuppression } from './operations/OffGuardSuppression.js';
+import { RollContextVisibility } from './operations/RollContextVisibility.js';
 import { SenseModifier } from './operations/SenseModifier.js';
 import { ShareVision } from './operations/ShareVision.js';
 import { VisibilityOverride } from './operations/VisibilityOverride.js';
@@ -83,6 +83,11 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           // Predicate at operation level (more granular)
           // Use PF2e's PredicateField for proper predicate support
           predicate: new PredicateFieldToUse({ required: false }),
+
+          selectors: new fields.ArrayField(
+            new fields.StringField({ required: true, blank: false }),
+            { required: false },
+          ),
 
           senseModifications: new fields.ObjectField({ required: false }),
 
@@ -277,7 +282,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     afterPrepareData() {
       super.afterPrepareData?.();
       for (const operation of this.operations || []) {
-        AttackQualifiedVisibility.register(operation, this);
+        RollContextVisibility.register(operation, this);
       }
     }
 
@@ -791,7 +796,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'overrideVisibility':
-          if (AttackQualifiedVisibility.isOperation(operation)) break;
+          if (RollContextVisibility.isOperation(operation)) break;
           await VisibilityOverride.applyVisibilityOverride(
             {
               ...operation,
@@ -875,7 +880,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
       const persistentOperations = (this.operations || []).filter(
-        (operation) => !AttackQualifiedVisibility.isOperation(operation),
+        (operation) => !RollContextVisibility.isOperation(operation),
       );
       if (!persistentOperations.length) return;
 
@@ -966,7 +971,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const tokens = this.actor?.getActiveTokens?.() || [];
       if (!tokens.length) return;
       const persistentOperations = (this.operations || []).filter(
-        (operation) => !AttackQualifiedVisibility.isOperation(operation),
+        (operation) => !RollContextVisibility.isOperation(operation),
       );
       if (!persistentOperations.length) return;
 
@@ -995,7 +1000,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
     }
 
     async removeOperation(operation, token) {
-      if (AttackQualifiedVisibility.isOperation(operation)) return;
+      if (RollContextVisibility.isOperation(operation)) return;
 
       // Try to get ruleElementId from various sources
       let ruleElementId = this.ruleElementId;

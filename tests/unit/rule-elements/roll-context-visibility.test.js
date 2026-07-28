@@ -1,21 +1,39 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-describe('attack-qualified visibility overrides', () => {
-  const rangedVisibilityOperation = {
+describe('roll-context visibility overrides', () => {
+  let evaluatedPredicates;
+
+  const contextualVisibilityOperation = {
     type: 'overrideVisibility',
     state: 'concealed',
-    predicate: ['origin:item:ranged'],
+    selectors: ['attack-roll'],
+    predicate: ['item:ranged'],
     direction: 'from',
     observers: 'all',
   };
 
   beforeEach(() => {
     jest.resetModules();
+    evaluatedPredicates = [];
+    global.game.pf2e = {
+      ...global.game.pf2e,
+      Predicate: class {
+        constructor(predicate) {
+          this.predicate = predicate;
+          evaluatedPredicates.push(predicate);
+        }
+
+        test(rollOptions) {
+          const options = new Set(rollOptions);
+          return this.predicate.every((term) => options.has(term));
+        }
+      },
+    };
   });
 
-  it('adds Concealed only to ranged attack roll context', async () => {
-    const { AttackQualifiedVisibility } = await import(
-      '../../../scripts/rule-elements/operations/AttackQualifiedVisibility.js'
+  it('uses configured selectors and delegates applicability to PF2e predicates', async () => {
+    const { RollContextVisibility } = await import(
+      '../../../scripts/rule-elements/operations/RollContextVisibility.js'
     );
     const actor = { synthetics: { ephemeralEffects: {} } };
     const ruleElement = {
@@ -24,7 +42,7 @@ describe('attack-qualified visibility overrides', () => {
       test: jest.fn(() => true),
     };
 
-    expect(AttackQualifiedVisibility.register(rangedVisibilityOperation, ruleElement)).toBe(true);
+    expect(RollContextVisibility.register(contextualVisibilityOperation, ruleElement)).toBe(true);
 
     const deferred = actor.synthetics.ephemeralEffects['attack-roll'].origin[0];
     await expect(deferred({ test: ['attack', 'item:melee'] })).resolves.toBeNull();
@@ -43,8 +61,30 @@ describe('attack-qualified visibility overrides', () => {
         }),
       }),
     );
+    expect(evaluatedPredicates).toContain(contextualVisibilityOperation.predicate);
 
     expect(Object.keys(actor.synthetics.ephemeralEffects)).toEqual(['attack-roll']);
+
+    const magicalVisibilityOperation = {
+      ...contextualVisibilityOperation,
+      selectors: ['spell-attack-roll'],
+      predicate: ['item:trait:magical'],
+    };
+    expect(RollContextVisibility.register(magicalVisibilityOperation, ruleElement)).toBe(true);
+    const magicalDeferred = actor.synthetics.ephemeralEffects['spell-attack-roll'].origin[0];
+    await expect(magicalDeferred({ test: ['item:ranged'] })).resolves.toBeNull();
+    await expect(magicalDeferred({ test: ['item:trait:magical'] })).resolves.toEqual(
+      expect.objectContaining({ name: 'Concealed (Elemental Rage)' }),
+    );
+
+    const outwardVisibilityOperation = {
+      ...contextualVisibilityOperation,
+      direction: 'to',
+    };
+    expect(RollContextVisibility.register(outwardVisibilityOperation, ruleElement)).toBe(true);
+    const outwardDeferred = actor.synthetics.ephemeralEffects['attack-roll'].target[0];
+    const outwardEffect = await outwardDeferred({ test: ['item:ranged'] });
+    expect(outwardEffect.system.rules[0].option).toBe('self:condition:concealed');
   });
 
   it('keeps the contextual operation out of persistent observer-target state', async () => {
@@ -88,12 +128,12 @@ describe('attack-qualified visibility overrides', () => {
     const item = { id: 'elemental-rage', name: 'Elemental Rage', actor };
     const EffectRuleElement = createPF2eVisionerEffectRuleElement(BaseRuleElement, {});
     const ruleElement = new EffectRuleElement(
-      { operations: [rangedVisibilityOperation] },
+      { operations: [contextualVisibilityOperation] },
       item,
     );
 
     ruleElement.afterPrepareData();
-    await ruleElement.applyOperation(rangedVisibilityOperation, token);
+    await ruleElement.applyOperation(contextualVisibilityOperation, token);
     await ruleElement.onUpdate();
 
     expect(actor.synthetics.ephemeralEffects['attack-roll'].origin).toHaveLength(1);

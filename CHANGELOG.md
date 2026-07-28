@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.41] - 2026-07-28
+
+### Changed
+
+- **Roll-context visibility now uses native PF2e selectors and predicates**: Contextual `overrideVisibility` operations declare their roll domains with `selectors`, while their predicates are passed unchanged to PF2e for evaluation. Elemental Rage concealment can now use `selectors: ["attack-roll"]` with `predicate: ["item:ranged"]` instead of Visioner recognizing a hardcoded ranged predicate.
+
 ## [8.3.40] - 2026-07-28
 
 ### Added

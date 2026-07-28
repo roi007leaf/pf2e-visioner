@@ -227,7 +227,7 @@ describe('SourceTracker', () => {
 
 
 describe('Rule Element Integration', () => {
-  it('should include provideCover in PF2eVisionerEffect schema operation choices', async () => {
+  it('should include provideCover and roll selectors in PF2eVisionerEffect schema', async () => {
     const baseRuleElementClass = class {
       static defineSchema() {
         return {};
@@ -304,6 +304,7 @@ describe('Rule Element Integration', () => {
     const operationChoices = schema.operations.element.schema.type.choices;
 
     expect(operationChoices).toContain('provideCover');
+    expect(schema.operations.element.schema.selectors).toBeInstanceOf(MockArrayField);
   });
 
   it('should have all required operation types', () => {

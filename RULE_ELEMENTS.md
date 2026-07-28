@@ -167,7 +167,8 @@ An effect on the defender can apply Concealed only during incoming ranged attack
     {
       "type": "overrideVisibility",
       "state": "concealed",
-      "predicate": ["origin:item:ranged"],
+      "selectors": ["attack-roll"],
+      "predicate": ["item:ranged"],
       "direction": "from",
       "observers": "all"
     }
@@ -175,4 +176,4 @@ An effect on the defender can apply Concealed only during incoming ranged attack
 }
 ```
 
-This is roll-context visibility: it supplies `target:condition:concealed` for ranged attacks while leaving the token's normal observer-target state unchanged. It does not use distance as a substitute for whether an attack is ranged.
+`selectors` declares the PF2e roll contexts in which Visioner evaluates the operation. Its `predicate` is passed unchanged to PF2e's predicate system, so any roll options available to that context can qualify the visibility state. This example supplies `target:condition:concealed` for ranged attacks while leaving the token's normal observer-target state unchanged.
