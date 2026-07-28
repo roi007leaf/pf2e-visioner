@@ -85,18 +85,21 @@ describe('roll-context visibility overrides', () => {
     const outwardDeferred = actor.synthetics.ephemeralEffects['attack-roll'].target[0];
     const outwardEffect = await outwardDeferred({ test: ['item:ranged'] });
     expect(outwardEffect.system.rules[0].option).toBe('self:condition:concealed');
+    expect(ruleElement.test).not.toHaveBeenCalled();
+
+    ruleElement.predicate = ['self:blocked'];
+    ruleElement.test.mockReturnValue(false);
+    await expect(deferred({ test: ['item:ranged'] })).resolves.toBeNull();
+    expect(ruleElement.test).toHaveBeenCalledWith(new Set(['item:ranged']));
   });
 
   it('keeps the contextual operation out of persistent observer-target state', async () => {
     const applyVisibilityOverride = jest.fn();
-    jest.doMock(
-      '../../../scripts/rule-elements/operations/VisibilityOverride.js',
-      () => ({
-        VisibilityOverride: {
-          applyVisibilityOverride,
-        },
-      }),
-    );
+    jest.doMock('../../../scripts/rule-elements/operations/VisibilityOverride.js', () => ({
+      VisibilityOverride: {
+        applyVisibilityOverride,
+      },
+    }));
 
     const { createPF2eVisionerEffectRuleElement } = await import(
       '../../../scripts/rule-elements/PF2eVisionerEffect.js'

@@ -86,7 +86,8 @@ export class RollContextVisibility {
         : `self:condition:${operation.state}`;
     const deferredEffect = async ({ test = [] } = {}) => {
       const rollOptions = new Set(test);
-      if (!ruleElement.test(rollOptions)) return null;
+      if (ruleElement.ignored) return null;
+      if (ruleElement.predicate?.length > 0 && !ruleElement.test(rollOptions)) return null;
       if (!PredicateHelper.evaluate(operation.predicate, rollOptions)) return null;
       return createVisibilityRollContextEffect(operation, ruleElement, rollOption);
     };

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.42] - 2026-07-28
+
+### Fixed
+
+- **Roll-context visibility works without a rule-level predicate**: Effects such as Elemental Rage now apply their contextual Concealed state during real ranged attacks without PF2e throwing an error when the `PF2eVisionerEffect` rule element has no top-level predicate.
+
 ## [8.3.41] - 2026-07-28
 
 ### Changed
