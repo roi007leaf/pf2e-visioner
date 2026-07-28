@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.43] - 2026-07-28
+
+### Fixed
+
+- **Roll-context visibility now applies as a temporary attack state**: Effects such as Elemental Rage temporarily expose the matching target as Concealed during the attack, allowing Flat Check Helper to provide its native DC 5 check with AVS enabled or disabled, then restore the target's prior visibility without persistent conditions or canvas changes.
+
 ## [8.3.42] - 2026-07-28
 
 ### Fixed

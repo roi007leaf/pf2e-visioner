@@ -68,6 +68,31 @@ describe('AutoCoverHooks stealth context routing', () => {
     expect(useCase).toBeNull();
   });
 
+  test('scopes contextual target visibility around attack rolls when auto-cover is disabled', async () => {
+    jest.resetModules();
+
+    const { AutoCoverHooks } = await import('../../../scripts/cover/auto-cover/AutoCoverHooks.js');
+    const { getActiveRollContextVisibilityOverride } =
+      await import('../../../scripts/services/roll-context-visibility-override.js');
+    const hooks = new AutoCoverHooks();
+    hooks.autoCoverSystem = { isEnabled: () => false };
+    const context = {
+      type: 'attack-roll',
+      options: new Set(['target:condition:concealed']),
+      origin: { token: { id: 'attacker' } },
+      target: { token: { id: 'defender' } },
+    };
+    const wrapped = jest.fn(async () => {
+      expect(getActiveRollContextVisibilityOverride('attacker', 'defender')?.state).toBe(
+        'concealed',
+      );
+      return 'rolled';
+    });
+
+    await expect(hooks._wrapCheckRoll(wrapped, {}, context)).resolves.toBe('rolled');
+    expect(getActiveRollContextVisibilityOverride('attacker', 'defender')).toBeNull();
+  });
+
   test('movement requests Take Cover expiration prompt through auto-cover hooks', async () => {
     jest.resetModules();
 

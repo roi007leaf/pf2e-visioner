@@ -19,6 +19,7 @@ import {
 import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { applyActiveSceneHearingRangeLimit } from './services/scene-hearing-range.js';
 import { manuallyRestoreAllPartyTokens } from './services/party-token-state.js';
+import { getActiveRollContextVisibilityOverride } from './services/roll-context-visibility-override.js';
 import { CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE } from './services/system-condition-overrides.js';
 import {
   setMovementPerformanceDiagnosticsEnabled,
@@ -455,6 +456,8 @@ export class Pf2eVisionerApi {
    */
   static getVisibility(observerId, targetId) {
     try {
+      const contextualOverride = getActiveRollContextVisibilityOverride(observerId, targetId);
+      if (contextualOverride) return contextualOverride.state;
       return getVisibility(observerId, targetId);
     } catch (error) {
       console.error('Error getting visibility:', error);
@@ -499,6 +502,16 @@ export class Pf2eVisionerApi {
 
       if (!observerToken || !targetToken) {
         return null;
+      }
+
+      const contextualOverride = getActiveRollContextVisibilityOverride(observerId, targetId);
+      if (contextualOverride) {
+        return {
+          state: contextualOverride.state,
+          lighting: null,
+          reasons: [],
+          slugs: [contextualOverride.state],
+        };
       }
 
       // Get components

@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { withRollContextVisibilityOverride } from '../../services/roll-context-visibility-override.js';
 import autoCoverSystem from './AutoCoverSystem.js';
 import coverUIManager from './CoverUIManager.js';
 import templateManager from './TemplateManager.js';
@@ -371,25 +372,27 @@ export class AutoCoverHooks {
    * @private
    */
   async _wrapCheckRoll(wrapped, check, context = {}, event = null, callback) {
-    try {
-      // Skip if auto-cover is disabled
-      if (!this.autoCoverSystem.isEnabled()) {
-        return await wrapped(check, context, event, callback);
+    return withRollContextVisibilityOverride(context, async () => {
+      try {
+        // Skip cover handling if auto-cover is disabled. Contextual visibility still applies.
+        if (!this.autoCoverSystem.isEnabled()) {
+          return await wrapped(check, context, event, callback);
+        }
+
+        // Get the appropriate use case for this context
+        const useCase = this._getUseCaseForContext(context);
+        if (!useCase) {
+          return await wrapped(check, context, event, callback);
+        }
+        // Handle the roll with the appropriate use case
+        await useCase.handleCheckRoll(check, context);
+      } catch (error) {
+        console.error('PF2E Visioner | Error in Check.roll wrapper:', error);
       }
 
-      // Get the appropriate use case for this context
-      const useCase = this._getUseCaseForContext(context);
-      if (!useCase) {
-        return await wrapped(check, context, event, callback);
-      }
-      // Handle the roll with the appropriate use case
-      await useCase.handleCheckRoll(check, context);
-    } catch (error) {
-      console.error('PF2E Visioner | Error in Check.roll wrapper:', error);
-    }
-
-    // Call original function
-    return await wrapped(check, context, event, callback);
+      // Call original function
+      return await wrapped(check, context, event, callback);
+    });
   }
 
   /**
