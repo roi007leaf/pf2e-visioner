@@ -1,5 +1,6 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
+import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import { applyCurrentViewHardHide } from './current-view-hard-hide.js';
 import {
   ensureDuringMoveSoundwaveRefresh,
@@ -54,6 +55,7 @@ function afterCoreRefresh(token, before) {
 }
 
 export function wrapTokenRefreshState(wrapped, ...args) {
+  if (isSceneTokenVisionDisabled()) return wrapped(...args);
   const before = renderState(this);
   const result = wrapped(...args);
   afterCoreRefresh(this, before);
@@ -61,6 +63,7 @@ export function wrapTokenRefreshState(wrapped, ...args) {
 }
 
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
+  if (isSceneTokenVisionDisabled()) return wrapped(...args);
   const before = renderState(this);
   const result = wrapped(...args);
   afterCoreRefresh(this, before);
@@ -68,6 +71,7 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
 }
 
 export function wrapTokenRefreshVisibility(wrapped, ...args) {
+  if (isSceneTokenVisionDisabled()) return wrapped(...args);
   return withDetectionSettingCache(() => {
     rememberSoundwaveDetectionBeforeCoreRefresh(this);
     const before = renderState(this);
@@ -78,6 +82,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
 }
 
 export function wrapTokenControl(wrapped, ...args) {
+  if (isSceneTokenVisionDisabled()) return wrapped(...args);
   rememberSoundwaveDetectionBeforeCoreRefresh(this);
   const result = wrapped(...args);
   refreshSoundwavesForActiveMovement();

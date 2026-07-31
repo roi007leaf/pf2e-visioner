@@ -68,6 +68,41 @@ describe('Visibility Map V2 profile storage', () => {
     expect(getVisibilityBetween(observer, target)).toBe('observed');
   });
 
+  test('scene Token Vision off exposes Core-observed defaults without deleting stored profile', () => {
+    const originalCanvas = global.canvas;
+    const storedProfile = {
+      detectionState: 'undetected',
+      hasConcealment: true,
+      coverState: 'none',
+      detectionSense: null,
+      awarenessState: null,
+    };
+    observer.document.getFlag.mockImplementation((moduleId, key) => {
+      if (moduleId === 'pf2e-visioner' && key === 'visibilityV2') {
+        return { target: storedProfile };
+      }
+      return null;
+    });
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas?.scene, tokenVision: false },
+    };
+    try {
+      expect(getVisibilityBetween(observer, target)).toBe('observed');
+      expect(getPerceptionProfileBetween(observer, target)).toEqual(
+        expect.objectContaining({
+          detectionState: 'observed',
+          hasConcealment: false,
+        }),
+      );
+      expect(getVisibilityMap(observer)).toEqual({});
+      expect(getPerceptionProfileMap(observer)).toEqual({});
+      expect(observer.document.getFlag).not.toHaveBeenCalled();
+    } finally {
+      global.canvas = originalCanvas;
+    }
+  });
+
   test('getVisibilityBetween serializes visibilityV2 profiles for legacy callers', () => {
     observer.document.getFlag.mockImplementation((moduleId, key) => {
       if (moduleId !== 'pf2e-visioner') return null;

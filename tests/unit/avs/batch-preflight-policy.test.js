@@ -13,6 +13,18 @@ describe('BatchPreflightPolicy', () => {
     });
   });
 
+  test('clears pending tokens when scene Token Vision is disabled', () => {
+    expect(buildBatchPreflightPlan({ sceneTokenVisionDisabled: true })).toEqual({
+      shouldProcess: false,
+      shouldClearPendingTokens: true,
+      shouldQueueChangedTokens: false,
+      shouldNotifyMovementStart: false,
+      logKind: 'skipped',
+      reason: 'token-vision-disabled-for-scene',
+      animatingTokenIds: [],
+    });
+  });
+
   test('queues changed tokens while movement is active', () => {
     expect(buildBatchPreflightPlan({ isTokenMoving: true })).toEqual({
       shouldProcess: false,

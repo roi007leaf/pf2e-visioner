@@ -5,6 +5,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { isSceneTokenVisionDisabled } from '../../services/scene-token-vision.js';
 import { getLogger } from '../../utils/logger.js';
 import { profileToLegacyVisibility } from '../perception-profile.js';
 import { AvsInvalidationCoordinator } from './core/AvsInvalidationCoordinator.js';
@@ -278,6 +279,7 @@ export class EventDrivenVisibilitySystem {
    * Force recalculation of all visibility (for manual triggers) - IMMEDIATE
    */
   recalculateAll() {
+    if (isSceneTokenVisionDisabled()) return;
     if (!this.#systemStateProvider.shouldProcessEvents()) return;
     const log = getLogger('AVS/API');
     const stack = new Error().stack;
@@ -295,6 +297,7 @@ export class EventDrivenVisibilitySystem {
    * @param {boolean} force - Force recalculation even if recently done
    */
   async recalculateAllVisibility(force = false) {
+    if (isSceneTokenVisionDisabled()) return;
     const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
     if (avsOnlyInCombat) {
       try {
@@ -322,6 +325,7 @@ export class EventDrivenVisibilitySystem {
    * @param {string[]|Set<string>} tokenIds
    */
   async recalculateForTokens(tokenIds) {
+    if (isSceneTokenVisionDisabled()) return;
     const avsOnlyInCombat = this.#systemStateProvider.getSetting('avsOnlyInCombat', false);
     if (avsOnlyInCombat) {
       try {
@@ -376,6 +380,7 @@ export class EventDrivenVisibilitySystem {
    * @returns {Promise<string>} Visibility state
    */
   async calculateVisibility(observer, target, options = undefined) {
+    if (isSceneTokenVisionDisabled()) return 'observed';
     const log = getLogger('AVS/API');
     try {
       // Short-circuit: AVS does not calculate for excluded participants (hidden, fails testVisibility, sneak-active)
@@ -410,6 +415,7 @@ export class EventDrivenVisibilitySystem {
    * @returns {Promise<string>} Visibility state
    */
   async calculateVisibilityWithOverrides(observer, target) {
+    if (isSceneTokenVisionDisabled()) return 'observed';
     const log = getLogger('AVS/API');
     try {
       if (!observer?.document?.id || !target?.document?.id) return 'observed';
@@ -459,6 +465,7 @@ export class EventDrivenVisibilitySystem {
    * This ensures AVS processes sneaking tokens even when they're hidden by Foundry
    */
   async recalculateSneakingTokens() {
+    if (isSceneTokenVisionDisabled()) return;
     const changedTokens = new Set();
     if (!this.#systemStateProvider.isEnabled()) return;
 

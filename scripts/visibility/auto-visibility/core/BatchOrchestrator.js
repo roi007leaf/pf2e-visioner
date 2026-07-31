@@ -11,6 +11,7 @@ import {
 } from '../../../stores/detection-map.js';
 import { isPrimaryGM } from '../../../services/gm-election.js';
 import { hasActivePendingTokenMovement as defaultHasActivePendingTokenMovement } from '../../../services/movement-tracking.js';
+import { isSceneTokenVisionDisabled } from '../../../services/scene-token-vision.js';
 import { getLogger } from '../../../utils/logger.js';
 import { scheduleTask } from '../../../utils/scheduler.js';
 import {
@@ -492,7 +493,10 @@ export class BatchOrchestrator {
 
     // Check if AVS is disabled for the current scene
     const disableAVS = canvas?.scene?.getFlag?.(this.moduleId, 'disableAVS');
-    const scenePreflightPlan = buildBatchPreflightPlan({ sceneAvsDisabled: !!disableAVS });
+    const scenePreflightPlan = buildBatchPreflightPlan({
+      sceneAvsDisabled: !!disableAVS,
+      sceneTokenVisionDisabled: isSceneTokenVisionDisabled(),
+    });
     if (!scenePreflightPlan.shouldProcess) {
       getLogger('AVS/Batch').debug(() => ({
         msg: 'processBatch:skipped',

@@ -1,5 +1,6 @@
 export function buildBatchPreflightPlan({
   sceneAvsDisabled = false,
+  sceneTokenVisionDisabled = false,
   isTokenMoving = false,
   animatingChangedTokenIds = [],
   hasVisibleChangedTokens = true,
@@ -12,6 +13,18 @@ export function buildBatchPreflightPlan({
       shouldNotifyMovementStart: false,
       logKind: 'skipped',
       reason: 'avs-disabled-for-scene',
+      animatingTokenIds: [],
+    };
+  }
+
+  if (sceneTokenVisionDisabled) {
+    return {
+      shouldProcess: false,
+      shouldClearPendingTokens: true,
+      shouldQueueChangedTokens: false,
+      shouldNotifyMovementStart: false,
+      logKind: 'skipped',
+      reason: 'token-vision-disabled-for-scene',
       animatingTokenIds: [],
     };
   }

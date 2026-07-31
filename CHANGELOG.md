@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.45] - 2026-07-31
+
+### Fixed
+
+- **Scenes without Token Vision now defer visibility entirely to Foundry Core**: Visioner skips AVS processing, visibility overrides, hard hiding, detection wrappers, movement soundwaves, and visibility indicators while Token Vision is disabled. Changing the setting also clears stale Visioner render effects without altering saved visibility states, preventing tokens from remaining transparent and allowing Visioner behavior to resume when Token Vision is re-enabled.
+
 ## [8.3.44] - 2026-07-31
 
 ### Fixed

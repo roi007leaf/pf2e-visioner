@@ -8,6 +8,7 @@ import {
   isAvsActiveGivenCombatGate,
 } from './Detection/detection-visibility-context.js';
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
+import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import { isPartyActorToken } from '../utils/token-actor.js';
@@ -141,6 +142,7 @@ export function targetShouldShowSoundwave(
   getHiddenOverride = hasHiddenAvsOverride,
   impreciselySensed = impreciselySensedOutOfSight,
 ) {
+  if (isSceneTokenVisionDisabled()) return false;
   for (const observer of observers) {
     if (observer === target) continue;
     if (getHiddenOverride(observer, target)) return true;
@@ -218,6 +220,7 @@ function showControlledTokenFullArt(target) {
 }
 
 export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
+  if (isSceneTokenVisionDisabled()) return;
   if (!target) return;
   if (target.detectionFilter === getSoundwaveFilter()) {
     previouslySoundwaveDetectedTargets.add(target);
@@ -269,6 +272,10 @@ export function removeSoundwaveFilterOverride(target) {
 }
 
 export function settleSoundwaveOverrides() {
+  if (isSceneTokenVisionDisabled()) {
+    clearDuringMoveSoundwaveState();
+    return;
+  }
   if (filterOverrides.size === 0) return;
   for (const entry of [...filterOverrides.values()]) {
     const target = entry.target;
@@ -310,6 +317,10 @@ export function clearDuringMoveSoundwaveState() {
 }
 
 export function refreshSoundwavesForActiveMovement() {
+  if (isSceneTokenVisionDisabled()) {
+    clearDuringMoveSoundwaveState();
+    return;
+  }
   const pendingMovementActive = hasActivePendingTokenMovement();
   // Controlled movers are interaction surfaces, not detection results. Keep their primary art
   // visible during selection, drag, and committed movement; soundwaves only describe other tokens.
@@ -402,6 +413,10 @@ export function refreshSoundwavesForActiveMovement() {
 }
 
 export function ensureDuringMoveSoundwaveRefresh() {
+  if (isSceneTokenVisionDisabled()) {
+    clearDuringMoveSoundwaveState();
+    return;
+  }
   if (running) return;
   if (!isAvsActiveGivenCombatGate()) return;
   const raf = globalThis.requestAnimationFrame;
@@ -431,6 +446,7 @@ export function ensureDuringMoveSoundwaveRefresh() {
 }
 
 export function startDuringMoveSoundwaveOnDrag(wrapped, ...args) {
+  if (isSceneTokenVisionDisabled()) return wrapped(...args);
   try {
     ensureDuringMoveSoundwaveRefresh();
   } catch {

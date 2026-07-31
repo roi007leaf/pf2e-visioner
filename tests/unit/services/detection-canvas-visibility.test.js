@@ -197,6 +197,42 @@ describe('canvas visibility wrapper', () => {
     expect(wrapped).toHaveBeenCalledTimes(1);
   });
 
+  test('scene Token Vision off bypasses active-peek visibility suppression', () => {
+    global.game.user.isGM = false;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({ id: 'observer' });
+    observer.vision = {
+      los: {
+        containsPoint: jest.fn(() => false),
+      },
+    };
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas.scene, tokenVision: false },
+      tokens: {
+        controlled: [observer],
+        get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
+        placeables: [observer, target],
+      },
+    };
+    peekRegistry.set(
+      'observer',
+      {
+        origin: { x: 0, y: 0 },
+        direction: 0,
+        fov: 30,
+        range: 200,
+        ignoredWallIds: ['door1'],
+      },
+      1000,
+    );
+    const wrapped = jest.fn(() => true);
+
+    expect(wrapCanvasVisibilityTest(wrapped, [{ x: 250, y: 0 }], { object: target })).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
   test('active peek keeps core visibility for a hidden (heard) target outside the peek polygon', () => {
     global.game.user.isGM = false;
     const observer = createMockToken({
@@ -284,6 +320,25 @@ describe('canvas visibility wrapper', () => {
         get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
         placeables: [observer, target],
       },
+    };
+    const wrapped = jest.fn(() => true);
+    const wrapper = createCanDetectVisibilityWrapper(2);
+
+    expect(wrapper.call({ id: 'basicSight' }, wrapped, { object: observer }, target)).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
+
+  test('scene Token Vision off keeps core can-detect result', () => {
+    global.game.user.isGM = false;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({
+      id: 'observer',
+      flags: visibilityV2Flags({ target: 'undetected' }),
+    });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas.scene, tokenVision: false },
     };
     const wrapped = jest.fn(() => true);
     const wrapper = createCanDetectVisibilityWrapper(2);
@@ -436,6 +491,33 @@ describe('canvas visibility wrapper', () => {
         tests: [{ x: 0, y: 0 }],
       }),
     ).toBe(true);
+    expect(detectionMode._testPoint).toHaveBeenCalledTimes(1);
+  });
+
+  test('scene Token Vision off bypasses Visioner detection-mode state', () => {
+    global.game.user.isGM = false;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const observer = createMockToken({ id: 'observer' });
+    const target = createMockToken({ id: 'target' });
+    target.document.getFlag = jest.fn(() => true);
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas.scene, tokenVision: false },
+    };
+    const detectionMode = {
+      id: 'basicSight',
+      _canDetect: jest.fn(() => false),
+      _testPoint: jest.fn(() => true),
+    };
+
+    expect(
+      testDetectionModeVisibility.call(detectionMode, { object: observer }, { id: 'basicSight', enabled: true }, {
+        object: target,
+        tests: [{ x: 0, y: 0 }],
+      }),
+    ).toBe(true);
+    expect(target.document.getFlag).not.toHaveBeenCalled();
+    expect(detectionMode._canDetect).not.toHaveBeenCalled();
     expect(detectionMode._testPoint).toHaveBeenCalledTimes(1);
   });
 });

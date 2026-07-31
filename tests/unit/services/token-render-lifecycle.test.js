@@ -263,4 +263,58 @@ describe('token render lifecycle service', () => {
     ).resolves.toEqual({ handled: true });
     expect(scheduleCanvasPerceptionUpdate).toHaveBeenCalledWith({ refreshVision: true });
   });
+
+  test('scene Token Vision off bypasses all Visioner token lifecycle work', async () => {
+    const originalCanvas = global.canvas;
+    const preUpdate = jest.fn();
+    const scheduleCompletion = jest.fn();
+    const refreshMoved = jest.fn();
+    const refreshRendered = jest.fn();
+    const refreshControlled = jest.fn();
+
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas?.scene, tokenVision: false },
+    };
+    try {
+      expect(
+        handleTokenPreUpdate(
+          { id: 'token-1' },
+          { x: 100 },
+          { animate: true },
+          'user-1',
+          { handlePreUpdateTokenMovement: preUpdate },
+        ),
+      ).toBeUndefined();
+      await expect(
+        handleTokenUpdated(
+          { id: 'token-1' },
+          { x: 100 },
+          {
+            schedulePendingTokenMovementCompletion: scheduleCompletion,
+            refreshSystemHiddenHighlightsForMovedToken: refreshMoved,
+          },
+        ),
+      ).resolves.toEqual({ handled: false, reason: 'token-vision-disabled' });
+      expect(
+        handleTokenRefreshed(
+          { document: { id: 'token-1' } },
+          { refreshSystemHiddenHighlightsForRenderedToken: refreshRendered },
+        ),
+      ).toEqual({ handled: false, reason: 'token-vision-disabled' });
+      await expect(
+        handleAvsBatchCompleteRefresh({
+          refreshSystemHiddenHighlightsForControlledTokens: refreshControlled,
+        }),
+      ).resolves.toEqual({ handled: false, reason: 'token-vision-disabled' });
+    } finally {
+      global.canvas = originalCanvas;
+    }
+
+    expect(preUpdate).not.toHaveBeenCalled();
+    expect(scheduleCompletion).not.toHaveBeenCalled();
+    expect(refreshMoved).not.toHaveBeenCalled();
+    expect(refreshRendered).not.toHaveBeenCalled();
+    expect(refreshControlled).not.toHaveBeenCalled();
+  });
 });

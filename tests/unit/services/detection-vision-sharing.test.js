@@ -87,4 +87,55 @@ describe('detection vision sharing wrappers', () => {
 
     expect(tokenDocument.sight.enabled).toBe(true);
   });
+
+  test('scene Token Vision off leaves prepareBaseData sight state to core', () => {
+    global.game.settings.set('pf2e', 'gmVision', false);
+    const tokenDocument = createMockToken({
+      id: 'minion',
+      flags: {
+        [MODULE_ID]: {
+          visionMasterTokenId: 'master',
+          visionSharingMode: 'replace',
+        },
+      },
+    }).document;
+    tokenDocument.sight = { enabled: true };
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas.scene, tokenVision: false },
+    };
+    const wrapped = jest.fn();
+
+    wrapTokenDocumentPrepareBaseData.call(tokenDocument, wrapped);
+
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(tokenDocument.sight.enabled).toBe(true);
+  });
+
+  test('scene Token Vision off leaves token vision-source result to core', () => {
+    global.game.settings.set('pf2e', 'gmVision', false);
+    const master = createMockToken({ id: 'master' });
+    const minion = createMockToken({
+      id: 'minion',
+      flags: {
+        [MODULE_ID]: {
+          visionMasterTokenId: 'master',
+          visionSharingMode: 'replace',
+        },
+      },
+    });
+    global.canvas = {
+      ...global.canvas,
+      scene: { ...global.canvas.scene, tokenVision: false },
+      tokens: {
+        controlled: [],
+        placeables: [master, minion],
+        get: jest.fn((id) => (id === 'master' ? master : id === 'minion' ? minion : null)),
+      },
+    };
+    const wrapped = jest.fn(() => true);
+
+    expect(wrapTokenVisionSource.call(minion, wrapped)).toBe(true);
+    expect(wrapped).toHaveBeenCalledTimes(1);
+  });
 });

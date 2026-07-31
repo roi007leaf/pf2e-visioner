@@ -154,4 +154,23 @@ describe('roll-context visibility overrides', () => {
     expect(applyVisibilityOverride).toHaveBeenCalledTimes(1);
     expect(token.document.setFlag).toHaveBeenCalledTimes(2);
   });
+
+  it('does not apply roll-context visibility while scene Token Vision is off', async () => {
+    global.canvas.scene = { tokenVision: false };
+    const { RollContextVisibility } = await import(
+      '../../../scripts/rule-elements/operations/RollContextVisibility.js'
+    );
+    const actor = { synthetics: { ephemeralEffects: {} } };
+    const ruleElement = {
+      actor,
+      item: { name: 'Elemental Rage' },
+      test: jest.fn(() => true),
+    };
+
+    expect(RollContextVisibility.register(contextualVisibilityOperation, ruleElement)).toBe(true);
+    const deferred = actor.synthetics.ephemeralEffects['attack-roll'].origin[0];
+
+    await expect(deferred({ test: ['attack', 'item:ranged'] })).resolves.toBeNull();
+    expect(ruleElement.test).not.toHaveBeenCalled();
+  });
 });

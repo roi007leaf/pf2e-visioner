@@ -46,6 +46,8 @@ describe('detection token refresh', () => {
     hasActivePendingTokenMovement.mockReturnValue(true);
     applyCurrentViewHardHide.mockClear();
     rememberSoundwaveDetectionBeforeCoreRefresh.mockClear();
+    refreshSoundwavesForActiveMovement.mockClear();
+    ensureDuringMoveSoundwaveRefresh.mockClear();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -116,5 +118,21 @@ describe('detection token refresh', () => {
     expect(wrapped).toHaveBeenCalledWith({ releaseOthers: true });
     expect(refreshSoundwavesForActiveMovement).toHaveBeenCalled();
     expect(ensureDuringMoveSoundwaveRefresh).toHaveBeenCalled();
+  });
+
+  it('scene Token Vision off runs only Core token refresh logic', () => {
+    globalThis.canvas = { scene: { tokenVision: false } };
+    const token = foundryHiddenToken();
+    const wrapped = jest.fn(() => {
+      token.visible = true;
+      token.mesh.visible = true;
+    });
+
+    wrapTokenRefreshVisibility.call(token, wrapped);
+
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
+    expect(rememberSoundwaveDetectionBeforeCoreRefresh).not.toHaveBeenCalled();
+    expect(refreshSoundwavesForActiveMovement).not.toHaveBeenCalled();
   });
 });

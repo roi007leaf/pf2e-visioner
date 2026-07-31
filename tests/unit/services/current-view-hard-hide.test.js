@@ -20,6 +20,7 @@ jest.mock('../../../scripts/services/movement-tracking.js', () => ({
 
 import {
   currentViewObservers,
+  currentViewVisionerObserversForTarget,
   targetIsHardHiddenFromCurrentView,
   applyCurrentViewHardHide,
   releaseCurrentViewHardHide,
@@ -59,6 +60,14 @@ describe('currentViewObservers', () => {
     draggedToken = a;
     controlled.push(a);
     expect(currentViewObservers().map((t) => t.document.id)).toEqual(['a']);
+  });
+
+  it('returns no Visioner observers when scene Token Vision is disabled', () => {
+    const a = { document: { id: 'a' } };
+    controlled.push(a);
+    globalThis.canvas.scene = { tokenVision: false };
+
+    expect(currentViewVisionerObserversForTarget({ document: { id: 'target' } })).toEqual([]);
   });
 });
 
@@ -212,6 +221,31 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     isSelectAllTokenVisibilityBypassActive.mockReturnValue(true);
     const t = target('t');
     __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('scene Token Vision off bypasses automatic Undetected hard-hide', () => {
+    globalThis.canvas.scene = { tokenVision: false };
+    const t = target('t');
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('scene Token Vision off bypasses explicit manual Undetected hard-hide', () => {
+    globalThis.canvas.scene = { tokenVision: false };
+    const t = target('t');
+    t.document.getFlag = jest.fn((_module, key) =>
+      key === 'avs-override-from-obs' ? { state: 'undetected' } : null);
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+
+  it('scene Token Vision off leaves Foundry-hidden rendering entirely to Core', () => {
+    globalThis.canvas.scene = { tokenVision: false };
+    const t = target('t', 'character', { hidden: true });
+
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
   });
 });

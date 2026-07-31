@@ -123,11 +123,11 @@ describe('tokenVision disabled (theater of mind: global sight, no move-time soun
     ).toBe(false);
   });
 
-  test('AVS hidden override still shows soundwave even with token vision disabled', () => {
+  test('manual hidden override is ignored when token vision is disabled', () => {
     const overrideHidden = () => true;
     expect(
       targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed'), overrideHidden),
-    ).toBe(true);
+    ).toBe(false);
   });
 });
 

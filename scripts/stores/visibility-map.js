@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from '../constants.js';
 import { getNativeVisibilityReplacement } from '../chat/services/feats/native-visibility-replacement.js';
+import { isSceneTokenVisionDisabled } from '../services/scene-token-vision.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getLogger } from '../utils/logger.js';
 import { getCachedSettingValue } from '../utils/setting-value-cache.js';
@@ -477,6 +478,7 @@ export async function setVisibilityMapsBatch(entries = [], options = {}) {
  * @returns {Record<string,string>}
  */
 export function getVisibilityMap(token) {
+  if (isSceneTokenVisionDisabled()) return {};
   const profileLegacyMap = profilesToLegacyVisibilityMap(getRawPerceptionProfileMap(token), {
     preserveEncounterUnnoticed: true,
   });
@@ -496,6 +498,7 @@ export function getDocumentVisibilityMap(token) {
  * @returns {Record<string, import('../visibility/perception-profile.js').DEFAULT_PERCEPTION_PROFILE>}
  */
 export function getPerceptionProfileMap(token) {
+  if (isSceneTokenVisionDisabled()) return {};
   return getRawPerceptionProfileMap(token);
 }
 
@@ -570,6 +573,7 @@ export async function setPerceptionProfileMap(token, profileMap, options = {}) {
  * @param {Token} target
  */
 export function getVisibilityBetween(observer, target) {
+  if (isSceneTokenVisionDisabled()) return 'observed';
   const targetId = getTokenId(target);
   const profile = getRawPerceptionProfileEntry(observer, targetId);
   if (!profile) return 'observed';
@@ -583,6 +587,9 @@ export function getVisibilityBetween(observer, target) {
  * @param {Token} target
  */
 export function getPerceptionProfileBetween(observer, target) {
+  if (isSceneTokenVisionDisabled()) {
+    return { ...DEFAULT_PERCEPTION_PROFILE };
+  }
   const profile =
     getRawPerceptionProfileEntry(observer, getTokenId(target)) || {
       ...DEFAULT_PERCEPTION_PROFILE,

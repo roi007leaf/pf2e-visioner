@@ -228,7 +228,7 @@ export async function registerHooks() {
     handleConditionItemChange(item);
   });
 
-  // Handle scene updates to trigger AVS recalculation when disableAVS flag changes
+  // Handle scene visibility-mode updates that require AVS recalculation or Core cleanup
   Hooks.on('updateScene', async (scene, changes) => {
     clearActiveSceneHearingRangeCache(scene);
     await handleSceneDisableAvsRefresh(scene, changes);

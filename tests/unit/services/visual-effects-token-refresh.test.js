@@ -105,6 +105,18 @@ describe('visual-effects updateTokenVisuals', () => {
     expect(target.refresh).toHaveBeenCalledTimes(1);
   });
 
+  test('scene Token Vision off skips Visioner token visual refreshes', async () => {
+    const [inView, offscreen] = global.canvas.tokens.placeables;
+    global.canvas.scene.tokenVision = false;
+
+    await updateTokenVisuals();
+    await updateOptimizedTokenVisuals();
+    await updateSpecificTokenPairs([{ observerId: 'in-view', targetId: 'offscreen' }]);
+
+    expect(inView.refresh).not.toHaveBeenCalled();
+    expect(offscreen.refresh).not.toHaveBeenCalled();
+  });
+
   test('skips offscreen tokens during pair-specific visual refreshes', async () => {
     const [inView, offscreen] = global.canvas.tokens.placeables;
 

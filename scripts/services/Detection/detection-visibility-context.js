@@ -12,6 +12,7 @@ import {
 } from '../../visibility/perception-profile.js';
 import { DetectionFrameCache } from './detection-frame-cache.js';
 import { getDetectionSetting } from './detection-setting-cache.js';
+import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 
 export const VISIBILITY_DETECTION_THRESHOLDS = {
   observed: 0,
@@ -77,6 +78,7 @@ export function reachesVisibilityThreshold(origin, target, threshold, config = {
 }
 
 export function getVisionerVisibilityBetweenTokens(observer, target) {
+  if (isSceneTokenVisionDisabled()) return 'observed';
   if (!observer || !target) return 'observed';
   if (!observer.document?.getFlag || !target.document?.id) return 'observed';
 
@@ -85,6 +87,7 @@ export function getVisionerVisibilityBetweenTokens(observer, target) {
 
 export function isAvsActiveGivenCombatGate() {
   try {
+    if (isSceneTokenVisionDisabled()) return false;
     if (!getDetectionSetting('avsOnlyInCombat')) return true;
     return !!(game.combat?.started && game.combat?.combatants?.size > 0);
   } catch {

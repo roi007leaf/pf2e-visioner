@@ -3,6 +3,7 @@ import '../../setup.js';
 import {
   hasDisableAvsFlagChange,
   hasSceneHearingRangeFlagChange,
+  hasSceneTokenVisionChange,
   handleSceneDisableAvsRefresh,
 } from '../../../scripts/services/scene-disable-avs-refresh.js';
 
@@ -25,6 +26,12 @@ describe('scene disable AVS refresh service', () => {
     expect(hasSceneHearingRangeFlagChange({ value: { hearingRange: 30 } })).toBe(true);
 
     expect(hasSceneHearingRangeFlagChange({ name: 'Other Scene' })).toBe(false);
+  });
+
+  test('detects scene Token Vision changes', () => {
+    expect(hasSceneTokenVisionChange({ tokenVision: false })).toBe(true);
+    expect(hasSceneTokenVisionChange({ tokenVision: true })).toBe(true);
+    expect(hasSceneTokenVisionChange({ name: 'Other Scene' })).toBe(false);
   });
 
   test('skips scenes that are not the active canvas scene', async () => {
@@ -139,6 +146,45 @@ describe('scene disable AVS refresh service', () => {
     expect(recalculateAll).toHaveBeenCalledWith(true);
   });
 
+  test('cleans visibility surfaces instead of recalculating when Token Vision is disabled', async () => {
+    const clearVisibility = jest.fn().mockResolvedValue(undefined);
+    const loadAutoVisibility = jest.fn();
+
+    const result = await handleSceneDisableAvsRefresh(
+      { id: 'active-scene', tokenVision: false },
+      { tokenVision: false },
+      {
+        getCurrentSceneId: () => 'active-scene',
+        clearVisibility,
+        loadAutoVisibility,
+      },
+    );
+
+    expect(result).toEqual({ refreshed: true, reason: 'token-vision-disabled' });
+    expect(clearVisibility).toHaveBeenCalledTimes(1);
+    expect(loadAutoVisibility).not.toHaveBeenCalled();
+  });
+
+  test('forces AVS recalculation when Token Vision is re-enabled', async () => {
+    const recalculateAll = jest.fn().mockResolvedValue(undefined);
+    const loadAutoVisibility = jest.fn().mockResolvedValue({ recalculateAll });
+    const clearVisibility = jest.fn();
+
+    const result = await handleSceneDisableAvsRefresh(
+      { id: 'active-scene', tokenVision: true },
+      { tokenVision: true },
+      {
+        getCurrentSceneId: () => 'active-scene',
+        clearVisibility,
+        loadAutoVisibility,
+      },
+    );
+
+    expect(result).toEqual({ refreshed: true });
+    expect(clearVisibility).not.toHaveBeenCalled();
+    expect(recalculateAll).toHaveBeenCalledWith(true);
+  });
+
   test('warns and returns error status when recalculation fails', async () => {
     const failure = new Error('recalc failed');
     const warn = jest.fn();
@@ -155,7 +201,7 @@ describe('scene disable AVS refresh service', () => {
 
     expect(result).toEqual({ refreshed: false, reason: 'error' });
     expect(warn).toHaveBeenCalledWith(
-      'PF2E Visioner | Failed to handle scene update for disableAVS:',
+      'PF2E Visioner | Failed to handle scene visibility config update:',
       failure,
     );
   });

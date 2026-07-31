@@ -29,6 +29,31 @@ async function clearDefaultAvsCaches() {
   );
 }
 
+async function clearDefaultVisionerVisibility() {
+  const [soundwaves, visualEffects, perceptionRefresh] = await Promise.all([
+    import('./during-move-soundwave.js'),
+    import('./visual-effects.js'),
+    import('../helpers/perception-refresh.js'),
+  ]);
+  const tokens = globalThis.canvas?.tokens?.placeables ?? [];
+
+  soundwaves.clearDuringMoveSoundwaveState?.();
+  visualEffects.clearVisionerTokenVisibilityEffects?.(tokens, { forceTokenVisible: false });
+  for (const token of tokens) {
+    token?.renderFlags?.set?.({
+      refreshState: true,
+      refreshMesh: true,
+      refreshVisibility: true,
+    });
+    token?.refresh?.();
+  }
+  perceptionRefresh.scheduleCanvasPerceptionUpdate?.({
+    initializeVision: true,
+    refreshLighting: true,
+    refreshVision: true,
+  });
+}
+
 function hasChangedPath(changes, path) {
   if (!changes || typeof changes !== 'object') return false;
   const flatPath = path.join('.');
@@ -60,8 +85,16 @@ export function hasSceneHearingRangeFlagChange(changes) {
   );
 }
 
+export function hasSceneTokenVisionChange(changes) {
+  return hasChangedPath(changes, ['tokenVision']);
+}
+
 export function hasSceneAvsRefreshFlagChange(changes) {
-  return hasDisableAvsFlagChange(changes) || hasSceneHearingRangeFlagChange(changes);
+  return (
+    hasDisableAvsFlagChange(changes) ||
+    hasSceneHearingRangeFlagChange(changes) ||
+    hasSceneTokenVisionChange(changes)
+  );
 }
 
 export async function handleSceneDisableAvsRefresh(
@@ -71,6 +104,7 @@ export async function handleSceneDisableAvsRefresh(
     getCurrentSceneId = getDefaultCurrentSceneId,
     loadAutoVisibility = loadDefaultAutoVisibility,
     clearCaches = clearDefaultAvsCaches,
+    clearVisibility = clearDefaultVisionerVisibility,
     warn = console.warn,
   } = {},
 ) {
@@ -84,11 +118,15 @@ export async function handleSceneDisableAvsRefresh(
     }
 
     await clearCaches?.();
+    if (hasSceneTokenVisionChange(changes) && scene?.tokenVision === false) {
+      await clearVisibility?.();
+      return { refreshed: true, reason: 'token-vision-disabled' };
+    }
     const autoVisibility = await loadAutoVisibility();
     await autoVisibility?.recalculateAll?.(true);
     return { refreshed: true };
   } catch (error) {
-    warn('PF2E Visioner | Failed to handle scene update for disableAVS:', error);
+    warn('PF2E Visioner | Failed to handle scene visibility config update:', error);
     return { refreshed: false, reason: 'error' };
   }
 }

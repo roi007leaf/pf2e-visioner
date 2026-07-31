@@ -3,6 +3,7 @@ import {
   schedulePendingTokenMovementCompletion as defaultSchedulePendingTokenMovementCompletion,
 } from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
+import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import { scheduleCanvasPerceptionUpdate as defaultScheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { primeHiddenDetectionFilterVisualsForObserver as defaultPrimeHiddenDetectionFilterVisualsForObserver } from '../stores/visibility-map.js';
 import {
@@ -75,6 +76,7 @@ export function handleTokenPreUpdate(
     warn = console.warn,
   } = {},
 ) {
+  if (isSceneTokenVisionDisabled()) return undefined;
   try {
     const result = handlePreUpdateTokenMovement(tokenDoc, changes, options, userId);
     if (result === false) return false;
@@ -95,6 +97,9 @@ export async function handleTokenUpdated(
     warn = console.warn,
   } = {},
 ) {
+  if (isSceneTokenVisionDisabled()) {
+    return { handled: false, reason: 'token-vision-disabled' };
+  }
   try {
     if (!hasPositionChange(changes)) {
       return { handled: false, reason: 'not-position' };
@@ -130,6 +135,9 @@ export function handleTokenRefreshed(
     warn = console.warn,
   } = {},
 ) {
+  if (isSceneTokenVisionDisabled()) {
+    return { handled: false, reason: 'token-vision-disabled' };
+  }
   if (isRefreshTokenProcessingSuppressed()) {
     return { handled: false, reason: 'suppressed' };
   }
@@ -167,6 +175,9 @@ export async function handleAvsBatchCompleteRefresh({
   defaultPrimeHiddenDetectionFilterVisualsForObserver,
   getControlledTokens = getDefaultControlledTokens,
 } = {}) {
+  if (isSceneTokenVisionDisabled()) {
+    return { handled: false, reason: 'token-vision-disabled' };
+  }
   try {
     await refreshSystemHiddenHighlightsForControlledTokens();
     await removeSystemHiddenIndicatorsForObservedTargets();

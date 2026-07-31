@@ -2,6 +2,8 @@
 import { MODULE_ID } from "../../../constants.js";
 import { getLogger } from "../../../utils/logger.js";
 import { getCachedSettingValue } from "../../../utils/setting-value-cache.js";
+import { isSceneTokenVisionDisabled } from '../../../services/scene-token-vision.js';
+
 /**
  * SystemStateProvider - Provides access to system state information
  * 
@@ -100,6 +102,9 @@ export class SystemStateProvider {
      * @returns {boolean} True if events should be processed
      */
     shouldProcessEvents() {
+        if (isSceneTokenVisionDisabled()) {
+            return false;
+        }
         if (!this.isEnabled() || !this.isGM()) {
             return false;
         }

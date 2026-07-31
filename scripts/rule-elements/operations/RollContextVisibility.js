@@ -1,4 +1,5 @@
 import { systemIconPath } from '../../system-adapter.js';
+import { isSceneTokenVisionDisabled } from '../../services/scene-token-vision.js';
 import { PredicateHelper } from '../PredicateHelper.js';
 
 function createVisibilityRollContextEffect(operation, ruleElement, rollOption) {
@@ -85,6 +86,7 @@ export class RollContextVisibility {
         ? `target:condition:${operation.state}`
         : `self:condition:${operation.state}`;
     const deferredEffect = async ({ test = [] } = {}) => {
+      if (isSceneTokenVisionDisabled()) return null;
       const rollOptions = new Set(test);
       if (ruleElement.ignored) return null;
       if (ruleElement.predicate?.length > 0 && !ruleElement.test(rollOptions)) return null;

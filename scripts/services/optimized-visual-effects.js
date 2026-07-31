@@ -7,6 +7,7 @@ import {
   refreshTokenVisuals,
   resolveTokenVisualRefreshTargets,
 } from './token-visual-refresh.js';
+import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import {
   resolveStrictWallVisualObserver,
   runWallVisualWorkflow,
@@ -17,6 +18,7 @@ export { cleanupDeletedWallVisuals, updateSpecificTokenPairs } from './visual-ef
 
 export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
+  if (isSceneTokenVisionDisabled()) return;
 
   refreshTokenVisuals(resolveTokenVisualRefreshTargets(tokens), { requireVisibleTrue: true });
 }

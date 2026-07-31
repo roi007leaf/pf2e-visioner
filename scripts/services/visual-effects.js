@@ -26,6 +26,7 @@ import { getVisibilityBetween } from '../utils.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
+import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import { clearHiddenTokenEchoes } from './hidden-token-echoes.js';
 import {
   buildSystemHiddenIndicatorDecision,
@@ -99,17 +100,20 @@ function removeSystemHiddenIndicators(tokens, { forceTokenVisible = false } = {}
 
 export function clearVisionerTokenVisibilityEffects(
   tokens = globalThis.canvas?.tokens?.placeables || [],
+  { forceTokenVisible = true } = {},
 ) {
-  removeSystemHiddenIndicators(tokens, { forceTokenVisible: true });
+  removeSystemHiddenIndicators(tokens, { forceTokenVisible });
   clearHiddenTokenEchoes(tokens);
   for (const token of tokens) {
     if (!token?._pvCurrentViewHardHidden) continue;
-    if ('visible' in token) token.visible = true;
-    if ('renderable' in token) token.renderable = true;
-    if (token.mesh) {
-      if ('visible' in token.mesh) token.mesh.visible = true;
-      if ('renderable' in token.mesh) token.mesh.renderable = true;
-      if ('alpha' in token.mesh) token.mesh.alpha = token.document?.hidden ? 0.5 : 1;
+    if (forceTokenVisible) {
+      if ('visible' in token) token.visible = true;
+      if ('renderable' in token) token.renderable = true;
+      if (token.mesh) {
+        if ('visible' in token.mesh) token.mesh.visible = true;
+        if ('renderable' in token.mesh) token.mesh.renderable = true;
+        if ('alpha' in token.mesh) token.mesh.alpha = token.document?.hidden ? 0.5 : 1;
+      }
     }
     for (const entry of token._pvHardHiddenChromeVisibility || []) {
       if (entry?.surface && 'visible' in entry.surface) entry.surface.visible = entry.visible;
@@ -121,6 +125,7 @@ export function clearVisionerTokenVisibilityEffects(
 
 export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
+  if (isSceneTokenVisionDisabled()) return;
   const targets =
     tokens === undefined || tokens === null ? null : resolveTokenVisualRefreshTargets(tokens);
 
@@ -144,6 +149,7 @@ export async function updateTokenVisuals(tokens = undefined) {
  * @param {Array<{observerId:string,targetId:string,visibility?:string,cover?:string}>} pairs
  */
 export async function updateSpecificTokenPairs(pairs) {
+  if (isSceneTokenVisionDisabled()) return;
   if (!Array.isArray(pairs) || pairs.length === 0) return;
   // Apply only changed visibility/cover per pair
   for (const p of pairs) {
@@ -295,6 +301,7 @@ export async function updateSystemHiddenTokenHighlights(
   options = {},
 ) {
   try {
+    if (isSceneTokenVisionDisabled()) return;
     const tokens = canvas?.tokens?.placeables || [];
     if (!tokens.length) {
       return;

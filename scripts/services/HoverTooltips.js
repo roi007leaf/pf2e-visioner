@@ -15,6 +15,7 @@ import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegio
 import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
+import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import {
   buildVisibilityFactorTooltipLines,
   buildVisibilityFactorIndicatorRequests,
@@ -869,6 +870,10 @@ function renderVisibilityIndicatorRequest({
  * @param {Token} hoveredToken - The token being hovered
  */
 function showVisibilityIndicators(hoveredToken) {
+  if (isSceneTokenVisionDisabled()) {
+    hideAllVisibilityIndicators();
+    return;
+  }
   // Check if tooltips are allowed for the current mode and token
   // Suppress hover overlays entirely while any keybind overlay is active, UNLESS this is a keyboard context
   if (
@@ -921,6 +926,10 @@ function showVisibilityIndicators(hoveredToken) {
  * @param {string} forceMode - Optional mode to force ('observer' or 'target'), defaults to current tooltipMode
  */
 function showVisibilityIndicatorsForToken(observerToken, forceMode = null) {
+  if (isSceneTokenVisionDisabled()) {
+    hideAllVisibilityIndicators();
+    return;
+  }
   // Use forced mode if provided, otherwise use current tooltipMode
   const effectiveMode = forceMode || HoverTooltips.tooltipMode;
 
@@ -1108,6 +1117,7 @@ function addVisibilityIndicator(
   detectionTarget = null,
   precomputedSenseUsed = undefined,
 ) {
+  if (isSceneTokenVisionDisabled()) return;
   const config = VISIBILITY_STATES[visibilityState];
   if (!config) return;
 

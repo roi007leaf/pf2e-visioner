@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import {
   getVisionerVisibilityBetweenTokens,
@@ -35,6 +36,7 @@ export function currentViewObservers() {
 }
 
 export function currentViewVisionerObserversForTarget(target) {
+  if (isSceneTokenVisionDisabled()) return [];
   if (shouldBypassAvsForGmVision()) return [];
   return currentViewObservers();
 }
@@ -123,6 +125,7 @@ function hasUndetectedAvsOverride(observer, target) {
 
 function automaticVisionerVisibilityIsActive() {
   try {
+    if (isSceneTokenVisionDisabled()) return false;
     if (globalThis.canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS') === true) return false;
     return (
       getDetectionSetting('autoVisibilityEnabled') !== false &&
@@ -221,6 +224,7 @@ export function releaseAllCurrentViewHardHide(tokens = globalThis.canvas?.tokens
 
 export function targetIsHardHiddenFromCurrentView(target) {
   if (!target?.document?.id) return false;
+  if (isSceneTokenVisionDisabled()) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
   if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
