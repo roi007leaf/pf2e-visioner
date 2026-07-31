@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.3.44] - 2026-07-31
+
+### Fixed
+
+- **Tokens no longer vanish from stale Undetected states while AVS is inactive**: Visioner's hard-hide rendering now ignores old automatically calculated visibility data when AVS is disabled or combat-only AVS is outside an encounter. Explicit manual Undetected overrides remain supported.
+- **Undetected tokens now hide rebuilt effect icons**: Hard-hide refreshes now discover replacement token-effect containers created by PF2e or other modules instead of only hiding the original container.
+
 ## [8.3.43] - 2026-07-28
 
 ### Fixed

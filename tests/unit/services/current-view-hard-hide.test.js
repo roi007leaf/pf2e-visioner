@@ -9,6 +9,10 @@ jest.mock('../../../scripts/services/Detection/select-all-token-visibility-bypas
 }));
 jest.mock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
   getVisionerVisibilityBetweenTokens: () => 'observed',
+  isAvsActiveGivenCombatGate: jest.fn(() => true),
+}));
+jest.mock('../../../scripts/services/Detection/detection-setting-cache.js', () => ({
+  getDetectionSetting: jest.fn(() => true),
 }));
 jest.mock('../../../scripts/services/movement-tracking.js', () => ({
   hasActivePendingTokenMovement: jest.fn(() => false),
@@ -26,6 +30,8 @@ import {
 import { shouldBypassAvsForGmVision } from '../../../scripts/services/gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from '../../../scripts/services/Detection/select-all-token-visibility-bypass.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
+import { isAvsActiveGivenCombatGate } from '../../../scripts/services/Detection/detection-visibility-context.js';
+import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 
 beforeEach(() => {
   controlled.length = 0;
@@ -37,6 +43,8 @@ beforeEach(() => {
   shouldBypassAvsForGmVision.mockReturnValue(false);
   isSelectAllTokenVisibilityBypassActive.mockReturnValue(false);
   hasActivePendingTokenMovement.mockReturnValue(false);
+  isAvsActiveGivenCombatGate.mockReturnValue(true);
+  getDetectionSetting.mockReturnValue(true);
 });
 
 describe('currentViewObservers', () => {
@@ -286,6 +294,98 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.visible).toBe(true);
   });
 
+  it('defers to Core outside combat when AVS is combat-only, ignoring stale Undetected state', () => {
+    globalThis.game = { user: { isGM: false } };
+    isAvsActiveGivenCombatGate.mockReturnValue(false);
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.renderable).toBe(true);
+    expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  it('defers to Core when AVS is off and no manual Undetected override exists', () => {
+    globalThis.game = { user: { isGM: false } };
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.renderable).toBe(true);
+    expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  it('defers to Core when AVS is disabled for the scene and no manual override exists', () => {
+    globalThis.canvas.scene = {
+      getFlag: jest.fn((_module, key) => key === 'disableAVS'),
+    };
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+  });
+
+  it('honors an explicit manual Undetected override while AVS is off', () => {
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const getFlag = (_module, key) =>
+      key === 'avs-override-from-obs'
+        ? { state: 'undetected', source: 'manual_action' }
+        : null;
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      document: { id: 't', hidden: false, getFlag },
+      actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+  });
+
+  it('releases a stale automatic hard-hide marker with no observer while AVS is off', () => {
+    controlled.length = 0;
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: false, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } } };
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBe(false);
+    expect(t.visible).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+  });
+
+  it('does not reveal a Core-invisible token while awaiting stale marker release with AVS off', () => {
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const t = { controlled: false, visible: false, renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: false, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
   it('leaves a core-LOS-hidden observed NPC invisible for players when AVS is off', () => {
     globalThis.game = {
       user: { isGM: false },
@@ -349,6 +449,23 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.effects.visible).toBe(false);
     expect(t.nameplate.visible).toBe(false);
     expect(t.bars.visible).toBe(false);
+  });
+
+  it('hides a replacement effects container on every hard-hide refresh', () => {
+    const firstEffects = { visible: true };
+    const t = { controlled: false, visible: true, renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 }, detectionFilter: {},
+      effects: firstEffects,
+      document: { id: 't', hidden: false }, actor: { type: 'npc', itemTypes: { condition: [] } } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    applyCurrentViewHardHide(t);
+
+    const replacementEffects = { visible: true };
+    t.effects = replacementEffects;
+    applyCurrentViewHardHide(t);
+
+    expect(firstEffects.visible).toBe(false);
+    expect(replacementEffects.visible).toBe(false);
   });
 
   it('restores chrome surfaces to their captured visibility on release', () => {

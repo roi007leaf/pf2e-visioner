@@ -2,7 +2,11 @@ import { MODULE_ID } from '../../constants.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
-import { getVisionerVisibilityBetweenTokens } from './detection-visibility-context.js';
+import {
+  getVisionerVisibilityBetweenTokens,
+  isAvsActiveGivenCombatGate,
+} from './detection-visibility-context.js';
+import { getDetectionSetting } from './detection-setting-cache.js';
 
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
@@ -78,17 +82,13 @@ function hardHiddenChromeSurfaces(token) {
 }
 
 function hideHardHiddenChromeSurfaces(token) {
-  const existing = token[HARD_HIDDEN_CHROME_KEY];
-  if (existing) {
-    for (const entry of existing) {
-      if (entry.surface && 'visible' in entry.surface) entry.surface.visible = false;
-    }
-    return;
+  const captured = token[HARD_HIDDEN_CHROME_KEY] ?? [];
+  const capturedSurfaces = new Set(captured.map((entry) => entry.surface));
+  for (const surface of hardHiddenChromeSurfaces(token)) {
+    if (capturedSurfaces.has(surface)) continue;
+    captured.push({ surface, visible: surface.visible });
+    capturedSurfaces.add(surface);
   }
-  const captured = hardHiddenChromeSurfaces(token).map((surface) => ({
-    surface,
-    visible: surface.visible,
-  }));
   for (const entry of captured) entry.surface.visible = false;
   token[HARD_HIDDEN_CHROME_KEY] = captured;
 }
@@ -118,6 +118,18 @@ function hasUndetectedAvsOverride(observer, target) {
     return state === 'undetected' || state === 'unnoticed';
   } catch {
     return false;
+  }
+}
+
+function automaticVisionerVisibilityIsActive() {
+  try {
+    if (globalThis.canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS') === true) return false;
+    return (
+      getDetectionSetting('autoVisibilityEnabled') !== false &&
+      isAvsActiveGivenCombatGate()
+    );
+  } catch {
+    return true;
   }
 }
 
@@ -176,6 +188,7 @@ export function applyCurrentViewHardHide(token) {
 export function releaseCurrentViewHardHideIfMarked(token) {
   if (!token?._pvCurrentViewHardHidden) return false;
   if (targetIsHardHiddenFromCurrentView(token)) return false;
+  if (!automaticVisionerVisibilityIsActive() && token.visible === false) return false;
   const released = releaseCurrentViewHardHide(token);
   token._pvCurrentViewHardHidden = false;
   return released;
@@ -212,16 +225,18 @@ export function targetIsHardHiddenFromCurrentView(target) {
   if (target.controlled) return false;
   if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
 
+  const automaticVisibilityActive = automaticVisionerVisibilityIsActive();
   const observers = currentViewVisionerObserversForTarget(target);
   if (observers.length === 0) {
-    if (globalThis.game?.user?.isGM) return false;
+    if (globalThis.game?.user?.isGM || !automaticVisibilityActive) return false;
     return !!target._pvCurrentViewHardHidden;
   }
 
   for (const observer of observers) {
     if (tokenIdOf(observer) === tokenIdOf(target)) continue;
     const state = getStoredVisibilityState(observer, target);
-    if (visionerStateHidesTargetRendering(state, target)) return true;
+    if (!visionerStateHidesTargetRendering(state, target)) continue;
+    if (automaticVisibilityActive || hasUndetectedAvsOverride(observer, target)) return true;
   }
   return false;
 }
