@@ -19,6 +19,11 @@ jest.mock('../../../scripts/services/during-move-soundwave.js', () => ({
 
 jest.mock('../../../scripts/services/Detection/multi-level-control-view.js', () => ({
   captureMultiLevelViewBeforeControl: jest.fn(),
+  enforceControlledLevelTokenRendering: jest.fn(),
+  reassertOtherLevelTokenRenderingSuppression: jest.fn(),
+  restoreOtherLevelTokenRenderingSuppression: jest.fn(),
+  suppressOtherLevelTokenRenderingBeforeControl: jest.fn(() => null),
+  tokenIsOutsideControlledLevelCullingSurface: jest.fn(() => false),
 }));
 
 import {
@@ -34,7 +39,12 @@ import {
   refreshSoundwavesForActiveMovement,
   rememberSoundwaveDetectionBeforeCoreRefresh,
 } from '../../../scripts/services/during-move-soundwave.js';
-import { captureMultiLevelViewBeforeControl } from '../../../scripts/services/Detection/multi-level-control-view.js';
+import {
+  captureMultiLevelViewBeforeControl,
+  reassertOtherLevelTokenRenderingSuppression,
+  restoreOtherLevelTokenRenderingSuppression,
+  suppressOtherLevelTokenRenderingBeforeControl,
+} from '../../../scripts/services/Detection/multi-level-control-view.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 
@@ -58,6 +68,9 @@ describe('detection token refresh', () => {
     rememberSoundwaveDetectionBeforeCoreRefresh.mockClear();
     refreshSoundwavesForActiveMovement.mockClear();
     ensureDuringMoveSoundwaveRefresh.mockClear();
+    suppressOtherLevelTokenRenderingBeforeControl.mockClear();
+    reassertOtherLevelTokenRenderingSuppression.mockClear();
+    restoreOtherLevelTokenRenderingSuppression.mockClear();
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -80,7 +93,7 @@ describe('detection token refresh', () => {
     expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
   });
 
-  it('defers and coalesces hard-hide rendering until Core finishes a multi-level refresh', () => {
+  it('hard-hides multi-level visuals synchronously and coalesces the settle pass', () => {
     usesCoreMultiLevelSurfaceRendering.mockReturnValue(true);
     const queued = [];
     jest
@@ -93,12 +106,12 @@ describe('detection token refresh', () => {
     wrapTokenRefreshVisibility.call(token, wrapped);
 
     expect(wrapped).toHaveBeenCalledTimes(2);
-    expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
+    expect(applyCurrentViewHardHide).toHaveBeenCalledTimes(2);
+    expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
     expect(queued).toHaveLength(1);
 
     queued[0]();
-    expect(applyCurrentViewHardHide).toHaveBeenCalledTimes(1);
-    expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
+    expect(applyCurrentViewHardHide).toHaveBeenCalledTimes(3);
   });
 
   it('keeps an already-visible GM ghost visible during movement', () => {
@@ -143,6 +156,9 @@ describe('detection token refresh', () => {
     const token = foundryHiddenToken();
     const wrapped = jest.fn(() => {
       expect(captureMultiLevelViewBeforeControl).toHaveBeenCalledWith(token);
+      expect(suppressOtherLevelTokenRenderingBeforeControl).toHaveBeenCalledWith(token, {
+        releaseOthers: true,
+      });
       return 'controlled';
     });
 
@@ -150,8 +166,20 @@ describe('detection token refresh', () => {
 
     expect(rememberSoundwaveDetectionBeforeCoreRefresh).toHaveBeenCalledWith(token);
     expect(wrapped).toHaveBeenCalledWith({ releaseOthers: true });
+    expect(reassertOtherLevelTokenRenderingSuppression).toHaveBeenCalledWith(null);
     expect(refreshSoundwavesForActiveMovement).toHaveBeenCalled();
     expect(ensureDuringMoveSoundwaveRefresh).toHaveBeenCalled();
+  });
+
+  it('restores suppressed other-level surfaces when Core rejects control', () => {
+    const token = foundryHiddenToken();
+    const transition = { entries: [{ surface: token }] };
+    suppressOtherLevelTokenRenderingBeforeControl.mockReturnValueOnce(transition);
+
+    expect(wrapTokenControl.call(token, () => false)).toBe(false);
+
+    expect(restoreOtherLevelTokenRenderingSuppression).toHaveBeenCalledWith(transition);
+    expect(reassertOtherLevelTokenRenderingSuppression).not.toHaveBeenCalled();
   });
 
   it('scene Token Vision off runs only Core token refresh logic', () => {

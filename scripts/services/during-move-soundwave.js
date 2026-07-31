@@ -5,6 +5,10 @@ import {
   targetIsHardHiddenFromCurrentView,
 } from './Detection/current-view-hard-hide.js';
 import {
+  enforceControlledLevelTokenRendering,
+  tokenIsOutsideControlledLevelCullingSurface,
+} from './Detection/multi-level-control-view.js';
+import {
   getVisionerVisibilityBetweenTokens,
   isAvsActiveGivenCombatGate,
 } from './Detection/detection-visibility-context.js';
@@ -236,7 +240,7 @@ function showSoundwaveRenderSurface(target) {
   setSoundwaveMeshVisible(target, true);
 }
 
-function showControlledTokenFullArt(target) {
+function clearControlledTokenSoundwave(target) {
   if (!target) return;
   removeSoundwaveFilterOverride(target);
   try {
@@ -244,13 +248,17 @@ function showControlledTokenFullArt(target) {
   } catch {
     /* leave Core's filter state intact if assignment fails */
   }
+  setSoundwaveMeshVisible(target, false);
+}
+
+function showControlledTokenFullArt(target) {
+  clearControlledTokenSoundwave(target);
   if ('visible' in target) target.visible = true;
   if ('renderable' in target) target.renderable = true;
   if (target.mesh) {
     if ('visible' in target.mesh) target.mesh.visible = true;
     if ('renderable' in target.mesh) target.mesh.renderable = true;
   }
-  setSoundwaveMeshVisible(target, false);
 }
 
 export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
@@ -306,6 +314,16 @@ export function removeSoundwaveFilterOverride(target) {
   return true;
 }
 
+function suppressSoundwaveForControlledLevel(target) {
+  if (!enforceControlledLevelTokenRendering(target)) return false;
+  // Removing an override restores Core's stored filter, whose reconciliation can make its
+  // detection surface visible again. Reassert level suppression after that handoff.
+  removeSoundwaveFilterOverride(target);
+  setSoundwaveMeshVisible(target, false);
+  enforceControlledLevelTokenRendering(target);
+  return true;
+}
+
 export function settleSoundwaveOverrides() {
   if (isSceneTokenVisionDisabled()) {
     clearDuringMoveSoundwaveState();
@@ -358,14 +376,17 @@ export function refreshSoundwavesForActiveMovement() {
     return;
   }
   const pendingMovementActive = hasActivePendingTokenMovement();
+  const movementOrDragActive = pendingMovementActive || isMovementOrDragActive();
   // Controlled movers are interaction surfaces, not detection results. Keep their primary art
-  // visible during selection, drag, and committed movement; soundwaves only describe other tokens.
+  // visible while selected, but let Core own visibility during drag and movement animation.
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-    if (target.controlled) showControlledTokenFullArt(target);
+    if (!target.controlled) continue;
+    if (movementOrDragActive) clearControlledTokenSoundwave(target);
+    else showControlledTokenFullArt(target);
   }
-  // Foundry moves a preview clone during drag. It follows the same full-art controlled-token rule.
+  // Preview clones can have transient transforms. Never force them visible before Core is ready.
   for (const preview of globalThis.canvas?.tokens?.preview?.children ?? []) {
-    if (preview?._original?.controlled) showControlledTokenFullArt(preview);
+    if (preview?._original?.controlled) clearControlledTokenSoundwave(preview);
   }
 
   // Only mutate soundwaves during an actual committed move. While merely hold-dragging
@@ -376,6 +397,12 @@ export function refreshSoundwavesForActiveMovement() {
   // Foundry can replace or hide the detection-filter mesh every frame. Reassert existing
   // soundwaves cheaply without rediscovering observers for every token.
   for (const { target } of filterOverrides.values()) {
+    if (suppressSoundwaveForControlledLevel(target)) continue;
+    if (tokenIsOutsideControlledLevelCullingSurface(target)) {
+      removeSoundwaveFilterOverride(target);
+      reconcileRenderSurfaceAfterSoundwave(target);
+      continue;
+    }
     showSoundwaveRenderSurface(target);
   }
 
@@ -388,9 +415,17 @@ export function refreshSoundwavesForActiveMovement() {
 
   const targetsWithObservers = [];
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
+    if (suppressSoundwaveForControlledLevel(target)) continue;
     if (isPartyActorToken(target)) continue;
     if (target.controlled) {
-      showControlledTokenFullArt(target);
+      clearControlledTokenSoundwave(target);
+      continue;
+    }
+    if (tokenIsOutsideControlledLevelCullingSurface(target)) {
+      if (filterOverrides.has(target)) {
+        removeSoundwaveFilterOverride(target);
+        reconcileRenderSurfaceAfterSoundwave(target);
+      }
       continue;
     }
     const hardHiddenFromStoredState = targetIsHardHiddenFromCurrentView(target);

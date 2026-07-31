@@ -11,10 +11,25 @@ import {
   rememberSoundwaveDetectionBeforeCoreRefresh,
 } from '../during-move-soundwave.js';
 import { withDetectionSettingCache } from './detection-setting-cache.js';
-import { captureMultiLevelViewBeforeControl } from './multi-level-control-view.js';
+import {
+  captureMultiLevelViewBeforeControl,
+  enforceControlledLevelTokenRendering,
+  reassertOtherLevelTokenRenderingSuppression,
+  restoreOtherLevelTokenRenderingSuppression,
+  suppressOtherLevelTokenRenderingBeforeControl,
+  tokenIsOutsideControlledLevelCullingSurface,
+} from './multi-level-control-view.js';
 
 const deferredCoreLevelHardHideTokens = new WeakSet();
 const LEGACY_FILTERED_EFFECT_VISIBILITY_KEY = '_pvLegacyFilteredEffectVisibility';
+
+function detectionFilterOwnsRenderSurface(token) {
+  return (
+    !token?.controlled &&
+    !!token?.detectionFilter &&
+    !tokenIsOutsideControlledLevelCullingSurface(token)
+  );
+}
 
 function reconcileLegacyFilteredEffectVisibility(token) {
   const effects = token?.effects;
@@ -29,7 +44,7 @@ function reconcileLegacyFilteredEffectVisibility(token) {
     token,
     LEGACY_FILTERED_EFFECT_VISIBILITY_KEY,
   );
-  if (!token.controlled && token.detectionFilter) {
+  if (detectionFilterOwnsRenderSurface(token)) {
     if (!hasCapturedVisibility) {
       token[LEGACY_FILTERED_EFFECT_VISIBILITY_KEY] = effects.visible;
     }
@@ -45,6 +60,26 @@ function reconcileLegacyFilteredEffectVisibility(token) {
     token[LEGACY_FILTERED_EFFECT_VISIBILITY_KEY] = undefined;
   }
   effects.visible = visible;
+}
+
+function hideFilteredTooltip(token) {
+  const tooltip = token?.tooltip;
+  if (!tooltip || !('visible' in tooltip)) return;
+  if (token._pvCurrentViewHardHidden === true || detectionFilterOwnsRenderSurface(token)) {
+    tooltip.visible = false;
+  }
+}
+
+function reconcileDetectionFilterRenderSurface(token) {
+  if (!usesCoreMultiLevelSurfaceRendering()) return;
+  if (hasActivePendingTokenMovement()) return;
+  const tokens = globalThis.canvas?.tokens;
+  if (tokens?._draggedToken || tokens?.preview?.children?.some?.((entry) => entry?.document?.id)) {
+    return;
+  }
+  if (!detectionFilterOwnsRenderSurface(token) || !token.mesh) return;
+  if ('visible' in token.mesh) token.mesh.visible = false;
+  if ('renderable' in token.mesh) token.mesh.renderable = false;
 }
 
 function renderState(token) {
@@ -78,10 +113,8 @@ function suppressNewFoundryHiddenVisibilityDuringMove(token, before) {
 }
 
 function applyCurrentViewHardHideAfterCore(token) {
-  if (!usesCoreMultiLevelSurfaceRendering()) {
-    applyCurrentViewHardHide(token);
-    return;
-  }
+  applyCurrentViewHardHide(token);
+  if (!usesCoreMultiLevelSurfaceRendering()) return;
   if (deferredCoreLevelHardHideTokens.has(token)) return;
 
   deferredCoreLevelHardHideTokens.add(token);
@@ -102,6 +135,8 @@ function afterCoreRefresh(token, before) {
   }
   try {
     applyCurrentViewHardHideAfterCore(token);
+    reconcileDetectionFilterRenderSurface(token);
+    enforceControlledLevelTokenRendering(token);
   } catch {
     /* keep Foundry visibility if the guard fails */
   }
@@ -125,6 +160,8 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   const result = wrapped(...args);
   afterCoreRefresh(this, before);
   reconcileLegacyFilteredEffectVisibility(this);
+  hideFilteredTooltip(this);
+  enforceControlledLevelTokenRendering(this);
   return result;
 }
 
@@ -144,13 +181,8 @@ export function wrapTokenRefreshTooltip(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return result;
   try {
     applyCurrentViewHardHide(this);
-    if (
-      this.tooltip &&
-      'visible' in this.tooltip &&
-      (this._pvCurrentViewHardHidden === true || (!this.controlled && this.detectionFilter))
-    ) {
-      this.tooltip.visible = false;
-    }
+    enforceControlledLevelTokenRendering(this);
+    hideFilteredTooltip(this);
   } catch {
     /* keep Foundry tooltip visibility if the guard fails */
   }
@@ -160,9 +192,17 @@ export function wrapTokenRefreshTooltip(wrapped, ...args) {
 export function wrapTokenControl(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
   captureMultiLevelViewBeforeControl(this);
-  rememberSoundwaveDetectionBeforeCoreRefresh(this);
-  const result = wrapped(...args);
-  refreshSoundwavesForActiveMovement();
-  ensureDuringMoveSoundwaveRefresh();
-  return result;
+  const levelTransition = suppressOtherLevelTokenRenderingBeforeControl(this, args[0]);
+  try {
+    rememberSoundwaveDetectionBeforeCoreRefresh(this);
+    const result = wrapped(...args);
+    if (result) reassertOtherLevelTokenRenderingSuppression(levelTransition);
+    else restoreOtherLevelTokenRenderingSuppression(levelTransition);
+    refreshSoundwavesForActiveMovement();
+    ensureDuringMoveSoundwaveRefresh();
+    return result;
+  } catch (error) {
+    restoreOtherLevelTokenRenderingSuppression(levelTransition);
+    throw error;
+  }
 }

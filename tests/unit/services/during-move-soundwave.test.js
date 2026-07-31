@@ -420,6 +420,8 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     getObservers = () => (gmVisionBypass ? [] : observers),
     getVisibility = () => 'hidden',
     isHardHidden = () => false,
+    enforceControlledLevelTokenRendering = () => false,
+    tokenIsOutsideControlledLevelCullingSurface = () => false,
     visionAnalyzer = null,
     releaseHardHideForLiveSight = (target) => {
       target._pvCurrentViewHardHidden = false;
@@ -448,6 +450,10 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       }));
       jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
         shouldBypassAvsForGmVision: () => gmVisionBypass,
+      }));
+      jest.doMock('../../../scripts/services/Detection/multi-level-control-view.js', () => ({
+        enforceControlledLevelTokenRendering,
+        tokenIsOutsideControlledLevelCullingSurface,
       }));
       jest.doMock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({
         VisionAnalyzer: { getInstance: () => visionAnalyzer },
@@ -756,7 +762,74 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     globalThis.CONFIG = savedConfig;
   });
 
-  test('keeps the moving preview clone on full art', async () => {
+  test('leaves Core movement visibility on the controlled token untouched', async () => {
+    const target = makeTarget();
+    target.controlled = true;
+    target.visible = false;
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false };
+    target.detectionFilter = null;
+    globalThis.canvas = {
+      tokens: { placeables: [target], preview: { children: [] } },
+    };
+    const mod = await loadWith({ pendingMovement: true });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target).toMatchObject({
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false },
+      detectionFilter: null,
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    });
+  });
+
+  test('does not repaint an active soundwave over another-level token suppressed by Core', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.visible = false;
+    target.renderable = false;
+    target.mesh = { visible: false, renderable: false };
+    const enforceLevelSuppression = jest.fn((token) => {
+      if (token !== target) return false;
+      token.visible = false;
+      token.renderable = false;
+      token.mesh.visible = false;
+      token.mesh.renderable = false;
+      token.detectionFilterMesh.visible = false;
+      token.detectionFilterMesh.renderable = false;
+      token.detectionFilterMesh.alpha = 0;
+      return true;
+    });
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      enforceControlledLevelTokenRendering: enforceLevelSuppression,
+    });
+    mod.installSoundwaveFilterOverride(target);
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(enforceLevelSuppression).toHaveBeenCalledWith(target);
+    expect(target).toMatchObject({
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false },
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('leaves moving preview clone visibility to Core', async () => {
     const savedConfig = globalThis.CONFIG;
     const soundwaveFilter = {};
     globalThis.CONFIG = {
@@ -775,7 +848,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       detectionFilter: null,
       visible: false,
       renderable: false,
-      mesh: { visible: true, renderable: true },
+      mesh: { visible: false, renderable: false },
     };
     globalThis.canvas = {
       tokens: { placeables: [target], preview: { children: [preview] } },
@@ -789,9 +862,9 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
 
     expect(preview.detectionFilter).toBeNull();
     expect(preview).toMatchObject({
-      visible: true,
-      renderable: true,
-      mesh: { visible: true, renderable: true },
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false },
       detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
     });
     globalThis.CONFIG = savedConfig;

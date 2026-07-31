@@ -15,6 +15,7 @@ import {
   wrapTokenVisionSource,
 } from './detection-vision-sharing.js';
 import { startDuringMoveSoundwaveOnDrag } from '../during-move-soundwave.js';
+import { wrapMultiLevelDragPreviewInitializeSources } from './multi-level-control-view.js';
 import { VISIBILITY_DETECTION_THRESHOLDS } from './detection-visibility-context.js';
 
 export function registerDetectionWrappers({
@@ -112,6 +113,12 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGenerati
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._onDragLeftMove',
       startDuringMoveSoundwaveOnDrag,
+      'WRAPPER',
+    );
+    libWrapperAdapter.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype.initializeSources',
+      wrapMultiLevelDragPreviewInitializeSources,
       'WRAPPER',
     );
     libWrapperAdapter.register(

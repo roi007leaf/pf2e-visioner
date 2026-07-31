@@ -8,6 +8,12 @@ import {
   isAvsActiveGivenCombatGate,
 } from './detection-visibility-context.js';
 import { getDetectionSetting } from './detection-setting-cache.js';
+import {
+  tokenIsOutsideControlledLevelCullingSurface,
+  usesCoreMultiLevelSurfaceRendering,
+} from './multi-level-control-view.js';
+
+export { usesCoreMultiLevelSurfaceRendering } from './multi-level-control-view.js';
 
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
@@ -102,15 +108,6 @@ function hideHardHiddenChromeSurfaces(token) {
   }
   for (const entry of captured) entry.surface.visible = false;
   token[HARD_HIDDEN_CHROME_KEY] = captured;
-}
-
-export function usesCoreMultiLevelSurfaceRendering() {
-  const scene = globalThis.canvas?.scene;
-  return !!(
-    (scene?.levels?.size ?? 0) > 1 &&
-    typeof scene.getSurfaces === 'function' &&
-    typeof scene.testSurfaceCollision === 'function'
-  );
 }
 
 function restoreHardHiddenChromeSurfaces(token) {
@@ -340,6 +337,9 @@ export function targetIsHardHiddenFromCurrentView(target) {
   if (isSelectAllTokenVisibilityBypassActive()) return false;
   if (target.controlled) return false;
   if (foundryHiddenRequiresVisionerRenderLock(target)) return true;
+  // Core multi-level culling applies only where a level surface exists. Outside those surfaces,
+  // the token remains part of the unrestricted scene view and AVS must not hide its render art.
+  if (tokenIsOutsideControlledLevelCullingSurface(target)) return false;
 
   const automaticVisibilityActive = automaticVisionerVisibilityIsActive();
   const observers = currentViewVisionerObserversForTarget(target);

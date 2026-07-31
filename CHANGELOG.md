@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.3.48] - 2026-07-31
+
+### Fixed
+
+- **Selecting, hovering, or switching tokens no longer flashes tokens from other levels**: Visioner suppresses covered tokens before Foundry changes the active level and keeps that suppression through token, detection-filter, tooltip, and soundwave refreshes. Deselecting still restores the full all-level scene view.
+- **Dragging or moving a selected token no longer causes rapid multi-level flicker**: Visioner keeps the original token's vision source stable while Foundry initializes its drag preview and avoids forcing incomplete preview or movement frames visible.
+- **Tokens outside a level's defined surface region remain visible**: Core's level culling, Visioner hard hiding, detection filters, and movement soundwaves now agree that off-surface tokens belong to the unrestricted scene view, while tokens hidden through Foundry's own toggle remain protected.
+
 ## [8.3.47] - 2026-07-31
 
 ### Fixed
