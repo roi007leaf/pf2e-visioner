@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.49] - 2026-07-31
+
+### Fixed
+
+- **Tokens hidden by Levels line of sight no longer flash between render passes on Foundry V13**: Visioner preserves Levels' completed hidden result between V13 refreshes, then restores rendering immediately when Levels' own line-of-sight polygon reveals the token. Foundry V14 and scenes without configured Levels remain unchanged.
+
 ## [8.3.48] - 2026-07-31
 
 ### Fixed

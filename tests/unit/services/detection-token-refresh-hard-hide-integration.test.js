@@ -663,6 +663,92 @@ describe('Foundry V13 _applyRenderFlags effect-icon ordering', () => {
     expect('_pvLegacyFilteredEffectVisibility' in token).toBe(false);
   });
 
+  it('keeps a Levels-hidden token non-renderable between V13 render passes without delaying LOS reveal', () => {
+    __setStoredVisibilityForTest(new Map());
+    globalThis.game.modules = new Map([['levels', { active: true }]]);
+    globalThis.canvas.scene = {
+      flags: {
+        levels: {
+          sceneLevels: [
+            [0, 10],
+            [10, 20],
+          ],
+        },
+      },
+    };
+
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper) => registered.set(target, wrapper)),
+    };
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration: 13 });
+
+    const refreshVisibility = registered.get(
+      'foundry.canvas.placeables.Token.prototype._refreshVisibility',
+    );
+    const applyRenderFlags = registered.get(
+      'foundry.canvas.placeables.Token.prototype._applyRenderFlags',
+    );
+    const token = {
+      controlled: false,
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      detectionFilter: null,
+      document: { id: 't', hidden: false, elevation: 20, getFlag: () => null },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
+    applyRenderFlags.call(token, () => {
+      refreshVisibility.call(token, () => {
+        // V13 Levels' visibility test settles this token as hidden by the active LOS polygon.
+        token.visible = false;
+        token.mesh.visible = false;
+      });
+    });
+
+    expect(token.visible).toBe(false);
+    expect(token.renderable).toBe(false);
+    expect(token.mesh.renderable).toBe(false);
+
+    applyRenderFlags.call(token, () => {
+      refreshVisibility.call(token, () => {
+        // The LOS polygon can reveal the token on the very next pass.
+        token.visible = true;
+        token.mesh.visible = true;
+      });
+    });
+
+    expect(token.visible).toBe(true);
+    expect(token.renderable).toBe(true);
+    expect(token.mesh.visible).toBe(true);
+    expect(token.mesh.renderable).toBe(true);
+  });
+
+  it('preserves V13 renderability outside a configured Levels scene', () => {
+    __setStoredVisibilityForTest(new Map());
+    globalThis.game.modules = new Map([['levels', { active: true }]]);
+    globalThis.canvas.scene = { flags: { levels: { sceneLevels: [] } } };
+
+    const token = {
+      controlled: false,
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      detectionFilter: null,
+      document: { id: 't', hidden: false, getFlag: () => null },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
+    wrapTokenApplyRenderFlags.call(token, () => {
+      token.visible = false;
+      token.mesh.visible = false;
+    });
+
+    expect(token.renderable).toBe(true);
+    expect(token.mesh.renderable).toBe(true);
+  });
+
   it('does not install the legacy outer wrapper on V14', () => {
     const registered = new Map();
     const libWrapperAdapter = {

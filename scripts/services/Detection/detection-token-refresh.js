@@ -11,6 +11,7 @@ import {
   rememberSoundwaveDetectionBeforeCoreRefresh,
 } from '../during-move-soundwave.js';
 import { withDetectionSettingCache } from './detection-setting-cache.js';
+import { stabilizeLegacyLevelsTokenRenderingAfterRenderPass } from './legacy-levels-render-guard.js';
 import {
   captureMultiLevelViewBeforeControl,
   enforceControlledLevelTokenRendering,
@@ -162,6 +163,7 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   reconcileLegacyFilteredEffectVisibility(this);
   hideFilteredTooltip(this);
   enforceControlledLevelTokenRendering(this);
+  stabilizeLegacyLevelsTokenRenderingAfterRenderPass(this);
   return result;
 }
 
