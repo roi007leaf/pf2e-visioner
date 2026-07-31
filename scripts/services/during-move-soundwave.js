@@ -1,6 +1,7 @@
 import { hasActivePendingTokenMovement } from './movement-tracking.js';
 import {
   currentViewVisionerObserversForTarget,
+  releaseCurrentViewHardHideForLiveSight,
   targetIsHardHiddenFromCurrentView,
 } from './Detection/current-view-hard-hide.js';
 import {
@@ -179,6 +180,39 @@ export function setSoundwaveMeshVisible(target, visible) {
   }
 }
 
+function reconcileRenderSurfaceAfterSoundwave(target) {
+  if (!target) return;
+  if (target.detectionFilter) {
+    setSoundwaveMeshVisible(target, true);
+    return;
+  }
+  setSoundwaveMeshVisible(target, false);
+  let coreVisible = false;
+  let visionerHardHidden = true;
+  try {
+    coreVisible = target.isVisible !== false;
+  } catch {
+    /* unsafe visibility getter -> do not reveal */
+  }
+  try {
+    visionerHardHidden = targetIsHardHiddenFromCurrentView(target);
+  } catch {
+    /* unsafe visibility state -> do not reveal */
+  }
+  if (
+    target._pvCurrentViewHardHidden === true ||
+    target.visible !== true ||
+    !coreVisible ||
+    visionerHardHidden
+  )
+    return;
+  if ('renderable' in target) target.renderable = true;
+  if (target.mesh) {
+    if ('visible' in target.mesh) target.mesh.visible = true;
+    if ('renderable' in target.mesh) target.mesh.renderable = true;
+  }
+}
+
 function hasActiveCoreSoundwaveSurface(target) {
   const mesh = target?.detectionFilterMesh;
   return (
@@ -268,6 +302,7 @@ export function removeSoundwaveFilterOverride(target) {
   } catch {
     /* leave rendering to Foundry if the property restore fails */
   }
+  reconcileRenderSurfaceAfterSoundwave(entry.target);
   return true;
 }
 
@@ -309,6 +344,7 @@ export function clearDuringMoveSoundwaveState() {
     } catch {
       /* best-effort restore */
     }
+    reconcileRenderSurfaceAfterSoundwave(entry.target);
   }
   filterOverrides.clear();
   senseMemo.clear();
@@ -357,7 +393,8 @@ export function refreshSoundwavesForActiveMovement() {
       showControlledTokenFullArt(target);
       continue;
     }
-    if (targetIsHardHiddenFromCurrentView(target)) continue;
+    const hardHiddenFromStoredState = targetIsHardHiddenFromCurrentView(target);
+    if (hardHiddenFromStoredState && !filterOverrides.has(target)) continue;
     const observers = currentViewVisionerObserversForTarget(target).filter(
       (observer) => !isPartyActorToken(observer),
     );
@@ -376,26 +413,30 @@ export function refreshSoundwavesForActiveMovement() {
   if (targetsWithObservers.length === 0 || !recomputeDue) return;
   lastWaveComputeAt = now;
   for (const { target, observers } of targetsWithObservers) {
+    const activeCoreSoundwave = hasActiveCoreSoundwaveSurface(target);
     // Core already has the correct filtered render surface for stored-hidden targets in darkness.
-    // Geometric LOS can still contain them even though no visual sense detects them; rebuilding the
-    // surface hides the primary mesh, while clearing it swaps the ripple for full art. Preserve the
-    // valid Core result unchanged until a real observer visibility state says otherwise.
+    // Preserve it only while no observer has effective live sight. The persisted state is frozen
+    // during movement, so using `hidden` alone would keep a stale Core ripple after LOS opens.
     if (
       !gmVisionBypass &&
-      hasActiveCoreSoundwaveSurface(target) &&
+      activeCoreSoundwave &&
       observers.length > 0 &&
       observers.every(
-        (observer) => getVisionerVisibilityBetweenTokens(observer, target) === 'hidden',
+        (observer) =>
+          getVisionerVisibilityBetweenTokens(observer, target) === 'hidden' &&
+          !observerSightContainsTarget(observer, target),
       )
-    ) {
+    )
       continue;
-    }
     const wantsSoundwave = targetShouldShowSoundwave(
       target,
       observers,
       undefined,
       undefined,
       memoImpreciselySensed,
+    );
+    const hasLiveSight = observers.some(
+      (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );
     try {
       if (wantsSoundwave) {
@@ -405,6 +446,8 @@ export function refreshSoundwavesForActiveMovement() {
         removeSoundwaveFilterOverride(target);
         if (target.detectionFilter) target.detectionFilter = null;
         setSoundwaveMeshVisible(target, false);
+        if (hasLiveSight) releaseCurrentViewHardHideForLiveSight(target);
+        reconcileRenderSurfaceAfterSoundwave(target);
       }
     } catch {
       /* keep core filter state if assignment fails */

@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.3.46] - 2026-07-31
+
+### Fixed
+
+- **Moving tokens now follow live line of sight without disappearing, flashing, or staying stuck in a stale Undetected state**: During drags and committed movement, Visioner defers stale stored visibility to Foundry's current line of sight, preserves valid reveals while AVS settles, and returns rendering to the settled AVS state when the batch completes.
+- **Soundwaves now switch cleanly to and from full token art during movement**: Active soundwaves are re-evaluated against current line of sight even while stored visibility temporarily lags. Removing or settling a soundwave no longer leaves the target invisible, reveals full art without sight, or keeps a stale soundwave after sight opens.
+- **Multi-level scenes no longer lose Core scene surfaces when Visioner hides an unseen token**: Visioner now preserves Foundry's multi-level renderability, hides only the affected token's visual layers, and defers its hard-hide pass until Core finishes refreshing the scene level.
+- **Deselecting tokens now restores the full multi-level scene for GMs**: Visioner returns to the previous all-levels view instead of leaving the canvas locked to the selected token's floor, preventing other decks or floors from disappearing after token selection.
+- **Foundry V13 no longer shows condition icons for unseen tokens after movement**: Visioner keeps condition and effect icons hidden while a token is Undetected or represented only by a soundwave or another detection filter, then restores them when the token becomes Observed again. Foundry V14 behavior is unchanged.
+
 ## [8.3.45] - 2026-07-31
 
 ### Fixed

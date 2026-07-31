@@ -19,9 +19,10 @@ import { VISIBILITY_DETECTION_THRESHOLDS } from './detection-visibility-context.
 export function registerDetectionWrappers({
   libWrapperAdapter = libWrapper,
   warn = console.warn,
+  foundryGeneration = Number(globalThis.game?.release?.generation),
 } = {}) {
   registerCoreDetectionWrappers(libWrapperAdapter);
-  registerTokenDetectionWrappers(libWrapperAdapter, warn);
+  registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGeneration);
 }
 
 function registerCoreDetectionWrappers(libWrapperAdapter) {
@@ -63,7 +64,7 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
   );
 }
 
-function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
+function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGeneration) {
   try {
     libWrapperAdapter.register(
       MODULE_ID,
@@ -89,8 +90,17 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn) {
       wrapTokenRenderDetectionFilter,
       'WRAPPER',
     );
+    if (Number(foundryGeneration) === 13) {
+      // V13 refreshes token effect icons after its nested visibility refresh. Reassert current-view
+      // hard-hide after the complete render-flag pass so Undetected tokens cannot leak icon sprites.
+      libWrapperAdapter.register(
+        MODULE_ID,
+        'foundry.canvas.placeables.Token.prototype._applyRenderFlags',
+        wrapTokenApplyRenderFlags,
+        'WRAPPER',
+      );
+    }
     void wrapTokenRefreshState;
-    void wrapTokenApplyRenderFlags;
     libWrapperAdapter.register(
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._onDragLeftMove',

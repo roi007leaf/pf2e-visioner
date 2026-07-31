@@ -32,18 +32,12 @@ describe('token render lifecycle service', () => {
     const failure = new Error('movement failed');
     const warn = jest.fn();
 
-    const result = handleTokenPreUpdate(
-      { id: 'token-1' },
-      { x: 100 },
-      {},
-      'user-1',
-      {
-        handlePreUpdateTokenMovement: jest.fn(() => {
-          throw failure;
-        }),
-        warn,
-      },
-    );
+    const result = handleTokenPreUpdate({ id: 'token-1' }, { x: 100 }, {}, 'user-1', {
+      handlePreUpdateTokenMovement: jest.fn(() => {
+        throw failure;
+      }),
+      warn,
+    });
 
     expect(result).toBeUndefined();
     expect(warn).toHaveBeenCalledWith('PF2E Visioner | preUpdateToken hook failed:', failure);
@@ -253,14 +247,17 @@ describe('token render lifecycle service', () => {
 
   test('nudges core vision refresh after AVS batch completion', async () => {
     const scheduleCanvasPerceptionUpdate = jest.fn();
+    const clearCurrentViewMovementRenderSettles = jest.fn();
 
     await expect(
       handleAvsBatchCompleteRefresh({
         refreshSystemHiddenHighlightsForControlledTokens: jest.fn(),
         removeSystemHiddenIndicatorsForObservedTargets: jest.fn(),
+        clearCurrentViewMovementRenderSettles,
         scheduleCanvasPerceptionUpdate,
       }),
     ).resolves.toEqual({ handled: true });
+    expect(clearCurrentViewMovementRenderSettles).toHaveBeenCalledTimes(1);
     expect(scheduleCanvasPerceptionUpdate).toHaveBeenCalledWith({ refreshVision: true });
   });
 
@@ -278,13 +275,9 @@ describe('token render lifecycle service', () => {
     };
     try {
       expect(
-        handleTokenPreUpdate(
-          { id: 'token-1' },
-          { x: 100 },
-          { animate: true },
-          'user-1',
-          { handlePreUpdateTokenMovement: preUpdate },
-        ),
+        handleTokenPreUpdate({ id: 'token-1' }, { x: 100 }, { animate: true }, 'user-1', {
+          handlePreUpdateTokenMovement: preUpdate,
+        }),
       ).toBeUndefined();
       await expect(
         handleTokenUpdated(

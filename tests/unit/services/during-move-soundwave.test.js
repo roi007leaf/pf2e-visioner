@@ -21,41 +21,75 @@ const sensed = () => true;
 
 describe('targetShouldShowSoundwave (during-move live decision)', () => {
   test('no soundwave when an observer sees the target (in sight)', () => {
-    expect(targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'))).toBe(false);
+    expect(targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'))).toBe(
+      false,
+    );
   });
 
   test('no soundwave for an observed target out of sight when precisely sensed (echolocation — a ring is imprecise-only)', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'), undefined, notSensed),
+      targetShouldShowSoundwave(
+        target,
+        [observer(false)],
+        getVisibility('observed'),
+        undefined,
+        notSensed,
+      ),
     ).toBe(false);
   });
 
   test('no soundwave for a concealed target out of sight when precisely sensed (echolocation — a ring is imprecise-only)', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'), undefined, notSensed),
+      targetShouldShowSoundwave(
+        target,
+        [observer(false)],
+        getVisibility('concealed'),
+        undefined,
+        notSensed,
+      ),
     ).toBe(false);
   });
 
   test('soundwave for an observed target whose sight is lost mid-move but is still sensed imprecisely (heard)', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(false)], getVisibility('observed'), undefined, sensed),
+      targetShouldShowSoundwave(
+        target,
+        [observer(false)],
+        getVisibility('observed'),
+        undefined,
+        sensed,
+      ),
     ).toBe(true);
   });
 
   test('soundwave for a concealed target whose sight is lost mid-move but is still sensed imprecisely (heard)', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(false)], getVisibility('concealed'), undefined, sensed),
+      targetShouldShowSoundwave(
+        target,
+        [observer(false)],
+        getVisibility('concealed'),
+        undefined,
+        sensed,
+      ),
     ).toBe(true);
   });
 
   test('still no soundwave for an in-sight observed target even when imprecisely sensed (sight wins)', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'), undefined, sensed),
+      targetShouldShowSoundwave(
+        target,
+        [observer(true)],
+        getVisibility('observed'),
+        undefined,
+        sensed,
+      ),
     ).toBe(false);
   });
 
   test('soundwave for a stored-hidden target out of sight', () => {
-    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('hidden'))).toBe(true);
+    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('hidden'))).toBe(
+      true,
+    );
   });
 
   test('soundwave stays during movement in complete darkness despite geometric LOS', () => {
@@ -66,21 +100,23 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
       },
     };
     expect(
-      targetShouldShowSoundwave(
-        target,
-        [darknessBlindedObserver],
-        getVisibility('hidden'),
-      ),
+      targetShouldShowSoundwave(target, [darknessBlindedObserver], getVisibility('hidden')),
     ).toBe(true);
   });
 
   test('no soundwave for undetected target (not sensed)', () => {
-    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('undetected'))).toBe(false);
+    expect(targetShouldShowSoundwave(target, [observer(false)], getVisibility('undetected'))).toBe(
+      false,
+    );
   });
 
   test('multi-observer: any observer that sees it suppresses the soundwave', () => {
     expect(
-      targetShouldShowSoundwave(target, [observer(false), observer(true)], getVisibility('observed')),
+      targetShouldShowSoundwave(
+        target,
+        [observer(false), observer(true)],
+        getVisibility('observed'),
+      ),
     ).toBe(false);
   });
 
@@ -91,7 +127,12 @@ describe('targetShouldShowSoundwave (during-move live decision)', () => {
   test('AVS hidden override is sticky: soundwave even when the target is in sight', () => {
     const overrideHidden = () => true;
     expect(
-      targetShouldShowSoundwave(target, [observer(true)], getVisibility('observed'), overrideHidden),
+      targetShouldShowSoundwave(
+        target,
+        [observer(true)],
+        getVisibility('observed'),
+        overrideHidden,
+      ),
     ).toBe(true);
   });
 
@@ -118,15 +159,20 @@ describe('tokenVision disabled (theater of mind: global sight, no move-time soun
   });
 
   test('no soundwave for observed target when token vision disabled', () => {
-    expect(
-      targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed')),
-    ).toBe(false);
+    expect(targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed'))).toBe(
+      false,
+    );
   });
 
   test('manual hidden override is ignored when token vision is disabled', () => {
     const overrideHidden = () => true;
     expect(
-      targetShouldShowSoundwave(target, [{ vision: null }], getVisibility('observed'), overrideHidden),
+      targetShouldShowSoundwave(
+        target,
+        [{ vision: null }],
+        getVisibility('observed'),
+        overrideHidden,
+      ),
     ).toBe(false);
   });
 });
@@ -160,7 +206,9 @@ describe('soundwave detectionFilter override (renders the ripple through Foundry
   beforeEach(() => {
     savedConfig = globalThis.CONFIG;
     globalThis.CONFIG = {
-      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } } },
+      Canvas: {
+        detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } },
+      },
     };
   });
   afterEach(() => {
@@ -190,7 +238,7 @@ describe('soundwave detectionFilter override (renders the ripple through Foundry
     expect(installSoundwaveFilterOverride(t)).toBe(false);
   });
 
-  test('remove restores a plain data property carrying Foundry\'s last value', () => {
+  test("remove restores a plain data property carrying Foundry's last value", () => {
     const t = { document: { id: 'd' }, detectionFilter: null };
     installSoundwaveFilterOverride(t);
     const foundryFilter = { id: 'foundry-hearing' };
@@ -232,7 +280,9 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
     savedConfig = globalThis.CONFIG;
     savedCanvas = globalThis.canvas;
     globalThis.CONFIG = {
-      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } } },
+      Canvas: {
+        detectionModes: { hearing: { constructor: { getDetectionFilter: () => mockFilter } } },
+      },
     };
   });
   afterEach(() => {
@@ -250,11 +300,17 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
 
   test("hands off once Foundry's own recompute has produced a filter (persisted settled to hidden)", () => {
     const t = overriddenTarget('h1');
+    t.visible = true;
+    t.renderable = true;
+    t.mesh = { visible: false, renderable: false, alpha: 1 };
+    t.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
     t.detectionFilter = { id: 'foundry-hearing' }; // Foundry settled a real filter
     globalThis.canvas = { tokens: { controlled: [], preview: { children: [] } } };
     settleSoundwaveOverrides();
     expect(isOverridden(t)).toBe(false);
     expect(t.detectionFilter).toEqual({ id: 'foundry-hearing' }); // ripple continues, no flash
+    expect(t.mesh).toEqual({ visible: false, renderable: false, alpha: 1 });
+    expect(t.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
   });
 
   test('keeps the ripple while the target is still out of sight and Foundry has not caught up', () => {
@@ -273,6 +329,27 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
     settleSoundwaveOverrides();
     expect(isOverridden(t)).toBe(false);
     expect(t.detectionFilter).toBeNull();
+  });
+
+  test('restores primary art when an observed target drops its settling soundwave override', () => {
+    const t = overriddenTarget('h3-render');
+    t.visible = true;
+    t.renderable = true;
+    t.isVisible = true;
+    t.mesh = { visible: false, renderable: false, alpha: 1 };
+    t.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    const observer = {
+      document: { id: 'o' },
+      vision: { los: { contains: () => true } },
+    };
+    globalThis.canvas = { tokens: { controlled: [observer], preview: { children: [] } } };
+
+    settleSoundwaveOverrides();
+
+    expect(isOverridden(t)).toBe(false);
+    expect(t.detectionFilter).toBeNull();
+    expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    expect(t.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
   });
 
   test('Party observer sight does not drop a settling override', () => {
@@ -318,7 +395,11 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
       tokens: {
         preview: {
           children: [
-            { _original: observer, document: { id: 'obs' }, vision: { los: { contains: () => true } } },
+            {
+              _original: observer,
+              document: { id: 'obs' },
+              vision: { los: { contains: () => true } },
+            },
           ],
         },
       },
@@ -338,6 +419,19 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
     getObservers = () => (gmVisionBypass ? [] : observers),
     getVisibility = () => 'hidden',
+    isHardHidden = () => false,
+    visionAnalyzer = null,
+    releaseHardHideForLiveSight = (target) => {
+      target._pvCurrentViewHardHidden = false;
+      if ('visible' in target) target.visible = true;
+      if ('renderable' in target) target.renderable = true;
+      if (target.mesh) {
+        if ('visible' in target.mesh) target.mesh.visible = true;
+        if ('renderable' in target.mesh) target.mesh.renderable = true;
+        if ('alpha' in target.mesh) target.mesh.alpha = 1;
+      }
+      return true;
+    },
   }) {
     let mod;
     await jest.isolateModulesAsync(async () => {
@@ -346,13 +440,17 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
         currentViewVisionerObserversForTarget: getObservers,
-        targetIsHardHiddenFromCurrentView: () => false,
+        releaseCurrentViewHardHideForLiveSight: releaseHardHideForLiveSight,
+        targetIsHardHiddenFromCurrentView: isHardHidden,
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
         getVisionerVisibilityBetweenTokens: getVisibility,
       }));
       jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
         shouldBypassAvsForGmVision: () => gmVisionBypass,
+      }));
+      jest.doMock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({
+        VisionAnalyzer: { getInstance: () => visionAnalyzer },
       }));
       mod = await import('../../../scripts/services/during-move-soundwave.js');
     });
@@ -525,7 +623,13 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
     target.mesh = { visible: true, renderable: true };
     const observers = [
-      { document: { id: 'obs' }, vision: { los: { contains: () => true } } },
+      {
+        document: { id: 'obs' },
+        vision: {
+          blinded: { darkness: true },
+          los: { contains: () => true },
+        },
+      },
     ];
     globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
     const mod = await loadWith({
@@ -539,6 +643,116 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(target.detectionFilter).toBe(soundwaveFilter);
     expect(target.mesh).toEqual({ visible: true, renderable: true });
     expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('drops a stale core soundwave when effective LOS now sees the target', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.visible = true;
+    target.renderable = true;
+    target.isVisible = true;
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.mesh = { visible: false, renderable: false, alpha: 1 };
+    const observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => true } } }];
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers,
+      getVisibility: () => 'hidden',
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('does not reveal primary art when no observer has live sight and no soundwave applies', async () => {
+    const releaseHardHideForLiveSight = jest.fn((target) => {
+      target.visible = true;
+      target.renderable = true;
+      target.mesh.visible = true;
+      target.mesh.renderable = true;
+      return true;
+    });
+    const target = makeTarget();
+    target.visible = false;
+    target.renderable = false;
+    target.isVisible = false;
+    target.detectionFilter = null;
+    target.mesh = { visible: false, renderable: false, alpha: 1 };
+    const observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }];
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers,
+      getVisibility: () => 'observed',
+      releaseHardHideForLiveSight,
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(releaseHardHideForLiveSight).not.toHaveBeenCalled();
+    expect(target).toMatchObject({
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false },
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    });
+  });
+
+  test('re-evaluates an active soundwave when stored undetected hard-hide lags live LOS', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    let seesTarget = false;
+    let hardHidden = false;
+    const observer = {
+      document: { id: 'obs' },
+      vision: { los: { contains: () => seesTarget } },
+    };
+    const target = makeTarget();
+    target.visible = true;
+    target.renderable = true;
+    target.isVisible = true;
+    target.detectionFilter = null;
+    target.mesh = { visible: true, renderable: true, alpha: 1 };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers: [observer],
+      getVisibility: () => (hardHidden ? 'undetected' : 'hidden'),
+      isHardHidden: () => hardHidden,
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+
+    hardHidden = true;
+    seesTarget = true;
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
     globalThis.CONFIG = savedConfig;
   });
 
@@ -654,10 +868,16 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       document: { id: 'observer' },
       vision: { los: { contains: () => false } },
     };
-    const partyTarget = { ...makeTarget(), actor: { type: 'party' }, document: { id: 'party-target' } };
+    const partyTarget = {
+      ...makeTarget(),
+      actor: { type: 'party' },
+      document: { id: 'party-target' },
+    };
     const npcTarget = { ...makeTarget(), actor: { type: 'npc' }, document: { id: 'npc-target' } };
     const getVisibility = jest.fn(() => 'hidden');
-    globalThis.canvas = { tokens: { placeables: [partyTarget, npcTarget], preview: { children: [] } } };
+    globalThis.canvas = {
+      tokens: { placeables: [partyTarget, npcTarget], preview: { children: [] } },
+    };
     const mod = await loadWith({ pendingMovement: true, observers: [observer], getVisibility });
 
     mod.refreshSoundwavesForActiveMovement();

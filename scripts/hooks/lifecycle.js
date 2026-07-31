@@ -17,7 +17,11 @@ import {
   clearAllDetectionFilterVisuals,
   primeHiddenDetectionFilterVisualsForObserver,
 } from '../stores/visibility-map.js';
-import { releaseAllCurrentViewHardHide } from '../services/Detection/current-view-hard-hide.js';
+import {
+  releaseAllCurrentViewHardHide,
+  usesCoreMultiLevelSurfaceRendering,
+} from '../services/Detection/current-view-hard-hide.js';
+import { restoreMultiLevelViewAfterControl } from '../services/Detection/multi-level-control-view.js';
 import {
   isSelectAllTokenVisibilityBypassActive,
   primeSelectAllTokenVisibilityBypassFromKeyboard,
@@ -127,7 +131,6 @@ function captureControlTokenHiddenRenderStates(observer) {
   controlTokenSessionState.hiddenRenderObserverId = observerId;
   controlTokenSessionState.hiddenRenderStateCaptured = true;
   controlTokenSessionState.hiddenRenderStates = hiddenRenderStates;
-
   return true;
 }
 
@@ -137,11 +140,9 @@ function restoreControlTokenHiddenRenderStates(observer) {
     !observerId ||
     controlTokenSessionState.hiddenRenderObserverId !== observerId ||
     !controlTokenSessionState.hiddenRenderStateCaptured
-  ) {
+  )
     return false;
-  }
 
-  const restoredTargetIds = [];
   for (const { token, state } of controlTokenSessionState.hiddenRenderStates) {
     if (!token?.document?.hidden || token.controlled) continue;
     if ('visible' in token) token.visible = state.visible;
@@ -152,7 +153,6 @@ function restoreControlTokenHiddenRenderStates(observer) {
       if ('alpha' in token.mesh) token.mesh.alpha = state.meshAlpha;
     }
     token._pvCurrentViewHardHidden = state.hardHidden;
-    restoredTargetIds.push(token.document.id);
   }
 
   return true;
@@ -246,7 +246,11 @@ function settleControlTokenSelectionRefreshes(session, token, { schedulePostReca
 
   for (const delayMs of CONTROL_TOKEN_POST_RECALC_VISIBILITY_REFRESH_DELAYS_MS) {
     scheduleControlTokenSessionTimer(session.sequence, session.tokenId, delayMs, () =>
-      refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+      refreshPendingVisibilityForActiveControlTokenSession(
+        session.sequence,
+        session.tokenId,
+        token,
+      ),
     );
   }
 }
@@ -309,7 +313,12 @@ function scheduleRefreshPendingVisibilityAfterControlToken(token) {
     session.sequence,
     session.tokenId,
     CONTROL_TOKEN_SELECTED_VISIBILITY_REFRESH_DELAY_MS,
-    () => refreshPendingVisibilityForActiveControlTokenSession(session.sequence, session.tokenId, token),
+    () =>
+      refreshPendingVisibilityForActiveControlTokenSession(
+        session.sequence,
+        session.tokenId,
+        token,
+      ),
   );
 }
 
@@ -319,11 +328,26 @@ function scheduleNoObserverVisibilityRefresh() {
     try {
       if (completed) return;
       if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
-      // Freeze+settle: core drives rendering; just nudge a vision refresh.
-      releaseAllCurrentViewHardHide();
-      clearAllDetectionFilterVisuals();
-      scheduleCanvasPerceptionUpdate({ initializeVision: true, refreshVision: true });
+
+      const finalize = () => {
+        if ((canvas?.tokens?.controlled?.length ?? 0) > 0) return;
+        releaseAllCurrentViewHardHide();
+        clearAllDetectionFilterVisuals();
+        const perceptionFlags = { initializeVision: true, refreshVision: true };
+        if (usesCoreMultiLevelSurfaceRendering()) perceptionFlags.refreshOcclusion = true;
+        scheduleCanvasPerceptionUpdate(perceptionFlags);
+      };
+
+      // Core changes to a controlled token's level after firing controlToken,
+      // but does not restore the prior view on release. Return to the level
+      // which showed the full multi-level scene before finalizing visibility.
+      const viewPromise = restoreMultiLevelViewAfterControl();
       completed = true;
+      if (viewPromise?.then) {
+        void Promise.resolve(viewPromise).then(finalize, finalize);
+      } else {
+        finalize();
+      }
     } catch {
       /* best effort */
     }
@@ -827,7 +851,7 @@ export function onReady() {
   if (game.user?.isGM) {
     // Run shortly after ready to avoid competing with other modules' migrations
     setTimeout(() => {
-      enableVisionForAllTokensAndPrototypes().catch(() => { });
+      enableVisionForAllTokensAndPrototypes().catch(() => {});
     }, 25);
     setTimeout(() => {
       runVisibilityV2MigrationIfNeeded().catch((error) => {
@@ -949,14 +973,14 @@ export async function onCanvasReady() {
         }
       }, 50);
     });
-  } catch (_) { }
+  } catch (_) {}
 
   initializeHoverTooltips();
 
   try {
     const { registerAvsGmVisionWarning } = await import('../ui/AvsGmVisionWarning.js');
     registerAvsGmVisionWarning();
-  } catch (_) { }
+  } catch (_) {}
 
   // Listen for condition changes to update lifesense highlights
   // Note: Trait changes are handled by ActorEventHandler for full AVS recalculation
@@ -974,7 +998,8 @@ export async function onCanvasReady() {
         const { requestTakeCoverExpirationForToken } = await import(
           '../chat/services/take-cover-expiration-service.js'
         );
-        const tokens = canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
+        const tokens =
+          canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
         for (const token of tokens) {
           await requestTakeCoverExpirationForToken(token, 'unconscious');
         }
@@ -1014,7 +1039,8 @@ export async function onCanvasReady() {
       const conditionSlug = item.slug || item.system?.slug || item.name?.toLowerCase?.();
       if (conditionSlug === 'prone' && game.user?.isGM) {
         const { removeTakeCoverProneRangedEffects } = await import('../cover/batch.js');
-        const tokens = canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
+        const tokens =
+          canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
         for (const token of tokens) {
           await removeTakeCoverProneRangedEffects(token);
         }
@@ -1098,10 +1124,10 @@ export async function onCanvasReady() {
             const wrapper = typeof window.$ === 'function' ? window.$(el) : el;
             await handleRenderChatMessage(msg, wrapper);
           }
-        } catch (_) { }
+        } catch (_) {}
       }, 50);
     }
-  } catch (_) { }
+  } catch (_) {}
 
   // Hide override validation indicator when scene changes
   bindHookOnce('hideOverrideIndicatorOnCanvasTearDown', 'canvasTearDown', async () => {
@@ -1134,7 +1160,7 @@ export async function onCanvasReady() {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
       if (!controlled || !indicator?.hasQueuedTokens?.()) return;
       indicator.show([], '', null);
-    } catch (error) { }
+    } catch (error) {}
   });
 
   // Update shared vision indicator when controlled token changes
@@ -1175,8 +1201,8 @@ export async function onCanvasReady() {
             const shouldRecalculate = shouldRunControlTokenSelectionAvsRecalc(token);
             const result = shouldRecalculate
               ? window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens?.([
-                session.tokenId,
-              ])
+                  session.tokenId,
+                ])
               : undefined;
             void Promise.resolve(result).finally(() => {
               settleControlTokenSelectionRefreshes(session, token, {
@@ -1233,7 +1259,7 @@ async function enableVisionForAllTokensAndPrototypes() {
   try {
     const enabled = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
     await applyEnableAllTokensVisionSetting(enabled);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 function getTokenVisionEnabled(doc) {
@@ -1246,7 +1272,11 @@ function getTokenVisionEnabled(doc) {
 
 function getActorById(actorId) {
   if (!actorId) return null;
-  return game.actors?.get?.(actorId) ?? game.actors?.contents?.find?.((actor) => actor?.id === actorId) ?? null;
+  return (
+    game.actors?.get?.(actorId) ??
+    game.actors?.contents?.find?.((actor) => actor?.id === actorId) ??
+    null
+  );
 }
 
 function getTokenActorTypeForVisionSync(tokenDoc) {
@@ -1274,7 +1304,7 @@ async function syncNpcVisionInScenes(enabled) {
       if (updates.length) {
         await scene.updateEmbeddedDocuments('Token', updates, { diff: false, render: false });
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -1290,7 +1320,7 @@ async function syncNpcPrototypeVision(enabled) {
           { diff: false },
         );
       }
-    } catch (_) { }
+    } catch (_) {}
   }
 }
 
@@ -1300,7 +1330,7 @@ export async function applyEnableAllTokensVisionSetting(enabled) {
     const desired = !!enabled;
     await syncNpcVisionInScenes(desired);
     await syncNpcPrototypeVision(desired);
-  } catch (_) { }
+  } catch (_) {}
 }
 
 export function setupFallbackHUDButton() {
@@ -1388,7 +1418,7 @@ export function setupFallbackHUDButton() {
           const pos = JSON.parse(savedPos);
           if (pos.left) button.style.left = pos.left;
           if (pos.top) button.style.top = pos.top;
-        } catch (_) { }
+        } catch (_) {}
       }
 
       button.addEventListener('click', async (event) => {

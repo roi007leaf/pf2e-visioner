@@ -8,6 +8,7 @@ jest.mock('../../../scripts/services/movement-tracking.js', () => ({
 
 jest.mock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
   applyCurrentViewHardHide: jest.fn(),
+  usesCoreMultiLevelSurfaceRendering: jest.fn(() => false),
 }));
 
 jest.mock('../../../scripts/services/during-move-soundwave.js', () => ({
@@ -16,16 +17,24 @@ jest.mock('../../../scripts/services/during-move-soundwave.js', () => ({
   rememberSoundwaveDetectionBeforeCoreRefresh: jest.fn(),
 }));
 
+jest.mock('../../../scripts/services/Detection/multi-level-control-view.js', () => ({
+  captureMultiLevelViewBeforeControl: jest.fn(),
+}));
+
 import {
   wrapTokenControl,
   wrapTokenRefreshVisibility,
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
-import { applyCurrentViewHardHide } from '../../../scripts/services/Detection/current-view-hard-hide.js';
+import {
+  applyCurrentViewHardHide,
+  usesCoreMultiLevelSurfaceRendering,
+} from '../../../scripts/services/Detection/current-view-hard-hide.js';
 import {
   ensureDuringMoveSoundwaveRefresh,
   refreshSoundwavesForActiveMovement,
   rememberSoundwaveDetectionBeforeCoreRefresh,
 } from '../../../scripts/services/during-move-soundwave.js';
+import { captureMultiLevelViewBeforeControl } from '../../../scripts/services/Detection/multi-level-control-view.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 
@@ -44,6 +53,7 @@ describe('detection token refresh', () => {
   beforeEach(() => {
     globalThis.game = { ready: true, user: { isGM: true } };
     hasActivePendingTokenMovement.mockReturnValue(true);
+    usesCoreMultiLevelSurfaceRendering.mockReturnValue(false);
     applyCurrentViewHardHide.mockClear();
     rememberSoundwaveDetectionBeforeCoreRefresh.mockClear();
     refreshSoundwavesForActiveMovement.mockClear();
@@ -67,6 +77,27 @@ describe('detection token refresh', () => {
     expect(token.visible).toBe(false);
     expect(token.renderable).toBe(true);
     expect(token.mesh).toEqual({ visible: false, renderable: true, alpha: 0.5 });
+    expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
+  });
+
+  it('defers and coalesces hard-hide rendering until Core finishes a multi-level refresh', () => {
+    usesCoreMultiLevelSurfaceRendering.mockReturnValue(true);
+    const queued = [];
+    jest
+      .spyOn(globalThis, 'queueMicrotask')
+      .mockImplementation((callback) => queued.push(callback));
+    const token = foundryHiddenToken({ visible: true });
+    const wrapped = jest.fn();
+
+    wrapTokenRefreshVisibility.call(token, wrapped);
+    wrapTokenRefreshVisibility.call(token, wrapped);
+
+    expect(wrapped).toHaveBeenCalledTimes(2);
+    expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
+    expect(queued).toHaveLength(1);
+
+    queued[0]();
+    expect(applyCurrentViewHardHide).toHaveBeenCalledTimes(1);
     expect(applyCurrentViewHardHide).toHaveBeenCalledWith(token);
   });
 
@@ -110,7 +141,10 @@ describe('detection token refresh', () => {
 
   it('captures soundwave detection before core controls the token', () => {
     const token = foundryHiddenToken();
-    const wrapped = jest.fn(() => 'controlled');
+    const wrapped = jest.fn(() => {
+      expect(captureMultiLevelViewBeforeControl).toHaveBeenCalledWith(token);
+      return 'controlled';
+    });
 
     expect(wrapTokenControl.call(token, wrapped, { releaseOthers: true })).toBe('controlled');
 

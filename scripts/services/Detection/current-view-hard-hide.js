@@ -11,6 +11,12 @@ import { getDetectionSetting } from './detection-setting-cache.js';
 
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
 const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
+const MOVEMENT_REVEAL_SETTLE_TTL_MS = 3000;
+
+// Stored AVS states intentionally remain frozen during movement. Remember targets Core revealed
+// from the live LOS result so the stale stored Undetected state cannot hide them for one frame (or
+// longer) between movement tracking ending and the AVS batch settling.
+let movementCoreVisibleReveals = new WeakMap();
 
 let storedVisibilityOverrideForTest = null;
 export function __setStoredVisibilityForTest(map) {
@@ -47,7 +53,10 @@ function actorOf(target) {
 
 function getStoredVisibilityState(observer, target) {
   if (storedVisibilityOverrideForTest) {
-    return storedVisibilityOverrideForTest.get(`${tokenIdOf(observer)}:${tokenIdOf(target)}`) || 'observed';
+    return (
+      storedVisibilityOverrideForTest.get(`${tokenIdOf(observer)}:${tokenIdOf(target)}`) ||
+      'observed'
+    );
   }
   return getVisionerVisibilityBetweenTokens(observer, target) || 'observed';
 }
@@ -95,6 +104,15 @@ function hideHardHiddenChromeSurfaces(token) {
   token[HARD_HIDDEN_CHROME_KEY] = captured;
 }
 
+export function usesCoreMultiLevelSurfaceRendering() {
+  const scene = globalThis.canvas?.scene;
+  return !!(
+    (scene?.levels?.size ?? 0) > 1 &&
+    typeof scene.getSurfaces === 'function' &&
+    typeof scene.testSurfaceCollision === 'function'
+  );
+}
+
 function restoreHardHiddenChromeSurfaces(token) {
   const captured = token?.[HARD_HIDDEN_CHROME_KEY];
   if (!captured) return;
@@ -127,17 +145,22 @@ function automaticVisionerVisibilityIsActive() {
   try {
     if (isSceneTokenVisionDisabled()) return false;
     if (globalThis.canvas?.scene?.getFlag?.(MODULE_ID, 'disableAVS') === true) return false;
-    return (
-      getDetectionSetting('autoVisibilityEnabled') !== false &&
-      isAvsActiveGivenCombatGate()
-    );
+    return getDetectionSetting('autoVisibilityEnabled') !== false && isAvsActiveGivenCombatGate();
   } catch {
     return true;
   }
 }
 
+function hasActiveCurrentViewTokenMovement() {
+  if (hasActivePendingTokenMovement()) return true;
+  const tokens = globalThis.canvas?.tokens;
+  if (tokens?._draggedToken) return true;
+  const previews = tokens?.preview?.children;
+  return !!(previews && previews.some?.((entry) => entry?.document?.id));
+}
+
 function shouldDeferRenderingToCoreDuringMove(target) {
-  if (!hasActivePendingTokenMovement()) return false;
+  if (!hasActiveCurrentViewTokenMovement()) return false;
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
@@ -158,15 +181,54 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   return deferrable;
 }
 
+function rememberMovementCoreReveal(target, coreVisible) {
+  if (!target) return;
+  if (!coreVisible) {
+    movementCoreVisibleReveals.delete(target);
+    return;
+  }
+  movementCoreVisibleReveals.set(target, Date.now() + MOVEMENT_REVEAL_SETTLE_TTL_MS);
+}
+
+function shouldPreserveMovementCoreReveal(target) {
+  const expiresAt = movementCoreVisibleReveals.get(target);
+  if (!expiresAt) return false;
+  if (expiresAt <= Date.now()) {
+    movementCoreVisibleReveals.delete(target);
+    return false;
+  }
+  const observers = currentViewVisionerObserversForTarget(target);
+  if (observers.some((observer) => hasUndetectedAvsOverride(observer, target))) {
+    movementCoreVisibleReveals.delete(target);
+    return false;
+  }
+  return true;
+}
+
+export function clearCurrentViewMovementRenderSettles() {
+  movementCoreVisibleReveals = new WeakMap();
+}
+
 export function applyCurrentViewHardHide(token) {
   const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
   if (shouldDefer) {
-    if (token.visible) releaseCurrentViewHardHide(token);
-    token._pvCurrentViewHardHidden = false;
+    rememberMovementCoreReveal(token, token.visible === true);
+    let released = false;
+    if (token.visible) {
+      released = releaseCurrentViewHardHide(token);
+      if (released || !hasCurrentViewHardHideRenderState(token)) {
+        token._pvCurrentViewHardHidden = false;
+      }
+    }
     return false;
   }
   const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
+  if (shouldHardHide && shouldPreserveMovementCoreReveal(token)) {
+    releaseCurrentViewHardHideForLiveSight(token);
+    return false;
+  }
   if (!shouldHardHide) {
+    movementCoreVisibleReveals.delete(token);
     if (globalThis.game?.user?.isGM && token.document?.hidden) {
       releaseCurrentViewHardHide(token);
       token._pvCurrentViewHardHidden = false;
@@ -175,12 +237,17 @@ export function applyCurrentViewHardHide(token) {
     }
     return false;
   }
-  token.visible = false;
-  token.renderable = false;
+  const preserveCoreRenderState = usesCoreMultiLevelSurfaceRendering();
+  if (!preserveCoreRenderState) {
+    token.visible = false;
+    token.renderable = false;
+  }
   if (token.mesh) {
     token.mesh.visible = false;
-    if ('renderable' in token.mesh) token.mesh.renderable = false;
-    if ('alpha' in token.mesh) token.mesh.alpha = 0;
+    if (!preserveCoreRenderState) {
+      if ('renderable' in token.mesh) token.mesh.renderable = false;
+      if ('alpha' in token.mesh) token.mesh.alpha = 0;
+    }
   }
   token.detectionFilter = null;
   hideHardHiddenChromeSurfaces(token);
@@ -191,30 +258,75 @@ export function applyCurrentViewHardHide(token) {
 export function releaseCurrentViewHardHideIfMarked(token) {
   if (!token?._pvCurrentViewHardHidden) return false;
   if (targetIsHardHiddenFromCurrentView(token)) return false;
-  if (!automaticVisionerVisibilityIsActive() && token.visible === false) return false;
+  const automaticActive = automaticVisionerVisibilityIsActive();
+  if (!automaticActive && token.visible === false) return false;
   const released = releaseCurrentViewHardHide(token);
+  if (released || !hasCurrentViewHardHideRenderState(token)) {
+    token._pvCurrentViewHardHidden = false;
+  }
+  return released;
+}
+
+function hasCurrentViewHardHideRenderState(token) {
+  const mesh = token?.mesh;
+  return (
+    token?.renderable === false ||
+    mesh?.visible === false ||
+    mesh?.renderable === false ||
+    (mesh && mesh.alpha === 0)
+  );
+}
+
+export function releaseCurrentViewHardHide(token) {
+  if (!token) return false;
+  if (token.controlled) return false;
+  const mesh = token.mesh;
+  if (!hasCurrentViewHardHideRenderState(token)) return false;
+  if ('visible' in token) token.visible = true;
+  if ('renderable' in token) token.renderable = true;
+  const detectionFilterOwnsRenderSurface = !!token.detectionFilter;
+  if (mesh) {
+    if ('visible' in mesh) mesh.visible = !detectionFilterOwnsRenderSurface;
+    if ('renderable' in mesh) mesh.renderable = !detectionFilterOwnsRenderSurface;
+    if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
+  }
+  if (!detectionFilterOwnsRenderSurface) restoreHardHiddenChromeSurfaces(token);
+  return true;
+}
+
+export function releaseCurrentViewHardHideForLiveSight(token) {
+  if (!token) return false;
+  let released = releaseCurrentViewHardHide(token);
+  if (!token.controlled && !token.detectionFilter) {
+    const mesh = token.mesh;
+    if (token.visible !== true) {
+      token.visible = true;
+      released = true;
+    }
+    if (token.renderable !== true) {
+      token.renderable = true;
+      released = true;
+    }
+    if (mesh) {
+      if ('visible' in mesh && mesh.visible !== true) {
+        mesh.visible = true;
+        released = true;
+      }
+      if ('renderable' in mesh && mesh.renderable !== true) {
+        mesh.renderable = true;
+        released = true;
+      }
+      if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
+    }
+  }
+  restoreHardHiddenChromeSurfaces(token);
   token._pvCurrentViewHardHidden = false;
   return released;
 }
 
-export function releaseCurrentViewHardHide(token) {
-  if (!token || token.controlled) return false;
-  const mesh = token.mesh;
-  const wasHardHidden =
-    token.renderable === false || mesh?.visible === false || (mesh && mesh.alpha === 0);
-  if (!wasHardHidden) return false;
-  if ('visible' in token) token.visible = true;
-  if ('renderable' in token) token.renderable = true;
-  if (mesh) {
-    if ('visible' in mesh) mesh.visible = true;
-    if ('renderable' in mesh) mesh.renderable = true;
-    if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
-  }
-  restoreHardHiddenChromeSurfaces(token);
-  return true;
-}
-
-export function releaseAllCurrentViewHardHide(tokens = globalThis.canvas?.tokens?.placeables ?? []) {
+export function releaseAllCurrentViewHardHide(
+  tokens = globalThis.canvas?.tokens?.placeables ?? [],
+) {
   let released = 0;
   for (const token of tokens ?? []) {
     if (releaseCurrentViewHardHide(token)) released += 1;

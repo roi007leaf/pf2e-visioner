@@ -4,6 +4,7 @@ import {
 } from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
+import { clearCurrentViewMovementRenderSettles as defaultClearCurrentViewMovementRenderSettles } from './Detection/current-view-hard-hide.js';
 import { scheduleCanvasPerceptionUpdate as defaultScheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { primeHiddenDetectionFilterVisualsForObserver as defaultPrimeHiddenDetectionFilterVisualsForObserver } from '../stores/visibility-map.js';
 import {
@@ -71,10 +72,7 @@ export function handleTokenPreUpdate(
   changes,
   options,
   userId,
-  {
-    handlePreUpdateTokenMovement = defaultHandlePreUpdateTokenMovement,
-    warn = console.warn,
-  } = {},
+  { handlePreUpdateTokenMovement = defaultHandlePreUpdateTokenMovement, warn = console.warn } = {},
 ) {
   if (isSceneTokenVisionDisabled()) return undefined;
   try {
@@ -126,12 +124,11 @@ export function handleTokenRefreshed(
   {
     isRefreshTokenProcessingSuppressed = defaultIsRefreshTokenProcessingSuppressed,
     isTokenDragOrMovementActive = defaultIsTokenDragOrMovementActive,
-    shouldRefreshRenderedTokenHighlights: shouldRefreshRenderedTokenHighlightsForToken =
-    shouldRefreshRenderedTokenHighlights,
-    shouldThrottleRenderedTokenHighlightRefresh: shouldThrottleRenderedTokenHighlightRefreshForToken =
-    shouldThrottleRenderedTokenHighlightRefresh,
-    refreshSystemHiddenHighlightsForRenderedToken =
-    defaultRefreshSystemHiddenHighlightsForRenderedToken,
+    shouldRefreshRenderedTokenHighlights:
+      shouldRefreshRenderedTokenHighlightsForToken = shouldRefreshRenderedTokenHighlights,
+    shouldThrottleRenderedTokenHighlightRefresh:
+      shouldThrottleRenderedTokenHighlightRefreshForToken = shouldThrottleRenderedTokenHighlightRefresh,
+    refreshSystemHiddenHighlightsForRenderedToken = defaultRefreshSystemHiddenHighlightsForRenderedToken,
     warn = console.warn,
   } = {},
 ) {
@@ -166,14 +163,12 @@ export function handleTokenRefreshed(
 }
 
 export async function handleAvsBatchCompleteRefresh({
-  refreshSystemHiddenHighlightsForControlledTokens =
-  defaultRefreshSystemHiddenHighlightsForControlledTokens,
-  removeSystemHiddenIndicatorsForObservedTargets =
-  defaultRemoveSystemHiddenIndicatorsForObservedTargets,
+  refreshSystemHiddenHighlightsForControlledTokens = defaultRefreshSystemHiddenHighlightsForControlledTokens,
+  removeSystemHiddenIndicatorsForObservedTargets = defaultRemoveSystemHiddenIndicatorsForObservedTargets,
   scheduleCanvasPerceptionUpdate = defaultScheduleCanvasPerceptionUpdate,
-  primeHiddenDetectionFilterVisualsForObserver =
-  defaultPrimeHiddenDetectionFilterVisualsForObserver,
+  primeHiddenDetectionFilterVisualsForObserver = defaultPrimeHiddenDetectionFilterVisualsForObserver,
   getControlledTokens = getDefaultControlledTokens,
+  clearCurrentViewMovementRenderSettles = defaultClearCurrentViewMovementRenderSettles,
 } = {}) {
   if (isSceneTokenVisionDisabled()) {
     return { handled: false, reason: 'token-vision-disabled' };
@@ -181,6 +176,7 @@ export async function handleAvsBatchCompleteRefresh({
   try {
     await refreshSystemHiddenHighlightsForControlledTokens();
     await removeSystemHiddenIndicatorsForObservedTargets();
+    clearCurrentViewMovementRenderSettles();
     scheduleCanvasPerceptionUpdate({ refreshVision: true });
     for (const observer of getControlledTokens()) {
       primeHiddenDetectionFilterVisualsForObserver(observer);
