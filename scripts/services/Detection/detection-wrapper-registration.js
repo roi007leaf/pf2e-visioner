@@ -7,6 +7,7 @@ import {
   wrapTokenApplyRenderFlags,
   wrapTokenControl,
   wrapTokenRefreshState,
+  wrapTokenRefreshTooltip,
   wrapTokenRefreshVisibility,
 } from './detection-token-refresh.js';
 import {
@@ -76,6 +77,12 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGenerati
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._refreshVisibility',
       wrapTokenRefreshVisibility,
+      'WRAPPER',
+    );
+    libWrapperAdapter.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._refreshTooltip',
+      wrapTokenRefreshTooltip,
       'WRAPPER',
     );
     libWrapperAdapter.register(

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.3.47] - 2026-07-31
+
+### Fixed
+
+- **Undetected tokens no longer reveal their elevation text on Foundry V13 or V14**: Visioner now re-hides elevation tooltips rebuilt by Core for Undetected and detection-filter-only tokens, while Observed tokens retain their normal elevation display.
+
 ## [8.3.46] - 2026-07-31
 
 ### Fixed

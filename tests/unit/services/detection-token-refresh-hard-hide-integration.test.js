@@ -171,3 +171,44 @@ describe('Foundry V13 _applyRenderFlags effect-icon ordering', () => {
     );
   });
 });
+
+describe('elevation tooltip hard-hide ordering', () => {
+  const observer = { document: { id: 'obs' }, controlled: true };
+
+  beforeEach(() => {
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    globalThis.game = { ready: true, user: { isGM: false } };
+    globalThis.canvas = { tokens: { controlled: [observer], _draggedToken: null } };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+  });
+
+  it.each([13, 14])('re-hides refreshed elevation text on Foundry V%s', (foundryGeneration) => {
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper) => registered.set(target, wrapper)),
+    };
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration });
+
+    const refreshTooltip = registered.get(
+      'foundry.canvas.placeables.Token.prototype._refreshTooltip',
+    );
+    const token = {
+      controlled: false,
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      tooltip: { visible: true },
+      detectionFilter: null,
+      document: { id: 't', hidden: false, getFlag: () => null },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
+    expect(refreshTooltip).toBeDefined();
+    refreshTooltip.call(token, () => {
+      token.tooltip = { visible: true };
+    });
+
+    expect(token._pvCurrentViewHardHidden).toBe(true);
+    expect(token.tooltip.visible).toBe(false);
+  });
+});

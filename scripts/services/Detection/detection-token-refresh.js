@@ -139,6 +139,24 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   });
 }
 
+export function wrapTokenRefreshTooltip(wrapped, ...args) {
+  const result = wrapped(...args);
+  if (isSceneTokenVisionDisabled()) return result;
+  try {
+    applyCurrentViewHardHide(this);
+    if (
+      this.tooltip &&
+      'visible' in this.tooltip &&
+      (this._pvCurrentViewHardHidden === true || (!this.controlled && this.detectionFilter))
+    ) {
+      this.tooltip.visible = false;
+    }
+  } catch {
+    /* keep Foundry tooltip visibility if the guard fails */
+  }
+  return result;
+}
+
 export function wrapTokenControl(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
   captureMultiLevelViewBeforeControl(this);
