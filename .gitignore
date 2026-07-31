@@ -11,3 +11,4 @@ web-bundles/
 output/playwright/
 artifacts/
 .playwright-mcp/
+.serena/
