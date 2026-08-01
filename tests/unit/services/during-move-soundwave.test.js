@@ -371,11 +371,17 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
 describe('observerSightContainsTarget (live vision polygon contains the target center)', () => {
   const target = { center: { x: 500, y: 500 } };
   let savedCanvas;
+  let savedConfig;
+  let savedGame;
   afterEach(() => {
     globalThis.canvas = savedCanvas;
+    globalThis.CONFIG = savedConfig;
+    globalThis.game = savedGame;
   });
   beforeEach(() => {
     savedCanvas = globalThis.canvas;
+    savedConfig = globalThis.CONFIG;
+    savedGame = globalThis.game;
     globalThis.canvas = { tokens: { preview: { children: [] } } };
   });
 
@@ -406,6 +412,56 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
     };
     expect(observerSightContainsTarget(observer, target)).toBe(true);
   });
+
+  test('rejects 2D polygon sight when legacy Levels reports a floor collision', () => {
+    globalThis.game = {
+      ...savedGame,
+      modules: new Map([['levels', { active: true }]]),
+    };
+    globalThis.CONFIG = {
+      ...savedConfig,
+      Levels: { API: { checkCollision: jest.fn(() => true) } },
+    };
+    const observer = {
+      losHeight: 5,
+      vision: { los: { contains: () => true } },
+    };
+    const otherLevelTarget = {
+      center: { x: 500, y: 500 },
+      losHeight: 15,
+    };
+
+    expect(observerSightContainsTarget(observer, otherLevelTarget)).toBe(false);
+  });
+
+  test('does not synthesize a lost-sight soundwave through a legacy Levels floor', () => {
+    globalThis.game = {
+      ...savedGame,
+      modules: new Map([['levels', { active: true }]]),
+    };
+    globalThis.CONFIG = {
+      ...savedConfig,
+      Levels: { API: { checkCollision: jest.fn(() => true) } },
+    };
+    const observer = {
+      losHeight: 5,
+      vision: { los: { contains: () => false } },
+    };
+    const otherLevelTarget = {
+      center: { x: 500, y: 500 },
+      losHeight: 15,
+    };
+
+    expect(
+      targetShouldShowSoundwave(
+        otherLevelTarget,
+        [observer],
+        () => 'observed',
+        () => false,
+        () => true,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('refreshSoundwavesForActiveMovement (only mutates during a committed move)', () => {
@@ -415,6 +471,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
 
   async function loadWith({
     pendingMovement,
+    avsActiveGivenCombatGate = true,
     gmVisionBypass = false,
     observers = [{ document: { id: 'obs' }, vision: { los: { contains: () => false } } }],
     getObservers = () => (gmVisionBypass ? [] : observers),
@@ -422,6 +479,11 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     isHardHidden = () => false,
     enforceControlledLevelTokenRendering = () => false,
     tokenIsOutsideControlledLevelCullingSurface = () => false,
+    levelsIntegration = {
+      isLegacyActive: false,
+      getVerticalDistance: () => 0,
+      test3DCollision: () => false,
+    },
     visionAnalyzer = null,
     releaseHardHideForLiveSight = (target) => {
       target._pvCurrentViewHardHidden = false;
@@ -447,6 +509,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       }));
       jest.doMock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
         getVisionerVisibilityBetweenTokens: getVisibility,
+        isAvsActiveGivenCombatGate: () => avsActiveGivenCombatGate,
       }));
       jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
         shouldBypassAvsForGmVision: () => gmVisionBypass,
@@ -454,6 +517,9 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       jest.doMock('../../../scripts/services/Detection/multi-level-control-view.js', () => ({
         enforceControlledLevelTokenRendering,
         tokenIsOutsideControlledLevelCullingSurface,
+      }));
+      jest.doMock('../../../scripts/services/LevelsIntegration.js', () => ({
+        LevelsIntegration: { getInstance: () => levelsIntegration },
       }));
       jest.doMock('../../../scripts/visibility/auto-visibility/VisionAnalyzer.js', () => ({
         VisionAnalyzer: { getInstance: () => visionAnalyzer },
@@ -716,6 +782,41 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       renderable: false,
       mesh: { visible: false, renderable: false },
       detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+    });
+  });
+
+  test('does not release a hidden other-level token from 2D sight alone', async () => {
+    const releaseHardHideForLiveSight = jest.fn();
+    const observer = {
+      document: { id: 'obs' },
+      vision: { los: { contains: () => true } },
+    };
+    const target = makeTarget();
+    target.visible = false;
+    target.renderable = false;
+    target.isVisible = false;
+    target.detectionFilter = null;
+    target.mesh = { visible: false, renderable: false, alpha: 1 };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers: [observer],
+      getVisibility: () => 'undetected',
+      levelsIntegration: {
+        isLegacyActive: true,
+        getVerticalDistance: () => 10,
+        test3DCollision: () => true,
+      },
+      releaseHardHideForLiveSight,
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(releaseHardHideForLiveSight).not.toHaveBeenCalled();
+    expect(target).toMatchObject({
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false },
     });
   });
 

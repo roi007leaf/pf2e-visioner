@@ -102,6 +102,21 @@ describe('HoverTooltips keybind state', () => {
     expect(HoverTooltips._savedKeyTooltipsActive).toBeUndefined();
   });
 
+  test('Alt highlight cannot reveal the Core border of a hard-hidden token', async () => {
+    global.game.user.isGM = false;
+    const hiddenHazard = makeToken('hidden-hazard', 100);
+    hiddenHazard._pvCurrentViewHardHidden = true;
+    hiddenHazard.border = { visible: true };
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [hiddenHazard];
+
+    const { onHighlightObjects } = await import('../../../scripts/services/HoverTooltips.js');
+
+    onHighlightObjects(true);
+
+    expect(hiddenHazard.border.visible).toBe(false);
+  });
+
   test('target keyboard overlay restores tooltip mode after rendering', async () => {
     const observer = makeToken('observer', 0);
     const target = makeToken('target', 100);

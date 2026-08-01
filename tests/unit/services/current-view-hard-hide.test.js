@@ -350,10 +350,15 @@ describe('applyCurrentViewHardHide', () => {
       getSurfaces: jest.fn(),
       testSurfaceCollision: jest.fn(),
     };
+    const hitArea = { contains: () => true };
     const t = {
       controlled: false,
       visible: true,
       renderable: true,
+      eventMode: 'static',
+      cursor: 'pointer',
+      hitArea,
+      interactiveChildren: true,
       mesh: { visible: true, renderable: true, alpha: 1 },
       detectionFilter: {},
       document: { id: 't', hidden: false },
@@ -368,6 +373,11 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.mesh.renderable).toBe(true);
     expect(t.mesh.alpha).toBe(1);
     expect(t.detectionFilter).toBe(null);
+    expect(t.eventMode).toBe('none');
+    expect(t.cursor).toBe('default');
+    expect(t.hitArea).not.toBe(hitArea);
+    expect(t.hitArea.contains(0, 0)).toBe(false);
+    expect(t.interactiveChildren).toBe(false);
   });
 
   it('leaves a non-hidden token untouched', () => {
@@ -579,6 +589,7 @@ describe('applyCurrentViewHardHide', () => {
       renderable: true,
       mesh: { visible: true, renderable: true, alpha: 1 },
       detectionFilter: {},
+      border: { visible: true },
       effects: { visible: true },
       nameplate: { visible: true },
       bars: { visible: true },
@@ -587,6 +598,7 @@ describe('applyCurrentViewHardHide', () => {
     };
     __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
     expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.border.visible).toBe(false);
     expect(t.effects.visible).toBe(false);
     expect(t.nameplate.visible).toBe(false);
     expect(t.bars.visible).toBe(false);
@@ -636,6 +648,34 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.effects.visible).toBe(true);
     expect(t.nameplate.visible).toBe(false);
     expect(t.bars.visible).toBe(true);
+  });
+
+  it('restores the exact interaction mode and cursor on release', () => {
+    const hitArea = { contains: () => true };
+    const t = {
+      controlled: false,
+      visible: true,
+      renderable: true,
+      eventMode: 'static',
+      cursor: 'pointer',
+      hitArea,
+      interactiveChildren: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      detectionFilter: {},
+      document: { id: 't', hidden: false },
+      actor: { type: 'hazard', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+
+    applyCurrentViewHardHide(t);
+    expect(t.eventMode).toBe('none');
+    expect(t.cursor).toBe('default');
+
+    releaseCurrentViewHardHide(t);
+    expect(t.eventMode).toBe('static');
+    expect(t.cursor).toBe('pointer');
+    expect(t.hitArea).toBe(hitArea);
+    expect(t.interactiveChildren).toBe(true);
   });
 
   it('marks tokens it hard-hides', () => {
@@ -719,6 +759,76 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     expect(t.mesh.visible).toBe(true);
     expect(t.mesh.alpha).toBe(1);
     expect(t._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('does not trust temporary Core visibility through a legacy Levels floor', () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.game = {
+      user: { isGM: false },
+      modules: new Map([['levels', { active: true }]]),
+    };
+    globalThis.CONFIG = {
+      ...savedConfig,
+      Levels: { API: { checkCollision: jest.fn(() => true) } },
+    };
+    const observer = {
+      controlled: true,
+      document: { id: 'obs' },
+      losHeight: 5,
+      vision: { los: { contains: () => true } },
+    };
+    controlled.splice(0, 1, observer);
+    const t = undetectedToken({ visible: true });
+    t.center = { x: 500, y: 500 };
+    t.losHeight = 15;
+
+    try {
+      expect(applyCurrentViewHardHide(t)).toBe(true);
+      expect(t).toMatchObject({
+        visible: false,
+        renderable: false,
+        mesh: { visible: false, renderable: false },
+        _pvCurrentViewHardHidden: true,
+      });
+    } finally {
+      globalThis.CONFIG = savedConfig;
+    }
+  });
+
+  it('still accepts a legitimate same-level Core reveal on a legacy Levels scene', () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.game = {
+      user: { isGM: false },
+      modules: new Map([['levels', { active: true }]]),
+    };
+    const checkCollision = jest.fn(() => true);
+    globalThis.CONFIG = {
+      ...savedConfig,
+      Levels: { API: { checkCollision } },
+    };
+    const observer = {
+      controlled: true,
+      document: { id: 'obs' },
+      losHeight: 5,
+      vision: { los: { contains: () => true } },
+    };
+    controlled.splice(0, 1, observer);
+    const t = undetectedToken({ visible: true });
+    t.center = { x: 500, y: 500 };
+    t.losHeight = 5;
+
+    try {
+      expect(applyCurrentViewHardHide(t)).toBe(false);
+      expect(t).toMatchObject({
+        visible: true,
+        renderable: true,
+        mesh: { visible: true, renderable: true },
+        _pvCurrentViewHardHidden: false,
+      });
+      expect(checkCollision).not.toHaveBeenCalled();
+    } finally {
+      globalThis.CONFIG = savedConfig;
+    }
   });
 
   it('keeps a Core-visible reveal through the stale Undetected movement-settle gap', () => {

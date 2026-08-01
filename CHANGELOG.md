@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.4.0] - 2026-08-01
+
+### Added
+
+- **Hidden hazards and loot now have a persistent GM-only canvas marker**: An orange Hidden eye-slash frame identifies placeables that are Visioner Hidden from the selected token. With no token selected, the marker appears when the placeable is Hidden from any scene token, and it is restored after canvas refreshes or token redraws.
+
+### Changed
+
+- **Converting PF2e visibility conditions on hazards and loot now produces Visioner Hidden state**: Standalone Hidden or Undetected conditions are converted for player-character observers as persistent pair visibility instead of leaving an unsupported creature-style Undetected override on these placeables.
+- **Visioner Hidden hazards and loot behave as fully undetected interaction surfaces for players**: Their token art, chrome, hover response, hit area, and pointer cursor remain unavailable until the relevant observer reveals them; observed placeables and GM interaction retain Foundry Core behavior.
+
+### Fixed
+
+- **Holding Alt no longer reveals the outline of a Hidden hazard or loot token to players**: Visioner reasserts its hard-hidden token border after Foundry's object-highlighting refresh while preserving normal Alt outlines for observed tokens.
+- **Foundry V13 Levels no longer reveals tokens or creates soundwaves through floors during movement**: Legacy 2D sight polygons are supplemented with Levels' 3D sight collision for live reveal, hard-hide, and soundwave decisions. Foundry V14 remains delegated to Core's 3D visibility handling.
+- **Creating tokens on Levels scenes no longer turns existing tokens transparent**: Visioner leaves Foundry's initial new-token control pass untouched instead of applying selected-level suppression before Core finishes placing the token.
+
 ## [8.3.49] - 2026-07-31
 
 ### Fixed

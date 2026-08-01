@@ -1,6 +1,7 @@
 import {
   CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
   SYSTEM_CONDITION_OVERRIDE_SOURCE,
+  applySystemConditionOverride,
   isSystemConditionSlug,
   removableSystemConditionItems,
   strongestSystemConditionState,
@@ -168,6 +169,49 @@ describe('syncSystemConditionOverridesForToken condition consumption', () => {
     expect(state.removedConditions).toEqual(['undetected']);
   });
 
+  test.each(['loot', 'hazard'])(
+    'standalone undetected on %s converts to Visioner hidden',
+    async (actorType) => {
+      const { state, deps } = makeConsumeDeps();
+      const target = tgt();
+      target.actor.type = actorType;
+
+      await syncSystemConditionOverridesForToken(target, deps);
+
+      expect(state.applied).toEqual([
+        ['pc1', 't', 'hidden', CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE],
+      ]);
+      expect(state.removedConditions).toEqual(['undetected']);
+    },
+  );
+
+  test.each(['loot', 'hazard'])(
+    'neutral %s converts undetected for player-character observers',
+    async (actorType) => {
+      const { state, deps } = makeConsumeDeps();
+      const target = tgt();
+      target.actor.type = actorType;
+      target.actor.alliance = null;
+      target.document.disposition = 0;
+      const player = obs('pc1');
+      player.actor.type = 'character';
+      delete deps.resolveEnemies;
+      const previousCanvas = globalThis.canvas;
+      globalThis.canvas = { tokens: { placeables: [target, player] } };
+
+      try {
+        await syncSystemConditionOverridesForToken(target, deps);
+      } finally {
+        globalThis.canvas = previousCanvas;
+      }
+
+      expect(state.applied).toEqual([
+        ['pc1', 't', 'hidden', CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE],
+      ]);
+      expect(state.removedConditions).toEqual(['undetected']);
+    },
+  );
+
   test('effect-granted only (nothing removable) → transient source, condition kept', async () => {
     const { state, deps } = makeConsumeDeps({ getRemovableConditions: () => [] });
     await syncSystemConditionOverridesForToken(tgt(), deps);
@@ -202,5 +246,53 @@ describe('syncSystemConditionOverridesForToken condition consumption', () => {
     await syncSystemConditionOverridesForToken(tgt(), deps);
     expect(state.removedOverrides).toEqual([]);
     expect(state.removedConditions).toEqual([]);
+  });
+});
+
+describe('applySystemConditionOverride', () => {
+  test.each(['loot', 'hazard'])(
+    'converted %s state writes directly to the visibility map',
+    async (actorType) => {
+      const observer = obs('pc1');
+      const target = tgt();
+      target.actor.type = actorType;
+      const setVisibility = jest.fn(async () => true);
+      const applyAvsOverride = jest.fn(async () => true);
+
+      await applySystemConditionOverride(
+        observer,
+        target,
+        'hidden',
+        CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
+        { setVisibility, applyAvsOverride },
+      );
+
+      expect(setVisibility).toHaveBeenCalledWith(observer, target, 'hidden');
+      expect(applyAvsOverride).not.toHaveBeenCalled();
+    },
+  );
+
+  test('converted creature state keeps using AVS overrides', async () => {
+    const observer = obs('pc1');
+    const target = tgt();
+    target.actor.type = 'npc';
+    const setVisibility = jest.fn(async () => true);
+    const applyAvsOverride = jest.fn(async () => true);
+
+    await applySystemConditionOverride(
+      observer,
+      target,
+      'undetected',
+      CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
+      { setVisibility, applyAvsOverride },
+    );
+
+    expect(applyAvsOverride).toHaveBeenCalledWith(
+      observer,
+      target,
+      'undetected',
+      CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE,
+    );
+    expect(setVisibility).not.toHaveBeenCalled();
   });
 });

@@ -67,6 +67,18 @@ function tokenAlliance(token) {
   return token?.actor?.alliance ?? token?.actor?.system?.details?.alliance ?? null;
 }
 
+function actorIsType(actor, type) {
+  try {
+    return actor?.type === type || actor?.isOfType?.(type);
+  } catch {
+    return false;
+  }
+}
+
+function isLootOrHazard(token) {
+  return actorIsType(token?.actor, 'loot') || actorIsType(token?.actor, 'hazard');
+}
+
 function dispositionOpposes(a, b) {
   const da = Number(a?.document?.disposition);
   const db = Number(b?.document?.disposition);
@@ -91,6 +103,21 @@ export function resolveEnemyObservers(token, tokens = globalThis.canvas?.tokens?
   });
 }
 
+export function resolveSystemConditionObservers(
+  token,
+  tokens = globalThis.canvas?.tokens?.placeables ?? [],
+) {
+  if (!isLootOrHazard(token)) return resolveEnemyObservers(token, tokens);
+  const id = token?.document?.id;
+  if (!id) return [];
+  return (tokens ?? []).filter(
+    (observer) =>
+      observer?.document?.id &&
+      observer.document.id !== id &&
+      actorIsType(observer?.actor, 'character'),
+  );
+}
+
 function defaultIsEnabled() {
   try {
     return !!globalThis.game?.settings?.get?.(MODULE_ID, 'systemConditionOverrides');
@@ -104,9 +131,31 @@ async function defaultGetOverrideData(observer, target) {
   return AvsOverrideManager.getOverrideData(observer, target);
 }
 
-async function defaultApplyOverride(observer, target, state, source = SYSTEM_CONDITION_OVERRIDE_SOURCE) {
+async function defaultApplyAvsOverride(observer, target, state, source) {
   const { default: AvsOverrideManager } = await import('../chat/services/infra/AvsOverrideManager.js');
   return AvsOverrideManager.applyOverrides(observer, { target, state }, { source });
+}
+
+async function defaultSetVisibility(observer, target, state) {
+  const { setVisibilityBetween } = await import('../stores/visibility-map.js');
+  return setVisibilityBetween(observer, target, state);
+}
+
+export async function applySystemConditionOverride(
+  observer,
+  target,
+  state,
+  source = SYSTEM_CONDITION_OVERRIDE_SOURCE,
+  deps = {},
+) {
+  const {
+    applyAvsOverride = defaultApplyAvsOverride,
+    setVisibility = defaultSetVisibility,
+  } = deps;
+  if (source === CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE && isLootOrHazard(target)) {
+    return setVisibility(observer, target, state);
+  }
+  return applyAvsOverride(observer, target, state, source);
 }
 
 async function defaultRemoveOverride(observerId, targetId) {
@@ -129,9 +178,9 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
   const {
     isEnabled = defaultIsEnabled,
     getOverrideData = defaultGetOverrideData,
-    applyOverride = defaultApplyOverride,
+    applyOverride = applySystemConditionOverride,
     removeOverride = defaultRemoveOverride,
-    resolveEnemies = resolveEnemyObservers,
+    resolveEnemies = resolveSystemConditionObservers,
     strongestState = strongestSystemConditionState,
     getRemovableConditions = removableSystemConditionItems,
     removeConditions = defaultRemoveConditionItems,
@@ -151,6 +200,7 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
   const appliedSource = consuming
     ? CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE
     : SYSTEM_CONDITION_OVERRIDE_SOURCE;
+  const appliedState = consuming && isLootOrHazard(token) ? 'hidden' : state;
 
   let appliedAny = false;
   for (const observer of enemies) {
@@ -167,7 +217,7 @@ export async function syncSystemConditionOverridesForToken(token, deps = {}) {
       ) {
         continue;
       }
-      await applyOverride(observer, token, state, appliedSource);
+      await applyOverride(observer, token, appliedState, appliedSource);
       appliedAny = true;
     } else if (existingSource === SYSTEM_CONDITION_OVERRIDE_SOURCE) {
       await removeOverride(observerId, targetId);

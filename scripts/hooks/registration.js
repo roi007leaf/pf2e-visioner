@@ -47,6 +47,10 @@ import {
   handleTokenCreatedForSystemConditions,
 } from '../services/system-condition-overrides.js';
 import { syncSystemHiddenIndicatorPositionForToken } from '../services/system-hidden-indicator-rendering.js';
+import {
+  refreshHiddenHazardIndicators,
+  syncHiddenHazardIndicator,
+} from '../services/hidden-hazard-indicators.js';
 
 function clearActorFeatureCacheForItem(item) {
   const actor = item?.actor ?? item?.parent ?? null;
@@ -61,6 +65,21 @@ export async function registerHooks() {
   Hooks.on('canvasReady', onCanvasReady);
   Hooks.on('canvasReady', () => {
     watchCurrentScenePreparedSenses();
+    refreshHiddenHazardIndicators();
+  });
+  Hooks.on('drawToken', (token) => {
+    try {
+      syncHiddenHazardIndicator(token);
+    } catch {
+      /* best-effort hidden hazard/loot indicator creation after redraw */
+    }
+  });
+  Hooks.on('controlToken', () => {
+    try {
+      refreshHiddenHazardIndicators();
+    } catch {
+      /* best-effort selected-observer indicator refresh */
+    }
   });
 
   const visionMasterTokenRefresh = createVisionMasterTokenRefresh();
@@ -173,6 +192,11 @@ export async function registerHooks() {
     } catch {
       /* best-effort indicator position sync */
     }
+    try {
+      syncHiddenHazardIndicator(token);
+    } catch {
+      /* best-effort hidden hazard/loot indicator creation */
+    }
     return handleTokenRefreshed(token);
   });
 
@@ -180,6 +204,7 @@ export async function registerHooks() {
     try {
       const target = canvas?.tokens?.get?.(targetId);
       if (!target) return;
+      syncHiddenHazardIndicator(target);
       if (state === 'undetected' || state === 'unnoticed') {
         const mesh = target.detectionFilterMesh;
         if (!mesh) return;

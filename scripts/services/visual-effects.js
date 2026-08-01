@@ -29,6 +29,10 @@ import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
 import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
 import { clearHiddenTokenEchoes } from './hidden-token-echoes.js';
 import {
+  clearHiddenHazardIndicators,
+  refreshHiddenHazardIndicators,
+} from './hidden-hazard-indicators.js';
+import {
   buildSystemHiddenIndicatorDecision,
   getSystemHiddenIndicatorCandidates,
   getSystemHiddenSenseContext,
@@ -104,6 +108,7 @@ export function clearVisionerTokenVisibilityEffects(
 ) {
   removeSystemHiddenIndicators(tokens, { forceTokenVisible });
   clearHiddenTokenEchoes(tokens);
+  clearHiddenHazardIndicators(tokens);
   for (const token of tokens) {
     if (!token?._pvCurrentViewHardHidden) continue;
     if (forceTokenVisible) {
@@ -125,7 +130,10 @@ export function clearVisionerTokenVisibilityEffects(
 
 export async function updateTokenVisuals(tokens = undefined) {
   if (!canvas?.tokens) return;
-  if (isSceneTokenVisionDisabled()) return;
+  if (isSceneTokenVisionDisabled()) {
+    clearHiddenHazardIndicators();
+    return;
+  }
   const targets =
     tokens === undefined || tokens === null ? null : resolveTokenVisualRefreshTargets(tokens);
 
@@ -142,6 +150,7 @@ export async function updateTokenVisuals(tokens = undefined) {
   }
 
   refreshTokenVisualTargets(targets);
+  refreshHiddenHazardIndicators(targets === null ? canvas.tokens.placeables : targets);
 }
 
 /**

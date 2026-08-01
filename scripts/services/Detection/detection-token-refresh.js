@@ -193,8 +193,12 @@ export function wrapTokenRefreshTooltip(wrapped, ...args) {
 
 export function wrapTokenControl(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
-  captureMultiLevelViewBeforeControl(this);
-  const levelTransition = suppressOtherLevelTokenRenderingBeforeControl(this, args[0]);
+  const controlOptions = args[0];
+  const isNewTokenControl = controlOptions?.isNew === true;
+  if (!isNewTokenControl) captureMultiLevelViewBeforeControl(this);
+  const levelTransition = isNewTokenControl
+    ? null
+    : suppressOtherLevelTokenRenderingBeforeControl(this, controlOptions);
   try {
     rememberSoundwaveDetectionBeforeCoreRefresh(this);
     const result = wrapped(...args);

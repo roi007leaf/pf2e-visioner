@@ -199,6 +199,57 @@ describe('multi-level token selection frame ordering', () => {
     expect(sceneView).not.toHaveBeenCalled();
   });
 
+  it('leaves existing token surfaces to Core when V14 controls a newly created token', () => {
+    const created = {
+      controlled: false,
+      document: { id: 'created', level: 'hold', hidden: false, getFlag: () => null },
+    };
+    const existing = {
+      controlled: false,
+      visible: true,
+      renderable: true,
+      _testCulled: jest.fn(() => true),
+      mesh: { visible: true, renderable: true, alpha: 1 },
+      document: { id: 'existing', level: 'upper', hidden: false, getFlag: () => null },
+    };
+    globalThis.canvas = {
+      level: { id: 'hold' },
+      scene: {
+        id: 'restored-keep',
+        levels: new Map([
+          ['hold', { id: 'hold' }],
+          ['upper', { id: 'upper' }],
+        ]),
+        getSurfaces: jest.fn(),
+        testSurfaceCollision: jest.fn(),
+      },
+      tokens: {
+        controlled: [],
+        _draggedToken: null,
+        placeables: [existing, created],
+      },
+    };
+    const coreControl = jest.fn(() => {
+      expect(existing).toMatchObject({
+        visible: true,
+        renderable: true,
+        mesh: { visible: true, renderable: true, alpha: 1 },
+      });
+      created.controlled = true;
+      globalThis.canvas.tokens.controlled = [created];
+      return created;
+    });
+
+    expect(wrapTokenControl.call(created, coreControl, { isNew: true, releaseOthers: true })).toBe(
+      created,
+    );
+    expect(existing).toMatchObject({
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true, alpha: 1 },
+    });
+  });
+
   it('keeps Anuithur suppressed through the delayed refresh after Celdar switches to Rootfall', () => {
     const celdar = {
       controlled: true,
@@ -852,5 +903,100 @@ describe('elevation tooltip hard-hide ordering', () => {
     } finally {
       globalThis.queueMicrotask = nativeQueueMicrotask;
     }
+  });
+});
+
+describe('player hover guard for Visioner-hidden hazards and loot', () => {
+  const observer = { document: { id: 'obs' }, controlled: true };
+
+  beforeEach(() => {
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    globalThis.game = {
+      ready: true,
+      release: { generation: 14 },
+      user: { isGM: false },
+      settings: { get: jest.fn(() => true) },
+    };
+    globalThis.canvas = {
+      scene: { tokenVision: true, getFlag: jest.fn(() => false) },
+      tokens: { controlled: [observer], _draggedToken: null },
+    };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+  });
+
+  it.each([
+    [13, 'hazard'],
+    [13, 'loot'],
+    [14, 'hazard'],
+    [14, 'loot'],
+  ])('blocks Core hover on V%s for player-hidden %s tokens', (foundryGeneration, actorType) => {
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper) => registered.set(target, wrapper)),
+    };
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration });
+
+    const canHover = registered.get('foundry.canvas.placeables.Token.prototype._canHover');
+    const hoverIn = registered.get('foundry.canvas.placeables.Token.prototype._onHoverIn');
+    const coreCanHover = jest.fn(() => true);
+    const coreHoverIn = jest.fn(() => true);
+    const token = {
+      controlled: false,
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: false, getFlag: () => null },
+      actor: { type: actorType, itemTypes: { condition: [] } },
+    };
+
+    expect(canHover).toBeDefined();
+    expect(canHover.call(token, coreCanHover, globalThis.game.user, {})).toBe(false);
+    expect(coreCanHover).not.toHaveBeenCalled();
+    expect(hoverIn).toBeDefined();
+    expect(hoverIn.call(token, coreHoverIn, {}, {})).toBe(false);
+    expect(coreHoverIn).not.toHaveBeenCalled();
+  });
+
+  it('blocks a hard-hidden token when its actor is unavailable to the player', () => {
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper) => registered.set(target, wrapper)),
+    };
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration: 14 });
+
+    const canHover = registered.get('foundry.canvas.placeables.Token.prototype._canHover');
+    const coreCanHover = jest.fn(() => true);
+    const token = {
+      controlled: false,
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: false, getFlag: () => null },
+      actor: null,
+    };
+
+    expect(canHover.call(token, coreCanHover, globalThis.game.user, {})).toBe(false);
+    expect(coreCanHover).not.toHaveBeenCalled();
+  });
+
+  it('preserves Core hover for observed hazards and GMs', () => {
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper) => registered.set(target, wrapper)),
+    };
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration: 14 });
+
+    const canHover = registered.get('foundry.canvas.placeables.Token.prototype._canHover');
+    const coreCanHover = jest.fn(() => true);
+    const token = {
+      controlled: false,
+      document: { id: 't', hidden: false, getFlag: () => null },
+      actor: { type: 'hazard', itemTypes: { condition: [] } },
+    };
+
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(canHover.call(token, coreCanHover, globalThis.game.user, {})).toBe(true);
+    expect(coreCanHover).toHaveBeenCalledTimes(1);
+
+    globalThis.game.user.isGM = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    expect(canHover.call(token, coreCanHover, globalThis.game.user, {})).toBe(true);
+    expect(coreCanHover).toHaveBeenCalledTimes(2);
   });
 });

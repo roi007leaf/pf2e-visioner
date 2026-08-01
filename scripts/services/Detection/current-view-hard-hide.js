@@ -2,6 +2,8 @@ import { MODULE_ID } from '../../constants.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
+import { currentViewHardHideSurfaces } from './current-view-hard-hide-surfaces.js';
+import { legacyLevelsFloorBlocksSightBetween } from './legacy-levels-live-sight.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import {
   getVisionerVisibilityBetweenTokens,
@@ -73,6 +75,26 @@ function hiddenStateShouldRenderHideTarget(target) {
   return HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES.has(actorType);
 }
 
+export function shouldBlockPlayerHoverForCurrentView(
+  target,
+  user = globalThis.game?.user,
+) {
+  if (!target || user?.isGM) return false;
+  if (target._pvCurrentViewHardHidden === true) return true;
+  if (!hiddenStateShouldRenderHideTarget(target)) return false;
+  return targetIsHardHiddenFromCurrentView(target);
+}
+
+export function wrapTokenCanHover(wrapped, user, event) {
+  if (shouldBlockPlayerHoverForCurrentView(this, user)) return false;
+  return wrapped(user, event);
+}
+
+export function wrapTokenHoverIn(wrapped, event, options) {
+  if (shouldBlockPlayerHoverForCurrentView(this)) return false;
+  return wrapped(event, options);
+}
+
 function visionerStateHidesTargetRendering(state, target) {
   if (RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) return true;
   return state === 'hidden' && hiddenStateShouldRenderHideTarget(target);
@@ -83,25 +105,13 @@ function foundryHiddenRequiresVisionerRenderLock(target) {
 }
 
 const HARD_HIDDEN_CHROME_KEY = '_pvHardHiddenChromeVisibility';
-
-function hardHiddenChromeSurfaces(token) {
-  return [
-    token?.effects,
-    token?.nameplate,
-    token?.bars,
-    token?.tooltip,
-    token?.levelIndicator,
-    token?.targetArrows,
-    token?.targetPips,
-    token?.turnMarker,
-    token?.turnMarker?.mesh,
-  ].filter((surface) => surface && 'visible' in surface);
-}
+const HARD_HIDDEN_INTERACTION_KEY = '_pvHardHiddenInteractionState';
+const HARD_HIDDEN_HIT_AREA = Object.freeze({ contains: () => false });
 
 function hideHardHiddenChromeSurfaces(token) {
   const captured = token[HARD_HIDDEN_CHROME_KEY] ?? [];
   const capturedSurfaces = new Set(captured.map((entry) => entry.surface));
-  for (const surface of hardHiddenChromeSurfaces(token)) {
+  for (const surface of currentViewHardHideSurfaces(token)) {
     if (capturedSurfaces.has(surface)) continue;
     captured.push({ surface, visible: surface.visible });
     capturedSurfaces.add(surface);
@@ -125,6 +135,36 @@ function restoreHardHiddenChromeSurfaces(token) {
   } catch {
     token[HARD_HIDDEN_CHROME_KEY] = null;
   }
+}
+
+function disableHardHiddenInteraction(token) {
+  if (!token[HARD_HIDDEN_INTERACTION_KEY]) {
+    token[HARD_HIDDEN_INTERACTION_KEY] = {
+      eventMode: token.eventMode,
+      cursor: token.cursor,
+      hitArea: token.hitArea,
+      interactiveChildren: token.interactiveChildren,
+    };
+  }
+  token.eventMode = 'none';
+  token.cursor = 'default';
+  token.hitArea = HARD_HIDDEN_HIT_AREA;
+  token.interactiveChildren = false;
+}
+
+function restoreHardHiddenInteraction(token) {
+  const captured = token?.[HARD_HIDDEN_INTERACTION_KEY];
+  if (!captured) return false;
+  token.eventMode = captured.eventMode;
+  token.cursor = captured.cursor;
+  token.hitArea = captured.hitArea;
+  token.interactiveChildren = captured.interactiveChildren;
+  try {
+    delete token[HARD_HIDDEN_INTERACTION_KEY];
+  } catch {
+    token[HARD_HIDDEN_INTERACTION_KEY] = null;
+  }
+  return true;
 }
 
 function hasUndetectedAvsOverride(observer, target) {
@@ -173,7 +213,7 @@ function shouldDeferRenderingToCoreDuringMove(target) {
     const state = getStoredVisibilityState(observer, target);
     if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) continue;
     if (hasUndetectedAvsOverride(observer, target)) return false;
-    deferrable = true;
+    if (!legacyLevelsFloorBlocksSightBetween(observer, target)) deferrable = true;
   }
   return deferrable;
 }
@@ -196,6 +236,13 @@ function shouldPreserveMovementCoreReveal(target) {
   }
   const observers = currentViewVisionerObserversForTarget(target);
   if (observers.some((observer) => hasUndetectedAvsOverride(observer, target))) {
+    movementCoreVisibleReveals.delete(target);
+    return false;
+  }
+  if (
+    observers.length > 0 &&
+    observers.every((observer) => legacyLevelsFloorBlocksSightBetween(observer, target))
+  ) {
     movementCoreVisibleReveals.delete(target);
     return false;
   }
@@ -248,6 +295,7 @@ export function applyCurrentViewHardHide(token) {
   }
   token.detectionFilter = null;
   hideHardHiddenChromeSurfaces(token);
+  disableHardHiddenInteraction(token);
   token._pvCurrentViewHardHidden = true;
   return true;
 }
@@ -276,9 +324,12 @@ function hasCurrentViewHardHideRenderState(token) {
 
 export function releaseCurrentViewHardHide(token) {
   if (!token) return false;
-  if (token.controlled) return false;
+  if (token.controlled) {
+    restoreHardHiddenInteraction(token);
+    return false;
+  }
   const mesh = token.mesh;
-  if (!hasCurrentViewHardHideRenderState(token)) return false;
+  if (!hasCurrentViewHardHideRenderState(token)) return restoreHardHiddenInteraction(token);
   if ('visible' in token) token.visible = true;
   if ('renderable' in token) token.renderable = true;
   const detectionFilterOwnsRenderSurface = !!token.detectionFilter;
@@ -288,6 +339,7 @@ export function releaseCurrentViewHardHide(token) {
     if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
   }
   if (!detectionFilterOwnsRenderSurface) restoreHardHiddenChromeSurfaces(token);
+  restoreHardHiddenInteraction(token);
   return true;
 }
 
@@ -317,6 +369,7 @@ export function releaseCurrentViewHardHideForLiveSight(token) {
     }
   }
   restoreHardHiddenChromeSurfaces(token);
+  restoreHardHiddenInteraction(token);
   token._pvCurrentViewHardHidden = false;
   return released;
 }

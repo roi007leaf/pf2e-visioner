@@ -14,6 +14,7 @@ import {
 } from './Detection/detection-visibility-context.js';
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
 import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
+import { legacyLevelsFloorBlocksSightBetween } from './Detection/legacy-levels-live-sight.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import { isPartyActorToken } from '../utils/token-actor.js';
@@ -78,7 +79,8 @@ export function observerSightContainsTarget(observer, target) {
     const vision = previewForObserver(observer)?.vision || observer?.vision;
     if (vision?.isBlinded || vision?.blinded?.darkness) return false;
     const los = vision?.los;
-    return !!(los && los.contains(center.x, center.y));
+    if (!(los && los.contains(center.x, center.y))) return false;
+    return !legacyLevelsFloorBlocksSightBetween(observer, target);
   } catch {
     return false;
   }
@@ -161,7 +163,8 @@ export function targetShouldShowSoundwave(
       sensedOutOfSight = true;
     } else if (
       (visibility === 'observed' || visibility === 'concealed') &&
-      impreciselySensed(observer, target)
+      impreciselySensed(observer, target) &&
+      !legacyLevelsFloorBlocksSightBetween(observer, target)
     ) {
       // Freeze+settle keeps the persisted state at the pre-move value, but the observer's live sight
       // polygon updates during a committed move. A previously-seen target whose live sight is now

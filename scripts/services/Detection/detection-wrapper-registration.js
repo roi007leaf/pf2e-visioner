@@ -17,6 +17,7 @@ import {
 import { startDuringMoveSoundwaveOnDrag } from '../during-move-soundwave.js';
 import { wrapMultiLevelDragPreviewInitializeSources } from './multi-level-control-view.js';
 import { VISIBILITY_DETECTION_THRESHOLDS } from './detection-visibility-context.js';
+import { wrapTokenCanHover, wrapTokenHoverIn } from './current-view-hard-hide.js';
 
 export function registerDetectionWrappers({
   libWrapperAdapter = libWrapper,
@@ -68,6 +69,18 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
 
 function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGeneration) {
   try {
+    libWrapperAdapter.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._canHover',
+      wrapTokenCanHover,
+      'WRAPPER',
+    );
+    libWrapperAdapter.register(
+      MODULE_ID,
+      'foundry.canvas.placeables.Token.prototype._onHoverIn',
+      wrapTokenHoverIn,
+      'WRAPPER',
+    );
     libWrapperAdapter.register(
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._isVisionSource',

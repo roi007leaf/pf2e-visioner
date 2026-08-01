@@ -16,6 +16,7 @@ import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween, getVisibilityMap } from '../utils.js';
 import { setPanningState } from '../utils/scheduler.js';
 import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
+import { reassertCurrentViewHardHideSurfaces } from './Detection/current-view-hard-hide-surfaces.js';
 import {
   buildVisibilityFactorTooltipLines,
   buildVisibilityFactorIndicatorRequests,
@@ -816,6 +817,8 @@ function onTokenPointerUp(token) {
  * @param {boolean} highlight - Whether objects should be highlighted
  */
 export function onHighlightObjects(highlight) {
+  if (highlight) reassertCurrentViewHardHideSurfaces();
+
   // Alt-key tooltips should work regardless of hover tooltip settings
   const canShow = canShowTooltips('target', null, true); // isKeyboardTooltip=true
 
