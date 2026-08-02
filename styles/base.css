@@ -1026,6 +1026,57 @@
   color: var(--visibility-unnoticed, #9c27b0) !important;
 }
 
+.pf2e-visioner-module-conflict-banner {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  z-index: 100000;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  width: max-content;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 0.65rem 0.9rem;
+  color: #fff3cd;
+  font-size: var(--font-size-14, 0.875rem);
+  line-height: 1.35;
+  background: rgb(55 12 12 / 96%);
+  border: 1px solid #ffb020;
+  border-left-width: 5px;
+  border-radius: 6px;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 55%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pf2e-visioner-module-conflict-banner i {
+  flex: 0 0 auto;
+  color: #ffb020;
+  font-size: 1.25rem;
+}
+
+.pf2e-visioner-module-conflict-banner button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 30px;
+  padding: 0.25rem 0.65rem;
+  color: #1b1200;
+  white-space: nowrap;
+  background: #ffb020;
+  border: 1px solid #ffd37a;
+  border-radius: 4px;
+  pointer-events: auto;
+}
+
+.pf2e-visioner-module-conflict-banner button:hover:not(:disabled) {
+  background: #ffc14d;
+}
+
+.pf2e-visioner-module-conflict-banner button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;

@@ -19,6 +19,7 @@ import './regions/register.js';
 import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { exposeVisionerGlobalsAsync } from './services/visioner-globals.js';
 import { createPeekManager } from './services/Peek/peek-bootstrap.js';
+import { showPerceptiveConflictBanner } from './integrations/module-compatibility-warnings.js';
 
 let initializedAutoVisibilitySystem = null;
 
@@ -180,6 +181,7 @@ Hooks.once('canvasReady', () => {
 Hooks.once('ready', async () => {
   try {
     refreshVisionerGlobals();
+    showPerceptiveConflictBanner();
 
     // Apply initial colorblind mode again to ensure it's set
     updateColorblindMode();

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.4.1] - 2026-08-02
+
+### Added
+
+- **Active Perceptive conflicts now show a persistent GM-only warning banner**: The non-dismissible banner explains that running both modules is unsupported and can cause severe lag or visibility and door-peeking conflicts. Its **Disable Perceptive** button updates Foundry's module configuration and opens the standard world-reload confirmation.
+
 ## [8.4.0] - 2026-08-01
 
 ### Added
