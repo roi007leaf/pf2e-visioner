@@ -678,6 +678,44 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.interactiveChildren).toBe(true);
   });
 
+  it('preserves Core-restored interaction when a token hidden at scene load is first revealed', () => {
+    globalThis.game = { user: { isGM: false } };
+    const initialHitArea = { id: 'hidden-hit-area' };
+    const revealedHitArea = { id: 'revealed-hit-area' };
+    const t = {
+      controlled: false,
+      visible: false,
+      renderable: false,
+      eventMode: 'none',
+      cursor: 'default',
+      hitArea: initialHitArea,
+      interactiveChildren: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      document: { id: 't', hidden: true },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
+    applyCurrentViewHardHide(t);
+
+    t.document.hidden = false;
+    t.visible = true;
+    t.renderable = true;
+    t.mesh.visible = true;
+    t.mesh.renderable = true;
+    t.mesh.alpha = 1;
+    t.eventMode = 'static';
+    t.cursor = 'pointer';
+    t.hitArea = revealedHitArea;
+    t.interactiveChildren = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    expect(t.eventMode).toBe('static');
+    expect(t.cursor).toBe('pointer');
+    expect(t.hitArea).toBe(revealedHitArea);
+    expect(t.interactiveChildren).toBe(true);
+  });
+
   it('marks tokens it hard-hides', () => {
     const t = {
       controlled: false,

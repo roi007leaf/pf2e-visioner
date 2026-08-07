@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.4.2] - 2026-08-07
+
+### Fixed
+
+- **Corner and door peeking now respects Proximity Sight wall restrictions**: Visibility uses the actual peek origin for proximity thresholds, attenuation distance, and Levels 3D collision checks, so peeking cannot bypass restricted walls while still allowing sight when the peek point is within range.
+- **Tokens revealed from GM Hidden after a scene loads can now be selected immediately**: Visioner preserves the interaction state Foundry rebuilds during a token's first reveal instead of restoring the disabled hit area and pointer state captured while it was hidden.
+
 ## [8.4.1] - 2026-08-02
 
 ### Added

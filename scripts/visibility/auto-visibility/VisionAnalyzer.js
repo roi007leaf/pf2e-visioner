@@ -247,13 +247,49 @@ export class VisionAnalyzer {
       const isMinimized = typeof document !== 'undefined' && document.hidden;
       const levelsIntegration = LevelsIntegration.getInstance();
       if (levelsIntegration.isActive && !isMinimized) {
-        const collisionDetails =
-          typeof levelsIntegration.get3DCollisionDetails === 'function'
-            ? levelsIntegration.get3DCollisionDetails(observer, target, 'sight')
-            : {
-                mode: levelsIntegration.mode,
-                result: levelsIntegration.test3DCollision(observer, target, 'sight'),
-              };
+        let collisionDetails;
+        if (
+          observerPeek?.origin &&
+          typeof levelsIntegration.get3DPointCollisionDetails === 'function'
+        ) {
+          const observerPoint = levelsIntegration.getTokenPosition?.(observer, {
+            origin: 'vision',
+          }) ?? {
+            x: observer.center.x,
+            y: observer.center.y,
+            elevation: observer.document?.elevation ?? 0,
+          };
+          const targetPoint = levelsIntegration.getTokenPosition?.(target, {
+            origin: 'vision',
+          }) ?? {
+            x: target.center.x,
+            y: target.center.y,
+            elevation: target.document?.elevation ?? 0,
+          };
+          collisionDetails = levelsIntegration.get3DPointCollisionDetails(
+            {
+              ...observerPoint,
+              x: observerPeek.origin.x,
+              y: observerPeek.origin.y,
+            },
+            targetPoint,
+            'sight',
+            {
+              originToken: observer,
+              targetToken: target,
+              originLevel: levelsIntegration.getTokenVisionLevel?.(observer),
+              targetLevel: levelsIntegration.getTokenVisionLevel?.(target),
+            },
+          );
+        } else {
+          collisionDetails =
+            typeof levelsIntegration.get3DCollisionDetails === 'function'
+              ? levelsIntegration.get3DCollisionDetails(observer, target, 'sight')
+              : {
+                  mode: levelsIntegration.mode,
+                  result: levelsIntegration.test3DCollision(observer, target, 'sight'),
+                };
+        }
         const hasSightCollision = !!collisionDetails.result;
         const polygonOnlyCollision =
           collisionDetails.mode === 'core' &&
@@ -343,6 +379,13 @@ export class VisionAnalyzer {
         }
       }
 
+      // Peeking moves the effective sight origin without moving the token. Always make that
+      // explicit for geometric wall checks instead of depending on an injected PositionManager.
+      if (observerPeek?.origin) {
+        observerPos = { x: observerPeek.origin.x, y: observerPeek.origin.y };
+        usingPositionManager = true;
+      }
+
       // Foundry only keeps observer.vision.los fresh for the client's active (controlled) vision
       // source, so on the GM's client every non-selected token has a missing or stale polygon and
       // falls back to a wrong answer. Compute the sight polygon on demand whenever the observer's
@@ -361,12 +404,13 @@ export class VisionAnalyzer {
       // The vision polygon is based on the observer's position and respects all walls
       // HOWEVER: During token movement, the vision polygon may be stale (based on old position)
       // So we check if the observer position has changed significantly
+      const stalePositionTolerance = observerPeek?.origin ? 0.5 : 5;
       const visionPolygonStale =
         !usingOnDemandLos &&
         usingPositionManager &&
         los?.points &&
-        (Math.abs(observerPos.x - observer.center.x) > 5 ||
-          Math.abs(observerPos.y - observer.center.y) > 5);
+        (Math.abs(observerPos.x - observer.center.x) > stalePositionTolerance ||
+          Math.abs(observerPos.y - observer.center.y) > stalePositionTolerance);
 
       if (los?.points && !visionPolygonStale) {
         const radius = target.externalRadius;
@@ -645,7 +689,14 @@ export class VisionAnalyzer {
     const peek = peekRegistry.get(observerId);
     if (!peek?.ignoredWallIds?.length) return walls;
     const ignore = new Set(peek.ignoredWallIds);
-    return walls.filter((w) => !ignore.has(w.document?.id));
+    const edgeSenseTypes = getEdgeSenseTypes();
+    const thresholdSenseTypes = new Set(
+      [edgeSenseTypes.PROXIMITY, edgeSenseTypes.DISTANCE].filter((type) => type !== undefined),
+    );
+    return walls.filter(
+      (wall) =>
+        !ignore.has(wall.document?.id) || thresholdSenseTypes.has(wall.document?.sight),
+    );
   }
 
   #getOnDemandSightPolygon(observer, observerPos) {
@@ -1033,6 +1084,9 @@ export class VisionAnalyzer {
       // For doors, skip the distance optimization since they need special proximity handling
       // Doors can block vision even when the ray midpoint is far from the door midpoint
       const isDoor = wall.document.door > 0;
+      const usesThresholdSight =
+        wall.document.sight === edgeSenseTypes.PROXIMITY ||
+        wall.document.sight === edgeSenseTypes.DISTANCE;
 
       if (!isDoor) {
         const wallMidX = (wallCoords[0] + wallCoords[2]) / 2;
@@ -1050,7 +1104,7 @@ export class VisionAnalyzer {
       // For doors, do a fast plane-crossing check before the more general wall intersection.
       // This avoids false positives from the old "close to the door plane" shortcut when
       // both sampled points are actually on the same side of a closed door.
-      if (isDoor) {
+      if (isDoor && !usesThresholdSight) {
         const doorThreshold = 3; // pixels
 
         const wallX1 = wallCoords[0];

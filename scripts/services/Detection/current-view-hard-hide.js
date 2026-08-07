@@ -155,10 +155,15 @@ function disableHardHiddenInteraction(token) {
 function restoreHardHiddenInteraction(token) {
   const captured = token?.[HARD_HIDDEN_INTERACTION_KEY];
   if (!captured) return false;
-  token.eventMode = captured.eventMode;
-  token.cursor = captured.cursor;
-  token.hitArea = captured.hitArea;
-  token.interactiveChildren = captured.interactiveChildren;
+  // Core can rebuild token interaction while Visioner's render lock is active, most notably when
+  // a token hidden at scene load is revealed for the first time. Preserve any values Core already
+  // restored; replace only the exact disabled values still owned by Visioner.
+  if (token.eventMode === 'none') token.eventMode = captured.eventMode;
+  if (token.cursor === 'default') token.cursor = captured.cursor;
+  if (token.hitArea === HARD_HIDDEN_HIT_AREA) token.hitArea = captured.hitArea;
+  if (token.interactiveChildren === false) {
+    token.interactiveChildren = captured.interactiveChildren;
+  }
   try {
     delete token[HARD_HIDDEN_INTERACTION_KEY];
   } catch {

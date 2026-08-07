@@ -30,6 +30,24 @@ describe('VisionAnalyzer peek constraints', () => {
       Circle: jest.fn((x, y, radius) => ({ x, y, radius })),
     };
 
+    global.game.modules = new Map();
+    global.game.settings = { get: jest.fn(() => false) };
+    global.canvas.grid = { size: 100 };
+    global.canvas.scene = { grid: { distance: 5 } };
+    global.foundry.canvas = {
+      geometry: {
+        Ray: jest.fn((a, b) => ({ A: a, B: b })),
+      },
+    };
+    global.foundry.utils.lineLineIntersection = jest.fn((a, b, c, d) => {
+      const denominator = (a.x - b.x) * (c.y - d.y) - (a.y - b.y) * (c.x - d.x);
+      if (Math.abs(denominator) < 1e-10) return null;
+      const t0 = ((a.x - c.x) * (c.y - d.y) - (a.y - c.y) * (c.x - d.x)) / denominator;
+      const t1 = ((a.x - c.x) * (a.y - b.y) - (a.y - c.y) * (a.x - b.x)) / denominator;
+      if (t0 < 0 || t0 > 1 || t1 < 0 || t1 > 1) return null;
+      return { x: a.x + t0 * (b.x - a.x), y: a.y + t0 * (b.y - a.y), t0 };
+    });
+
     canvas.walls.placeables = [];
   });
 
@@ -75,6 +93,39 @@ describe('VisionAnalyzer peek constraints', () => {
 
   function directionToward(origin, target) {
     return Math.atan2(target.center.y - origin.y, target.center.x - origin.x);
+  }
+
+  function makeProximityPeekPair({ observerX = 0, targetX = 300 } = {}) {
+    const observer = {
+      id: 'proximity-peeker',
+      center: { x: observerX, y: 0 },
+      vision: null,
+      actor: { system: { perception: { vision: true }, traits: { size: { value: 'med' } } } },
+      document: { id: 'proximity-peeker', x: observerX, y: 0, width: 0, height: 0, elevation: 0 },
+    };
+    const target = {
+      id: 'proximity-target',
+      center: { x: targetX, y: 0 },
+      shape: null,
+      document: { id: 'proximity-target', x: targetX, y: 0, width: 0, height: 0, elevation: 0 },
+    };
+    return { observer, target };
+  }
+
+  function proximityWall({ attenuation = false, door = 0 } = {}) {
+    return {
+      document: {
+        id: 'proximity-wall',
+        move: CONST.WALL_SENSE_TYPES.NORMAL,
+        sight: CONST.WALL_SENSE_TYPES.PROXIMITY,
+        sound: CONST.WALL_SENSE_TYPES.NONE,
+        light: CONST.WALL_SENSE_TYPES.NORMAL,
+        door,
+        ds: 0,
+        threshold: { sight: 1, attenuation },
+        c: [200, -100, 200, 100],
+      },
+    };
   }
 
   test('clear LOS baseline returns true with no peek', () => {
@@ -152,6 +203,118 @@ describe('VisionAnalyzer peek constraints', () => {
       1000,
     );
     expect(va.hasLineOfSight(observer, target)).toBe(true);
+  });
+
+  test('corner peek remains blocked by a proximity wall when the peek origin is outside its threshold', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair();
+    canvas.walls.placeables = [proximityWall()];
+    va.clearCache();
+    peekRegistry.set(
+      observer.document.id,
+      { origin: { x: 100, y: 0 }, direction: 0, fov: null, range: 0, ignoredWallIds: [] },
+      Date.now(),
+    );
+
+    expect(va.hasLineOfSight(observer, target)).toBe(false);
+  });
+
+  test('door peek still applies proximity restriction to its otherwise ignored wall', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair();
+    canvas.walls.placeables = [proximityWall({ door: 1 })];
+    va.clearCache();
+    peekRegistry.set(
+      observer.document.id,
+      { origin: { x: 100, y: 0 }, direction: 0, fov: 120, range: 0, ignoredWallIds: ['proximity-wall'] },
+      Date.now(),
+    );
+
+    expect(va.hasLineOfSight(observer, target)).toBe(false);
+  });
+
+  test('peek origin inside a proximity threshold can see through the wall', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair();
+    canvas.walls.placeables = [proximityWall({ door: 1 })];
+    va.clearCache();
+    peekRegistry.set(
+      observer.document.id,
+      {
+        origin: { x: 190, y: 0 },
+        direction: 0,
+        fov: null,
+        range: 0,
+        ignoredWallIds: ['proximity-wall'],
+      },
+      Date.now(),
+    );
+
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+  });
+
+  test('peek origin drives proximity threshold attenuation distance', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair({ observerX: 195, targetX: 212 });
+    observer.vision = {
+      active: true,
+      los: {
+        points: [0, 0, 1, 1],
+        intersectCircle: () => ({ points: [{ x: target.center.x, y: target.center.y }] }),
+        contains: () => true,
+      },
+    };
+    canvas.visibility = { testVisibility: jest.fn(() => true) };
+    canvas.walls.placeables = [proximityWall({ attenuation: true, door: 1 })];
+    va.clearCache();
+    peekRegistry.set(
+      observer.document.id,
+      {
+        origin: { x: 190, y: 0 },
+        direction: 0,
+        fov: null,
+        range: 0,
+        ignoredWallIds: ['proximity-wall'],
+      },
+      Date.now(),
+    );
+
+    expect(va.hasLineOfSight(observer, target)).toBe(false);
+  });
+
+  test('active Levels collision uses the peek origin instead of the token center', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair();
+    const get3DPointCollisionDetails = jest.fn(() => ({
+      mode: 'core',
+      result: false,
+      reason: 'clear',
+    }));
+    jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+      isActive: true,
+      mode: 'core',
+      getTokenPosition: (token) => ({
+        x: token.center.x,
+        y: token.center.y,
+        elevation: 5,
+      }),
+      getTokenVisionLevel: () => null,
+      get3DPointCollisionDetails,
+      getTokenLevelId: () => null,
+    });
+    peekRegistry.set(
+      observer.document.id,
+      { origin: { x: 100, y: 0 }, direction: 0, fov: null, range: 0, ignoredWallIds: [] },
+      Date.now(),
+    );
+
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+    expect(get3DPointCollisionDetails).toHaveBeenCalledWith(
+      { x: 100, y: 0, elevation: 5 },
+      { x: target.center.x, y: target.center.y, elevation: 5 },
+      'sight',
+      expect.objectContaining({ originToken: observer, targetToken: target }),
+    );
   });
 
   test('returns false when target is outside the peek cone', () => {
