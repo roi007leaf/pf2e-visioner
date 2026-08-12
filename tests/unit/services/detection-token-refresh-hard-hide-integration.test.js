@@ -924,6 +924,24 @@ describe('player hover guard for Visioner-hidden hazards and loot', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
   });
 
+  it('registers hover guards as MIXED because hidden tokens intentionally stop the wrapper chain', () => {
+    const registered = new Map();
+    const libWrapperAdapter = {
+      register: jest.fn((_moduleId, target, wrapper, type) => {
+        registered.set(target, { wrapper, type });
+      }),
+    };
+
+    registerDetectionWrappers({ libWrapperAdapter, foundryGeneration: 14 });
+
+    expect(
+      registered.get('foundry.canvas.placeables.Token.prototype._canHover')?.type,
+    ).toBe('MIXED');
+    expect(
+      registered.get('foundry.canvas.placeables.Token.prototype._onHoverIn')?.type,
+    ).toBe('MIXED');
+  });
+
   it.each([
     [13, 'hazard'],
     [13, 'loot'],

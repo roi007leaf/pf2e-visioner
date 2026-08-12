@@ -73,13 +73,13 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGenerati
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._canHover',
       wrapTokenCanHover,
-      'WRAPPER',
+      'MIXED',
     );
     libWrapperAdapter.register(
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._onHoverIn',
       wrapTokenHoverIn,
-      'WRAPPER',
+      'MIXED',
     );
     libWrapperAdapter.register(
       MODULE_ID,

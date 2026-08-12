@@ -160,7 +160,10 @@ function restoreHardHiddenInteraction(token) {
   // restored; replace only the exact disabled values still owned by Visioner.
   if (token.eventMode === 'none') token.eventMode = captured.eventMode;
   if (token.cursor === 'default') token.cursor = captured.cursor;
-  if (token.hitArea === HARD_HIDDEN_HIT_AREA) token.hitArea = captured.hitArea;
+  if (token.hitArea === HARD_HIDDEN_HIT_AREA || token.hitArea == null) {
+    // Core-hidden tokens can be captured before Core assigns their normal interactive hit area.
+    token.hitArea = captured.hitArea ?? token.shape ?? null;
+  }
   if (token.interactiveChildren === false) {
     token.interactiveChildren = captured.interactiveChildren;
   }

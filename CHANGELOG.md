@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.4.3] - 2026-08-12
+
+### Fixed
+
+- **Players can now hover and directly target tokens revealed from GM Hidden after joining a scene**: Tokens that were already Foundry-hidden before the player loaded the scene now regain Foundry's normal token-shaped hit area when revealed, restoring hover borders and direct targeting while preserving the GM's ghosted hidden-token interaction.
+- **Deselecting a player-owned token after it is hidden no longer causes a libWrapper console error**: Visioner's intentional hidden-token hover guard now uses libWrapper's conditional wrapper contract, so clearing token selection can safely make the token non-interactive without libWrapper unregistering the guard.
+
 ## [8.4.2] - 2026-08-07
 
 ### Fixed
