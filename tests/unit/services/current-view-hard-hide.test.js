@@ -145,8 +145,16 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
   });
-  it('GM observer: foundry-hidden token is NOT force-hidden by this rule', () => {
+  it('GM observer: Foundry-hidden token is hard-hidden from the selected-token view', () => {
     globalThis.game = { user: { isGM: true } };
+    const t = target('t', 'character', { hidden: true });
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+  it('GM without an observer leaves Foundry-hidden rendering to Core', () => {
+    globalThis.game = { user: { isGM: true } };
+    controlled.length = 0;
+    draggedToken = null;
     const t = target('t', 'character', { hidden: true });
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
@@ -529,22 +537,43 @@ describe('applyCurrentViewHardHide', () => {
     expect(t.mesh.visible).toBe(false);
   });
 
-  it('restores a Foundry-hidden token that core itself left invisible, even with no hard-hide marker set', () => {
+  it('hard-hides a Foundry-hidden token in a GM selected-token view', () => {
     globalThis.game = { user: { isGM: true } };
     const t = {
       controlled: false,
-      visible: false,
+      visible: true,
       renderable: true,
-      mesh: { visible: false, renderable: true, alpha: 0.5 },
+      mesh: { visible: true, renderable: true, alpha: 0.5 },
       document: { id: 't', hidden: true },
       actor: { type: 'npc', itemTypes: { condition: [] } },
     };
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
-    expect(t._pvCurrentViewHardHidden).toBeUndefined();
+
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+    expect(t._pvCurrentViewHardHidden).toBe(true);
+  });
+
+  it('restores a Foundry-hidden token to GM Core view after deselection', () => {
+    globalThis.game = { user: { isGM: true } };
+    controlled.length = 0;
+    draggedToken = null;
+    const t = {
+      controlled: false,
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      _pvCurrentViewHardHidden: true,
+      document: { id: 't', hidden: true },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
     expect(applyCurrentViewHardHide(t)).toBe(false);
     expect(t.visible).toBe(true);
-    expect(t.mesh.visible).toBe(true);
-    expect(t.mesh.alpha).toBe(0.5);
+    expect(t.renderable).toBe(true);
+    expect(t.mesh).toEqual({ visible: true, renderable: true, alpha: 0.5 });
     expect(t._pvCurrentViewHardHidden).toBe(false);
   });
 

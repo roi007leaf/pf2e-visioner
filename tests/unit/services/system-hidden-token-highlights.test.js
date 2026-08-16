@@ -375,7 +375,6 @@ describe('system-hidden token highlight service', () => {
       buildSystemHiddenIndicatorDecision({
         observer,
         token: target,
-        user: { isGM: false },
         senseContext: getSystemHiddenSenseContext(observer),
         grid: {
           size: 50,
@@ -402,7 +401,7 @@ describe('system-hidden token highlight service', () => {
     });
   });
 
-  test('keeps Foundry-hidden special-sense decisions available to a GM viewer', () => {
+  test('blocks Foundry-hidden special-sense decisions in a GM observer perspective', () => {
     const observer = {
       document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
       actor: {
@@ -421,7 +420,6 @@ describe('system-hidden token highlight service', () => {
       buildSystemHiddenIndicatorDecision({
         observer,
         token: target,
-        user: { isGM: true },
         senseContext: getSystemHiddenSenseContext(observer),
         grid: {
           size: 50,
@@ -430,9 +428,8 @@ describe('system-hidden token highlight service', () => {
         },
       }),
     ).toMatchObject({
-      shouldShowIndicator: true,
-      indicatorMode: 'scent',
-      shouldShowScentIndicator: true,
+      shouldShowIndicator: false,
+      shouldShowScentIndicator: false,
     });
   });
 
@@ -822,12 +819,12 @@ describe('system-hidden indicator render lifecycle', () => {
     expect(hiddenTarget._pvSystemHiddenIndicator).toBe(existingIndicator);
   });
 
-  test('removes a stale special-sense indicator when a player target becomes Foundry hidden', async () => {
+  test('removes a stale special-sense indicator when a GM target becomes Foundry hidden', async () => {
     const { updateSystemHiddenTokenHighlights } = await import(
       '../../../scripts/services/visual-effects.js'
     );
 
-    global.game.user.isGM = false;
+    global.game.user.isGM = true;
     const parent = { removeChild: jest.fn() };
     const existingIndicator = {
       _pvObserverId: 'observer',

@@ -44,16 +44,16 @@ describe('nested _applyRenderFlags -> _refreshVisibility during a held drag (sta
     globalThis.canvas = { tokens: { controlled: [observer], _draggedToken: null } };
   });
 
-  it('does not re-hide a target that applyCurrentViewHardHide already revealed earlier in the same nested refresh', () => {
+  it('keeps a Foundry-hidden target secret across a nested held-drag refresh', () => {
     const token = foundryHiddenTarget();
 
-    // Prior ticks already hard-hid it while undetected (mirrors a real move in progress).
+    // Prior ticks already hard-hid the GM-secret target.
     __setStoredVisibilityForTest(new Map([['obs:t', 'undetected']]));
     applyCurrentViewHardHide(token);
     expect(token.visible).toBe(false);
     expect(token._pvCurrentViewHardHidden).toBe(true);
 
-    // Visibility settles to observed mid-move (e.g. the drag brought it back into view).
+    // Even if AVS visibility settles to observed, Foundry Hidden remains authoritative.
     __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
 
     // Foundry's own _applyRenderFlags calls _refreshVisibility internally - both are wrapped,
@@ -65,9 +65,9 @@ describe('nested _applyRenderFlags -> _refreshVisibility during a held drag (sta
       });
     });
 
-    expect(token.visible).toBe(true);
-    expect(token.mesh.visible).toBe(true);
-    expect(token._pvCurrentViewHardHidden).toBe(false);
+    expect(token.visible).toBe(false);
+    expect(token.mesh.visible).toBe(false);
+    expect(token._pvCurrentViewHardHidden).toBe(true);
   });
 });
 

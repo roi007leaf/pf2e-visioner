@@ -101,7 +101,9 @@ function visionerStateHidesTargetRendering(state, target) {
 }
 
 function foundryHiddenRequiresVisionerRenderLock(target) {
-  return !!target?.document?.hidden && !globalThis.game?.user?.isGM;
+  if (!target?.document?.hidden) return false;
+  if (!globalThis.game?.user?.isGM) return true;
+  return currentViewObservers().length > 0;
 }
 
 const HARD_HIDDEN_CHROME_KEY = '_pvHardHiddenChromeVisibility';
