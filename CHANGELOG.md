@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.4.4] - 2026-08-16
+
+### Fixed
+
+- **Foundry-hidden tokens no longer reveal their locations through special-sense indicators**: Scent, Lifesense, Thoughtsense, Echolocation, and blind/deaf fallback indicators now respect the GM's Foundry Hidden toggle in every selected-token perspective, including perspectives viewed from a GM account.
+- **Selecting or dragging a token as GM now hides other Foundry-hidden tokens from that token's perspective**: Visioner suppresses hidden token art, chrome, interaction surfaces, and nested movement-refresh repaints while the observer perspective is active, then restores Foundry's normal GM hidden-token view after deselection.
+
 ## [8.4.3] - 2026-08-12
 
 ### Fixed
