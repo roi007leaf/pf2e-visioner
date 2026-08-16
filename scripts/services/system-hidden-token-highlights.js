@@ -194,6 +194,7 @@ export function getSystemHiddenTokenDistance(
 export function buildSystemHiddenIndicatorDecision({
   observer,
   token,
+  user = globalThis.game?.user,
   positionOverride = null,
   senseContext = getSystemHiddenSenseContext(observer),
   grid = null,
@@ -205,6 +206,8 @@ export function buildSystemHiddenIndicatorDecision({
   canScentDetect = () => true,
 } = {}) {
   const isSystemHidden = !token?.visible || token?.renderable === false;
+  const mayShowSystemHiddenIndicator =
+    token?.document?.hidden !== true || user?.isGM === true;
   const targetTraits = token?.actor?.system?.traits?.value || [];
   const distanceInFeet = getSystemHiddenTokenDistance(observer, token, positionOverride, grid);
   const lifesenseRange = senseContext?.lifesenseSense?.range ?? 0;
@@ -229,19 +232,25 @@ export function buildSystemHiddenIndicatorDecision({
     detectedByEcholocation && getSoundBlocked({ observer, token, isSoundBlocked });
 
   const shouldShowLifesenseIndicator =
-    isSystemHidden && canBeDetectedByLifesense && isWithinLifesenseRange;
+    mayShowSystemHiddenIndicator &&
+    isSystemHidden &&
+    canBeDetectedByLifesense &&
+    isWithinLifesenseRange;
   const shouldShowScentIndicator =
+    mayShowSystemHiddenIndicator &&
     isSystemHidden &&
     !!senseContext?.observerHasScent &&
     canBeDetectedByScent &&
     isWithinScentRange;
   const shouldShowThoughtsenseIndicator =
+    mayShowSystemHiddenIndicator &&
     !!senseContext?.observerHasThoughtsense &&
     canBeDetectedByThoughtsense &&
     isWithinThoughtsenseRange &&
     (isSystemHidden || isHiddenFromObserver) &&
     getSoundBlocked({ observer, token, isSoundBlocked });
   const shouldShowEcholocationIndicator =
+    mayShowSystemHiddenIndicator &&
     isSystemHidden &&
     !!senseContext?.observerHasEcholocation &&
     !senseContext?.observerIsDeafened &&
@@ -249,7 +258,9 @@ export function buildSystemHiddenIndicatorDecision({
     isWithinEcholocationRange &&
     detectedByEcholocation;
   const shouldShowBlindDeafIndicator =
-    !!senseContext?.observerIsBlindAndDeaf && isHiddenFromObserver;
+    mayShowSystemHiddenIndicator &&
+    !!senseContext?.observerIsBlindAndDeaf &&
+    isHiddenFromObserver;
   const shouldShowIndicator =
     shouldShowLifesenseIndicator ||
     shouldShowScentIndicator ||

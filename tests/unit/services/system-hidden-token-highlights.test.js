@@ -347,6 +347,95 @@ describe('system-hidden token highlight service', () => {
     });
   });
 
+  test('blocks every special-sense indicator for a Foundry-hidden target viewed by a player', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        system: {
+          perception: {
+            senses: [
+              { type: 'lifesense', range: 60 },
+              { type: 'thoughtsense', range: 60 },
+              { type: 'echolocation', acuity: 'precise', range: 60 },
+              { type: 'scent', range: 60 },
+            ],
+          },
+        },
+        hasCondition: jest.fn((slug) => slug === 'blinded' || slug === 'deafened'),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', hidden: true, x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        user: { isGM: false },
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid: {
+          size: 50,
+          distance: 5,
+          measurePath: jest.fn(() => ({ distance: 5 })),
+        },
+        getVisibilityState: jest.fn(() => 'hidden'),
+        getDetectionBetween: jest.fn(() => ({
+          sense: 'echolocation',
+          isPrecise: true,
+        })),
+        isSoundBlocked: jest.fn(() => true),
+        canLifesenseDetect: jest.fn(() => true),
+        canThoughtsenseDetect: jest.fn(() => true),
+        canScentDetect: jest.fn(() => true),
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: false,
+      shouldShowLifesenseIndicator: false,
+      shouldShowScentIndicator: false,
+      shouldShowThoughtsenseIndicator: false,
+      shouldShowEcholocationIndicator: false,
+      shouldShowBlindDeafIndicator: false,
+    });
+  });
+
+  test('keeps Foundry-hidden special-sense decisions available to a GM viewer', () => {
+    const observer = {
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        system: { perception: { senses: [{ type: 'scent', range: 30 }] } },
+        hasCondition: jest.fn(() => false),
+      },
+    };
+    const target = {
+      visible: false,
+      renderable: false,
+      document: { id: 'target', hidden: true, x: 250, y: 0, width: 1, height: 1 },
+      actor: { system: { traits: { value: [] } } },
+    };
+
+    expect(
+      buildSystemHiddenIndicatorDecision({
+        observer,
+        token: target,
+        user: { isGM: true },
+        senseContext: getSystemHiddenSenseContext(observer),
+        grid: {
+          size: 50,
+          distance: 5,
+          measurePath: jest.fn(() => ({ distance: 5 })),
+        },
+      }),
+    ).toMatchObject({
+      shouldShowIndicator: true,
+      indicatorMode: 'scent',
+      shouldShowScentIndicator: true,
+    });
+  });
+
   test('does not build scent indicator when the target is outside scent range', () => {
     const observer = {
       document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
@@ -731,6 +820,51 @@ describe('system-hidden indicator render lifecycle', () => {
     expect(existingIndicator._pvAnimationFrameId).not.toHaveBeenCalled();
     expect(global.canvas.interface.addChild).not.toHaveBeenCalled();
     expect(hiddenTarget._pvSystemHiddenIndicator).toBe(existingIndicator);
+  });
+
+  test('removes a stale special-sense indicator when a player target becomes Foundry hidden', async () => {
+    const { updateSystemHiddenTokenHighlights } = await import(
+      '../../../scripts/services/visual-effects.js'
+    );
+
+    global.game.user.isGM = false;
+    const parent = { removeChild: jest.fn() };
+    const existingIndicator = {
+      _pvObserverId: 'observer',
+      _pvIndicatorMode: 'scent',
+      parent,
+      destroy: jest.fn(),
+    };
+    const observer = {
+      id: 'observer',
+      document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
+      actor: {
+        type: 'character',
+        system: { perception: { senses: [{ type: 'scent', range: 60 }] } },
+        hasCondition: jest.fn(() => false),
+      },
+      distanceTo: jest.fn(() => 30),
+    };
+    const hiddenTarget = {
+      id: 'target',
+      document: { id: 'target', hidden: true, x: 100, y: 0, width: 1, height: 1 },
+      actor: {
+        type: 'character',
+        system: { traits: { value: [] } },
+      },
+      visible: false,
+      renderable: false,
+      _pvSystemHiddenIndicator: existingIndicator,
+    };
+
+    global.canvas.tokens.placeables = [observer, hiddenTarget];
+    global.canvas.tokens.get = jest.fn((id) => (id === 'observer' ? observer : hiddenTarget));
+
+    await updateSystemHiddenTokenHighlights('observer');
+
+    expect(parent.removeChild).toHaveBeenCalledWith(existingIndicator);
+    expect(existingIndicator.destroy).toHaveBeenCalledTimes(1);
+    expect(hiddenTarget._pvSystemHiddenIndicator).toBeNull();
   });
 
   test('GM Vision removes existing Visioner token indicators and restores normal rendering', async () => {
