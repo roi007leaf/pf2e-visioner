@@ -12,6 +12,7 @@ import {
 } from '../services/runtime-state.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
 import { onRenderTileConfig } from '../ui/tile-cover-config.js';
+import { gmObserverView } from '../services/GmObserverView/gm-observer-view.js';
 
 export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
@@ -1471,6 +1472,18 @@ export function registerUIHooks() {
       // === LIGHTING TOOL ADDITIONS ===
       const lighting = groups.find((c) => c?.name === 'lighting' || c?.name === 'lights');
       if (lighting) {
+        addTool(lighting.tools, {
+          name: 'pf2e-visioner-gm-observer-view',
+          title: game.i18n.localize('PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW.name'),
+          icon: 'fa-solid fa-eye',
+          toggle: true,
+          active: gmObserverView.isActive(),
+          onChange: async (_event, toggled) => {
+            const enabled = typeof toggled === 'boolean' ? toggled : !gmObserverView.isActive();
+            await gmObserverView.setEnabled(enabled);
+          },
+        });
+
         // Darkness Mode tool (dialog-based): Plain Darkness vs Heightened Darkness
         const selectedLights = canvas?.lighting?.controlled ?? [];
         const isHeightened = (l) => {

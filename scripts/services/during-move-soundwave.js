@@ -71,6 +71,39 @@ function previewForObserver(observer) {
   return previews.find((c) => c?._original === observer || (id && c?.document?.id === id)) || null;
 }
 
+function coreVisualDetectionSeesTarget(observer, target, visionSource) {
+  const visibility = globalThis.canvas?.visibility;
+  const createTestConfig = visibility?._createVisibilityTestConfig;
+  const modes = globalThis.CONFIG?.Canvas?.detectionModes;
+  const observerModes = visionSource?.object?.document?.detectionModes ?? observer?.document?.detectionModes;
+  if (!visionSource || typeof createTestConfig !== 'function' || !modes || !observerModes) {
+    return null;
+  }
+
+  try {
+    const center = target?.center;
+    const points = target?.document?.getVisibilityTestPoints?.() ?? [
+      {
+        x: center.x,
+        y: center.y,
+        elevation: target?.document?.elevation ?? 0,
+      },
+    ];
+    const config = createTestConfig.call(visibility, points, { object: target });
+    let tested = false;
+    for (const id of ['basicSight', 'lightPerception']) {
+      const mode = modes[id];
+      const modeConfig = observerModes[id];
+      if (!modeConfig || typeof mode?.testVisibility !== 'function') continue;
+      tested = true;
+      if (mode.testVisibility(visionSource, modeConfig, config)) return true;
+    }
+    return tested ? false : null;
+  } catch {
+    return null;
+  }
+}
+
 export function observerSightContainsTarget(observer, target) {
   try {
     if (globalThis.canvas?.scene?.tokenVision === false) return true;
@@ -80,7 +113,13 @@ export function observerSightContainsTarget(observer, target) {
     if (vision?.isBlinded || vision?.blinded?.darkness) return false;
     const los = vision?.los;
     if (!(los && los.contains(center.x, center.y))) return false;
-    return !legacyLevelsFloorBlocksSightBetween(observer, target);
+    if (legacyLevelsFloorBlocksSightBetween(observer, target)) return false;
+
+    // LOS alone is insufficient: a moving token can carry its only light source away while the
+    // target remains inside the same wall polygon. Ask Core's visual modes whether sight or light
+    // perception currently succeeds, without running special modes such as hearing (which would
+    // mutate the target's detection filter). Fall back to geometry when Core test APIs are absent.
+    return coreVisualDetectionSeesTarget(observer, target, vision) ?? true;
   } catch {
     return false;
   }
@@ -235,10 +274,12 @@ function showSoundwaveRenderSurface(target) {
   if ('visible' in target) target.visible = true;
   if ('renderable' in target) target.renderable = true;
   if (target.mesh) {
-    // A detection-filter mesh renders the waves. Showing the primary mesh here reveals the full
-    // token art in darkness underneath/over the waves.
-    if ('visible' in target.mesh) target.mesh.visible = false;
-    if ('renderable' in target.mesh) target.mesh.renderable = false;
+    // Core's detection-filter pass calls `mesh.render(renderer)` directly. PIXI still rejects that
+    // call when the mesh is non-renderable, producing a blank filter surface even though the
+    // detection-filter mesh remains visible. Foundry routes the detected token through that
+    // filtered surface, so a renderable source does not expose the unfiltered token art.
+    if ('visible' in target.mesh) target.mesh.visible = true;
+    if ('renderable' in target.mesh) target.mesh.renderable = true;
   }
   setSoundwaveMeshVisible(target, true);
 }
@@ -451,6 +492,18 @@ export function refreshSoundwavesForActiveMovement() {
   if (targetsWithObservers.length === 0 || !recomputeDue) return;
   lastWaveComputeAt = now;
   for (const { target, observers } of targetsWithObservers) {
+    const protectedCoreSoundwave =
+      filterOverrides.get(target)?.state.stored === getSoundwaveFilter();
+    const hasLiveSight = observers.some(
+      (observer) => observer !== target && observerSightContainsTarget(observer, target),
+    );
+    // Preserve Core hearing only while no observer has effective visual detection. Checking raw
+    // geometry here is insufficient for moving light sources; conversely, keeping this override
+    // after light perception succeeds delays soundwave removal until movement settlement.
+    if (!gmVisionBypass && protectedCoreSoundwave && !hasLiveSight) {
+      showSoundwaveRenderSurface(target);
+      continue;
+    }
     const activeCoreSoundwave = hasActiveCoreSoundwaveSurface(target);
     // Core already has the correct filtered render surface for stored-hidden targets in darkness.
     // Preserve it only while no observer has effective live sight. The persisted state is frozen
@@ -459,22 +512,22 @@ export function refreshSoundwavesForActiveMovement() {
       !gmVisionBypass &&
       activeCoreSoundwave &&
       observers.length > 0 &&
+      !hasLiveSight &&
       observers.every(
-        (observer) =>
-          getVisionerVisibilityBetweenTokens(observer, target) === 'hidden' &&
-          !observerSightContainsTarget(observer, target),
+        (observer) => getVisionerVisibilityBetweenTokens(observer, target) === 'hidden',
       )
-    )
+    ) {
+      // Core's current surface is correct, but its next movement repaint can clear the filter
+      // inside our recompute throttle window. Protect and reassert it until movement settles.
+      installSoundwaveFilterOverride(target);
       continue;
+    }
     const wantsSoundwave = targetShouldShowSoundwave(
       target,
       observers,
       undefined,
       undefined,
       memoImpreciselySensed,
-    );
-    const hasLiveSight = observers.some(
-      (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );
     try {
       if (wantsSoundwave) {
@@ -493,13 +546,26 @@ export function refreshSoundwavesForActiveMovement() {
   }
 }
 
+function protectActiveCoreSoundwaveSurfaces() {
+  let hasProtectedSoundwave = filterOverrides.size > 0;
+  for (const target of canvas?.tokens?.placeables ?? []) {
+    if (target?.controlled || !hasActiveCoreSoundwaveSurface(target)) continue;
+    // Capture the filter synchronously. Core can clear it before our first animation frame,
+    // especially when the expensive visibility decision is still inside its throttle window.
+    installSoundwaveFilterOverride(target);
+    hasProtectedSoundwave = true;
+  }
+  return hasProtectedSoundwave;
+}
+
 export function ensureDuringMoveSoundwaveRefresh() {
   if (isSceneTokenVisionDisabled()) {
     clearDuringMoveSoundwaveState();
     return;
   }
   if (running) return;
-  if (!isAvsActiveGivenCombatGate()) return;
+  const hasProtectedSoundwave = protectActiveCoreSoundwaveSurfaces();
+  if (!isAvsActiveGivenCombatGate() && !hasProtectedSoundwave) return;
   const raf = globalThis.requestAnimationFrame;
   if (typeof raf !== 'function') return;
   running = true;

@@ -395,6 +395,42 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
     expect(observerSightContainsTarget(observer, target)).toBe(false);
   });
 
+  test('false when geometric LOS remains but Core light perception no longer sees the target', () => {
+    const basicSight = { testVisibility: jest.fn(() => false) };
+    const lightPerception = { testVisibility: jest.fn(() => false) };
+    const observer = {
+      document: {
+        detectionModes: {
+          basicSight: { enabled: true },
+          lightPerception: { enabled: true },
+        },
+      },
+      vision: { los: { contains: () => true } },
+    };
+    const litTarget = {
+      center: target.center,
+      document: { getVisibilityTestPoints: () => [target.center] },
+    };
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { basicSight, lightPerception } },
+    };
+    globalThis.canvas = {
+      tokens: { preview: { children: [] } },
+      visibility: { _createVisibilityTestConfig: jest.fn(() => ({ tests: [] })) },
+    };
+
+    expect(observerSightContainsTarget(observer, litTarget)).toBe(false);
+    expect(
+      targetShouldShowSoundwave(
+        litTarget,
+        [observer],
+        () => 'observed',
+        () => false,
+        () => true,
+      ),
+    ).toBe(true);
+  });
+
   test('prefers the drag preview vision polygon when one exists', () => {
     const observer = { document: { id: 'obs' }, vision: { los: { contains: () => false } } };
     globalThis.canvas = {
@@ -590,7 +626,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(getObservers).not.toHaveBeenCalled();
   });
 
-  test('reasserts an active soundwave mesh after core repaint inside the throttle window', async () => {
+  test('keeps the Core filter source renderable when reasserting a soundwave', async () => {
     const savedConfig = globalThis.CONFIG;
     globalThis.CONFIG = {
       Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } },
@@ -612,7 +648,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(target).toMatchObject({
       visible: true,
       renderable: true,
-      mesh: { visible: false, renderable: false },
+      mesh: { visible: true, renderable: true },
     });
     expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
     globalThis.CONFIG = savedConfig;
@@ -718,6 +754,92 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     globalThis.CONFIG = savedConfig;
   });
 
+  test('preserves Core hearing when effective visual detection fails despite geometric LOS', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    const basicSight = { testVisibility: jest.fn(() => false) };
+    const lightPerception = { testVisibility: jest.fn(() => false) };
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          basicSight,
+          lightPerception,
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.mesh = { visible: true, renderable: false };
+    const observers = [
+      {
+        document: {
+          id: 'obs',
+          detectionModes: {
+            basicSight: { enabled: true },
+            lightPerception: { enabled: true },
+          },
+        },
+        vision: { los: { contains: () => true } },
+      },
+    ];
+    globalThis.canvas = {
+      tokens: { placeables: [target], preview: { children: [] } },
+      visibility: { _createVisibilityTestConfig: jest.fn(() => ({ tests: [] })) },
+    };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers,
+      getVisibility: () => 'hidden',
+    });
+    mod.installSoundwaveFilterOverride(target);
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.mesh).toEqual({ visible: true, renderable: true });
+    expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    globalThis.CONFIG = savedConfig;
+  });
+
+  test('protects an existing core soundwave from the next movement repaint inside the throttle window', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwaveFilter = {};
+    globalThis.CONFIG = {
+      Canvas: {
+        detectionModes: {
+          hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+        },
+      },
+    };
+    const target = makeTarget();
+    target.detectionFilter = soundwaveFilter;
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    target.mesh = { visible: false, renderable: false };
+    const observers = [
+      { document: { id: 'obs' }, vision: { los: { contains: () => false } } },
+    ];
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      observers,
+      getVisibility: () => 'hidden',
+      gmVisionBypass: false,
+    });
+    nowSpy.mockReturnValueOnce(10_000).mockReturnValue(10_001);
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(target.detectionFilter).toBe(soundwaveFilter);
+    expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    globalThis.CONFIG = savedConfig;
+  });
+
   test('drops a stale core soundwave when effective LOS now sees the target', async () => {
     const savedConfig = globalThis.CONFIG;
     const soundwaveFilter = {};
@@ -742,6 +864,7 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       observers,
       getVisibility: () => 'hidden',
     });
+    mod.installSoundwaveFilterOverride(target);
 
     mod.refreshSoundwavesForActiveMovement();
 
@@ -1087,6 +1210,51 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(target.detectionFilter).toBeNull();
     expect(target.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
     globalThis.CONFIG = savedConfig;
+  });
+
+  test('protects an existing soundwave during movement outside the AVS combat gate', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const savedRaf = globalThis.requestAnimationFrame;
+    const soundwaveFilter = {};
+    const rafCallbacks = [];
+    let mod;
+    try {
+      globalThis.CONFIG = {
+        Canvas: {
+          detectionModes: {
+            hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } },
+          },
+        },
+      };
+      globalThis.requestAnimationFrame = jest.fn((callback) => rafCallbacks.push(callback));
+      const target = makeTarget();
+      target.detectionFilter = soundwaveFilter;
+      target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+      target.mesh = { visible: false, renderable: false };
+      globalThis.canvas = {
+        scene: { tokenVision: true },
+        tokens: { placeables: [target], preview: { children: [] } },
+      };
+      mod = await loadWith({ pendingMovement: true, avsActiveGivenCombatGate: false });
+
+      mod.ensureDuringMoveSoundwaveRefresh();
+
+      expect(rafCallbacks).toHaveLength(1);
+      target.detectionFilter = null;
+      target.detectionFilterMesh.visible = false;
+      target.detectionFilterMesh.renderable = false;
+      target.detectionFilterMesh.alpha = 0;
+      nowSpy.mockReturnValue(1);
+      rafCallbacks.shift()();
+
+      expect(target.detectionFilter).toBe(soundwaveFilter);
+      expect(target.mesh).toEqual({ visible: true, renderable: true });
+      expect(target.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    } finally {
+      mod?.clearDuringMoveSoundwaveState();
+      globalThis.requestAnimationFrame = savedRaf;
+      globalThis.CONFIG = savedConfig;
+    }
   });
 });
 

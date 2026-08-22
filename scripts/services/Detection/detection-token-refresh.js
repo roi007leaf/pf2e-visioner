@@ -3,8 +3,11 @@ import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import {
   applyCurrentViewHardHide,
+  releaseCurrentViewHardHideForLiveSight,
+  targetIsUnseenByEveryCurrentViewObserver,
   usesCoreMultiLevelSurfaceRendering,
 } from './current-view-hard-hide.js';
+import { gmObserverView } from '../GmObserverView/gm-observer-view.js';
 import {
   ensureDuringMoveSoundwaveRefresh,
   refreshSoundwavesForActiveMovement,
@@ -131,12 +134,24 @@ function applyCurrentViewHardHideAfterCore(token) {
 }
 
 function afterCoreRefresh(token, before) {
-  if (!shouldBypassAvsForGmVision()) {
+  // A nested _applyRenderFlags -> _refreshVisibility pass may leave the inner observer
+  // presentation in place. Remove only Visioner's owned presentation before reading Core truth.
+  gmObserverView.beforeCoreTokenRefresh(token);
+  const coreVisible = token?.visible === true;
+  const observerViewActive = gmObserverView.isActive();
+  const visionerHidden = observerViewActive
+    ? targetIsUnseenByEveryCurrentViewObserver(token)
+    : false;
+
+  if (!observerViewActive && !shouldBypassAvsForGmVision()) {
     suppressNewFoundryHiddenVisibilityDuringMove(token, before);
   }
   try {
-    applyCurrentViewHardHideAfterCore(token);
-    reconcileDetectionFilterRenderSurface(token);
+    if (observerViewActive) releaseCurrentViewHardHideForLiveSight(token);
+    else {
+      applyCurrentViewHardHideAfterCore(token);
+      reconcileDetectionFilterRenderSurface(token);
+    }
     enforceControlledLevelTokenRendering(token);
   } catch {
     /* keep Foundry visibility if the guard fails */
@@ -145,10 +160,15 @@ function afterCoreRefresh(token, before) {
   // Token#_refreshVisibility forces a controlled token's primary mesh visible. Reassert the
   // remembered soundwave after Core has applied those flags so no full-art frame leaks through.
   refreshSoundwavesForActiveMovement();
+  if (observerViewActive) {
+    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerHidden });
+    enforceControlledLevelTokenRendering(token);
+  }
 }
 
 export function wrapTokenRefreshState(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
+  gmObserverView.beforeCoreTokenRefresh(this);
   const before = renderState(this);
   const result = wrapped(...args);
   afterCoreRefresh(this, before);
@@ -157,6 +177,7 @@ export function wrapTokenRefreshState(wrapped, ...args) {
 
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
+  gmObserverView.beforeCoreTokenRefresh(this);
   const before = renderState(this);
   const result = wrapped(...args);
   afterCoreRefresh(this, before);
@@ -171,6 +192,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
   return withDetectionSettingCache(() => {
     rememberSoundwaveDetectionBeforeCoreRefresh(this);
+    gmObserverView.beforeCoreTokenRefresh(this);
     const before = renderState(this);
     const result = wrapped(...args);
     afterCoreRefresh(this, before);

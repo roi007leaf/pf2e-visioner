@@ -779,6 +779,16 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  gmObserverView: {
+    name: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW.name',
+    hint: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   // Loot DCs
   lootStealthDC: {
     name: 'PF2E_VISIONER.SETTINGS.LOOT_STEALTH_DC.name',
@@ -1253,6 +1263,13 @@ export const KEYBINDINGS = {
     hint: 'PF2E_VISIONER.KEYBINDINGS.HOLD_PEEK.hint',
     editable: [],
     restricted: false,
+  },
+  toggleGmObserverView: {
+    name: 'PF2E_VISIONER.KEYBINDINGS.TOGGLE_GM_OBSERVER_VIEW.name',
+    hint: 'PF2E_VISIONER.KEYBINDINGS.TOGGLE_GM_OBSERVER_VIEW.hint',
+    uneditable: [{ key: 'KeyG', modifiers: ['Control'] }],
+    editable: [],
+    restricted: true,
   },
   holdDoorPeek: {
     name: 'PF2E_VISIONER.KEYBINDINGS.HOLD_DOOR_PEEK.name',

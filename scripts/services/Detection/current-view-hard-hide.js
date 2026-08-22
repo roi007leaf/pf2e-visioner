@@ -1,6 +1,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { gmObserverView } from '../GmObserverView/gm-observer-view.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import { currentViewHardHideSurfaces } from './current-view-hard-hide-surfaces.js';
 import { legacyLevelsFloorBlocksSightBetween } from './legacy-levels-live-sight.js';
@@ -264,6 +265,15 @@ export function clearCurrentViewMovementRenderSettles() {
 }
 
 export function applyCurrentViewHardHide(token) {
+  if (gmObserverView.isActive()) {
+    gmObserverView.beforeCoreTokenRefresh(token);
+    const coreVisible = token?.visible === true;
+    const visionerHidden = targetIsUnseenByEveryCurrentViewObserver(token);
+    releaseCurrentViewHardHideForLiveSight(token);
+    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerHidden });
+    return false;
+  }
+
   const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
   if (shouldDefer) {
     rememberMovementCoreReveal(token, token.visible === true);
@@ -418,4 +428,32 @@ export function targetIsHardHiddenFromCurrentView(target) {
     if (automaticVisibilityActive || hasUndetectedAvsOverride(observer, target)) return true;
   }
   return false;
+}
+
+/**
+ * Observer View aggregates multiple selected tokens like Core: a target is unseen only when every
+ * relevant observer's Visioner state hides it. The ordinary hard-hide policy remains unchanged.
+ */
+export function targetIsUnseenByEveryCurrentViewObserver(target) {
+  if (!target?.document?.id) return false;
+  if (isSceneTokenVisionDisabled()) return false;
+  if (isSelectAllTokenVisibilityBypassActive()) return false;
+  if (target.controlled) return false;
+
+  const observers = currentViewVisionerObserversForTarget(target);
+  if (observers.length === 0) return false;
+  if (target.document.hidden) return true;
+  if (tokenIsOutsideControlledLevelCullingSurface(target)) return false;
+
+  const automaticVisibilityActive = automaticVisionerVisibilityIsActive();
+  let relevantObservers = 0;
+  for (const observer of observers) {
+    if (tokenIdOf(observer) === tokenIdOf(target)) continue;
+    relevantObservers += 1;
+    const state = getStoredVisibilityState(observer, target);
+    const stateHides = visionerStateHidesTargetRendering(state, target);
+    const overrideHides = hasUndetectedAvsOverride(observer, target);
+    if (!stateHides || (!automaticVisibilityActive && !overrideHides)) return false;
+  }
+  return relevantObservers > 0;
 }

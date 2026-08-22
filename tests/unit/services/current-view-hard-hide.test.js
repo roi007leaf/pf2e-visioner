@@ -22,6 +22,7 @@ import {
   currentViewObservers,
   currentViewVisionerObserversForTarget,
   targetIsHardHiddenFromCurrentView,
+  targetIsUnseenByEveryCurrentViewObserver,
   applyCurrentViewHardHide,
   clearCurrentViewMovementRenderSettles,
   releaseCurrentViewHardHide,
@@ -273,6 +274,49 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     const t = target('t', 'character', { hidden: true });
 
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+  });
+});
+
+describe('targetIsUnseenByEveryCurrentViewObserver', () => {
+  beforeEach(() => {
+    globalThis.game = { user: { isGM: true } };
+    controlled.length = 0;
+    controlled.push(
+      { document: { id: 'observer-a' }, controlled: true },
+      { document: { id: 'observer-b' }, controlled: true },
+    );
+  });
+
+  it('uses best-observer aggregation when one selected token perceives the target', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'undetected'],
+        ['observer-b:target', 'observed'],
+      ]),
+    );
+
+    expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(false);
+  });
+
+  it('reports unseen when every selected observer has an undetected state', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'undetected'],
+        ['observer-b:target', 'unnoticed'],
+      ]),
+    );
+
+    expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(true);
   });
 });
 

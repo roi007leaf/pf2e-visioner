@@ -1,5 +1,9 @@
 {
   "PF2E_VISIONER": {
+    "GM_OBSERVER_VIEW_INDICATOR": {
+      "label": "GM Observer View",
+      "hint": "GM Observer View is active. Drag to move; click to disable."
+    },
     "ENVIRONMENT": {},
     "MODULE_TITLE": "PF2E Visioner",
     "MECHANICAL_EFFECTS": {
@@ -786,6 +790,10 @@
         "name": "Vision for NPCs",
         "hint": "Enables token vision for all NPC tokens to more easily see point of view"
       },
+      "GM_OBSERVER_VIEW": {
+        "name": "GM Observer View",
+        "hint": "Reveals and lightens the scene for the GM without disabling a selected token's vision. Tokens the selected observer cannot perceive remain visible with diagonal hatching. Detection rules are unchanged."
+      },
       "ENABLE_CAMERA_VISION_AGGREGATION": {
         "name": "Camera Vision Aggregation",
         "hint": "When enabled, camera accounts with observer permissions on multiple party tokens will display the best (most permissive) visibility state across all controlled tokens, instead of just the first token. Useful for streaming where camera needs to see what any party member can see."
@@ -1331,6 +1339,10 @@
       "TOGGLE_OBSERVER_MODE": {
         "name": "Toggle Observer Mode for Hover Tooltips",
         "hint": "Hold this key to switch hover tooltips to observer mode (how hovered token sees others)"
+      },
+      "TOGGLE_GM_OBSERVER_VIEW": {
+        "name": "Toggle GM Observer View",
+        "hint": "Toggle Visioner's GM-only observer rendering without changing token perception rules. Ctrl+G is reserved for this action while Visioner is active."
       },
       "OPEN_QUICK_PANEL": {
         "name": "Open Visioner Quick Panel",

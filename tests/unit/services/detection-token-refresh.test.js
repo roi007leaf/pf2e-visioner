@@ -8,7 +8,17 @@ jest.mock('../../../scripts/services/movement-tracking.js', () => ({
 
 jest.mock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
   applyCurrentViewHardHide: jest.fn(),
+  releaseCurrentViewHardHideForLiveSight: jest.fn(),
+  targetIsUnseenByEveryCurrentViewObserver: jest.fn(() => false),
   usesCoreMultiLevelSurfaceRendering: jest.fn(() => false),
+}));
+
+jest.mock('../../../scripts/services/GmObserverView/gm-observer-view.js', () => ({
+  gmObserverView: {
+    isActive: jest.fn(() => false),
+    beforeCoreTokenRefresh: jest.fn(),
+    afterCoreTokenRefresh: jest.fn(),
+  },
 }));
 
 jest.mock('../../../scripts/services/during-move-soundwave.js', () => ({
@@ -32,8 +42,11 @@ import {
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
 import {
   applyCurrentViewHardHide,
+  releaseCurrentViewHardHideForLiveSight,
+  targetIsUnseenByEveryCurrentViewObserver,
   usesCoreMultiLevelSurfaceRendering,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
+import { gmObserverView } from '../../../scripts/services/GmObserverView/gm-observer-view.js';
 import {
   ensureDuringMoveSoundwaveRefresh,
   refreshSoundwavesForActiveMovement,
@@ -64,6 +77,11 @@ describe('detection token refresh', () => {
     globalThis.game = { ready: true, user: { isGM: true } };
     hasActivePendingTokenMovement.mockReturnValue(true);
     usesCoreMultiLevelSurfaceRendering.mockReturnValue(false);
+    targetIsUnseenByEveryCurrentViewObserver.mockReturnValue(false);
+    gmObserverView.isActive.mockReturnValue(false);
+    gmObserverView.beforeCoreTokenRefresh.mockClear();
+    gmObserverView.afterCoreTokenRefresh.mockClear();
+    releaseCurrentViewHardHideForLiveSight.mockClear();
     applyCurrentViewHardHide.mockClear();
     rememberSoundwaveDetectionBeforeCoreRefresh.mockClear();
     refreshSoundwavesForActiveMovement.mockClear();
@@ -136,6 +154,25 @@ describe('detection token refresh', () => {
 
     expect(token.visible).toBe(true);
     expect(token.mesh.visible).toBe(true);
+  });
+
+  it('uses Core and Visioner truth for observer presentation instead of hard-hiding', () => {
+    gmObserverView.isActive.mockReturnValue(true);
+    targetIsUnseenByEveryCurrentViewObserver.mockReturnValue(true);
+    const token = foundryHiddenToken();
+    const wrapped = jest.fn(() => {
+      token.visible = false;
+      token.mesh.visible = false;
+    });
+
+    wrapTokenRefreshVisibility.call(token, wrapped);
+
+    expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
+    expect(releaseCurrentViewHardHideForLiveSight).toHaveBeenCalledWith(token);
+    expect(gmObserverView.afterCoreTokenRefresh).toHaveBeenCalledWith(token, {
+      coreVisible: false,
+      visionerHidden: true,
+    });
   });
 
   it('reads each detection setting once across one token visibility refresh', () => {

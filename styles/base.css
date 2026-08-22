@@ -918,6 +918,64 @@
   color: var(--color-text-dark-secondary);
 }
 
+#pf2e-visioner-gm-observer-indicator {
+  position: fixed;
+  top: 4.25rem;
+  left: 50%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: auto;
+  min-height: 2rem;
+  height: auto;
+  margin: 0;
+  padding: 0.35rem 0.8rem;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(83, 9, 7, 0.96), rgba(35, 6, 5, 0.96));
+  border: 2px solid #ff4d3d;
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.72),
+    0 0 18px rgba(255, 77, 61, 0.8);
+  font-family: var(--font-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  line-height: 1;
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+  transition: none !important;
+  animation: none !important;
+  user-select: none;
+  will-change: transform;
+}
+
+#pf2e-visioner-gm-observer-indicator.dragging {
+  cursor: grabbing;
+}
+
+#pf2e-visioner-gm-observer-indicator:hover,
+#pf2e-visioner-gm-observer-indicator:focus-visible {
+  border-color: #ffd166;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.8),
+    0 0 24px rgba(255, 209, 102, 0.95);
+}
+
+#pf2e-visioner-gm-observer-indicator > i {
+  color: #ffd166;
+  font-size: 1rem;
+  text-shadow: 0 0 7px rgba(255, 209, 102, 0.95);
+}
+
+@media (max-width: 700px) {
+  #pf2e-visioner-gm-observer-indicator {
+    top: 3.65rem;
+  }
+}
+
 /* Tile Config cover controls live outside the .pf2e-visioner app scope. */
 .pf2e-visioner-tile-cover-settings .form-group {
   display: flex;

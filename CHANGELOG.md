@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.5.0] - 2026-08-22
+
+### Added
+
+- **GM Observer View provides a dedicated GM visibility mode without replacing a selected token's vision**: Toggle it from the Lighting controls or with Ctrl+G to brighten the scene while preserving the observer's perception. Tokens unseen by every selected observer remain visible to the GM with a subtle hatched treatment, without changing PF2e detection states.
+- **GM Observer View includes a draggable on-screen indicator**: Move the compact indicator anywhere on screen; its position is remembered, and clicking it disables the mode.
+
+### Fixed
+
+- **Ctrl+G now consistently toggles Visioner's GM Observer View instead of PF2e GM Vision**: Visioner reserves and consumes the shortcut at priority while disabling competing GM Vision when Observer View activates.
+- **Movement soundwaves no longer disappear or turn into blank tokens during movement**: Visioner preserves Core hearing filters and their render source throughout movement, including when automatic visibility is outside its combat gate, without revealing full token art.
+- **Moving light sources now update soundwaves before movement settles**: Targets switching between visually observed and hidden use Core sight and light-perception results during movement, so soundwaves appear or clear as soon as illumination changes.
+- **GM Observer View now remains stable through token selection, movement, darkvision, and nested refreshes**: Unseen-token hatching and observer coloring remain consistent while Core-owned render surfaces refresh.
+
 ## [8.4.4] - 2026-08-16
 
 ### Fixed

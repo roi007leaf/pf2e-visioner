@@ -34,7 +34,10 @@ const SETTINGS_GROUPS = {
     },
   ],
   Vision: [
-    { title: 'Vision', keys: ['enableAllTokensVision', 'enableCameraVisionAggregation'] },
+    {
+      title: 'Vision',
+      keys: ['enableAllTokensVision', 'gmObserverView', 'enableCameraVisionAggregation'],
+    },
     { title: 'Hidden Loot Actors', keys: ['includeLootActors', 'lootStealthDC'] },
     { title: 'Hidden Walls', keys: ['hiddenWallsEnabled', 'wallStealthDC'] },
     {
@@ -499,7 +502,16 @@ export function registerSettings() {
       if (isGroupedKey(key)) settingConfig.config = false;
 
       // Add onChange handler for settings that require restart
-      if (key === 'enableHoverTooltips') {
+      if (key === 'gmObserverView') {
+        settingConfig.onChange = async () => {
+          try {
+            const { gmObserverView } = await import(
+              './services/GmObserverView/gm-observer-view.js'
+            );
+            gmObserverView.refresh();
+          } catch {}
+        };
+      } else if (key === 'enableHoverTooltips') {
         // Live-apply without world reload
         settingConfig.onChange = async (value) => {
           try {
@@ -870,6 +882,18 @@ export function registerKeybindings() {
             ? { x: canvas.mousePosition.x, y: canvas.mousePosition.y }
             : { x: token.center.x, y: token.center.y };
           mgr.toggleCornerPeek(token, mouse);
+        };
+        break;
+      case 'toggleGmObserverView':
+        // Consume Ctrl+G before PF2e's normal-precedence GM Vision binding.
+        keybindingConfig.precedence =
+          globalThis.CONST?.KEYBINDING_PRECEDENCE?.PRIORITY ?? 0;
+        keybindingConfig.onDown = async () => {
+          const { gmObserverView } = await import(
+            './services/GmObserverView/gm-observer-view.js'
+          );
+          await gmObserverView.toggle();
+          return true;
         };
         break;
       case 'holdDoorPeek':
