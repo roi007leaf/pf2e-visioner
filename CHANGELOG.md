@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.2] - 2026-08-23
+
+### Fixed
+
+- **Sense Suppression regions now disable PF2e canvas darkvision correctly**: Suppressing Darkvision, Greater Darkvision, or Low-Light Vision now updates the observer's transient Core vision source as well as Visioner's AVS and Seek calculations. Vision capabilities restore when the observer leaves the region, exact unsuppressed fallback senses remain available, and actor/token source data is not modified.
+
 ## [8.5.1] - 2026-08-23
 
 ### Added

@@ -20,6 +20,7 @@ import { LevelsIntegration } from './services/LevelsIntegration.js';
 import { exposeVisionerGlobalsAsync } from './services/visioner-globals.js';
 import { createPeekManager } from './services/Peek/peek-bootstrap.js';
 import { showPerceptiveConflictBanner } from './integrations/module-compatibility-warnings.js';
+import { registerSenseSuppressionVisionIntegration } from './regions/sense-suppression-vision-integration.js';
 
 let initializedAutoVisibilitySystem = null;
 
@@ -117,6 +118,9 @@ Hooks.once('init', async () => {
 
     // Register hooks
     await registerHooks();
+
+    // Keep PF2e's prepared canvas vision source aligned with suppression regions.
+    registerSenseSuppressionVisionIntegration();
 
     // Set up API
     const { api } = await import('./api.js');
