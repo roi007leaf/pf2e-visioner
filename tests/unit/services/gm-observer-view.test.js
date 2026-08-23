@@ -1,6 +1,7 @@
 import '../../setup.js';
 
 import { gmObserverView } from '../../../scripts/services/GmObserverView/gm-observer-view.js';
+import { setCachedSettingValue } from '../../../scripts/utils/setting-value-cache.js';
 
 const INDICATOR_POSITION_KEY = 'pf2e-visioner-gm-observer-indicator-pos';
 
@@ -16,10 +17,31 @@ class FakeBaseFilter {
   }
 }
 
+class FakeContainer {
+  constructor() {
+    this.alpha = 1;
+    this.visible = true;
+    this.renderable = true;
+    this.eventMode = 'auto';
+    this.parent = null;
+    this.destroy = jest.fn();
+  }
+}
+
+class FakeOutlineFilter extends FakeBaseFilter {
+  static get defaultUniforms() {
+    return {
+      outlineColor: [1, 1, 1, 1],
+      knockout: true,
+      wave: false,
+    };
+  }
+}
+
 function makeToken() {
   const foreignMeshFilter = { id: 'foreign-mesh-filter' };
   const detectionFilter = { id: 'core-detection-filter' };
-  return {
+  const token = {
     controlled: false,
     visible: false,
     renderable: false,
@@ -30,10 +52,25 @@ function makeToken() {
       renderable: false,
       alpha: 0,
       filters: [foreignMeshFilter],
+      tint: 0x123456,
+      worldAlpha: 0.25,
+      pluginName: 'primary-plugin',
+      render: jest.fn(),
     },
-    document: { id: 'target', hidden: false },
+    document: { id: 'target', hidden: false, x: 100, y: 200 },
+    position: { x: 100, y: 200 },
+    shape: { id: 'token-shape' },
     foreignMeshFilter,
   };
+  token.addChild = jest.fn((child) => {
+    child.parent = token;
+    return child;
+  });
+  token.removeChild = jest.fn((child) => {
+    if (child.parent === token) child.parent = null;
+    return child;
+  });
+  return token;
 }
 
 describe('GM Observer View token presentation', () => {
@@ -42,9 +79,20 @@ describe('GM Observer View token presentation', () => {
   beforeEach(() => {
     globalThis.localStorage?.removeItem(INDICATOR_POSITION_KEY);
     soundwaveFilter = { id: 'soundwave-filter' };
-    globalThis.PIXI = { Program: { defaultFragmentPrecision: 'mediump' } };
+    globalThis.PIXI = {
+      Container: FakeContainer,
+      Program: { defaultFragmentPrecision: 'mediump' },
+    };
     globalThis.foundry = {
-      canvas: { rendering: { filters: { AbstractBaseFilter: FakeBaseFilter } } },
+      canvas: {
+        rendering: {
+          filters: {
+            AbstractBaseFilter: FakeBaseFilter,
+            OutlineOverlayFilter: FakeOutlineFilter,
+          },
+          shaders: { BaseSamplerShader: { classPluginName: 'base-sampler-plugin' } },
+        },
+      },
     };
     globalThis.CONFIG = {
       Canvas: {
@@ -64,13 +112,22 @@ describe('GM Observer View token presentation', () => {
         ),
       },
       settings: {
-        get: jest.fn((namespace, key) => namespace === 'pf2e-visioner' && key === 'gmObserverView'),
+        get: jest.fn((namespace, key) => {
+          if (namespace !== 'pf2e-visioner') return false;
+          if (key === 'gmObserverView') return true;
+          if (key === 'gmObserverViewDarknessOpacity') return 0.7;
+          return false;
+        }),
       },
+    };
+    const tokenLayer = {
+      controlled: [{ document: { id: 'observer' } }],
+      placeables: [],
     };
     globalThis.canvas = {
       ready: true,
       environment: { initialize: jest.fn() },
-      tokens: { controlled: [{ document: { id: 'observer' } }], placeables: [] },
+      tokens: tokenLayer,
     };
   });
 
@@ -86,7 +143,7 @@ describe('GM Observer View token presentation', () => {
 
     gmObserverView.afterCoreTokenRefresh(token, {
       coreVisible: false,
-      visionerHidden: false,
+      visionerState: null,
     });
 
     expect(token.visible).toBe(true);
@@ -99,8 +156,8 @@ describe('GM Observer View token presentation', () => {
     expect(token.mesh.filters[1]).toMatchObject({
       padding: 5,
       uniforms: {
-        stripeColor: [1, 0.7, 0.2],
-        outlineColor: [1, 0.28, 0.12],
+        stripeColor: [0.9569, 0.2627, 0.2118],
+        outlineColor: [0.9569, 0.2627, 0.2118],
         stripeOpacity: 0.24,
         stripeSpacing: 18,
         stripeWidth: 0.09,
@@ -108,6 +165,168 @@ describe('GM Observer View token presentation', () => {
     });
     expect(token.detectionFilter).toEqual({ id: 'core-detection-filter' });
     expect(token.detectionFilterMesh.visible).toBe(false);
+  });
+
+  it('uses an orange outline without diagonal lines for hidden tokens', () => {
+    const token = makeToken();
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: true,
+        visionerState: 'hidden',
+      }),
+    ).toBe('hidden');
+
+    expect(token.mesh.filters[1]).toMatchObject({
+      uniforms: {
+        stripeColor: [1, 0.4, 0],
+        outlineColor: [1, 0.4, 0],
+        stripeOpacity: 0,
+      },
+    });
+    expect(token._pvGmObserverViewPresentation).toBe('hidden');
+  });
+
+  it('uses purple state styling for unnoticed tokens', () => {
+    const token = makeToken();
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: false,
+        visionerState: 'unnoticed',
+      }),
+    ).toBe('unnoticed');
+
+    expect(token.mesh.filters[1]).toMatchObject({
+      uniforms: {
+        stripeColor: [0.6118, 0.1529, 0.6902],
+        outlineColor: [0.6118, 0.1529, 0.6902],
+        stripeOpacity: 0.24,
+      },
+    });
+  });
+
+  it.each([
+    ['hidden', 0xff6600, 0],
+    ['undetected', 0xf44336, 0.58],
+    ['unnoticed', 0x9c27b0, 0.58],
+  ])('draws bright post-darkness %s markings from the token art alpha', (state, color, stripeOpacity) => {
+    const token = makeToken();
+
+    gmObserverView.afterCoreTokenRefresh(token, {
+      coreVisible: false,
+      visionerState: state,
+    });
+
+    expect(token.addChild).toHaveBeenCalledTimes(1);
+    const outline = token.addChild.mock.calls[0][0];
+    expect(outline).toBeInstanceOf(FakeContainer);
+    expect(outline).toMatchObject({
+      alpha: 1,
+      visible: true,
+      renderable: true,
+      eventMode: 'none',
+      parent: token,
+      zIndex: -0.5,
+    });
+    expect(outline._pvStateOutlineFilter).toMatchObject({
+      animated: false,
+      thickness: 2,
+      uniforms: {
+        outlineColor: [
+          ((color >> 16) & 0xff) / 255,
+          ((color >> 8) & 0xff) / 255,
+          (color & 0xff) / 255,
+          1,
+        ],
+        knockout: true,
+        wave: false,
+      },
+    });
+    expect(outline._pvStateHatchFilter).toMatchObject({
+      uniforms: {
+        stripeColor: [
+          ((color >> 16) & 0xff) / 255,
+          ((color >> 8) & 0xff) / 255,
+          (color & 0xff) / 255,
+        ],
+        stripeOpacity,
+        stripeSpacing: 16,
+        stripeWidth: 0.16,
+        keylineOpacity: stripeOpacity > 0 ? 0.34 : 0,
+        keylineWidth: 0.32,
+        highlightMix: 0.18,
+      },
+    });
+
+    const renderedStates = [];
+    token.mesh.render.mockImplementation(() => {
+      renderedStates.push({
+        filters: token.mesh.filters,
+        tint: token.mesh.tint,
+        worldAlpha: token.mesh.worldAlpha,
+        pluginName: token.mesh.pluginName,
+      });
+    });
+    const renderer = { id: 'renderer' };
+    outline.render(renderer);
+
+    expect(token.mesh.render).toHaveBeenCalledTimes(stripeOpacity > 0 ? 2 : 1);
+    expect(token.mesh.render).toHaveBeenLastCalledWith(renderer);
+    if (stripeOpacity > 0) {
+      expect(renderedStates[0].filters).toEqual([outline._pvStateHatchFilter]);
+    }
+    expect(renderedStates.at(-1)).toEqual({
+      filters: [outline._pvStateOutlineFilter],
+      tint: 0xffffff,
+      worldAlpha: 1,
+      pluginName: 'base-sampler-plugin',
+    });
+    expect(token.mesh).toMatchObject({
+      filters: [token.foreignMeshFilter, expect.any(FakeBaseFilter)],
+      tint: 0x123456,
+      worldAlpha: 0.25,
+      pluginName: 'primary-plugin',
+    });
+  });
+
+  it('updates an owned filter when visibility changes from hidden to undetected', () => {
+    const token = makeToken();
+    globalThis.canvas.tokens.placeables = [token];
+
+    gmObserverView.afterCoreTokenRefresh(token, {
+      coreVisible: true,
+      visionerState: 'hidden',
+    });
+    const stateFilter = token.mesh.filters[1];
+    const stateOutline = token.addChild.mock.calls[0][0];
+
+    gmObserverView.beforeCoreTokenRefresh(token);
+    gmObserverView.afterCoreTokenRefresh(token, {
+      coreVisible: false,
+      visionerState: 'undetected',
+    });
+
+    expect(token.mesh.filters[1]).toBe(stateFilter);
+    expect(stateFilter.uniforms).toMatchObject({
+      outlineColor: [0.9569, 0.2627, 0.2118],
+      stripeOpacity: 0.24,
+    });
+    expect(token.removeChild).toHaveBeenCalledWith(stateOutline);
+    expect(token.addChild).toHaveBeenLastCalledWith(stateOutline);
+    expect(stateOutline._pvStateOutlineFilter.uniforms.outlineColor).toEqual([
+      0xf4 / 255,
+      0x43 / 255,
+      0x36 / 255,
+      1,
+    ]);
+    expect(stateOutline._pvStateHatchFilter.uniforms).toMatchObject({
+      stripeColor: [0xf4 / 255, 0x43 / 255, 0x36 / 255],
+      stripeOpacity: 0.58,
+      keylineOpacity: 0.34,
+    });
   });
 
   it('preserves movement soundwaves across consecutive observer presentation refreshes', () => {
@@ -119,7 +338,7 @@ describe('GM Observer View token presentation', () => {
     for (let frame = 0; frame < 2; frame += 1) {
       gmObserverView.afterCoreTokenRefresh(token, {
         coreVisible: false,
-        visionerHidden: true,
+        visionerState: 'undetected',
       });
 
       expect(token.detectionFilter).toBe(soundwaveFilter);
@@ -200,14 +419,15 @@ describe('GM Observer View token presentation', () => {
     expect(restored.style.transform).toBe('none');
   });
 
-  it('restores Core state and removes only its own hatch before the next Core refresh', () => {
+  it('restores Core state and removes its own hatch and interface contour before Core refresh', () => {
     const token = makeToken();
     globalThis.canvas.tokens.placeables = [token];
 
     gmObserverView.afterCoreTokenRefresh(token, {
       coreVisible: false,
-      visionerHidden: true,
+      visionerState: 'undetected',
     });
+    const stateOutline = token.addChild.mock.calls[0][0];
     gmObserverView.beforeCoreTokenRefresh(token);
 
     expect(token).toMatchObject({ visible: false, renderable: false });
@@ -215,6 +435,8 @@ describe('GM Observer View token presentation', () => {
     expect(token.mesh.filters).toEqual([token.foreignMeshFilter]);
     expect(token.detectionFilterMesh).toMatchObject({ visible: true, renderable: true });
     expect(token.detectionFilter).toEqual({ id: 'core-detection-filter' });
+    expect(token.removeChild).toHaveBeenCalledWith(stateOutline);
+    expect(stateOutline.parent).toBeNull();
   });
 
   it('does not alter a target already perceived by the selected observer', () => {
@@ -229,7 +451,7 @@ describe('GM Observer View token presentation', () => {
     expect(
       gmObserverView.afterCoreTokenRefresh(token, {
         coreVisible: true,
-        visionerHidden: false,
+        visionerState: null,
       }),
     ).toBe('unchanged');
 
@@ -245,7 +467,7 @@ describe('GM Observer View token presentation', () => {
     expect(
       gmObserverView.afterCoreTokenRefresh(token, {
         coreVisible: false,
-        visionerHidden: true,
+        visionerState: 'undetected',
       }),
     ).toBe('normal');
 
@@ -259,7 +481,7 @@ describe('GM Observer View token presentation', () => {
     expect(gmObserverView.isActive()).toBe(false);
   });
 
-  it('reveals fog and lightens darkness without changing active vision sources', () => {
+  it('reveals fog and lightens ambient darkness without changing active vision sources', () => {
     const visionSource = { active: true };
     globalThis.canvas.scene = { tokenVision: true };
     globalThis.canvas.visibility = { visible: true };
@@ -271,8 +493,8 @@ describe('GM Observer View token presentation', () => {
     gmObserverView.syncCanvas();
 
     expect(globalThis.canvas.visibility.visible).toBe(false);
-    expect(globalThis.canvas.effects.darkness.alpha).toBe(0.5);
-    expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0xd1d1ff);
+    expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
+    expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x4b4b58);
     expect(visionSource.active).toBe(true);
 
     gmObserverView.clear();
@@ -280,6 +502,33 @@ describe('GM Observer View token presentation', () => {
     expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
     expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x111111);
     expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(2);
+  });
+
+  it('updates ambient darkness strength live without reinitializing unchanged colors', () => {
+    globalThis.canvas.scene = { tokenVision: true };
+    globalThis.canvas.visibility = { visible: true };
+    globalThis.canvas.effects = {
+      darkness: { alpha: 1 },
+      visionSources: [{ active: true }],
+    };
+
+    gmObserverView.syncCanvas();
+    expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x4b4b58);
+    expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
+    expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(1);
+
+    setCachedSettingValue('gmObserverViewDarknessOpacity', 0.85);
+    gmObserverView.syncCanvas();
+    expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x2e2e35);
+    expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(2);
+
+    gmObserverView.syncCanvas();
+    expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(2);
+
+    gmObserverView.clear();
+    expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x111111);
+    expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
+    expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(3);
   });
 
   it('keeps observer token markings colored through PF2e monochrome darkvision', () => {

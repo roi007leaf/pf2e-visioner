@@ -60,6 +60,9 @@
 .pv-form-row .pv-col-grow { flex:1 1 auto; }
 .pv-form-row .pv-col-static { flex:0 0 auto; display:flex; align-items:center; }
 .pv-note { opacity:.8; }
+.pv-range-control { display:grid; grid-template-columns:minmax(0, 1fr) 3.5rem; gap:10px; align-items:center; }
+.pv-range-control input[type="range"] { width:100%; margin:0; }
+.pv-range-value { text-align:center; font-variant-numeric:tabular-nums; }
 
 .pv-fab-footer { flex-shrink:0; display:flex; justify-content:flex-end; padding:10px; background: var(--color-bg-primary); border-top:1px solid var(--color-border-light-primary); pointer-events:none; }
 .pv-fab-save { pointer-events:all; width:46px; height:46px; border-radius:50%; background: var(--color-primary-500, #ff8400); color:#fff; border:none; box-shadow:0 2px 8px rgba(0,0,0,0.25); display:flex; align-items:center; justify-content:center; }

@@ -9,7 +9,7 @@ jest.mock('../../../scripts/services/movement-tracking.js', () => ({
 jest.mock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
   applyCurrentViewHardHide: jest.fn(),
   releaseCurrentViewHardHideForLiveSight: jest.fn(),
-  targetIsUnseenByEveryCurrentViewObserver: jest.fn(() => false),
+  observerViewStateForCurrentView: jest.fn(() => null),
   usesCoreMultiLevelSurfaceRendering: jest.fn(() => false),
 }));
 
@@ -42,8 +42,8 @@ import {
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
 import {
   applyCurrentViewHardHide,
+  observerViewStateForCurrentView,
   releaseCurrentViewHardHideForLiveSight,
-  targetIsUnseenByEveryCurrentViewObserver,
   usesCoreMultiLevelSurfaceRendering,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
 import { gmObserverView } from '../../../scripts/services/GmObserverView/gm-observer-view.js';
@@ -77,7 +77,7 @@ describe('detection token refresh', () => {
     globalThis.game = { ready: true, user: { isGM: true } };
     hasActivePendingTokenMovement.mockReturnValue(true);
     usesCoreMultiLevelSurfaceRendering.mockReturnValue(false);
-    targetIsUnseenByEveryCurrentViewObserver.mockReturnValue(false);
+    observerViewStateForCurrentView.mockReturnValue(null);
     gmObserverView.isActive.mockReturnValue(false);
     gmObserverView.beforeCoreTokenRefresh.mockClear();
     gmObserverView.afterCoreTokenRefresh.mockClear();
@@ -158,7 +158,7 @@ describe('detection token refresh', () => {
 
   it('uses Core and Visioner truth for observer presentation instead of hard-hiding', () => {
     gmObserverView.isActive.mockReturnValue(true);
-    targetIsUnseenByEveryCurrentViewObserver.mockReturnValue(true);
+    observerViewStateForCurrentView.mockReturnValue('undetected');
     const token = foundryHiddenToken();
     const wrapped = jest.fn(() => {
       token.visible = false;
@@ -171,7 +171,7 @@ describe('detection token refresh', () => {
     expect(releaseCurrentViewHardHideForLiveSight).toHaveBeenCalledWith(token);
     expect(gmObserverView.afterCoreTokenRefresh).toHaveBeenCalledWith(token, {
       coreVisible: false,
-      visionerHidden: true,
+      visionerState: 'undetected',
     });
   });
 

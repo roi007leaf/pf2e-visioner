@@ -9,7 +9,7 @@ describe('GM Observer View presentation policy', () => {
     culled: false,
     hasObservers: true,
     coreVisible: true,
-    visionerHidden: false,
+    visionerState: null,
   };
 
   it('leaves rendering untouched outside observer view', () => {
@@ -31,7 +31,7 @@ describe('GM Observer View presentation policy', () => {
         ...base,
         hasObservers: false,
         coreVisible: false,
-        visionerHidden: true,
+        visionerState: 'undetected',
       }),
     ).toBe('normal');
   });
@@ -40,11 +40,27 @@ describe('GM Observer View presentation policy', () => {
     expect(resolveGmObserverTokenPresentation(base)).toBe('unchanged');
   });
 
-  it('hatches a token outside Core perception', () => {
-    expect(resolveGmObserverTokenPresentation({ ...base, coreVisible: false })).toBe('unseen');
+  it('uses undetected treatment outside Core perception', () => {
+    expect(resolveGmObserverTokenPresentation({ ...base, coreVisible: false })).toBe(
+      'undetected',
+    );
   });
 
-  it('hatches a token hidden by Visioner even when Core reports it visible', () => {
-    expect(resolveGmObserverTokenPresentation({ ...base, visionerHidden: true })).toBe('unseen');
+  it('uses outline-only hidden treatment for a Visioner-hidden token', () => {
+    expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'hidden' })).toBe(
+      'hidden',
+    );
+  });
+
+  it('uses undetected treatment for a Visioner-undetected token', () => {
+    expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'undetected' })).toBe(
+      'undetected',
+    );
+  });
+
+  it('uses unnoticed treatment for a Visioner-unnoticed token', () => {
+    expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'unnoticed' })).toBe(
+      'unnoticed',
+    );
   });
 });

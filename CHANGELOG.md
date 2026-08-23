@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.5.1] - 2026-08-23
+
+### Added
+
+- **GM Observer View darkness strength is now adjustable per client**: A slider controls how dark unlit areas remain while preserving scene lighting contrast, with changes applying immediately to the active view.
+
+### Changed
+
+- **GM Observer View now distinguishes trustworthy per-observer awareness states**: AVS and manual states use orange Hidden, red Undetected, and purple Unnoticed markers. Without AVS or a manual state, Visioner follows Foundry Core visibility and uses generic red Undetected styling only for fully unseen tokens.
+- **Unseen-token markings now remain legible through full scene darkness**: State-colored contours render from the token-art silhouette above darkness, while Undetected and Unnoticed use higher-contrast Visioner signal hatching with a dark keyline. Hidden remains outline-only, and Core soundwave filters retain rendering priority.
+
 ## [8.5.0] - 2026-08-22
 
 ### Added

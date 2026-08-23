@@ -789,6 +789,21 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  gmObserverViewDarknessOpacity: {
+    name: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.name',
+    hint: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Number,
+    default: 0.7,
+    range: {
+      min: 0,
+      max: 1,
+      step: 0.05,
+    },
+  },
+
   // Loot DCs
   lootStealthDC: {
     name: 'PF2E_VISIONER.SETTINGS.LOOT_STEALTH_DC.name',

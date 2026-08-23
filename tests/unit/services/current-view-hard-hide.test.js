@@ -21,6 +21,7 @@ jest.mock('../../../scripts/services/movement-tracking.js', () => ({
 import {
   currentViewObservers,
   currentViewVisionerObserversForTarget,
+  observerViewStateForCurrentView,
   targetIsHardHiddenFromCurrentView,
   targetIsUnseenByEveryCurrentViewObserver,
   applyCurrentViewHardHide,
@@ -317,6 +318,137 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     );
 
     expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(true);
+    expect(observerViewStateForCurrentView(target)).toBe('undetected');
+  });
+
+  it('reports a hidden creature as visually unseen without hard-hiding it', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'hidden'],
+        ['observer-b:target', 'hidden'],
+      ]),
+    );
+
+    expect(targetIsHardHiddenFromCurrentView(target)).toBe(false);
+    expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(true);
+    expect(observerViewStateForCurrentView(target)).toBe('hidden');
+  });
+
+  it('uses the best unseen state when observers have hidden and undetected awareness', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'undetected'],
+        ['observer-b:target', 'hidden'],
+      ]),
+    );
+
+    expect(observerViewStateForCurrentView(target)).toBe('hidden');
+  });
+
+  it('treats a Foundry-hidden token as undetected', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: true },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
+    expect(observerViewStateForCurrentView(target)).toBe('undetected');
+  });
+
+  it('preserves unnoticed as the strongest unseen state when shared by every observer', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'unnoticed'],
+        ['observer-b:target', 'unnoticed'],
+      ]),
+    );
+
+    expect(observerViewStateForCurrentView(target)).toBe('unnoticed');
+  });
+
+  it('defers to Core when AVS is off and no manual observer state exists', () => {
+    controlled.splice(1);
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(new Map([['observer-a:target', 'hidden']]));
+
+    expect(observerViewStateForCurrentView(target)).toBeNull();
+  });
+
+  it.each(['hidden', 'undetected', 'unnoticed'])(
+    'honors manual %s observer state while AVS is off',
+    (state) => {
+      controlled.splice(1);
+      getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+      const target = {
+        controlled: false,
+        document: {
+          id: 'target',
+          hidden: false,
+          getFlag: jest.fn((_module, key) =>
+            key === 'avs-override-from-observer-a'
+              ? { state, source: 'manual_action' }
+              : null,
+          ),
+        },
+        actor: { type: 'npc', itemTypes: { condition: [] } },
+      };
+      __setStoredVisibilityForTest(new Map([['observer-a:target', state]]));
+
+      expect(observerViewStateForCurrentView(target)).toBe(state);
+    },
+  );
+
+  it('ignores converted actor-condition state while AVS is off', () => {
+    controlled.splice(1);
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const target = {
+      controlled: false,
+      document: {
+        id: 'target',
+        hidden: false,
+        getFlag: jest.fn((_module, key) =>
+          key === 'avs-override-from-observer-a'
+            ? { state: 'hidden', source: 'converted-system-condition' }
+            : null,
+        ),
+      },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(new Map([['observer-a:target', 'hidden']]));
+
+    expect(observerViewStateForCurrentView(target)).toBeNull();
+  });
+
+  it('keeps Foundry-hidden tokens generically undetected while AVS is off', () => {
+    controlled.splice(1);
+    getDetectionSetting.mockImplementation((key) => key !== 'autoVisibilityEnabled');
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: true, getFlag: jest.fn(() => null) },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+
+    expect(observerViewStateForCurrentView(target)).toBe('undetected');
   });
 });
 

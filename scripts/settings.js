@@ -36,7 +36,12 @@ const SETTINGS_GROUPS = {
   Vision: [
     {
       title: 'Vision',
-      keys: ['enableAllTokensVision', 'gmObserverView', 'enableCameraVisionAggregation'],
+      keys: [
+        'enableAllTokensVision',
+        'gmObserverView',
+        'gmObserverViewDarknessOpacity',
+        'enableCameraVisionAggregation',
+      ],
     },
     { title: 'Hidden Loot Actors', keys: ['includeLootActors', 'lootStealthDC'] },
     { title: 'Hidden Walls', keys: ['hiddenWallsEnabled', 'wallStealthDC'] },
@@ -112,6 +117,20 @@ function isGroupedKey(key) {
 }
 
 let currentVisionerSettingsApp = null;
+
+export function settingInputPresentation(config = {}) {
+  let inputType = 'text';
+  if (config.choices && typeof config.choices === 'object') inputType = 'select';
+  else if (config.type === Boolean) inputType = 'checkbox';
+  else if (config.type === Number) inputType = config.range ? 'range' : 'number';
+
+  return {
+    inputType,
+    min: config.range?.min ?? config.min ?? null,
+    max: config.range?.max ?? config.max ?? null,
+    step: config.range?.step ?? config.step ?? 1,
+  };
+}
 
 class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -227,10 +246,10 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
             current = pendingRaw !== '' && pendingRaw != null ? Number(pendingRaw) : saved;
           else current = String(pendingRaw);
         }
-        let inputType = 'text';
+        const presentation = settingInputPresentation(cfg);
+        const inputType = presentation.inputType;
         let choicesList = null;
         if (cfg.choices && typeof cfg.choices === 'object') {
-          inputType = 'select';
           try {
             choicesList = Object.entries(cfg.choices).map(([val, label]) => ({
               value: val,
@@ -240,8 +259,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           } catch {
             choicesList = null;
           }
-        } else if (cfg.type === Boolean) inputType = 'checkbox';
-        else if (cfg.type === Number) inputType = 'number';
+        }
 
         // Determine depth (indentation) if this key is a child of some earlier parent in the same category
         let depth = 0;
@@ -275,9 +293,9 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           value: current,
           inputType,
           choices: choicesList,
-          min: cfg.min ?? null,
-          max: cfg.max ?? null,
-          step: cfg.step ?? 1,
+          min: presentation.min,
+          max: presentation.max,
+          step: presentation.step,
           depth,
         });
       }
@@ -307,6 +325,18 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
             VisionerSettingsForm._onSwitchGroup(null, btn);
           } catch { }
         });
+      });
+
+      // Keep range values readable while dragging; settings still apply via Save.
+      content.querySelectorAll('[data-pv-range]').forEach((input) => {
+        const output = input
+          .closest('.pv-range-control')
+          ?.querySelector('[data-pv-range-value]');
+        const syncOutput = () => {
+          if (output) output.textContent = input.value;
+        };
+        input.addEventListener('input', syncOutput);
+        syncOutput();
       });
 
       // Utility: show/hide a setting's form-group wrapper
@@ -502,7 +532,7 @@ export function registerSettings() {
       if (isGroupedKey(key)) settingConfig.config = false;
 
       // Add onChange handler for settings that require restart
-      if (key === 'gmObserverView') {
+      if (key === 'gmObserverView' || key === 'gmObserverViewDarknessOpacity') {
         settingConfig.onChange = async () => {
           try {
             const { gmObserverView } = await import(

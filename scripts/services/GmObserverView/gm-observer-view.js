@@ -4,21 +4,89 @@ import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { resolveGmObserverTokenPresentation } from './gm-observer-view-policy.js';
 
 const SETTING_KEY = 'gmObserverView';
-const DARKNESS_ALPHA = 0.5;
+const DARKNESS_STRENGTH_SETTING_KEY = 'gmObserverViewDarknessOpacity';
+const DEFAULT_DARKNESS_STRENGTH = 0.7;
 const TOKEN_PRESENTATION_KEY = '_pvGmObserverViewPresentation';
 const MODE_INDICATOR_ID = 'pf2e-visioner-gm-observer-indicator';
 const MODE_INDICATOR_POSITION_KEY = 'pf2e-visioner-gm-observer-indicator-pos';
 const MODE_INDICATOR_DRAG_THRESHOLD = 4;
 const ACTIVE_BODY_CLASS = 'pf2e-visioner-gm-observer-view-active';
+const HIDDEN_FILTER_UNIFORMS = Object.freeze({
+  stripeColor: [1, 0.4, 0],
+  outlineColor: [1, 0.4, 0],
+  stripeOpacity: 0,
+  muteAmount: 0.25,
+  brightness: 0.82,
+});
+const UNDETECTED_FILTER_UNIFORMS = Object.freeze({
+  stripeColor: [0.9569, 0.2627, 0.2118],
+  outlineColor: [0.9569, 0.2627, 0.2118],
+  stripeOpacity: 0.24,
+  muteAmount: 0.45,
+  brightness: 0.72,
+});
+const UNNOTICED_FILTER_UNIFORMS = Object.freeze({
+  stripeColor: [0.6118, 0.1529, 0.6902],
+  outlineColor: [0.6118, 0.1529, 0.6902],
+  stripeOpacity: 0.24,
+  muteAmount: 0.45,
+  brightness: 0.72,
+});
+const STATE_FILTER_UNIFORMS = Object.freeze({
+  hidden: HIDDEN_FILTER_UNIFORMS,
+  undetected: UNDETECTED_FILTER_UNIFORMS,
+  unnoticed: UNNOTICED_FILTER_UNIFORMS,
+});
+const STATE_INTERFACE_OUTLINE_COLORS = Object.freeze({
+  hidden: 0xff6600,
+  undetected: 0xf44336,
+  unnoticed: 0x9c27b0,
+});
+const INTERFACE_HATCH_STYLE = Object.freeze({
+  opacity: 0.58,
+  spacing: 16,
+  width: 0.16,
+  keylineOpacity: 0.34,
+  keylineWidth: 0.32,
+  highlightMix: 0.18,
+});
 
 let presentedTokens = new Set();
 let tokenPresentationStates = new WeakMap();
 let ownedTokenFilters = new WeakMap();
+let ownedTokenOutlines = new WeakMap();
 let hatchFilterClass = null;
-let darknessState = null;
+let interfaceHatchFilterClass = null;
 let darknessColorState = null;
 let primaryVisionModeState = null;
 let modeIndicatorCleanup = null;
+
+function observerDarknessStrength() {
+  const configured = Number(
+    getCachedSettingValue(DARKNESS_STRENGTH_SETTING_KEY, DEFAULT_DARKNESS_STRENGTH),
+  );
+  if (!Number.isFinite(configured)) return DEFAULT_DARKNESS_STRENGTH;
+  return Math.min(1, Math.max(0, configured));
+}
+
+function rgbColorNumber(value, fallback) {
+  if (typeof value === 'string') {
+    const match = value.trim().match(/^#?([0-9a-f]{6})$/i);
+    if (match) return Number.parseInt(match[1], 16);
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(0xffffff, Math.max(0, Math.round(numeric)));
+}
+
+function mixRgbColors(fromColor, toColor, amount) {
+  const from = rgbColorNumber(fromColor, 0xd1d1ff);
+  const to = rgbColorNumber(toColor, from);
+  const mix = Math.min(1, Math.max(0, Number(amount) || 0));
+  const channel = (shift) =>
+    Math.round(((from >> shift) & 0xff) * (1 - mix) + ((to >> shift) & 0xff) * mix);
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
 
 function hasCurrentObservers() {
   const tokens = globalThis.canvas?.tokens;
@@ -53,9 +121,7 @@ function getHatchFilterClass() {
     static get defaultUniforms() {
       return {
         uSampler: null,
-        stripeColor: [1, 0.7, 0.2],
-        outlineColor: [1, 0.28, 0.12],
-        stripeOpacity: 0.24,
+        ...UNDETECTED_FILTER_UNIFORMS,
         stripeSpacing: 18,
         stripeWidth: 0.09,
       };
@@ -73,6 +139,8 @@ function getHatchFilterClass() {
         uniform float stripeOpacity;
         uniform float stripeSpacing;
         uniform float stripeWidth;
+        uniform float muteAmount;
+        uniform float brightness;
 
         void main() {
           vec4 baseColor = texture2D(uSampler, vTextureCoord);
@@ -94,8 +162,8 @@ function getHatchFilterClass() {
             fract((pixel.x + pixel.y) / stripeSpacing)
           ) * baseColor.a;
           float luminance = dot(baseColor.rgb, vec3(0.299, 0.587, 0.114));
-          vec3 muted = mix(baseColor.rgb, vec3(luminance), 0.45) * 0.72;
-          vec3 marked = mix(muted, vec3(0.45, 0.12, 0.035), 0.08 * baseColor.a);
+          vec3 muted = mix(baseColor.rgb, vec3(luminance), muteAmount) * brightness;
+          vec3 marked = mix(muted, outlineColor, 0.04 * baseColor.a);
           marked = mix(marked, stripeColor, hatch * stripeOpacity);
           vec3 outputColor = mix(marked, outlineColor, outline);
           gl_FragColor = vec4(outputColor, max(baseColor.a * 0.9, outline));
@@ -104,6 +172,70 @@ function getHatchFilterClass() {
     }
   };
   return hatchFilterClass;
+}
+
+function getInterfaceHatchFilterClass() {
+  const BaseFilter = globalThis.foundry?.canvas?.rendering?.filters?.AbstractBaseFilter;
+  if (!BaseFilter) return null;
+  if (interfaceHatchFilterClass?.__pvBaseFilter === BaseFilter) {
+    return interfaceHatchFilterClass;
+  }
+
+  interfaceHatchFilterClass = class GmObserverInterfaceHatchFilter extends BaseFilter {
+    static __pvBaseFilter = BaseFilter;
+
+    static get defaultUniforms() {
+      return {
+        uSampler: null,
+        stripeColor: UNDETECTED_FILTER_UNIFORMS.stripeColor,
+        stripeOpacity: INTERFACE_HATCH_STYLE.opacity,
+        stripeSpacing: INTERFACE_HATCH_STYLE.spacing,
+        stripeWidth: INTERFACE_HATCH_STYLE.width,
+        keylineOpacity: INTERFACE_HATCH_STYLE.keylineOpacity,
+        keylineWidth: INTERFACE_HATCH_STYLE.keylineWidth,
+        highlightMix: INTERFACE_HATCH_STYLE.highlightMix,
+      };
+    }
+
+    static _createFragmentShader() {
+      const precision = globalThis.PIXI?.Program?.defaultFragmentPrecision ?? 'mediump';
+      return `
+        precision ${precision} float;
+        varying vec2 vTextureCoord;
+        uniform sampler2D uSampler;
+        uniform vec4 inputSize;
+        uniform vec3 stripeColor;
+        uniform float stripeOpacity;
+        uniform float stripeSpacing;
+        uniform float stripeWidth;
+        uniform float keylineOpacity;
+        uniform float keylineWidth;
+        uniform float highlightMix;
+
+        void main() {
+          float tokenAlpha = texture2D(uSampler, vTextureCoord).a;
+          vec2 pixel = vTextureCoord * inputSize.xy;
+          float phase = fract((pixel.x + pixel.y) / stripeSpacing);
+          float tokenMask = smoothstep(0.04, 0.45, tokenAlpha);
+          float keyline = step(
+            1.0 - keylineWidth,
+            phase
+          ) * tokenMask;
+          float hatch = step(
+            1.0 - stripeWidth,
+            phase
+          ) * tokenMask;
+          float keylineAlpha = keyline * keylineOpacity;
+          float hatchAlpha = hatch * stripeOpacity;
+          vec3 accentColor = mix(stripeColor, vec3(1.0), highlightMix);
+          vec4 backing = vec4(vec3(0.015) * keylineAlpha, keylineAlpha);
+          vec4 accent = vec4(accentColor * hatchAlpha, hatchAlpha);
+          gl_FragColor = accent + (backing * (1.0 - accent.a));
+        }
+      `;
+    }
+  };
+  return interfaceHatchFilterClass;
 }
 
 function removeOwnedFilter(token, { destroy = false } = {}) {
@@ -125,7 +257,139 @@ function removeOwnedFilter(token, { destroy = false } = {}) {
   return true;
 }
 
-function attachOwnedFilter(token) {
+function removeOwnedOutline(token, { destroy = false } = {}) {
+  const owned = ownedTokenOutlines.get(token);
+  if (!owned) return false;
+  try {
+    owned.container?.parent?.removeChild?.(owned.container);
+  } catch {
+    /* token may already be destroyed */
+  }
+  if (destroy) {
+    try {
+      owned.outlineFilter?.destroy?.();
+      owned.hatchFilter?.destroy?.();
+      owned.container?.destroy?.();
+    } catch {
+      /* best-effort GPU cleanup */
+    }
+    ownedTokenOutlines.delete(token);
+  }
+  return true;
+}
+
+function renderTokenMeshWithFilter(mesh, filter, renderer) {
+  if (!mesh || !filter || typeof mesh.render !== 'function') return;
+  const originalFilters = mesh.filters;
+  const originalTint = mesh.tint;
+  const originalWorldAlpha = mesh.worldAlpha;
+  const originalPluginName = mesh.pluginName;
+  const pluginName =
+    globalThis.foundry?.canvas?.rendering?.shaders?.BaseSamplerShader?.classPluginName;
+
+  try {
+    mesh.filters = [filter];
+    mesh.tint = 0xffffff;
+    mesh.worldAlpha = 1;
+    if (pluginName) mesh.pluginName = pluginName;
+    mesh.render(renderer);
+  } finally {
+    mesh.filters = originalFilters;
+    mesh.tint = originalTint;
+    mesh.worldAlpha = originalWorldAlpha;
+    mesh.pluginName = originalPluginName;
+  }
+}
+
+function colorNumberToRgba(color) {
+  return [((color >> 16) & 0xff) / 255, ((color >> 8) & 0xff) / 255, (color & 0xff) / 255, 1];
+}
+
+function colorNumberToRgb(color) {
+  return colorNumberToRgba(color).slice(0, 3);
+}
+
+function attachOwnedOutline(token, presentation) {
+  const color = STATE_INTERFACE_OUTLINE_COLORS[presentation];
+  const Container = globalThis.PIXI?.Container;
+  const FilterClass =
+    globalThis.foundry?.canvas?.rendering?.filters?.OutlineOverlayFilter;
+  const HatchFilterClass = getInterfaceHatchFilterClass();
+  const mesh = token?.mesh;
+  if (
+    color === undefined ||
+    !Container ||
+    !FilterClass ||
+    !HatchFilterClass ||
+    !mesh ||
+    typeof token?.addChild !== 'function'
+  ) {
+    removeOwnedOutline(token);
+    return null;
+  }
+
+  let owned = ownedTokenOutlines.get(token);
+  if (owned?.mesh !== mesh || owned?.container?.destroyed) {
+    removeOwnedOutline(token, { destroy: true });
+    owned = null;
+  }
+  if (!owned) {
+    const outlineFilter = FilterClass.create({
+      outlineColor: colorNumberToRgba(color),
+      knockout: true,
+      wave: false,
+    });
+    outlineFilter.animated = false;
+    outlineFilter.thickness = 2;
+    const hatchFilter = HatchFilterClass.create({});
+
+    const container = new Container();
+    container.name = 'PF2E Visioner GM Observer State Outline';
+    container.updateTransform = () => {};
+    container.render = (renderer) => {
+      if (Number(hatchFilter.uniforms.stripeOpacity) > 0) {
+        renderTokenMeshWithFilter(mesh, hatchFilter, renderer);
+      }
+      renderTokenMeshWithFilter(mesh, outlineFilter, renderer);
+    };
+    container._pvStateOutlineFilter = outlineFilter;
+    container._pvStateHatchFilter = hatchFilter;
+    owned = { container, outlineFilter, hatchFilter, mesh };
+    ownedTokenOutlines.set(token, owned);
+  }
+
+  try {
+    const showHatch = (STATE_FILTER_UNIFORMS[presentation]?.stripeOpacity ?? 0) > 0;
+    Object.assign(owned.outlineFilter.uniforms, {
+      outlineColor: colorNumberToRgba(color),
+      knockout: true,
+      wave: false,
+    });
+    Object.assign(owned.hatchFilter.uniforms, {
+      stripeColor: colorNumberToRgb(color),
+      stripeOpacity: showHatch ? INTERFACE_HATCH_STYLE.opacity : 0,
+      stripeSpacing: INTERFACE_HATCH_STYLE.spacing,
+      stripeWidth: INTERFACE_HATCH_STYLE.width,
+      keylineOpacity: showHatch ? INTERFACE_HATCH_STYLE.keylineOpacity : 0,
+      keylineWidth: INTERFACE_HATCH_STYLE.keylineWidth,
+      highlightMix: INTERFACE_HATCH_STYLE.highlightMix,
+    });
+    if (owned.container.parent !== token) token.addChild(owned.container);
+    owned.container.eventMode = 'none';
+    owned.container.interactive = false;
+    owned.container.alpha = 1;
+    owned.container.visible = true;
+    owned.container.renderable = true;
+    // Core soundwaves retain priority at zIndex 0; hover/selection borders remain above both.
+    owned.container.zIndex = -0.5;
+    return owned.container;
+  } catch {
+    removeOwnedOutline(token, { destroy: true });
+    return null;
+  }
+}
+
+function attachOwnedFilter(token, presentation) {
   const mesh = token?.mesh;
   if (!mesh) return null;
 
@@ -145,6 +409,10 @@ function attachOwnedFilter(token) {
 
   mesh.filters ??= [];
   if (!mesh.filters.includes(owned.filter)) mesh.filters.push(owned.filter);
+  Object.assign(
+    owned.filter.uniforms,
+    STATE_FILTER_UNIFORMS[presentation] ?? UNDETECTED_FILTER_UNIFORMS,
+  );
   owned.filter.enabled = true;
   return owned.filter;
 }
@@ -192,6 +460,7 @@ function restoreTokenPresentation(token) {
   }
 
   removeOwnedFilter(token);
+  removeOwnedOutline(token);
   tokenPresentationStates.delete(token);
   presentedTokens.delete(token);
   try {
@@ -202,7 +471,7 @@ function restoreTokenPresentation(token) {
   return !!state;
 }
 
-function forceTokenArtVisible(token, { hatched }) {
+function forceTokenArtVisible(token, { presentation }) {
   const changes = [];
   const preserveSoundwave = hasActiveSoundwaveSurface(token);
   captureOwnedChange(changes, token, 'visible', true);
@@ -215,12 +484,17 @@ function forceTokenArtVisible(token, { hatched }) {
     captureOwnedChange(changes, token?.detectionFilterMesh, 'renderable', false);
   }
 
-  if (hatched) attachOwnedFilter(token);
-  else removeOwnedFilter(token);
+  if (STATE_FILTER_UNIFORMS[presentation]) {
+    attachOwnedFilter(token, presentation);
+    attachOwnedOutline(token, presentation);
+  } else {
+    removeOwnedFilter(token, { destroy: true });
+    removeOwnedOutline(token, { destroy: true });
+  }
 
   tokenPresentationStates.set(token, { changes });
   presentedTokens.add(token);
-  token[TOKEN_PRESENTATION_KEY] = hatched ? 'unseen' : 'normal';
+  token[TOKEN_PRESENTATION_KEY] = presentation;
 }
 
 function expectedCoreVisibilityGroupState() {
@@ -269,20 +543,12 @@ function restoreCanvasPresentation() {
     visibility.visible = expectedCoreVisibilityGroupState();
   }
 
-  if (darknessState) {
-    try {
-      if (darknessState.surface?.alpha === DARKNESS_ALPHA) {
-        darknessState.surface.alpha = darknessState.alpha;
-      }
-    } catch {
-      /* canvas may already be torn down */
-    }
-    darknessState = null;
-  }
-
   if (darknessColorState) {
     try {
-      if (darknessColorState.config?.darknessColor === darknessColorState.observerColor) {
+      if (
+        darknessColorState.config?.darknessColor === darknessColorState.appliedColor &&
+        darknessColorState.appliedColor !== darknessColorState.originalColor
+      ) {
         darknessColorState.config.darknessColor = darknessColorState.originalColor;
         globalThis.canvas?.environment?.initialize?.();
       }
@@ -297,17 +563,27 @@ function syncDarknessColor() {
   const config = globalThis.CONFIG?.Canvas;
   if (!config || !('darknessColor' in config)) return;
   const observerColor = globalThis.CONFIG?.PF2E?.Canvas?.darkness?.gmVision ?? 0xd1d1ff;
-  if (darknessColorState?.config === config) {
-    config.darknessColor = observerColor;
-    return;
+
+  if (darknessColorState?.config !== config) {
+    darknessColorState = {
+      config,
+      originalColor: config.darknessColor,
+      appliedColor: null,
+    };
+  } else if (config.darknessColor !== darknessColorState.appliedColor) {
+    // Respect a new base color supplied by Core, PF2e, or another module while active.
+    darknessColorState.originalColor = config.darknessColor;
   }
 
-  darknessColorState = {
-    config,
-    originalColor: config.darknessColor,
+  const appliedColor = mixRgbColors(
     observerColor,
-  };
-  config.darknessColor = observerColor;
+    darknessColorState.originalColor,
+    observerDarknessStrength(),
+  );
+  darknessColorState.appliedColor = appliedColor;
+  if (config.darknessColor === appliedColor) return;
+
+  config.darknessColor = appliedColor;
   try {
     globalThis.canvas?.environment?.initialize?.();
   } catch {
@@ -324,14 +600,6 @@ function syncCanvasPresentation() {
   const visibility = globalThis.canvas?.visibility;
   if (visibility && 'visible' in visibility) visibility.visible = false;
   syncDarknessColor();
-
-  const darkness = globalThis.canvas?.effects?.darkness;
-  if (darkness && 'alpha' in darkness) {
-    if (darknessState?.surface !== darkness) {
-      darknessState = { surface: darkness, alpha: darkness.alpha };
-    }
-    darkness.alpha = DARKNESS_ALPHA;
-  }
   syncPrimaryVisionModePresentation();
   return true;
 }
@@ -574,7 +842,7 @@ export const gmObserverView = {
     return token ? restoreTokenPresentation(token) : false;
   },
 
-  afterCoreTokenRefresh(token, { coreVisible = false, visionerHidden = false } = {}) {
+  afterCoreTokenRefresh(token, { coreVisible = false, visionerState = null } = {}) {
     if (!token) return 'unchanged';
     restoreTokenPresentation(token);
 
@@ -586,11 +854,15 @@ export const gmObserverView = {
       culled: isTokenCulled(token),
       hasObservers: hasCurrentObservers(),
       coreVisible,
-      visionerHidden,
+      visionerState,
     });
-    if (presentation === 'unchanged') return presentation;
+    if (presentation === 'unchanged') {
+      removeOwnedFilter(token, { destroy: true });
+      removeOwnedOutline(token, { destroy: true });
+      return presentation;
+    }
 
-    forceTokenArtVisible(token, { hatched: presentation === 'unseen' });
+    forceTokenArtVisible(token, { presentation });
     return presentation;
   },
 
@@ -612,10 +884,12 @@ export const gmObserverView = {
     for (const token of presentedTokens) {
       restoreTokenPresentation(token);
       removeOwnedFilter(token, { destroy: true });
+      removeOwnedOutline(token, { destroy: true });
     }
     presentedTokens = new Set();
     tokenPresentationStates = new WeakMap();
     ownedTokenFilters = new WeakMap();
+    ownedTokenOutlines = new WeakMap();
     syncModeIndicator(false);
     if (restoreCanvas) restoreCanvasPresentation();
     else primaryVisionModeState = null;

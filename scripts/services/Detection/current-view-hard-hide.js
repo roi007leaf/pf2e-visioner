@@ -19,6 +19,7 @@ import {
 export { usesCoreMultiLevelSurfaceRendering } from './multi-level-control-view.js';
 
 const RENDER_HIDDEN_FROM_OBSERVER_STATES = new Set(['undetected', 'unnoticed']);
+const OBSERVER_VIEW_UNSEEN_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 const HIDDEN_STATE_RENDER_HIDDEN_ACTOR_TYPES = new Set(['hazard', 'loot']);
 const MOVEMENT_REVEAL_SETTLE_TTL_MS = 3000;
 
@@ -268,9 +269,9 @@ export function applyCurrentViewHardHide(token) {
   if (gmObserverView.isActive()) {
     gmObserverView.beforeCoreTokenRefresh(token);
     const coreVisible = token?.visible === true;
-    const visionerHidden = targetIsUnseenByEveryCurrentViewObserver(token);
+    const visionerState = observerViewStateForCurrentView(token);
     releaseCurrentViewHardHideForLiveSight(token);
-    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerHidden });
+    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerState });
     return false;
   }
 
@@ -430,30 +431,68 @@ export function targetIsHardHiddenFromCurrentView(target) {
   return false;
 }
 
+function hasObserverViewManualUnseenOverride(observer, target) {
+  try {
+    const observerId = tokenIdOf(observer);
+    if (!observerId) return false;
+    const override = target?.document?.getFlag?.(
+      MODULE_ID,
+      `avs-override-from-${observerId}`,
+    );
+    if (!override || override.coverOnly === true) return false;
+    // Missing source is legacy manual data. Automatic actor-condition conversions must not claim
+    // exact per-observer awareness while AVS is disabled.
+    if ((override.source ?? 'manual_action') !== 'manual_action') return false;
+    return OBSERVER_VIEW_UNSEEN_STATES.has(override.state);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Observer View aggregates multiple selected tokens like Core: a target is unseen only when every
  * relevant observer's Visioner state hides it. The ordinary hard-hide policy remains unchanged.
  */
-export function targetIsUnseenByEveryCurrentViewObserver(target) {
-  if (!target?.document?.id) return false;
-  if (isSceneTokenVisionDisabled()) return false;
-  if (isSelectAllTokenVisibilityBypassActive()) return false;
-  if (target.controlled) return false;
+function observerViewPresentationState(state, target) {
+  if (state === 'hidden') {
+    return hiddenStateShouldRenderHideTarget(target) ? 'undetected' : 'hidden';
+  }
+  if (state === 'undetected' || state === 'unnoticed') return state;
+  return null;
+}
+
+/** Return the best PF2e unseen state shared by every selected observer. */
+export function observerViewStateForCurrentView(target) {
+  if (!target?.document?.id) return null;
+  if (isSceneTokenVisionDisabled()) return null;
+  if (isSelectAllTokenVisibilityBypassActive()) return null;
+  if (target.controlled) return null;
 
   const observers = currentViewVisionerObserversForTarget(target);
-  if (observers.length === 0) return false;
-  if (target.document.hidden) return true;
-  if (tokenIsOutsideControlledLevelCullingSurface(target)) return false;
+  if (observers.length === 0) return null;
+  if (target.document.hidden) return 'undetected';
+  if (tokenIsOutsideControlledLevelCullingSurface(target)) return null;
 
   const automaticVisibilityActive = automaticVisionerVisibilityIsActive();
   let relevantObservers = 0;
+  let bestUnseenState = null;
+  let bestUnseenRank = Infinity;
   for (const observer of observers) {
     if (tokenIdOf(observer) === tokenIdOf(target)) continue;
     relevantObservers += 1;
     const state = getStoredVisibilityState(observer, target);
-    const stateHides = visionerStateHidesTargetRendering(state, target);
-    const overrideHides = hasUndetectedAvsOverride(observer, target);
-    if (!stateHides || (!automaticVisibilityActive && !overrideHides)) return false;
+    const presentationState = observerViewPresentationState(state, target);
+    const manualOverrideHides = hasObserverViewManualUnseenOverride(observer, target);
+    if (!presentationState || (!automaticVisibilityActive && !manualOverrideHides)) return null;
+    const rank = presentationState === 'hidden' ? 0 : presentationState === 'undetected' ? 1 : 2;
+    if (rank < bestUnseenRank) {
+      bestUnseenState = presentationState;
+      bestUnseenRank = rank;
+    }
   }
-  return relevantObservers > 0;
+  return relevantObservers > 0 ? bestUnseenState : null;
+}
+
+export function targetIsUnseenByEveryCurrentViewObserver(target) {
+  return observerViewStateForCurrentView(target) !== null;
 }

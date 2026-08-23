@@ -53,4 +53,23 @@ describe('GM Observer View keybinding', () => {
     expect(toggle).toHaveBeenCalledTimes(1);
     expect(systemGmVision).not.toHaveBeenCalled();
   });
+
+  it('defines client-adjustable darkness strength with a contrast-preserving default', async () => {
+    const { DEFAULT_SETTINGS } = await import('../../../scripts/constants.js');
+    const { settingInputPresentation } = await import('../../../scripts/settings.js');
+
+    expect(DEFAULT_SETTINGS.gmObserverViewDarknessOpacity).toMatchObject({
+      scope: 'client',
+      restricted: true,
+      type: Number,
+      default: 0.7,
+      range: { min: 0, max: 1, step: 0.05 },
+    });
+    expect(settingInputPresentation(DEFAULT_SETTINGS.gmObserverViewDarknessOpacity)).toEqual({
+      inputType: 'range',
+      min: 0,
+      max: 1,
+      step: 0.05,
+    });
+  });
 });

@@ -3,8 +3,8 @@ import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import {
   applyCurrentViewHardHide,
+  observerViewStateForCurrentView,
   releaseCurrentViewHardHideForLiveSight,
-  targetIsUnseenByEveryCurrentViewObserver,
   usesCoreMultiLevelSurfaceRendering,
 } from './current-view-hard-hide.js';
 import { gmObserverView } from '../GmObserverView/gm-observer-view.js';
@@ -139,9 +139,7 @@ function afterCoreRefresh(token, before) {
   gmObserverView.beforeCoreTokenRefresh(token);
   const coreVisible = token?.visible === true;
   const observerViewActive = gmObserverView.isActive();
-  const visionerHidden = observerViewActive
-    ? targetIsUnseenByEveryCurrentViewObserver(token)
-    : false;
+  const visionerState = observerViewActive ? observerViewStateForCurrentView(token) : null;
 
   if (!observerViewActive && !shouldBypassAvsForGmVision()) {
     suppressNewFoundryHiddenVisibilityDuringMove(token, before);
@@ -161,7 +159,7 @@ function afterCoreRefresh(token, before) {
   // remembered soundwave after Core has applied those flags so no full-art frame leaks through.
   refreshSoundwavesForActiveMovement();
   if (observerViewActive) {
-    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerHidden });
+    gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerState });
     enforceControlledLevelTokenRendering(token);
   }
 }

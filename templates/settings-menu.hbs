@@ -35,7 +35,12 @@
             <div class="pv-form-row" data-depth="{{item.depth}}" style="--pv-depth: {{item.depth}};">
               <label>{{item.name}}</label>
               {{#if item.hint}}<div class="notes pv-note">{{item.hint}}</div>{{/if}}
-              {{#if (eq item.inputType "number")}}
+              {{#if (eq item.inputType "range")}}
+                <div class="pv-range-control">
+                  <input type="range" name="settings.{{item.key}}" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}" data-pv-range>
+                  <output class="pv-range-value" data-pv-range-value>{{item.value}}</output>
+                </div>
+              {{else if (eq item.inputType "number")}}
                 <input type="number" name="settings.{{item.key}}" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}">
               {{else if (eq item.inputType "select")}}
                 <select name="settings.{{item.key}}">
