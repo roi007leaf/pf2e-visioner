@@ -33,6 +33,7 @@ export class CoverDetector {
     this._featUpgradeRecords = new Map();
     this._ruleElementBlocks = new Map();
     this._snipingDuoRecords = new Map();
+    this._wallEvaluationContext = null;
   }
   // Define token disposition constants for use within this class
   static TOKEN_DISPOSITIONS = {
@@ -80,8 +81,16 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
-    const cover = this._detectBetweenTokensCore(attacker, target, options);
-    return this._applyPeekCoverCap(target, cover);
+    const ownsWallContext = this._wallEvaluationContext === null;
+    if (ownsWallContext) {
+      this._wallEvaluationContext = { walls: null, coverOverrides: new Map() };
+    }
+    try {
+      const cover = this._detectBetweenTokensCore(attacker, target, options);
+      return this._applyPeekCoverCap(target, cover);
+    } finally {
+      if (ownsWallContext) this._wallEvaluationContext = null;
+    }
   }
 
   _applyPeekCoverCap(defender, cover) {
@@ -372,7 +381,7 @@ export class CoverDetector {
     try {
       const wouldNaturallyBlock = this._wouldWallNaturallyBlock(wallDoc, attackerPos);
 
-      const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
+      const coverOverride = this._getWallCoverOverride(wallDoc);
       if (coverOverride && coverOverride !== 'auto') {
         if (wouldNaturallyBlock) {
           if (coverOverride === 'none') return false;
@@ -521,14 +530,17 @@ export class CoverDetector {
   }
 
   _getSceneWalls() {
+    if (this._wallEvaluationContext?.walls) return this._wallEvaluationContext.walls;
+
     const walls = canvas?.walls;
-    if (!walls) return [];
+    if (!walls) return this._cacheSceneWalls([]);
 
     const objectChildren = Array.isArray(walls.objects?.children) ? walls.objects.children : [];
     const placeables = Array.isArray(walls.placeables) ? walls.placeables : [];
 
-    if (objectChildren.length === 0) return placeables;
-    if (placeables.length === 0) return objectChildren;
+    if (objectChildren === placeables) return this._cacheSceneWalls(placeables);
+    if (objectChildren.length === 0) return this._cacheSceneWalls(placeables);
+    if (placeables.length === 0) return this._cacheSceneWalls(objectChildren);
 
     const seen = new Set();
     const merged = [];
@@ -539,7 +551,21 @@ export class CoverDetector {
       seen.add(key);
       merged.push(wall);
     }
-    return merged;
+    return this._cacheSceneWalls(merged);
+  }
+
+  _cacheSceneWalls(walls) {
+    if (this._wallEvaluationContext) this._wallEvaluationContext.walls = walls;
+    return walls;
+  }
+
+  _getWallCoverOverride(wallDoc) {
+    const cache = this._wallEvaluationContext?.coverOverrides;
+    if (!cache) return wallDoc?.getFlag?.(MODULE_ID, 'coverOverride');
+    if (cache.has(wallDoc)) return cache.get(wallDoc);
+    const coverOverride = wallDoc?.getFlag?.(MODULE_ID, 'coverOverride');
+    cache.set(wallDoc, coverOverride);
+    return coverOverride;
   }
 
   _getWallCoords(wall) {
@@ -768,7 +794,7 @@ export class CoverDetector {
 
       for (const wall of walls) {
         const wallDoc = wall.document || wall;
-        const coverOverride = wallDoc.getFlag?.(MODULE_ID, 'coverOverride');
+        const coverOverride = this._getWallCoverOverride(wallDoc);
 
         if (!coverOverride || coverOverride === 'auto') {
           continue;
@@ -942,13 +968,8 @@ export class CoverDetector {
     const ray = this._createRay(a, b);
     const rayLength = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 
-    // Check if there are any walls at all
-    const totalWalls = this._getSceneWalls().length;
-    if (totalWalls === 0) {
-      return false;
-    }
-
     const walls = this._getSceneWalls();
+    if (walls.length === 0) return false;
     for (const wall of walls) {
       const c = this._getWallCoords(wall);
       if (!c) continue;

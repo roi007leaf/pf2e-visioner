@@ -59,6 +59,60 @@ describe('CoverDetector', () => {
     });
   });
 
+  describe('wall hot-path reuse', () => {
+    test('returns shared wall array directly when Foundry exposes one array through both surfaces', () => {
+      const wall = makeVerticalWall(WALL_SENSE_TYPES.NORMAL, 0);
+      const sharedWalls = [wall];
+      const previousObjects = global.canvas.walls.objects;
+      global.canvas.walls.objects = { children: sharedWalls };
+      global.canvas.walls.placeables = sharedWalls;
+      try {
+        expect(coverDetector._getSceneWalls()).toBe(sharedWalls);
+      } finally {
+        global.canvas.walls.objects = previousObjects;
+      }
+    });
+
+    test('fetches scene walls once per blocked-ray check', () => {
+      const wall = makeVerticalWall(WALL_SENSE_TYPES.NORMAL, 0);
+      const sceneWallsSpy = jest.spyOn(coverDetector, '_getSceneWalls').mockReturnValue([wall]);
+      jest.spyOn(coverDetector, '_getWallCoords').mockReturnValue(null);
+
+      coverDetector._isRayBlockedByWalls({ x: 0, y: 0 }, { x: 100, y: 0 });
+
+      expect(sceneWallsSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test('reads each wall cover override once per cover calculation', () => {
+      const attacker = global.createMockToken({
+        id: 'source',
+        x: 0,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 0, y: 0 },
+      });
+      const target = global.createMockToken({
+        id: 'target',
+        x: 100,
+        y: 0,
+        width: 1,
+        height: 1,
+        center: { x: 100, y: 0 },
+      });
+      const wall = makeVerticalWall(WALL_SENSE_TYPES.NORMAL, 0);
+      global.canvas.walls.placeables = [wall];
+      global.canvas.tokens.placeables = [attacker, target];
+
+      coverDetector.detectBetweenTokens(attacker, target);
+
+      const overrideReads = wall.document.getFlag.mock.calls.filter(
+        ([moduleId, key]) => moduleId === 'pf2e-visioner' && key === 'coverOverride',
+      );
+      expect(overrideReads).toHaveLength(1);
+    });
+  });
+
   describe('detectBetweenTokens', () => {
     let sourceToken, targetToken;
 

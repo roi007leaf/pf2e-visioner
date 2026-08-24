@@ -423,8 +423,11 @@ export function refreshSoundwavesForActiveMovement() {
   const movementOrDragActive = pendingMovementActive || isMovementOrDragActive();
   // Controlled movers are interaction surfaces, not detection results. Keep their primary art
   // visible while selected, but let Core own visibility during drag and movement animation.
-  for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
-    if (!target.controlled) continue;
+  const tokenLayer = globalThis.canvas?.tokens;
+  const controlledTokens = Array.isArray(tokenLayer?.controlled)
+    ? tokenLayer.controlled
+    : (tokenLayer?.placeables ?? []).filter((target) => target.controlled);
+  for (const target of controlledTokens) {
     if (movementOrDragActive) clearControlledTokenSoundwave(target);
     else showControlledTokenFullArt(target);
   }

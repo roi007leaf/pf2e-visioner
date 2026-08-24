@@ -273,6 +273,16 @@ export class PeekManager {
     }
   }
 
+  onControlToken() {
+    const controlled = globalThis.canvas?.tokens?.controlled ?? [];
+    for (const [id] of [...this._active]) {
+      const remainsSoleObserver =
+        controlled.length === 1 && controlled[0]?.document?.id === id;
+      if (!remainsSoleObserver) this.endPeek(id, 'control');
+    }
+    if (this._active.size === 0) this._clearPendingReaim();
+  }
+
   endAll(reason) {
     this._clearPendingReaim();
     for (const id of this._registry.ids()) this.endPeek(id, reason);
@@ -284,6 +294,7 @@ export class PeekManager {
     if (typeof Hooks === 'undefined') return;
     Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
     Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
+    Hooks.on('controlToken', () => this.onControlToken());
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
     registerDoorPeekInteraction(this);
     if (typeof setInterval !== 'undefined') {

@@ -151,6 +151,24 @@ describe('EncounterStealthInitiativeService', () => {
     mockGetCoverBetween.mockReturnValue('none');
   });
 
+  test('reads feature setting once per tracker visibility refresh', async () => {
+    setSetting(false);
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10, 'perception'),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+    global.game.settings.get.mockClear();
+
+    encounterStealthInitiativeService.applyTrackerVisibility(combat);
+
+    const reads = global.game.settings.get.mock.calls.filter(
+      ([moduleId, key]) =>
+        moduleId === 'pf2e-visioner' && key === 'enableStealthInitiativeVisibility',
+    );
+    expect(reads).toHaveLength(1);
+  });
+
   test('setting defaults to disabled for PF2e Avoid Notice compatibility', async () => {
     const { DEFAULT_SETTINGS } = await import('../../../scripts/constants.js');
 

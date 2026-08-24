@@ -235,6 +235,36 @@ describe('PeekManager hook reactions', () => {
     mgr.onWallUpdate({ id: 'door9' }, { ds: 1 });
     expect(d.registry.has('p')).toBe(false);
   });
+
+  test('controlToken hook ends an active peek when drag-selection controls multiple tokens', () => {
+    const { d, mgr } = mgrWith();
+    const peeker = createMockToken({ id: 'p', x: 0, y: 0, width: 1, height: 1 });
+    const other = createMockToken({ id: 'other', x: 100, y: 0, width: 1, height: 1 });
+    peeker.controlled = true;
+    other.controlled = true;
+    mgr.startCornerPeek(peeker, { x: 500, y: 0 });
+    global.canvas.tokens.controlled = [peeker, other];
+
+    const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(1);
+    const addEventListenerSpy = jest
+      .spyOn(document, 'addEventListener')
+      .mockImplementation(() => {});
+    try {
+      mgr.init();
+      const controlHook = global.Hooks.on.mock.calls.find(([name]) => name === 'controlToken')?.[1];
+      expect(controlHook).toEqual(expect.any(Function));
+
+      controlHook(other, true);
+
+      expect(d.registry.has('p')).toBe(false);
+      expect(d.renderer.clear).toHaveBeenCalledWith(peeker);
+      expect(d.socket.sendEnd).toHaveBeenCalledWith('p');
+      expect(d.recompute).toHaveBeenCalledWith('p');
+    } finally {
+      setIntervalSpy.mockRestore();
+      addEventListenerSpy.mockRestore();
+    }
+  });
 });
 
 describe('PeekManager heartbeat', () => {

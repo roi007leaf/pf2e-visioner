@@ -256,25 +256,27 @@ export class EncounterStealthInitiativeService {
     const combatants = collectionToArray(combat?.combatants ?? combat?.turns);
     const combatantRowsById = this._indexCombatantRows();
     const seenIds = new Set();
+    const enabled = this.isEnabled();
 
     for (const combatant of combatants) {
       const combatantId = combatant?.id;
       if (!combatantId) continue;
       seenIds.add(combatantId);
       const rows = combatantRowsById.get(combatantId) ?? [];
-      const hidden = this.shouldHideCombatantFromCurrentUser(combatant, combat);
-      const masked = !hidden && this.shouldMaskCombatantDetailsFromCurrentUser(combatant, combat);
+      const hidden = this.shouldHideCombatantFromCurrentUser(combatant, combat, { enabled });
+      const masked =
+        !hidden && this.shouldMaskCombatantDetailsFromCurrentUser(combatant, combat, { enabled });
       this._setCombatantRowsHidden(combatantId, hidden, rows);
       this._setCombatantRowsMasked(combatantId, masked, rows);
       this._setStealthInitiativeMarker(
         combatantId,
-        this.isEnabled() && this.isStealthInitiativeCombatant(combatant) && hasNumericInitiative(combatant),
+        enabled && this.isStealthInitiativeCombatant(combatant) && hasNumericInitiative(combatant),
         rows,
       );
       this._restoreExpiredInitialOverridesForCombatant(combatant, combat);
     }
 
-    if (!this.isEnabled() || game.user?.isGM) {
+    if (!enabled || game.user?.isGM) {
       this._showRowsHiddenByVisioner();
       this._unmaskRowsMaskedByVisioner();
       this._removeStaleStealthInitiativeMarkers(seenIds);
@@ -292,8 +294,8 @@ export class EncounterStealthInitiativeService {
     }
   }
 
-  shouldHideCombatantFromCurrentUser(combatant, combat = game.combat) {
-    if (!this.isEnabled()) return false;
+  shouldHideCombatantFromCurrentUser(combatant, combat = game.combat, { enabled = this.isEnabled() } = {}) {
+    if (!enabled) return false;
     if (game.user?.isGM) return false;
     if (!this.isStealthInitiativeCombatant(combatant)) return false;
     if (!hasNumericInitiative(combatant)) return false;
@@ -331,8 +333,8 @@ export class EncounterStealthInitiativeService {
     return true;
   }
 
-  shouldMaskCombatantDetailsFromCurrentUser(combatant, combat = game.combat) {
-    if (!this.isEnabled()) return false;
+  shouldMaskCombatantDetailsFromCurrentUser(combatant, combat = game.combat, { enabled = this.isEnabled() } = {}) {
+    if (!enabled) return false;
     if (game.user?.isGM) return false;
     if (!this.isStealthInitiativeCombatant(combatant)) return false;
     if (!hasNumericInitiative(combatant)) return false;

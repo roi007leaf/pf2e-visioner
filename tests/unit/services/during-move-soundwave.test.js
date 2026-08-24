@@ -626,6 +626,28 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(getObservers).not.toHaveBeenCalled();
   });
 
+  test('does not scan all placeables for controlled-token cleanup inside the throttle window', async () => {
+    const target = makeTarget();
+    target.controlled = true;
+    const detectedTarget = makeTarget();
+    detectedTarget.document.id = 'detected-target';
+    const placeables = [target, detectedTarget];
+    const originalIterator = placeables[Symbol.iterator].bind(placeables);
+    const iteratorSpy = jest.fn(() => originalIterator());
+    placeables[Symbol.iterator] = iteratorSpy;
+    globalThis.canvas = {
+      tokens: { controlled: [target], placeables, preview: { children: [] } },
+    };
+    const mod = await loadWith({ pendingMovement: true });
+
+    nowSpy.mockReturnValue(10_000);
+    mod.refreshSoundwavesForActiveMovement();
+    iteratorSpy.mockClear();
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(iteratorSpy).not.toHaveBeenCalled();
+  });
+
   test('keeps the Core filter source renderable when reasserting a soundwave', async () => {
     const savedConfig = globalThis.CONFIG;
     globalThis.CONFIG = {

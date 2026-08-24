@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.5.3] - 2026-08-24
+
+### Fixed
+
+- **Active peeking now exits cleanly when token selection changes**: Drag-selecting the peeking token together with another token now clears the local peek source, socket state, and visibility calculation instead of leaving Foundry's scene vision in a broken state until scene reload.
+
+### Changed
+
+- **Token-heavy and wall-heavy scenes now avoid redundant visibility work**: Movement soundwave cleanup uses Foundry's controlled-token collection, encounter tracker refreshes reuse their feature setting, and cover calculations reuse scene walls and wall override flags for the duration of each calculation.
+
 ## [8.5.2] - 2026-08-23
 
 ### Fixed
