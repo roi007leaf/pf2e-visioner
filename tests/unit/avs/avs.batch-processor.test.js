@@ -8,6 +8,7 @@ import {
 import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
 import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
+import { HashGridIndex } from '../../../scripts/visibility/auto-visibility/core/HashGridIndex.js';
 
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
@@ -263,6 +264,22 @@ describe('BatchProcessor', () => {
       ]),
     );
     expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
+  });
+
+  test('converts max visibility distance from scene units to pixels for spatial queries', async () => {
+    const previousGridDistance = global.canvas.scene.grid.distance;
+    const queryCircleSpy = jest.spyOn(HashGridIndex.prototype, 'queryCircle').mockReturnValue([]);
+    global.canvas.scene.grid.distance = 5;
+    processor.maxVisibilityDistance = 100;
+
+    try {
+      await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+
+      expect(queryCircleSpy).toHaveBeenCalledWith(50, 50, 2000);
+    } finally {
+      queryCircleSpy.mockRestore();
+      global.canvas.scene.grid.distance = previousGridDistance;
+    }
   });
 
   test('reports detailed processor timing buckets', async () => {
@@ -1005,6 +1022,7 @@ describe('BatchProcessor', () => {
     const observer = makeToken('A', 0, 0);
     const farTarget = makeToken('B', 300, 0);
     global.canvas.tokens.placeables = [observer, farTarget];
+    processor.maxVisibilityDistance = 100;
     processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
     processor.visionAnalyzer.getVisionCapabilities.mockImplementation(() => ({
       isDeafened: false,

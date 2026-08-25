@@ -1,6 +1,7 @@
 import '../../setup.js';
 
 import { SpatialAnalysisService } from '../../../scripts/visibility/auto-visibility/core/SpatialAnalysisService.js';
+import { HashGridIndex } from '../../../scripts/visibility/auto-visibility/core/HashGridIndex.js';
 import { ViewportFilterService } from '../../../scripts/visibility/auto-visibility/core/ViewportFilterService.js';
 
 describe('SpatialAnalysisService', () => {
@@ -73,6 +74,32 @@ describe('SpatialAnalysisService', () => {
       new Set(),
     );
     expect(positionManager.getTokenPosition).not.toHaveBeenCalled();
+  });
+
+  test('converts max visibility distance from scene units to pixels for movement bounds', () => {
+    const previousGridDistance = global.canvas.scene.grid.distance;
+    const queryRectSpy = jest.spyOn(HashGridIndex.prototype, 'queryRect').mockReturnValue([]);
+    global.canvas.scene.grid.distance = 5;
+    global.canvas.tokens.placeables = [];
+    const service = new SpatialAnalysisService(
+      { getTokenPosition: jest.fn() },
+      { isExcludedToken: jest.fn(() => false) },
+      { incrementSpatialOptimizations: jest.fn(), updateMovementMetrics: jest.fn() },
+    );
+
+    try {
+      service.getAffectedTokensByMovement({ x: 0, y: 0 }, { x: 100, y: 0 }, 'moving');
+
+      expect(queryRectSpy).toHaveBeenCalledWith({
+        x: -2000,
+        y: -2000,
+        width: 4100,
+        height: 4000,
+      });
+    } finally {
+      queryRectSpy.mockRestore();
+      global.canvas.scene.grid.distance = previousGridDistance;
+    }
   });
 
   test('does not resolve viewport positions for Foundry-hidden tokens', () => {

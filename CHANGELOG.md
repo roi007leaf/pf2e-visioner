@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.4] - 2026-08-25
+
+### Fixed
+
+- **AVS spatial filtering now respects the scene distance scale**: Maximum visibility ranges measured in feet are converted using both pixels per grid and distance per grid, preventing 5× oversized radii and roughly 25× oversized query areas on common 5-foot grids during batch recalculation and movement analysis.
+
 ## [8.5.3] - 2026-08-24
 
 ### Fixed

@@ -1,4 +1,5 @@
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
+import { sceneDistanceToPixels } from '../../../helpers/geometry-utils.js';
 import { HashGridIndex } from './HashGridIndex.js';
 
 /**
@@ -24,7 +25,7 @@ export class SpatialAnalysisService {
     /**
      * Get tokens within a certain distance of a position for spatial optimization.
      * @param {Object} position - {x, y} position to search around
-     * @param {number} maxDistance - Maximum distance in grid units
+     * @param {number} maxDistance - Maximum distance in scene units (feet in PF2e)
      * @param {string} excludeTokenId - Token ID to exclude from results
      * @returns {Token[]} Array of tokens within range
      */
@@ -286,8 +287,7 @@ export class SpatialAnalysisService {
             );
             index.build(tokens, (t) => this.#positionManager.getTokenPosition(t));
 
-            const gridSize = canvas.grid?.size || 1;
-            const radiusPx = this.#maxVisibilityDistance * gridSize;
+            const radiusPx = sceneDistanceToPixels(this.#maxVisibilityDistance);
 
             const minX = Math.min(oldPos.x, newPos.x) - radiusPx;
             const minY = Math.min(oldPos.y, newPos.y) - radiusPx;
@@ -442,7 +442,7 @@ export class SpatialAnalysisService {
 
     /**
      * Calculate the maximum visibility distance considering all special senses in the scene
-     * @returns {number} Maximum visibility distance in grid units
+     * @returns {number} Maximum visibility distance in scene units (feet in PF2e)
      * @private
      */
     #calculateDynamicMaxDistance() {

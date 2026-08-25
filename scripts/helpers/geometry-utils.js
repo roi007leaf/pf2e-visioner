@@ -77,6 +77,31 @@ export function calculateRealDistanceInFeet(
 }
 
 /**
+ * Convert scene distance units (feet in PF2e) to canvas pixels.
+ * Falls back to one distance unit per grid square so missing scene scale data
+ * cannot make a spatial prefilter narrower than its previous behavior.
+ * @param {number} distance - Distance in scene units
+ * @param {Canvas} [canvasRef=globalThis.canvas] - Canvas providing grid scale
+ * @returns {number} Distance in pixels
+ */
+export function sceneDistanceToPixels(distance, canvasRef = globalThis.canvas) {
+  const numericDistance = Number(distance);
+  if (!Number.isFinite(numericDistance) || numericDistance <= 0) return 0;
+
+  const rawGridSize = Number(
+    canvasRef?.grid?.size ?? canvasRef?.scene?.grid?.size ?? canvasRef?.dimensions?.size,
+  );
+  const rawGridDistance = Number(
+    canvasRef?.scene?.grid?.distance ?? canvasRef?.grid?.distance ?? canvasRef?.dimensions?.distance,
+  );
+  const gridSize = Number.isFinite(rawGridSize) && rawGridSize > 0 ? rawGridSize : 1;
+  const gridDistance =
+    Number.isFinite(rawGridDistance) && rawGridDistance > 0 ? rawGridDistance : 1;
+
+  return (numericDistance * gridSize) / gridDistance;
+}
+
+/**
  * Check if a point is inside a rectangle
  * @param {number} px - Point x coordinate
  * @param {number} py - Point y coordinate

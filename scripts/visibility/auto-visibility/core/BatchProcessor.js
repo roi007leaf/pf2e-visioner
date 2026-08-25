@@ -2,6 +2,7 @@ import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js
 import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
+import { sceneDistanceToPixels } from '../../../helpers/geometry-utils.js';
 import { getLogger } from '../../../utils/logger.js';
 import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
@@ -691,8 +692,7 @@ export class BatchProcessor {
       }
       // Use quadtree to preselect tokens in range (AABB+circle), then filter out excluded/self
       stageStart = this.nowProvider();
-      const gridSize = canvas.grid?.size || 1;
-      const radiusPx = (this.maxVisibilityDistance || 20) * gridSize;
+      const radiusPx = sceneDistanceToPixels(this.maxVisibilityDistance || 20);
       const candidates = index.queryCircle(changedTokenPos.x, changedTokenPos.y, radiusPx);
       let relevantTokens = candidates
         .map((pt) => pt.token)
