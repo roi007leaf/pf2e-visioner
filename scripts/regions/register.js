@@ -34,9 +34,9 @@ function registerBehavior() {
   }
 }
 
-// Register labels after translations are loaded
+// Region data models must exist before Scene documents prepare their behaviors.
 if (typeof Hooks !== 'undefined' && Hooks.once) {
-  Hooks.once('ready', () => registerBehavior());
+  Hooks.once('init', () => registerBehavior());
 } else {
   // Fallback for environments where Hooks isn't available yet
   registerBehavior();

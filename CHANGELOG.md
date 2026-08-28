@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.5] - 2026-08-28
+
+### Fixed
+
+- **Visioner Region behaviors now register before Scene preparation**: Existing Visibility, Concealment, Cover, and Sense Suppression behaviors hydrate with their correct Foundry data models, preventing `_getTerrainEffects` token-movement errors that previously required toggling or recreating the behavior.
+
 ## [8.5.4] - 2026-08-25
 
 ### Fixed
