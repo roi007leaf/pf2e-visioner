@@ -165,10 +165,16 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
 
   async _prepareContext() {
     const isGM = !!game.user?.isGM;
+    const pendingObserverView = this?._pendingChanges?.['settings.gmObserverView'];
+    const observerViewEnabled =
+      pendingObserverView === undefined
+        ? game.settings.get(MODULE_ID, 'gmObserverView') === true
+        : pendingObserverView === true;
     const keyVisible = (key) => {
       const cfg = DEFAULT_SETTINGS[key];
       if (!cfg) return false;
       if (cfg.restricted && !isGM) return false;
+      if (key === 'suppressAvsGmVisionWarning' && observerViewEnabled) return false;
       return true;
     };
 

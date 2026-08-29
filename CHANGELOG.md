@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.6] - 2026-08-29
+
+### Fixed
+
+- **GM Observer View now hides the obsolete GM Vision warning preference**: The client-only warning suppression setting is removed from A.V.S. Settings while GM Observer View is enabled, including during unsaved tab changes, and returns when Observer View is disabled.
+
 ## [8.5.5] - 2026-08-28
 
 ### Fixed
