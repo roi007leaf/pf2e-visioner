@@ -794,6 +794,10 @@
         "name": "GM Observer View",
         "hint": "Reveals and lightens the scene for the GM with or without AVS. AVS and manual per-observer states use exact Hidden, Undetected, and Unnoticed markers. Without either, token visibility follows Foundry Core and fully unseen tokens use generic red Undetected styling. Detection rules are unchanged."
       },
+      "SHOW_GM_OBSERVER_VIEW_INDICATOR": {
+        "name": "Show GM Observer View Indicator",
+        "hint": "Shows the persistent GM Observer View active-mode indicator. Disable this to keep Observer View active without displaying the indicator."
+      },
       "GM_OBSERVER_VIEW_DARKNESS_OPACITY": {
         "name": "GM Observer View Darkness Strength",
         "hint": "Controls how dark unlit areas remain while GM Observer View is active. Higher values preserve more darkness contrast; lower values brighten the scene more."

@@ -4,6 +4,7 @@ import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { resolveGmObserverTokenPresentation } from './gm-observer-view-policy.js';
 
 const SETTING_KEY = 'gmObserverView';
+const SHOW_MODE_INDICATOR_SETTING_KEY = 'showGmObserverViewIndicator';
 const DARKNESS_STRENGTH_SETTING_KEY = 'gmObserverViewDarknessOpacity';
 const DEFAULT_DARKNESS_STRENGTH = 0.7;
 const TOKEN_PRESENTATION_KEY = '_pvGmObserverViewPresentation';
@@ -772,7 +773,9 @@ function syncModeIndicator(active) {
 
   document.body.classList.toggle(ACTIVE_BODY_CLASS, active);
   const existing = document.getElementById(MODE_INDICATOR_ID);
-  if (!active) {
+  const showIndicator =
+    active && getCachedSettingValue(SHOW_MODE_INDICATOR_SETTING_KEY, true) !== false;
+  if (!showIndicator) {
     modeIndicatorCleanup?.();
     modeIndicatorCleanup = null;
     existing?.remove();

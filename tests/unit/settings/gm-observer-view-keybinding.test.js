@@ -72,4 +72,15 @@ describe('GM Observer View keybinding', () => {
       step: 0.05,
     });
   });
+
+  it('shows the GM Observer View indicator by default with a client toggle', async () => {
+    const { DEFAULT_SETTINGS } = await import('../../../scripts/constants.js');
+
+    expect(DEFAULT_SETTINGS.showGmObserverViewIndicator).toMatchObject({
+      scope: 'client',
+      restricted: true,
+      type: Boolean,
+      default: true,
+    });
+  });
 });

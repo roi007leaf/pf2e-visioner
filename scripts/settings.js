@@ -39,6 +39,7 @@ const SETTINGS_GROUPS = {
       keys: [
         'enableAllTokensVision',
         'gmObserverView',
+        'showGmObserverViewIndicator',
         'gmObserverViewDarknessOpacity',
         'enableCameraVisionAggregation',
       ],
@@ -200,6 +201,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
     const flatDependencyMap = new Map();
     // We'll extend this with the runtime dependency map defined later; replicate keys here for depth calc
     const dependencyPairs = [
+      ['gmObserverView', ['showGmObserverViewIndicator']],
       ['includeLootActors', ['lootStealthDC']],
       ['hiddenWallsEnabled', ['wallStealthDC']],
       ['limitSeekRangeInCombat', ['customSeekDistance']],
@@ -363,6 +365,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
 
       // Generic dependency system per redesign
       const dependencyMap = {
+        gmObserverView: ['showGmObserverViewIndicator'],
         autoCover: [
           'autoCoverVisualizationOnlyInEncounter',
           'autoCoverVisualizationRespectFogForGM',
@@ -538,13 +541,17 @@ export function registerSettings() {
       if (isGroupedKey(key)) settingConfig.config = false;
 
       // Add onChange handler for settings that require restart
-      if (key === 'gmObserverView' || key === 'gmObserverViewDarknessOpacity') {
+      if (
+        key === 'gmObserverView' ||
+        key === 'showGmObserverViewIndicator' ||
+        key === 'gmObserverViewDarknessOpacity'
+      ) {
         settingConfig.onChange = async () => {
           try {
             const { gmObserverView } = await import(
               './services/GmObserverView/gm-observer-view.js'
             );
-            gmObserverView.refresh();
+            gmObserverView.refresh({ perception: key !== 'showGmObserverViewIndicator' });
           } catch {}
         };
       } else if (key === 'enableHoverTooltips') {

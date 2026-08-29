@@ -789,6 +789,16 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  showGmObserverViewIndicator: {
+    name: 'PF2E_VISIONER.SETTINGS.SHOW_GM_OBSERVER_VIEW_INDICATOR.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SHOW_GM_OBSERVER_VIEW_INDICATOR.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
+
   gmObserverViewDarknessOpacity: {
     name: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.name',
     hint: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.hint',

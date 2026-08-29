@@ -115,6 +115,7 @@ describe('GM Observer View token presentation', () => {
         get: jest.fn((namespace, key) => {
           if (namespace !== 'pf2e-visioner') return false;
           if (key === 'gmObserverView') return true;
+          if (key === 'showGmObserverViewIndicator') return true;
           if (key === 'gmObserverViewDarknessOpacity') return 0.7;
           return false;
         }),
@@ -368,8 +369,20 @@ describe('GM Observer View token presentation', () => {
     expect(disable).toHaveBeenCalledWith(false);
 
     gmObserverView.clear();
-    expect(document.getElementById('pf2e-visioner-gm-observer-indicator')).toBeNull();
+    expect(
+      document.getElementById('pf2e-visioner-gm-observer-indicator'),
+    ).toBeNull();
     expect(document.body.classList).not.toContain('pf2e-visioner-gm-observer-view-active');
+  });
+
+  it('can hide the indicator without disabling GM Observer View', () => {
+    setCachedSettingValue('showGmObserverViewIndicator', false);
+
+    gmObserverView.refresh({ perception: false });
+
+    expect(document.getElementById('pf2e-visioner-gm-observer-indicator')).toBeNull();
+    expect(document.body.classList).toContain('pf2e-visioner-gm-observer-view-active');
+    expect(gmObserverView.isActive()).toBe(true);
   });
 
   it('drags the active-mode indicator anywhere onscreen and remembers its position', () => {

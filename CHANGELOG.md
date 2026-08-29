@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.7] - 2026-08-29
+
+### Added
+
+- **GM Observer View's active indicator can now be hidden per client**: A new setting shown beneath GM Observer View removes the persistent draggable indicator immediately while leaving Observer View and its visibility presentation active. The indicator remains enabled by default.
+
 ## [8.5.6] - 2026-08-29
 
 ### Fixed
