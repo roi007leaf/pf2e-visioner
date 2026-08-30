@@ -20,6 +20,7 @@ import {
   applyCurrentViewHardHide,
   __setStoredVisibilityForTest,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
+import { primeHiddenDetectionFilterVisualsForObserver } from '../../../scripts/stores/visibility-map.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 
 function foundryHiddenTarget() {
@@ -34,6 +35,47 @@ function foundryHiddenTarget() {
     actor: { type: 'npc', itemTypes: { condition: [] } },
   };
 }
+
+describe('observer-switch detection-filter reconciliation', () => {
+  beforeEach(() => {
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    globalThis.game = { ready: true, user: { isGM: true } };
+  });
+
+  it('restores primary art when the new observer already stores the target as observed', () => {
+    const observer = {
+      controlled: true,
+      document: {
+        id: 'new-observer',
+        getFlag: (_moduleId, key) => (key === 'visibilityV2' ? {} : null),
+      },
+    };
+    const target = {
+      controlled: false,
+      visible: false,
+      renderable: false,
+      mesh: { visible: false, renderable: false, alpha: 0 },
+      detectionFilter: { id: 'stale-old-observer-soundwave' },
+      detectionFilterMesh: { visible: false, renderable: false, alpha: 0 },
+      _pvCurrentViewHardHidden: true,
+      document: { id: 'target', hidden: false, getFlag: () => null },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    globalThis.canvas = {
+      tokens: { controlled: [observer], _draggedToken: null, placeables: [observer, target] },
+    };
+    __setStoredVisibilityForTest(new Map([['new-observer:target', 'observed']]));
+
+    primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
+    applyCurrentViewHardHide(target);
+
+    expect(target.detectionFilter).toBeNull();
+    expect(target.visible).toBe(true);
+    expect(target.renderable).toBe(true);
+    expect(target.mesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+    expect(target._pvCurrentViewHardHidden).toBe(false);
+  });
+});
 
 describe('nested _applyRenderFlags -> _refreshVisibility during a held drag (stale outer "before" snapshot)', () => {
   const observer = { document: { id: 'obs' }, controlled: true };

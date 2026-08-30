@@ -171,11 +171,14 @@ function tokenObjectById(tokenId) {
   );
 }
 
-function getCurrentViewObserverIds() {
+function getCurrentViewObservers() {
+  const observers = [];
   const ids = new Set();
   const addToken = (token) => {
     const id = getTokenId(token);
-    if (id) ids.add(id);
+    if (!id || ids.has(id)) return;
+    ids.add(id);
+    observers.push(token);
   };
 
   addToken(canvas?.tokens?._draggedToken);
@@ -183,7 +186,11 @@ function getCurrentViewObserverIds() {
     addToken(token);
   }
 
-  return ids;
+  return observers;
+}
+
+function getCurrentViewObserverIds() {
+  return new Set(getCurrentViewObservers().map((observer) => getTokenId(observer)));
 }
 
 function shouldClearObservedDetectionFilterForChange(change) {
@@ -194,6 +201,19 @@ function shouldClearObservedDetectionFilterForChange(change) {
   // Observed/concealed targets never carry a soundwave filter (core-native
   // contract) — clear it on the transition regardless of move state.
   return true;
+}
+
+function shouldRefreshHiddenDetectionFilterForChange(change, target) {
+  const observers = getCurrentViewObservers();
+  if (!observers.length || !change?.observerId) return false;
+  if (!observers.some((observer) => getTokenId(observer) === change.observerId)) return false;
+
+  return !observers.some((observer) => {
+    const observerId = getTokenId(observer);
+    const visibility =
+      observerId === change.observerId ? change.to : getVisibilityBetween(observer, target);
+    return visibility === 'observed' || visibility === 'concealed';
+  });
 }
 
 export function clearAllDetectionFilterVisuals(tokens = globalThis.canvas?.tokens?.placeables ?? []) {
@@ -305,6 +325,7 @@ function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
   for (const change of changes) {
     if (change?.to !== 'hidden') continue;
     const target = tokenObjectById(change.targetId);
+    if (!shouldRefreshHiddenDetectionFilterForChange(change, target)) continue;
     if (!target || tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
     refreshCoreDetectionFilterForHiddenTarget(target);
     if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
@@ -319,12 +340,10 @@ function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
 }
 
 /**
- * Re-prime the detectionFilterMesh for targets already stored as 'hidden' relative to
- * `observer`, without requiring a fresh state transition. clearAllDetectionFilterVisuals()
- * zeroes the mesh out while no token is controlled; reselecting an observer whose targets'
- * stored state never changed produces no transition for refreshHiddenDetectionFilterVisualsForChanges
- * to react to, so the mesh would otherwise stay invisible forever despite core Foundry
- * correctly recomputing token.detectionFilter.
+ * Reconcile detection-filter visuals for targets whose stored state did not transition when
+ * `observer` became the current view. Clear stale filters inherited from a previous observer,
+ * then re-prime targets already stored as hidden. Without this pass, a stale filter can keep the
+ * primary mesh invisible even though the newly selected observer stores the target as observed.
  */
 export function primeHiddenDetectionFilterVisualsForObserver(
   observer,
@@ -335,8 +354,16 @@ export function primeHiddenDetectionFilterVisualsForObserver(
   let primed = 0;
   for (const target of tokens ?? []) {
     if (!target || target === observer || target.controlled) continue;
+    const visibility = getVisibilityBetween(observer, target);
+    if (visibility === 'observed' || visibility === 'concealed') {
+      if (tokenHasDetectionFilterVisual(target)) {
+        clearDetectionFilterVisuals(target);
+        target.refresh?.();
+      }
+      continue;
+    }
     if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
-    if (getVisibilityBetween(observer, target) !== 'hidden') continue;
+    if (visibility !== 'hidden') continue;
 
     refreshCoreDetectionFilterForHiddenTarget(target);
     if (tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
@@ -523,7 +550,7 @@ export async function setVisibilityMap(token, visibilityMap, options = {}) {
   const changes = buildVisibilityMapDiff(previousMap, nextMap);
   const observerId = getTokenId(token);
   const observerName = token?.name ?? document?.name ?? observerId;
-  const observedClearChanges = changes.map((change) => ({
+  const renderChanges = changes.map((change) => ({
     ...change,
     observerId,
     observerName,
@@ -542,10 +569,10 @@ export async function setVisibilityMap(token, visibilityMap, options = {}) {
   const nextProfiles = legacyVisibilityMapToProfiles(nextMap, previousProfiles, {
     preserveObserved: options?.preserveObserved === true,
   });
-  clearObservedDetectionFilterVisualsForChanges(observedClearChanges);
-  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  clearObservedDetectionFilterVisualsForChanges(renderChanges);
+  refreshHiddenDetectionFilterVisualsForChanges(renderChanges);
   const result = await setPerceptionProfileFlag(token, nextProfiles, options);
-  refreshHiddenDetectionFilterVisualsForChanges(changes);
+  refreshHiddenDetectionFilterVisualsForChanges(renderChanges);
   return result;
 }
 
@@ -758,7 +785,9 @@ export async function setPerceptionProfileBetween(
       clearDetectionFilterVisuals(target);
     }
     if (legacyState === 'hidden') {
-      refreshHiddenDetectionFilterVisualsForChanges([{ to: legacyState, targetId }]);
+      refreshHiddenDetectionFilterVisualsForChanges([
+        { to: legacyState, observerId, targetId, targetName: target?.name },
+      ]);
     }
     notifyVisibilityMapUpdated(observer, target, legacyState, options);
   }

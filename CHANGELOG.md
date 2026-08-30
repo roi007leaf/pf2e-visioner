@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.8] - 2026-08-30
+
+### Fixed
+
+- **Switching selected observer tokens no longer leaves creatures missing or incorrectly filtered**: Visioner now limits Hidden and soundwave visual updates to the active observer perspective and clears stale detection filters when the newly selected observer already sees a target, preventing late results from a previous selection from phasing tokens out or leaving their primary art hidden.
+
 ## [8.5.7] - 2026-08-29
 
 ### Added

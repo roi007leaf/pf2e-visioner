@@ -412,6 +412,69 @@ describe('Visibility Map V2 profile storage', () => {
     }
   });
 
+  test('late hidden write for a previous observer does not replace the current observer view', async () => {
+    const observerFlags = { 'pf2e-visioner': { visibilityV2: {} } };
+    const controlledObserver = global.createMockToken({ id: 'controlled-observer' });
+    observer.document.getFlag.mockImplementation(
+      (moduleId, key) => observerFlags[moduleId]?.[key] ?? null,
+    );
+    target.detectionFilter = null;
+    target.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    target.document.getVisibilityTestPoints = jest.fn(() => [{ x: 10, y: 20 }]);
+    target.refresh = jest.fn();
+    const originalVisibility = global.canvas.visibility;
+    const originalTokens = global.canvas.tokens;
+    const originalUpdateEmbeddedDocuments = global.canvas.scene.updateEmbeddedDocuments;
+    global.canvas.visibility = {
+      ...originalVisibility,
+      testVisibility: jest.fn((_points, { object }) => {
+        object.detectionFilter = { id: 'previous-observer-soundwave' };
+        object.detectionFilterMesh.visible = true;
+        object.detectionFilterMesh.renderable = true;
+        object.detectionFilterMesh.alpha = 1;
+        return true;
+      }),
+    };
+    global.canvas.tokens = {
+      ...global.canvas.tokens,
+      controlled: [controlledObserver],
+      get: jest.fn((id) =>
+        id === 'observer'
+          ? observer
+          : id === 'controlled-observer'
+            ? controlledObserver
+            : id === 'target'
+              ? target
+              : null,
+      ),
+      placeables: [observer, controlledObserver, target],
+    };
+    global.canvas.scene.updateEmbeddedDocuments = jest.fn(async (_documentName, updates) => {
+      for (const update of updates) {
+        const nextMap = update['flags.pf2e-visioner.visibilityV2'];
+        if (nextMap) observerFlags['pf2e-visioner'].visibilityV2 = nextMap;
+      }
+      return [];
+    });
+
+    try {
+      await setVisibilityMapsBatch([{ token: observer, visibilityMap: { target: 'hidden' } }]);
+
+      expect(global.canvas.visibility.testVisibility).not.toHaveBeenCalled();
+      expect(target.detectionFilter).toBeNull();
+      expect(target.detectionFilterMesh).toMatchObject({
+        visible: false,
+        renderable: false,
+        alpha: 0,
+      });
+      expect(target.refresh).not.toHaveBeenCalled();
+    } finally {
+      global.canvas.visibility = originalVisibility;
+      global.canvas.tokens = originalTokens;
+      global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
+    }
+  });
+
   test('stale hidden visual retry does not restore soundwave after observed write', async () => {
     jest.useFakeTimers();
     const flags = {
@@ -530,6 +593,7 @@ describe('Visibility Map V2 profile storage', () => {
     };
     global.canvas.tokens = {
       ...global.canvas.tokens,
+      controlled: [observer],
       get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
       placeables: [observer, target],
     };
@@ -594,6 +658,7 @@ describe('Visibility Map V2 profile storage', () => {
     };
     global.canvas.tokens = {
       ...global.canvas.tokens,
+      controlled: [observer],
       get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
       placeables: [observer, target],
     };
@@ -652,6 +717,7 @@ describe('Visibility Map V2 profile storage', () => {
     const originalTokens = global.canvas.tokens;
     global.canvas.tokens = {
       ...global.canvas.tokens,
+      controlled: [observer],
       get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
       placeables: [observer, target],
     };
@@ -688,6 +754,7 @@ describe('Visibility Map V2 profile storage', () => {
     global.canvas.visibility = { ...originalVisibility, testVisibility: undefined };
     global.canvas.tokens = {
       ...global.canvas.tokens,
+      controlled: [observer],
       get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
       placeables: [observer, target],
     };
@@ -725,6 +792,7 @@ describe('Visibility Map V2 profile storage', () => {
     global.canvas.visibility = { ...originalVisibility, testVisibility: undefined };
     global.canvas.tokens = {
       ...global.canvas.tokens,
+      controlled: [observer],
       get: jest.fn((id) => (id === 'observer' ? observer : id === 'target' ? target : null)),
       placeables: [observer, target],
     };
