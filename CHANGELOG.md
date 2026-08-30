@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.5.9] - 2026-08-30
+
+### Fixed
+
+- **Full AVS recalculations now repair stale visibility states without requiring token selection**: Reconciliation batches clear cached visibility and line-of-sight results before calculating, preventing an outdated Undetected profile from surviving when the observer can currently see the target. Partial event batches retain their caches for performance.
+
 ## [8.5.8] - 2026-08-30
 
 ### Fixed

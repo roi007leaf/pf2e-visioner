@@ -575,6 +575,8 @@ export class BatchOrchestrator {
       candidateTokens,
       exclusionManager: this.exclusionManager,
     });
+    const isCompleteCandidateBatch =
+      allTokens.length > 0 && visibleChangedTokens.size === allTokens.length;
 
     const visibilityPreflightPlan = buildBatchPreflightPlan({ hasVisibleChangedTokens });
     if (!visibilityPreflightPlan.shouldProcess) {
@@ -611,10 +613,13 @@ export class BatchOrchestrator {
     // Detect movement batches via the stop-timer movementSession only. lastMovedTokenId can
     // outlive movement, so using it here makes later non-movement refreshes bypass filters.
 
-    if (useFullTokenScope) {
+    // A batch covering every candidate token is a reconciliation pass. It must not reuse
+    // pair results from the state it is trying to repair. Partial batches keep the caches.
+    if (useFullTokenScope || isCompleteCandidateBatch) {
       try {
         this.batchProcessor?.globalVisibilityCache?.clear?.();
         this.batchProcessor?.globalLosCache?.clear?.();
+        this.clearBurstLosMemo();
       } catch (err) {
         console.warn(
           'PF2E Visioner | BatchOrchestrator.processBatch: Failed to clear caches:',

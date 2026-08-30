@@ -219,6 +219,18 @@ describe('BatchOrchestrator', () => {
     expect(batchProcessor.globalLosCache.clear).not.toHaveBeenCalled();
   });
 
+  test('processBatch clears stale caches when every candidate token is recalculated', async () => {
+    const staleLosMemo = new Map([['stale', false]]);
+    orchestrator._lastLosMemo = { map: staleLosMemo, ts: Date.now() };
+
+    await orchestrator.processBatch(new Set(['A', 'B']));
+
+    expect(batchProcessor.globalVisibilityCache.clear).toHaveBeenCalledTimes(1);
+    expect(batchProcessor.globalLosCache.clear).toHaveBeenCalledTimes(1);
+    expect(orchestrator._lastLosMemo.map).not.toBe(staleLosMemo);
+    expect(orchestrator._lastLosMemo.map.has('stale')).toBe(false);
+  });
+
   test('processBatch clears global caches for movement batches', async () => {
     await orchestrator.processBatch(new Set(['A']), { movementSession: { sessionId: 'move-1' } });
 
