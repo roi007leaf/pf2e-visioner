@@ -119,7 +119,7 @@ describe('Hazard/Loot manager helpers', () => {
     }
   });
 
-  test('uses prep default visibility when no player character tokens are on the scene', async () => {
+  test('presents legacy hidden prep defaults as undetected when no PCs are on the scene', async () => {
     const { getHazardLootManagerRows } = await import(
       '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
     );
@@ -139,13 +139,13 @@ describe('Hazard/Loot manager helpers', () => {
     const rows = getHazardLootManagerRows({ tokens: [loot, hazard] });
 
     expect(rows).toHaveLength(2);
-    expect(rows.find((row) => row.id === 'loot1')).toMatchObject({ visibility: 'hidden' });
+    expect(rows.find((row) => row.id === 'loot1')).toMatchObject({ visibility: 'undetected' });
     expect(rows.find((row) => row.id === 'hazard1')).toMatchObject({
       visibility: 'observed',
     });
   });
 
-  test('stores prep visibility defaults when applying with no player character observers', async () => {
+  test('stores undetected prep visibility defaults when applying with no player character observers', async () => {
     const { applyHazardLootManagerUpdates } = await import(
       '../../../scripts/managers/hazard-loot-manager/HazardLootManager.js'
     );
@@ -162,14 +162,14 @@ describe('Hazard/Loot manager helpers', () => {
 
     const result = await applyHazardLootManagerUpdates(
       [
-        { tokenId: 'loot1', visibility: 'hidden' },
+        { tokenId: 'loot1', visibility: 'undetected' },
         { tokenId: 'hazard1', visibility: 'observed' },
       ],
       { tokens: [loot, hazard] },
     );
 
     expect(result).toEqual({ targets: 2, visibilityPairs: 0, dcUpdates: 0, rankUpdates: 0 });
-    expect(loot.document.getFlag('pf2e-visioner', 'defaultPlayerVisibility')).toBe('hidden');
+    expect(loot.document.getFlag('pf2e-visioner', 'defaultPlayerVisibility')).toBe('undetected');
     expect(hazard.document.getFlag('pf2e-visioner', 'defaultPlayerVisibility')).toBeNull();
   });
 
@@ -250,15 +250,15 @@ describe('Hazard/Loot manager helpers', () => {
 
     const result = await applyHazardLootManagerUpdates(
       [
-        { tokenId: 'loot1', visibility: 'hidden', stealthDC: 20 },
+        { tokenId: 'loot1', visibility: 'undetected', stealthDC: 20 },
         { tokenId: 'hazard1', visibility: 'observed', stealthDC: 30, minPerceptionRank: 3 },
       ],
       { tokens: [pc1, pc2, loot, hazard] },
     );
 
     expect(result).toEqual({ targets: 2, visibilityPairs: 4, dcUpdates: 1, rankUpdates: 1 });
-    expect(getVisibilityBetween(pc1, loot)).toBe('hidden');
-    expect(getVisibilityBetween(pc2, loot)).toBe('hidden');
+    expect(getVisibilityBetween(pc1, loot)).toBe('undetected');
+    expect(getVisibilityBetween(pc2, loot)).toBe('undetected');
     expect(getVisibilityBetween(pc1, hazard)).toBe('observed');
     expect(getVisibilityBetween(pc2, hazard)).toBe('observed');
     expect(loot.document.getFlag('pf2e-visioner', 'stealthDC')).toBe(20);
@@ -280,18 +280,18 @@ describe('Hazard/Loot manager helpers', () => {
         <select id="hazard-loot-visibility-filter">
           <option value=""></option>
           <option value="observed">Observed</option>
-          <option value="hidden">Hidden</option>
+          <option value="undetected">Undetected</option>
         </select>
         <button type="button" id="hazard-loot-clear-filters"></button>
         <span id="hazard-loot-count-visible">1</span>
         <table>
           <tbody>
-            <tr data-token-id="loot1" data-token-name="hidden chest" data-token-type="loot" data-visibility="hidden">
+            <tr data-token-id="loot1" data-token-name="hidden chest" data-token-type="loot" data-visibility="undetected">
               <td>
                 <div class="hazard-loot-state-buttons">
-                  <input type="hidden" name="token.loot1.visibility" value="hidden" />
+                  <input type="hidden" name="token.loot1.visibility" value="undetected" />
                   <button type="button" class="hazard-loot-state-btn" data-state="observed"></button>
-                  <button type="button" class="hazard-loot-state-btn active" data-state="hidden"></button>
+                  <button type="button" class="hazard-loot-state-btn active" data-state="undetected"></button>
                 </div>
               </td>
             </tr>
@@ -305,7 +305,7 @@ describe('Hazard/Loot manager helpers', () => {
     const row = root.querySelector('tr[data-token-id="loot1"]');
     const input = root.querySelector('input[name="token.loot1.visibility"]');
     const observedButton = root.querySelector('.hazard-loot-state-btn[data-state="observed"]');
-    const hiddenButton = root.querySelector('.hazard-loot-state-btn[data-state="hidden"]');
+    const undetectedButton = root.querySelector('.hazard-loot-state-btn[data-state="undetected"]');
     const visibilityFilter = root.querySelector('#hazard-loot-visibility-filter');
     const visibleCount = root.querySelector('#hazard-loot-count-visible');
 
@@ -314,9 +314,9 @@ describe('Hazard/Loot manager helpers', () => {
     expect(input.value).toBe('observed');
     expect(row.dataset.visibility).toBe('observed');
     expect(observedButton.classList.contains('active')).toBe(true);
-    expect(hiddenButton.classList.contains('active')).toBe(false);
+    expect(undetectedButton.classList.contains('active')).toBe(false);
 
-    visibilityFilter.value = 'hidden';
+    visibilityFilter.value = 'undetected';
     visibilityFilter.dispatchEvent(new Event('change'));
 
     expect(row.style.display).toBe('none');
@@ -339,7 +339,7 @@ describe('Hazard/Loot manager helpers', () => {
     root.innerHTML = `
       <form class="pf2e-visioner-hazard-loot-manager">
         <section class="hazard-loot-section hazard-loot-section-loot">
-          <button type="button" class="loot-hidden" data-action="bulkHidden"></button>
+          <button type="button" class="loot-undetected" data-action="bulkUndetected"></button>
           <button type="button" class="loot-party-dc" data-action="setPartyDC" data-party-dc="18"></button>
           <table><tbody>
             <tr data-token-id="loot1" data-token-name="loot" data-token-type="loot" data-visibility="observed">
@@ -347,19 +347,19 @@ describe('Hazard/Loot manager helpers', () => {
                 <input type="hidden" name="token.loot1.visibility" value="observed" />
                 <input type="number" name="token.loot1.dc" value="12" />
                 <button type="button" class="hazard-loot-state-btn active" data-state="observed"></button>
-                <button type="button" class="hazard-loot-state-btn" data-state="hidden"></button>
+                <button type="button" class="hazard-loot-state-btn" data-state="undetected"></button>
               </td>
             </tr>
           </tbody></table>
         </section>
         <section class="hazard-loot-section hazard-loot-section-hazards">
-          <button type="button" class="hazard-hidden" data-action="bulkHidden"></button>
+          <button type="button" class="hazard-undetected" data-action="bulkUndetected"></button>
           <table><tbody>
             <tr data-token-id="hazard1" data-token-name="hazard" data-token-type="hazard" data-visibility="observed">
               <td>
                 <input type="hidden" name="token.hazard1.visibility" value="observed" />
                 <button type="button" class="hazard-loot-state-btn active" data-state="observed"></button>
-                <button type="button" class="hazard-loot-state-btn" data-state="hidden"></button>
+                <button type="button" class="hazard-loot-state-btn" data-state="undetected"></button>
               </td>
             </tr>
           </tbody></table>
@@ -368,10 +368,10 @@ describe('Hazard/Loot manager helpers', () => {
     `;
     app.element = root;
 
-    await VisionerHazardLootManager._onBulkHidden.call(
+    await VisionerHazardLootManager._onBulkUndetected.call(
       app,
       null,
-      root.querySelector('.loot-hidden'),
+      root.querySelector('.loot-undetected'),
     );
     await VisionerHazardLootManager._onSetPartyDC.call(
       app,
@@ -379,17 +379,17 @@ describe('Hazard/Loot manager helpers', () => {
       root.querySelector('.loot-party-dc'),
     );
 
-    expect(root.querySelector('input[name="token.loot1.visibility"]').value).toBe('hidden');
+    expect(root.querySelector('input[name="token.loot1.visibility"]').value).toBe('undetected');
     expect(root.querySelector('input[name="token.loot1.dc"]').value).toBe('18');
     expect(root.querySelector('input[name="token.hazard1.visibility"]').value).toBe('observed');
 
-    await VisionerHazardLootManager._onBulkHidden.call(
+    await VisionerHazardLootManager._onBulkUndetected.call(
       app,
       null,
-      root.querySelector('.hazard-hidden'),
+      root.querySelector('.hazard-undetected'),
     );
 
-    expect(root.querySelector('input[name="token.hazard1.visibility"]').value).toBe('hidden');
+    expect(root.querySelector('input[name="token.hazard1.visibility"]').value).toBe('undetected');
     expect(root.querySelector('input[name="token.loot1.dc"]').value).toBe('18');
   });
 

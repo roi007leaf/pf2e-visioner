@@ -200,16 +200,11 @@ function automaticVisionerVisibilityIsActive() {
   }
 }
 
-function hasActiveCurrentViewTokenMovement() {
-  if (hasActivePendingTokenMovement()) return true;
-  const tokens = globalThis.canvas?.tokens;
-  if (tokens?._draggedToken) return true;
-  const previews = tokens?.preview?.children;
-  return !!(previews && previews.some?.((entry) => entry?.document?.id));
-}
-
 function shouldDeferRenderingToCoreDuringMove(target) {
-  if (!hasActiveCurrentViewTokenMovement()) return false;
+  // A held drag is only a preview: Core may render temporary LOS from the clone, but the player
+  // has not committed movement and must not see stored Undetected targets. Once movement commits,
+  // pending-movement tracking allows Core LOS to reveal ordinary targets during the animation.
+  if (!hasActivePendingTokenMovement()) return false;
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;

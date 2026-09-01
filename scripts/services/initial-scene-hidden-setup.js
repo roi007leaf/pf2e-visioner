@@ -214,15 +214,15 @@ export function getDefaultPlayerVisibility(tokenOrDocument) {
     MODULE_ID,
     DEFAULT_PLAYER_VISIBILITY_FLAG,
   );
-  return state === 'hidden' ? 'hidden' : 'observed';
+  return state === 'hidden' || state === 'undetected' ? state : 'observed';
 }
 
 export async function setDefaultPlayerVisibility(tokenOrDocument, state) {
   const doc = getTokenDocument(tokenOrDocument);
   if (!doc) return false;
 
-  if (state === 'hidden') {
-    await doc.setFlag?.(MODULE_ID, DEFAULT_PLAYER_VISIBILITY_FLAG, 'hidden');
+  if (state === 'hidden' || state === 'undetected') {
+    await doc.setFlag?.(MODULE_ID, DEFAULT_PLAYER_VISIBILITY_FLAG, state);
     return true;
   }
 
@@ -297,10 +297,11 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
     const actor = getTokenActor(target);
     if (!targetId || targetId === observerId) continue;
     if (!actorIsType(actor, 'loot') && !actorIsType(actor, 'hazard')) continue;
-    if (getDefaultPlayerVisibility(target) !== 'hidden') continue;
+    const defaultVisibility = getDefaultPlayerVisibility(target);
+    if (defaultVisibility !== 'hidden' && defaultVisibility !== 'undetected') continue;
 
     targetDefaults += 1;
-    await setVisibilityBetween(observer, target, 'hidden', {
+    await setVisibilityBetween(observer, target, defaultVisibility, {
       direction: 'observer_to_target',
       skipEphemeralUpdate: true,
     });
@@ -631,7 +632,7 @@ export async function clearSceneHiddenForPCs(options = {}) {
   const actorPrepCleared = await clearPreparedActorSceneVisibility(options);
 
   for (const target of tokenTargets) {
-    if (getDefaultPlayerVisibility(target) === 'hidden') {
+    if (['hidden', 'undetected'].includes(getDefaultPlayerVisibility(target))) {
       defaultsCleared += 1;
       await setDefaultPlayerVisibility(target, 'observed');
     }

@@ -149,9 +149,11 @@ export function getPartyLevel(tokens = getPlaceableTokens()) {
 }
 
 function getVisibilityForAllPlayers(target, observers) {
-  if (!observers.length) return getDefaultPlayerVisibility(target);
+  const asManagerState = (state) =>
+    state === 'hidden' || state === 'undetected' ? 'undetected' : state;
+  if (!observers.length) return asManagerState(getDefaultPlayerVisibility(target));
   const states = observers.map((observer) => getVisibilityBetween(observer, target));
-  if (states.every((state) => state === 'hidden')) return 'hidden';
+  if (states.every((state) => asManagerState(state) === 'undetected')) return 'undetected';
   if (states.every((state) => state === 'observed')) return 'observed';
   return 'mixed';
 }
@@ -260,7 +262,7 @@ export async function applyHazardLootManagerUpdates(
 
     targets += 1;
 
-    if (update.visibility === 'hidden' || update.visibility === 'observed') {
+    if (update.visibility === 'undetected' || update.visibility === 'observed') {
       await setDefaultPlayerVisibility(target, update.visibility);
 
       for (const observer of observers) {
@@ -342,7 +344,7 @@ export class VisionerHazardLootManager extends foundry.applications.api.Applicat
     actions: {
       apply: VisionerHazardLootManager._onApply,
       close: VisionerHazardLootManager._onClose,
-      bulkHidden: VisionerHazardLootManager._onBulkHidden,
+      bulkUndetected: VisionerHazardLootManager._onBulkUndetected,
       bulkObserved: VisionerHazardLootManager._onBulkObserved,
       setPartyDC: VisionerHazardLootManager._onSetPartyDC,
       openSheet: VisionerHazardLootManager._onOpenSheet,
@@ -429,7 +431,7 @@ export class VisionerHazardLootManager extends foundry.applications.api.Applicat
   }
 
   static _setRowVisibility(row, state) {
-    if (!row || !['observed', 'hidden'].includes(state)) return;
+    if (!row || !['observed', 'undetected'].includes(state)) return;
 
     const input = row.querySelector('input[name$=".visibility"], select[name$=".visibility"]');
     if (input) input.value = state;
@@ -458,10 +460,10 @@ export class VisionerHazardLootManager extends foundry.applications.api.Applicat
     });
   }
 
-  static async _onBulkHidden(_event, _button) {
+  static async _onBulkUndetected(_event, _button) {
     const form = this.element?.querySelector?.('form.pf2e-visioner-hazard-loot-manager');
     this.constructor._setVisibleRows(form, (row) => {
-      this.constructor._setRowVisibility(row, 'hidden');
+      this.constructor._setRowVisibility(row, 'undetected');
     }, _button);
   }
 

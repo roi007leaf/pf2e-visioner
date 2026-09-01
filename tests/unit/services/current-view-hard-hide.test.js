@@ -1150,7 +1150,7 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     });
   });
 
-  it('defers during a live drag before pending position tracking starts', () => {
+  it('keeps undetected targets hard-hidden during a held drag before movement commits', () => {
     hasActivePendingTokenMovement.mockReturnValue(false);
     draggedToken = controlled[0];
     const t = undetectedToken({ visible: true });
@@ -1159,12 +1159,12 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     t.mesh.alpha = 1;
     delete t._pvCurrentViewHardHidden;
 
-    expect(applyCurrentViewHardHide(t)).toBe(false);
-    expect(t.visible).toBe(true);
-    expect(t.renderable).toBe(true);
-    expect(t.mesh.visible).toBe(true);
-    expect(t.mesh.renderable).toBe(true);
-    expect(t._pvCurrentViewHardHidden).toBe(false);
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh.visible).toBe(false);
+    expect(t.mesh.renderable).toBe(false);
+    expect(t._pvCurrentViewHardHidden).toBe(true);
   });
 
   it('retains its marker until a Core-invisible token can restore stale surfaces', () => {

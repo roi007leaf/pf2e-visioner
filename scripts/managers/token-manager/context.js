@@ -60,13 +60,17 @@ function isVisibilityOverrideFlag(flagData) {
 }
 
 function getManualVisibilityStateKeys({ isNonAvsToken = false, avsEnabled = false } = {}) {
-  const keys = isNonAvsToken ? ['observed', 'hidden'] : Object.keys(VISIBILITY_STATES);
+  const keys = isNonAvsToken ? ['observed', 'undetected'] : Object.keys(VISIBILITY_STATES);
   return keys.filter((key) => {
     if (VISIBILITY_STATES[key]?.manual === false) return false;
     if (MANUAL_VISIBILITY_STATE_EXCLUSIONS.has(key)) return false;
     if (key === 'avs' && !avsEnabled) return false;
     return true;
   });
+}
+
+function getNonAvsDisplayState(state) {
+  return state === 'hidden' ? 'undetected' : state;
 }
 
 function svgDataUri(svg) {
@@ -326,6 +330,8 @@ export async function buildContext(app, options) {
           );
         }
 
+        if (isNonAvsToken) actualCurrentState = getNonAvsDisplayState(actualCurrentState);
+
         // Update selection based on override/AVS logic
         visibilityStates.forEach((state) => {
           if (isNonAvsToken) {
@@ -510,6 +516,8 @@ export async function buildContext(app, options) {
             currentVisibilityState || 'observed',
           );
         }
+
+        if (isNonAvsToken) actualCurrentState = getNonAvsDisplayState(actualCurrentState);
 
         // Update selection based on override/AVS logic
         visibilityStates.forEach((state) => {

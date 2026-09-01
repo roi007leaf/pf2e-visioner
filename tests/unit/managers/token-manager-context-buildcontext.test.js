@@ -427,6 +427,47 @@ describe('Token Manager Context Building - DC Display Fix', () => {
   });
 
   describe('Context Properties', () => {
+    test('presents hidden hazards as undetected in observer mode', async () => {
+      mockApp.mode = 'observer';
+      const hazard = createMockToken({
+        id: 'hazard-1',
+        name: 'Unknown Hazard',
+        actor: createMockActor({
+          id: 'actor-hazard',
+          type: 'hazard',
+          hasPlayerOwner: false,
+        }),
+        document: {
+          id: 'hazard-1',
+          name: 'Unknown Hazard',
+          disposition: -1,
+          getFlag: jest.fn(() => null),
+        },
+      });
+      mockApp.visibilityData = { [hazard.document.id]: 'hidden' };
+      global.canvas.tokens.placeables = [mockObserver, hazard];
+      global.canvas.tokens.get.mockImplementation(
+        (id) => [mockObserver, hazard].find((token) => token.id === id) || null,
+      );
+
+      const { getSceneTargets, getVisibilityBetween } = require('../../../scripts/utils.js');
+      getSceneTargets.mockReturnValue([hazard]);
+      getVisibilityBetween.mockReturnValue('hidden');
+
+      const context = await buildContext(mockApp, {});
+      const row = context.hazardTargets.find((target) => target.id === hazard.document.id);
+
+      expect(row.visibilityStates.map((state) => state.value)).toEqual([
+        'observed',
+        'undetected',
+      ]);
+      expect(row.currentVisibilityState).toBe('undetected');
+      expect(row.visibilityStates.find((state) => state.value === 'undetected')).toMatchObject({
+        label: 'PF2E_VISIONER.VISIBILITY.UNDETECTED',
+        selected: true,
+      });
+    });
+
     test('labels manual concealed controls as observed plus concealed without changing value', async () => {
       mockApp.mode = 'observer';
 

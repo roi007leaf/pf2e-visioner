@@ -24,9 +24,9 @@ describe('Hazard/Loot manager template styling', () => {
     expect(template).toContain('{{#each hazardRows as |row|}}');
     expect(template).toContain('class="hazard-loot-state-buttons"');
     expect(template).toContain('class="visioner-icon-btn hazard-loot-state-btn');
-    expect(template).toContain('Set visible loot Hidden for all current and future player characters');
+    expect(template).toContain('Set visible loot Undetected for all current and future player characters');
     expect(template).toContain('Set visible loot Observed and clear prep defaults for all player characters');
-    expect(template).toContain('Hidden from all current and future player characters');
+    expect(template).toContain('Undetected by all current and future player characters');
     expect(template).toContain('Observed for all player characters; clears prep default');
     expect(template).toContain('type="hidden"');
     expect(template).toContain('name="token.{{row.id}}.visibility"');
@@ -35,7 +35,8 @@ describe('Hazard/Loot manager template styling', () => {
     expect(template).toContain('class="visioner-icon-btn hazard-loot-rank-btn');
     expect(template).toContain('Sheet DC');
     expect(template).toContain('class="hazard-loot-row-actions"');
-    expect(template).toContain('fa-eye-slash visibility-hidden');
+    expect(template).toContain('fa-ghost visibility-undetected');
+    expect(template).not.toContain('fa-eye-slash visibility-undetected');
     expect(template).toContain('fa-eye visibility-observed');
     expect(template).toContain('fa-table-list hazard-loot-dc-icon');
     expect(template).toContain('fa-check hazard-loot-apply-icon');

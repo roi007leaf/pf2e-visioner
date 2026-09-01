@@ -224,12 +224,12 @@ describe('initial scene hidden setup', () => {
     });
   });
 
-  test('applies default hidden visibility to future player character tokens', async () => {
+  test('applies legacy hidden and new undetected defaults to future PC tokens', async () => {
     const service = await import('../../../scripts/services/initial-scene-hidden-setup.js');
     const pc = makeToken('pc', 'character', { hasPlayerOwner: true });
     pc.document.actor = pc.actor;
     const loot = makeToken('loot', 'loot', {
-      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },
+      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'undetected' } },
     });
     const hazard = makeToken('hazard', 'hazard', {
       flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },
@@ -246,7 +246,7 @@ describe('initial scene hidden setup', () => {
     });
 
     expect(result).toMatchObject({ applied: 2, targetDefaults: 2 });
-    expect(getVisibilityBetween(pc, loot)).toBe('hidden');
+    expect(getVisibilityBetween(pc, loot)).toBe('undetected');
     expect(getVisibilityBetween(pc, hazard)).toBe('hidden');
     expect(getVisibilityBetween(pc, visibleLoot)).toBe('observed');
     expect(getVisibilityBetween(pc, npc)).toBe('observed');
@@ -318,7 +318,7 @@ describe('initial scene hidden setup', () => {
       },
     });
     const loot = makeToken('loot', 'loot', {
-      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },
+      flags: { [MODULE_ID]: { defaultPlayerVisibility: 'undetected' } },
     });
     const hazard = makeToken('hazard', 'hazard', {
       flags: { [MODULE_ID]: { defaultPlayerVisibility: 'hidden' } },

@@ -1,9 +1,10 @@
 import { getVisibilityBetween } from '../stores/visibility-map.js';
 import { getDefaultPlayerVisibility } from './initial-scene-hidden-setup.js';
 
-const HIDDEN_HAZARD_INDICATOR_COLOR = 0xff9800;
+const UNDETECTED_HAZARD_INDICATOR_COLOR = 0xf44336;
 const HIDDEN_HAZARD_INDICATOR_KEY = '_pvHiddenHazardIndicator';
 const HIDDEN_INDICATOR_ACTOR_TYPES = new Set(['hazard', 'loot']);
+const PLAYER_UNSEEN_VISIBILITY_STATES = new Set(['hidden', 'undetected', 'unnoticed']);
 
 function actorIsType(actor, type) {
   try {
@@ -41,6 +42,10 @@ function isHiddenIndicatorTarget(token) {
   return false;
 }
 
+function isPlayerUnseenVisibilityState(state) {
+  return PLAYER_UNSEEN_VISIBILITY_STATES.has(state);
+}
+
 export function isHazardOrLootHiddenFromAnyObserver(
   token,
   observers = getHiddenHazardObservers(),
@@ -54,8 +59,12 @@ export function isHazardOrLootHiddenFromAnyObserver(
   const relevantObservers = (observers ?? []).filter(
     (observer) => !!tokenId(observer) && tokenId(observer) !== targetId,
   );
-  if (!relevantObservers.length) return getDefaultVisibility(token) === 'hidden';
-  return relevantObservers.some((observer) => getVisibility(observer, token) === 'hidden');
+  if (!relevantObservers.length) {
+    return isPlayerUnseenVisibilityState(getDefaultVisibility(token));
+  }
+  return relevantObservers.some((observer) =>
+    isPlayerUnseenVisibilityState(getVisibility(observer, token)),
+  );
 }
 
 export function shouldShowHiddenHazardIndicator(
@@ -77,7 +86,7 @@ export function shouldShowHiddenHazardIndicator(
 
 export function drawHiddenHazardIndicator(
   graphics,
-  { width, height, color = HIDDEN_HAZARD_INDICATOR_COLOR } = {},
+  { width, height, color = UNDETECTED_HAZARD_INDICATOR_COLOR } = {},
 ) {
   const inset = 3;
   const badgeRadius = Math.max(9, Math.min(14, Math.min(width, height) * 0.14));
@@ -93,15 +102,36 @@ export function drawHiddenHazardIndicator(
   graphics.endFill();
   graphics.lineStyle(2.5, color, 1);
 
-  // Match Visioner's Hidden state (fa-eye-slash) rather than resembling a
-  // generic no-entry badge. Drawing it in PIXI keeps the marker attached to
-  // the token so Foundry/Levels culling applies to the whole indicator.
-  graphics.drawEllipse(badgeX, badgeY, badgeRadius * 0.65, badgeRadius * 0.4);
+  // Red ghost matches Visioner's Undetected state. The same GM-only marker
+  // covers current Undetected and legacy Hidden storage. Drawing it in PIXI
+  // keeps the marker attached to the token so Foundry/Levels culling applies
+  // to the whole indicator.
+  const ghostRadius = badgeRadius * 0.58;
+  const ghostHeadY = badgeY - badgeRadius * 0.08;
+  const ghostBodyTop = badgeY - badgeRadius * 0.06;
+  const ghostBodyHeight = badgeRadius * 0.62;
+  graphics.lineStyle(0, color, 0);
   graphics.beginFill(color, 1);
-  graphics.drawCircle(badgeX, badgeY, badgeRadius * 0.17);
+  graphics.drawCircle(badgeX, ghostHeadY, ghostRadius);
+  graphics.drawRect(
+    badgeX - ghostRadius,
+    ghostBodyTop,
+    ghostRadius * 2,
+    ghostBodyHeight,
+  );
   graphics.endFill();
-  graphics.moveTo(badgeX - badgeRadius * 0.6, badgeY - badgeRadius * 0.6);
-  graphics.lineTo(badgeX + badgeRadius * 0.6, badgeY + badgeRadius * 0.6);
+
+  graphics.beginFill(0x111111, 1);
+  const eyeRadius = Math.max(1, badgeRadius * 0.09);
+  graphics.drawCircle(badgeX - badgeRadius * 0.2, badgeY - badgeRadius * 0.15, eyeRadius);
+  graphics.drawCircle(badgeX + badgeRadius * 0.2, badgeY - badgeRadius * 0.15, eyeRadius);
+
+  const bottomY = ghostBodyTop + ghostBodyHeight;
+  const cutoutRadius = badgeRadius * 0.16;
+  graphics.drawCircle(badgeX - badgeRadius * 0.38, bottomY, cutoutRadius);
+  graphics.drawCircle(badgeX, bottomY, cutoutRadius);
+  graphics.drawCircle(badgeX + badgeRadius * 0.38, bottomY, cutoutRadius);
+  graphics.endFill();
 }
 
 export function removeHiddenHazardIndicator(token) {

@@ -75,6 +75,21 @@ describe('hidden hazard indicators', () => {
     ).toBe(true);
   });
 
+  test('shows GM marker when hazard or loot is Undetected by an observer', () => {
+    const observer = token('pc', 'character');
+
+    for (const target of [token('hazard', 'hazard'), token('loot', 'loot')]) {
+      expect(
+        shouldShowHiddenHazardIndicator(target, {
+          user: gm,
+          scene,
+          observers: [observer],
+          getVisibility: () => 'undetected',
+        }),
+      ).toBe(true);
+    }
+  });
+
   test('supports hidden loot targets', () => {
     const loot = token('loot', 'loot');
     const observer = token('pc', 'character');
@@ -92,6 +107,16 @@ describe('hidden hazard indicators', () => {
     expect(
       isHazardOrLootHiddenFromAnyObserver(hazard, [], {
         getDefaultVisibility: () => 'hidden',
+      }),
+    ).toBe(true);
+  });
+
+  test('uses Undetected default player visibility when scene has no observers', () => {
+    const hazard = token('hazard', 'hazard');
+
+    expect(
+      isHazardOrLootHiddenFromAnyObserver(hazard, [], {
+        getDefaultVisibility: () => 'undetected',
       }),
     ).toBe(true);
   });
@@ -120,17 +145,19 @@ describe('hidden hazard indicators', () => {
     );
   });
 
-  test('draws orange frame and the module hidden eye-slash badge', () => {
+  test('draws red frame and an Undetected ghost badge', () => {
     const indicator = graphics();
 
     drawHiddenHazardIndicator(indicator, { width: 100, height: 80 });
 
-    expect(indicator.lineStyle).toHaveBeenNthCalledWith(1, 3, 0xff9800, 0.9);
-    expect(indicator.drawRect).toHaveBeenCalledWith(3, 3, 94, 74);
-    expect(indicator.drawEllipse).toHaveBeenCalledTimes(1);
-    expect(indicator.drawCircle).toHaveBeenCalledTimes(2);
-    expect(indicator.moveTo).toHaveBeenCalledTimes(1);
-    expect(indicator.lineTo).toHaveBeenCalledTimes(1);
+    expect(indicator.lineStyle).toHaveBeenNthCalledWith(1, 3, 0xf44336, 0.9);
+    expect(indicator.drawRect).toHaveBeenNthCalledWith(1, 3, 3, 94, 74);
+    expect(indicator.beginFill).toHaveBeenCalledWith(0xf44336, 1);
+    expect(indicator.drawRect).toHaveBeenCalledTimes(2);
+    expect(indicator.drawCircle).toHaveBeenCalledTimes(7);
+    expect(indicator.drawEllipse).not.toHaveBeenCalled();
+    expect(indicator.moveTo).not.toHaveBeenCalled();
+    expect(indicator.lineTo).not.toHaveBeenCalled();
   });
 
   test('attaches marker to hazard token so Core visibility and Levels culling apply together', () => {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.5.10] - 2026-09-01
+
+### Fixed
+
+- **Held token drags no longer reveal Undetected hazards or loot to players**: Uncommitted drag previews keep stored unseen targets fully suppressed; normal line-of-sight updates resume after movement is committed.
+- **Hazard and loot preparation controls now use Undetected semantics consistently**: The Hazard/Loot Manager and main Token Manager show and apply the red ghost Undetected state instead of Hidden, while legacy Hidden defaults remain readable and are presented as Undetected.
+- **GM-only unseen hazard and loot markers now match the Undetected state**: Canvas markers use a red frame and ghost badge instead of the orange Hidden eye, and remain available for Undetected, Unnoticed, and legacy Hidden visibility data.
+
 ## [8.5.9] - 2026-08-30
 
 ### Fixed
