@@ -213,8 +213,9 @@ export class AutoCoverHooks {
    */
   async onUpdateToken(tokenDoc, changes) {
     try {
-      // Skip if auto-cover is disabled
-      if (!this.autoCoverSystem.isEnabled()) return;
+      // Existing cover must expire even when automatic detection has been disabled.
+      // The GM receives player movement updates and owns the affected documents.
+      if (!game.user?.isGM) return;
 
       // Check if this is a position/size/rotation update
       if (!this._isPositionUpdate(changes)) return;
@@ -249,6 +250,7 @@ export class AutoCoverHooks {
     return (
       'x' in changes ||
       'y' in changes ||
+      'elevation' in changes ||
       'width' in changes ||
       'height' in changes ||
       'rotation' in changes

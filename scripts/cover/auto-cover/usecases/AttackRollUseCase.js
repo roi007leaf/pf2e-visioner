@@ -158,6 +158,24 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     return true;
   }
 
+  _getPreAppliedCover(attacker, target) {
+    // Combat-start effects remain authoritative until movement removes them.
+    const effects = target?.actor?.itemTypes?.effect ?? target?.actor?._source?.items ?? [];
+    const effect = effects.find((item) => {
+      const flags = item.flags?.[MODULE_ID];
+      if (!flags?.isEphemeralCover) return false;
+      return flags.observerTokenId
+        ? flags.observerTokenId === attacker?.id
+        : !!attacker?.actor?.signature && flags.observerActorSignature === attacker.actor.signature;
+    });
+    return effect?.flags?.[MODULE_ID]?.coverState || 'none';
+  }
+
+  _getFixedCover(attacker, target) {
+    const manualCover = getCoverBetween(attacker, target);
+    return manualCover !== 'none' ? manualCover : this._getPreAppliedCover(attacker, target);
+  }
+
   _isPf2eCheckDialogEnabled() {
     return !!game?.user?.flags?.pf2e?.settings?.showCheckDialogs;
   }
@@ -525,7 +543,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this._storeOffGuardSuppressionChatInfo(data, doc, attacker, target);
 
     // Determine base cover state (manual token cover first, then auto-detection)
-    const manualCover = getCoverBetween(attacker, target);
+    const manualCover = this._getFixedCover(attacker, target);
     let state = manualCover;
 
     // Fallback to auto-detection if no manual cover
@@ -546,7 +564,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       // Check for any override for this token pair
       const override = overrideManager.consumeOverride(attacker, target);
 
-      if (override) {
+      if (override && this._getPreAppliedCover(attacker, target) === 'none') {
         state = override.state;
         overrideSource = override.source;
         wasOverridden = state !== originalDetectedState;
@@ -672,7 +690,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     this._stripSuppressedOffGuardModifiers(ctx, attacker, target);
     this._ensureUnsuppressedOffGuardModifier(dialog, attacker, target);
     this._ensureUnsuppressedOffGuardModifier(ctx, attacker, target);
-    const manualCover = getCoverBetween(attacker, target);
+    const manualCover = this._getFixedCover(attacker, target);
     let state = this._detectCover(attacker, target, ctx);
     state = await this._applyCoverAdjustments(attacker, target, state, ctx, { consume: false });
 
@@ -688,6 +706,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         manualCover,
         snipingDuoCoverIgnore,
         ({ chosen, dctx, target: tgt, targetActor: tgtActor }) => {
+          if (manualCover !== 'none') chosen = manualCover;
           const effectiveTarget = target || tgt;
           const sourceTargetActor = tgtActor || effectiveTarget?.actor;
           const callbackOffGuardAdjustment = this._getUnsuppressedOffGuardAdjustment(
@@ -760,15 +779,14 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             this._syncClonedDefenderIntoContext(effectiveTarget, clonedActor, dctx);
             const dcObj = dctx.dc;
             if (dcObj?.slug) {
-              const didAdjustDc = this._applyAdjustedDcFromTargetActor(sourceTargetActor, dcObj, [
-                {
-                  slug: 'cover',
-                  label,
-                  modifier: bonus,
-                  type: 'circumstance',
-                },
-              ]);
-              const st = didAdjustDc ? null : clonedActor.getStatistic(dcObj.slug)?.dc;
+              const didAdjustDc = this._applyAdjustedDcFromTargetActor(
+                sourceTargetActor,
+                dcObj,
+                [{ slug: 'cover', label, modifier: bonus, type: 'circumstance' }],
+              );
+              const st = didAdjustDc
+                ? null
+                : clonedActor.getStatistic(dcObj.slug === 'ac' ? 'armor' : dcObj.slug)?.dc;
               if (st) {
                 dcObj.value = st.value;
                 dcObj.statistic = st;
@@ -822,15 +840,9 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     if (targets.length === 0) return;
     try {
       for (const target of targets) {
-        await this.autoCoverSystem.setCoverBetween(attacker, target, 'none', {
-          skipEphemeralUpdate: true,
-        });
-        // Remove ephemeral cover effects for this specific attacker
-        try {
-          this.autoCoverSystem.cleanupCover(target, attacker);
-        } catch (e) {
-          console.warn('PF2E Visioner | Failed to cleanup ephemeral cover effects:', e);
-        }
+        if (this._getPreAppliedCover(attacker, target) !== 'none') continue;
+        // Clear the defender's effect together with the attacker's cover map.
+        await this.autoCoverSystem.cleanupCover(attacker, target);
       }
     } catch (_) {}
   }
@@ -857,7 +869,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         this._ensureUnsuppressedOffGuardModifier(check, attacker, target);
         this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
 
-        const manualCover = getCoverBetween(attacker, target);
+        const manualCover = this._getFixedCover(attacker, target);
         let detected = this._detectCover(attacker, target, context);
         if (manualCover === 'none') {
           detected = await this._applyCoverAdjustments(attacker, target, detected, context, { consume: true });
@@ -924,7 +936,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
     }
 
     let items = foundry.utils.deepClone(tgtActor._source?.items ?? []);
-    // Remove any existing one-roll cover effects we may have added
+    // Remove previous one-roll effects while preserving pre-applied cover.
     items = items.filter(
       (i) =>
         !(
@@ -983,8 +995,14 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           : dcAdjustments.filter((adjustment) => adjustment.slug === 'pf2e-visioner-off-guard');
       const didAdjustDc =
         activeDcAdjustments.length > 0 &&
-        this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, activeDcAdjustments);
-      const clonedStat = didAdjustDc ? null : clonedActor.getStatistic?.(dcObj.slug)?.dc;
+        this._applyAdjustedDcFromTargetActor(
+          tgtActor,
+          dcObj,
+          activeDcAdjustments,
+        );
+      const clonedStat = didAdjustDc
+        ? null
+        : clonedActor.getStatistic?.(dcObj.slug === 'ac' ? 'armor' : dcObj.slug)?.dc;
       if (clonedStat && manualCover === 'none') {
         dcObj.value = clonedStat.value;
         dcObj.statistic = clonedStat;

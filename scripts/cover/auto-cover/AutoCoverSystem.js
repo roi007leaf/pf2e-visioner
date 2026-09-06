@@ -172,6 +172,13 @@ export class AutoCoverSystem {
     const tokens = canvas?.tokens?.placeables || [];
     for (const token of tokens) {
       const attackerId = getTokenId(token);
+      // Recover effects orphaned by older flag-only cleanup, including after reload.
+      for (const effect of token.actor?.itemTypes?.effect || []) {
+        const flags = effect.flags?.[MODULE_ID];
+        if (flags?.isEphemeralCover && flags.observerTokenId) {
+          addPair(flags.observerTokenId, attackerId);
+        }
+      }
       const coverMap = token?.document?.getFlag?.(MODULE_ID, 'autoCoverMap');
       if (!coverMap || typeof coverMap !== 'object') continue;
       for (const [targetId, state] of Object.entries(coverMap)) {
@@ -375,11 +382,11 @@ export class AutoCoverSystem {
 
   async onUpdateDocument(document, changes) {
     if (document?.documentName !== 'Token') return;
-    // Skip if auto-cover is disabled
-    if (!this.isEnabled()) return;
+    // Cleanup belongs to the GM and must outlive the automatic detection setting.
+    if (!game.user?.isGM) return;
 
     // Skip if not a position or size change
-    if (!('x' in changes) && !('y' in changes) && !('width' in changes) && !('height' in changes)) return;
+    if (!['x', 'y', 'elevation', 'width', 'height', 'rotation'].some((key) => key in changes)) return;
 
     const tokenId = document.id;
     const token = canvas?.tokens?.get(tokenId);

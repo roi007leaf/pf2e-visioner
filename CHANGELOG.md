@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.5.11] - 2026-09-06
+
+### Fixed
+
+- **Combat-start cover stays consistent through attacks until first movement**: Attack dialogs and rolls honor pre-applied cover like manual cover. Attacking preserves that cover; the first movement of either token removes the affected relationship and its effect.
+- **Movement reliably clears expired automatic cover**: Cleanup handles elevation changes, disabled automatic detection, duplicate effects, changed actor signatures, and orphaned effects after reload. The GM processes player movement, and removing one cover relationship explicitly deletes its stored entry while preserving other targets.
+
 ## [8.5.10] - 2026-09-01
 
 ### Fixed

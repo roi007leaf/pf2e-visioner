@@ -69,8 +69,13 @@ export class CoverStateManager {
     // Get current state for this target
     const currentState = coverMap[target.document.id] || 'none';
 
-    // If no change needed, skip the update
-    if (currentState === state) return;
+    // A flag-only cleanup may already have removed the map while leaving its effect.
+    if (currentState === state) {
+      if (state === 'none' && !options.skipEphemeralUpdate) {
+        await this._updateEphemeralEffects(source, target, state, options);
+      }
+      return;
+    }
 
     // Create updated map
     const updatedMap = { ...coverMap };
@@ -88,11 +93,11 @@ export class CoverStateManager {
       // If map is empty, remove the flag entirely
       await source.document.unsetFlag(CoverStateManager.FLAG_SCOPE, CoverStateManager.FLAG_KEY);
     } else {
-      // Otherwise update with the new map
+      // Foundry merges object flags. Explicit deletion is required for one pair.
       await source.document.setFlag(
         CoverStateManager.FLAG_SCOPE,
         CoverStateManager.FLAG_KEY,
-        updatedMap,
+        state === 'none' ? { [`-=${target.document.id}`]: null } : updatedMap,
       );
     }
 
@@ -160,15 +165,19 @@ export class CoverStateManager {
 
       await runWithCoverEffectLock(actor, async () => {
         // Check if effect already exists for this attacker
-        const existingEffect = actor.itemTypes.effect.find(
-          (e) =>
-            e.flags?.[MODULE_ID]?.isEphemeralCover &&
-            e.flags?.[MODULE_ID]?.observerActorSignature === attacker.actor.signature,
-        );
+        const existingEffects = actor.itemTypes.effect.filter((effect) => {
+          const flags = effect.flags?.[MODULE_ID];
+          if (!flags?.isEphemeralCover) return false;
+          // Token identity survives actor changes; signatures support legacy effects.
+          return flags.observerTokenId
+            ? flags.observerTokenId === attacker.id
+            : !!attacker.actor?.signature &&
+                flags.observerActorSignature === attacker.actor.signature;
+        });
 
         // Remove existing effect if found
-        if (existingEffect) {
-          await deleteExistingEmbeddedItems(actor, [existingEffect.id]);
+        if (existingEffects.length) {
+          await deleteExistingEmbeddedItems(actor, existingEffects.map((effect) => effect.id));
         }
 
         // If no cover or removing cover, just return after cleaning up

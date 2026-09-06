@@ -127,7 +127,7 @@ describe('CoverStateManager', () => {
       await coverStateManager.setCoverBetween(sourceToken, targetToken, 'none');
 
       expect(sourceToken.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'autoCoverMap', {
-        'other-target': 'lesser',
+        [`-=${targetToken.document.id}`]: null,
       });
     });
 
