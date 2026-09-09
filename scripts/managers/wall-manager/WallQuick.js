@@ -44,6 +44,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       id: d?.id,
       hiddenWallsEnabled,
       hiddenWall: !!hiddenWall,
+      blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
       identifier: identifier || '',
       dc: Number(dc) || '',
       connectedCsv: Array.isArray(connected) ? connected.join(', ') : '',
@@ -146,6 +147,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     const fd = new FormData(form);
     const entries = Object.fromEntries(fd.entries());
     const patch = { _id: app.wall.id };
+    patch[`flags.${MODULE_ID}.blocksScent`] = fd.has('blocksScent');
 
     // Handle cover override - this now determines if wall provides cover
     const coverOverride = entries['coverOverride'];

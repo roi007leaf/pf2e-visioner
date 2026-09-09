@@ -20,7 +20,7 @@ import {
   applyCurrentViewHardHide,
   __setStoredVisibilityForTest,
 } from '../../../scripts/services/Detection/current-view-hard-hide.js';
-import { primeHiddenDetectionFilterVisualsForObserver } from '../../../scripts/stores/visibility-map.js';
+import { clearAllDetectionFilterVisuals, primeHiddenDetectionFilterVisualsForObserver } from '../../../scripts/stores/visibility-map.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 
 function foundryHiddenTarget() {
@@ -165,6 +165,26 @@ describe('multi-level hover visibility refresh ordering', () => {
     expect(token.mesh.renderable).toBe(false);
     expect(token.detectionFilterMesh.visible).toBe(true);
     expect(token._pvCurrentViewHardHidden).toBe(false);
+  });
+
+  it('releases its primary mesh render suppression when an observed door update clears the filter', () => {
+    const token = foundryHiddenTarget();
+    token.document.hidden = false;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    token.detectionFilter = { id: 'hearing' };
+    wrapTokenRefreshVisibility.call(token, () => {});
+    expect(token.mesh.renderable).toBe(false);
+
+    // Core refreshes visible before the Observed flag clears its stale hearing filter.
+    token.mesh.visible = true;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'observed']]));
+    clearAllDetectionFilterVisuals([token]);
+    expect(token.detectionFilter).toBeNull();
+    expect(token.mesh).toMatchObject({ visible: true, renderable: true });
+
+    const unrelatedSuppression = { mesh: { visible: true, renderable: false } };
+    clearAllDetectionFilterVisuals([unrelatedSuppression]);
+    expect(unrelatedSuppression.mesh.renderable).toBe(false);
   });
 });
 

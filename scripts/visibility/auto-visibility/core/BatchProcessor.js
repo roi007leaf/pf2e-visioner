@@ -314,6 +314,7 @@ export class BatchProcessor {
    * @param {Function} [dependencies.nowProvider] - Optional timing source for performance telemetry
    */
   constructor(dependencies) {
+    this.spatialAnalyzer = dependencies.spatialAnalyzer;
     this.viewportFilterService = dependencies.viewportFilterService;
     this.optimizedVisibilityCalculator = dependencies.optimizedVisibilityCalculator;
     this.globalLosCache = dependencies.globalLosCache;
@@ -692,7 +693,9 @@ export class BatchProcessor {
       }
       // Use quadtree to preselect tokens in range (AABB+circle), then filter out excluded/self
       stageStart = this.nowProvider();
-      const radiusPx = sceneDistanceToPixels(this.maxVisibilityDistance || 20);
+      const radiusPx = sceneDistanceToPixels(
+        this.maxVisibilityDistance ?? this.spatialAnalyzer?.getMaxVisibilityDistance?.() ?? 100,
+      );
       const candidates = index.queryCircle(changedTokenPos.x, changedTokenPos.y, radiusPx);
       let relevantTokens = candidates
         .map((pt) => pt.token)
@@ -806,15 +809,10 @@ export class BatchProcessor {
           profileMetadata2 = replacement.profileMetadata;
         }
 
-        // For observer movement: recalculate visibility even if observer has overrides
-        // Only skip if target has overrides that would prevent meaningful recalculation
-        const shouldSkipDueToTargetOverride = hasOverride2; // otherToken -> changedToken override
-
-        if (shouldSkipDueToTargetOverride) {
-          // Target has override preventing recalculation - skip expensive calculation
-          if (hasOverride1) breakdown.pairsSkippedOverride += 1;
-          if (hasOverride2) breakdown.pairsSkippedOverride += 1;
-
+        // Overrides are directional: a target's Hide result must not blind the hider.
+        if (hasOverride1) breakdown.pairsSkippedOverride += 1;
+        if (hasOverride2) breakdown.pairsSkippedOverride += 1;
+        if (hasOverride1 && hasOverride2) {
           if (
             hasOverride1 &&
             (effectiveVisibility1 !== originalVisibility1 ||

@@ -414,6 +414,20 @@ export function targetIsHardHiddenFromCurrentView(target) {
   const observers = currentViewVisionerObserversForTarget(target);
   if (observers.length === 0) {
     if (globalThis.game?.user?.isGM || !automaticVisibilityActive) return false;
+    try {
+      const sources = (globalThis.canvas?.tokens?.placeables ?? []).filter((token) =>
+        token._isVisionSource?.(),
+      );
+      if (sources.length > 0) {
+        return sources.every(
+          (observer) =>
+            tokenIdOf(observer) !== tokenIdOf(target) &&
+            visionerStateHidesTargetRendering(getStoredVisibilityState(observer, target), target),
+        );
+      }
+    } catch {
+      // Missing/invalid vision sources must not release an existing render lock.
+    }
     return !!target._pvCurrentViewHardHidden;
   }
 

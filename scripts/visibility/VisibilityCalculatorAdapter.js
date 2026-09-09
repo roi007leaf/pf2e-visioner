@@ -10,6 +10,7 @@
 import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { MODULE_ID } from '../constants.js';
 import { calculateDistanceInFeet } from '../helpers/geometry-utils.js';
+import { isScentBlocked } from '../helpers/scent-wall-utils.js';
 import { ConcealmentRegionBehavior } from '../regions/ConcealmentRegionBehavior.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 import { LevelsIntegration } from '../services/LevelsIntegration.js';
@@ -184,6 +185,9 @@ export async function tokenStateToInput(
     losSource,
   }));
   const soundBlocked = visionAnalyzer.isSoundBlocked(observer, target);
+  const scentBlocked = (observerState.precise.scent || observerState.imprecise.scent)
+    ? isScentBlocked(observer, target)
+    : false;
 
   if (linePassesThroughDarkness && rayDarknessRank > 0) {
     // Map darkness rank to lighting level for the ray
@@ -206,6 +210,7 @@ export async function tokenStateToInput(
     observer: observerState,
     rayDarkness: rayDarkness,
     soundBlocked: soundBlocked, // Add sound blocking information
+    scentBlocked,
     hasLineOfSight: hasLineOfSight, // Add line of sight information
   };
 }

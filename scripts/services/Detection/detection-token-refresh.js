@@ -1,4 +1,6 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { suppressCurrentViewScentTokenArt } from '../../stores/visibility-map.js';
+import { suppressDetectionFilterPrimaryMesh } from './detection-filter-mesh-suppression.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import {
@@ -26,6 +28,13 @@ import {
 
 const deferredCoreLevelHardHideTokens = new WeakSet();
 const LEGACY_FILTERED_EFFECT_VISIBILITY_KEY = '_pvLegacyFilteredEffectVisibility';
+
+export function wrapPrimaryTokenMeshRender(wrapped, ...args) {
+  // Accept a placeable token or a document-backed mesh reference.
+  const token = this.object?.object ?? this.object;
+  if (token?.mesh === this && suppressCurrentViewScentTokenArt(token)) return;
+  return wrapped(...args);
+}
 
 function detectionFilterOwnsRenderSurface(token) {
   return (
@@ -82,8 +91,7 @@ function reconcileDetectionFilterRenderSurface(token) {
     return;
   }
   if (!detectionFilterOwnsRenderSurface(token) || !token.mesh) return;
-  if ('visible' in token.mesh) token.mesh.visible = false;
-  if ('renderable' in token.mesh) token.mesh.renderable = false;
+  suppressDetectionFilterPrimaryMesh(token);
 }
 
 function renderState(token) {
@@ -162,6 +170,7 @@ function afterCoreRefresh(token, before) {
     gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerState });
     enforceControlledLevelTokenRendering(token);
   }
+  suppressCurrentViewScentTokenArt(token);
 }
 
 export function wrapTokenRefreshState(wrapped, ...args) {
@@ -183,6 +192,7 @@ export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   hideFilteredTooltip(this);
   enforceControlledLevelTokenRendering(this);
   stabilizeLegacyLevelsTokenRenderingAfterRenderPass(this);
+  suppressCurrentViewScentTokenArt(this);
   return result;
 }
 

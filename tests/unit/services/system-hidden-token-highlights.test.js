@@ -347,6 +347,27 @@ describe('system-hidden token highlight service', () => {
     });
   });
 
+  test('replaces an AVS scent silhouette with a presence marker and clears it after visual reveal', () => {
+    const observer = {
+      actor: { system: { perception: { senses: [{ type: 'scent', range: 60 }] } } },
+      distanceTo: () => 30,
+    };
+    const token = { visible: true, renderable: true, actor: { system: { traits: { value: [] } } } };
+    const options = {
+      observer, token,
+      getVisibilityState: () => 'hidden',
+      getDetectionBetween: () => ({ sense: 'scent', isPrecise: false }),
+      isScentBlocked: () => false,
+    };
+    expect(buildSystemHiddenIndicatorDecision(options)).toMatchObject({
+      shouldShowScentIndicator: true, indicatorMode: 'scent',
+    });
+    expect(buildSystemHiddenIndicatorDecision({ ...options, isScentBlocked: () => true }).shouldShowScentIndicator).toBe(false);
+    token.visible = false;
+    token.renderable = false;
+    expect(buildSystemHiddenIndicatorDecision({ ...options, getVisibilityState: () => 'observed' }).shouldShowScentIndicator).toBe(false);
+  });
+
   test('blocks every special-sense indicator for a Foundry-hidden target viewed by a player', () => {
     const observer = {
       document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },

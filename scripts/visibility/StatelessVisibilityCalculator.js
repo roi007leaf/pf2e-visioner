@@ -119,6 +119,7 @@ function profileMetadataForResult(result, target) {
  * @param {number} input.rayDarkness.rank - Darkness rank along the ray (1-3 = magical, 4+ = greater magical)
  * @param {string} input.rayDarkness.lightingLevel - Lighting level of darkness along ray (one of LightingLevel enum values)
  * @param {boolean} input.soundBlocked - Whether sound is blocked between observer and target (walls with sound restriction)
+ * @param {boolean} input.scentBlocked - Whether a wall explicitly blocks scent between observer and target
  *
  * @returns {Object} Visibility result
  * @returns {string} result.state - One of VisibilityState enum values (OBSERVED, CONCEALED, HIDDEN, UNDETECTED)
@@ -141,6 +142,7 @@ export function calculateVisibility(input) {
   const observer = normalizeObserverState(input.observer);
   const rayDarkness = input.rayDarkness || null;
   const soundBlocked = input.soundBlocked ?? false;
+  const scentBlocked = input.scentBlocked ?? false;
   const hasLineOfSight = input.hasLineOfSight ?? undefined;
   const previousState = input.previousState ?? null;
 
@@ -153,7 +155,7 @@ export function calculateVisibility(input) {
       observerName: input._debug?.observerName,
       targetName: input._debug?.targetName,
     }));
-    const result = handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight);
+    const result = handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight, scentBlocked);
 
     return withProfile(result, profileMetadataForResult(result, target));
   }
@@ -164,6 +166,7 @@ export function calculateVisibility(input) {
   // 2a. Check precise non-visual senses (bypass invisibility and lighting)
   const preciseNonVisualResult = checkPreciseNonVisualSenses(observer, target, soundBlocked, {
     hasLineOfSight,
+    scentBlocked,
   });
   if (preciseNonVisualResult) {
     allDetectionResults.push(preciseNonVisualResult);
@@ -188,6 +191,7 @@ export function calculateVisibility(input) {
   // 2c. Check imprecise senses (provide worse detection than precise senses)
   const impreciseResult = checkImpreciseSenses(observer, target, soundBlocked, {
     hasLineOfSight,
+    scentBlocked,
   });
   if (impreciseResult) {
     allDetectionResults.push(impreciseResult);
@@ -281,10 +285,17 @@ function tremorsenseGroundContactBroken(observer, target) {
 /**
  * Handle blinded observer - can only use non-visual senses
  */
-function handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight = undefined) {
+function handleBlindedObserver(
+  observer,
+  target,
+  soundBlocked,
+  hasLineOfSight = undefined,
+  scentBlocked = false,
+) {
   // Check for non-visual senses that still work when blinded
   const nonVisualPrecise = checkPreciseNonVisualSenses(observer, target, soundBlocked, {
     hasLineOfSight,
+    scentBlocked,
   });
   if (nonVisualPrecise) {
     return nonVisualPrecise;
@@ -292,6 +303,7 @@ function handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight = 
 
   const nonVisualImprecise = checkImpreciseSenses(observer, target, soundBlocked, {
     hasLineOfSight,
+    scentBlocked,
   });
   if (nonVisualImprecise) {
     return nonVisualImprecise;
@@ -315,7 +327,7 @@ function handleBlindedObserver(observer, target, soundBlocked, hasLineOfSight = 
 function checkNonAuditorySenses(
   observer,
   target,
-  { hasLineOfSight = undefined, soundBlocked = false } = {},
+  { hasLineOfSight = undefined, soundBlocked = false, scentBlocked = false } = {},
 ) {
   const { imprecise } = observer;
 
@@ -332,8 +344,8 @@ function checkNonAuditorySenses(
     }
   }
 
-  // Scent: detects by smell, BYPASSES invisibility
-  if (imprecise.scent) {
+  // Scent bypasses invisibility, but respects walls configured to block scent.
+  if (imprecise.scent && !scentBlocked) {
     return {
       state: VisibilityState.HIDDEN,
       detection: {
@@ -472,7 +484,7 @@ function checkPreciseNonVisualSenses(
   observer,
   target,
   soundBlocked = false,
-  { hasLineOfSight = undefined } = {},
+  { hasLineOfSight = undefined, scentBlocked = false } = {},
 ) {
   const { precise, conditions } = observer;
   const { auxiliary } = target;
@@ -502,6 +514,11 @@ function checkPreciseNonVisualSenses(
           },
         };
       }
+      continue;
+    }
+
+    // Scent can cross visual obstructions, unless a wall explicitly blocks scent.
+    if (type === SenseType.SCENT && scentBlocked) {
       continue;
     }
 
@@ -847,7 +864,7 @@ function checkImpreciseSenses(
   observer,
   target,
   soundBlocked = false,
-  { hasLineOfSight = undefined } = {},
+  { hasLineOfSight = undefined, scentBlocked = false } = {},
 ) {
   const { imprecise, conditions } = observer;
   const { auxiliary } = target;
@@ -906,10 +923,9 @@ function checkImpreciseSenses(
     });
   }
 
-  // Scent: detects by smell, BYPASSES invisibility
-  // No conditions or restrictions
+  // Scent bypasses invisibility, but respects walls configured to block scent.
   // Priority: 3
-  if (imprecise.scent) {
+  if (imprecise.scent && !scentBlocked) {
     workingSenses.push({
       priority: 3,
       state: VisibilityState.HIDDEN,

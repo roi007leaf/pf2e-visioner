@@ -35,6 +35,7 @@ import {
   registerTimedOverrideHooks,
 } from './startup-managers.js';
 import { handleWallCreated, handleWallDeleted, handleWallUpdated } from '../services/Walls/wall-lifecycle.js';
+import { prepareDoorScentRenderTransition } from '../services/door-state-visibility-refresh.js';
 import {
   handleAvsBatchCompleteRefresh,
   handleTokenPreUpdate,
@@ -162,6 +163,7 @@ export async function registerHooks() {
   Hooks.on('createWall', async () => {
     await handleWallCreated();
   });
+  Hooks.on('preUpdateWall', prepareDoorScentRenderTransition);
   Hooks.on('updateWall', async (doc, changes) => {
     await handleWallUpdated(doc, changes);
   });

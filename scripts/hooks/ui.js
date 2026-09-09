@@ -2318,6 +2318,15 @@ function onRenderWallConfig(app, html) {
       </div>
     `;
 
+    const scentRow = document.createElement('div');
+    scentRow.className = 'form-group';
+    scentRow.innerHTML = `
+      <label>${game.i18n.localize('PF2E_VISIONER.UI.WALL_BLOCKS_SCENT')}</label>
+      <input type="checkbox" name="flags.${MODULE_ID}.blocksScent" ${app.document?.getFlag?.(MODULE_ID, 'blocksScent') === true ? 'checked' : ''} data-dtype="Boolean" />
+      <p class="notes">${game.i18n.localize('PF2E_VISIONER.UI.WALL_BLOCKS_SCENT_HINT')}</p>
+    `;
+    fs.appendChild(scentRow);
+
     const isDoor = Number(app.document?.door) > 0;
     if (isDoor) {
       const allowed = app.document?.getFlag?.(MODULE_ID, 'peekAllowed') === true;

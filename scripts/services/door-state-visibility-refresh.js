@@ -1,5 +1,14 @@
 import { MODULE_ID } from '../constants.js';
 import { setPostBatchPerceptionRefreshSuppression } from './runtime-state.js';
+import { suppressCurrentViewScentTokenArt } from '../stores/visibility-map.js';
+
+export function prepareDoorScentRenderTransition(wallDocument, changes) {
+  if (changes?.ds === undefined || Number(changes.ds) === 1) return;
+  const closingDoor = { ...(wallDocument.toObject?.() ?? wallDocument), ds: changes.ds };
+  for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
+    suppressCurrentViewScentTokenArt(target, { walls: [closingDoor] });
+  }
+}
 
 export function buildDoorStateSuppression(wallDocument, doorState, { now = Date.now } = {}) {
   return {
@@ -97,6 +106,8 @@ export function createDoorStateVisibilityRefreshService({
   }
 
   async function handleDoorStateChange(wallDocument, doorState) {
+    // Hide stale Observed art before yielding to the asynchronous AVS recomputation.
+    for (const token of getCanvasTokens().placeables ?? []) suppressCurrentViewScentTokenArt(token);
     try {
       setSuppression(buildDoorStateSuppression(wallDocument, doorState, { now }));
     } catch {

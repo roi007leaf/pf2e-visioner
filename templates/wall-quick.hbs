@@ -2,6 +2,11 @@
   <fieldset>
     <legend>PF2E Visioner</legend>
     <div class="form-group">
+      <label>{{localize "PF2E_VISIONER.UI.WALL_BLOCKS_SCENT"}}</label>
+      <input type="checkbox" name="blocksScent" {{checked blocksScent}} />
+      <p class="notes">{{localize "PF2E_VISIONER.UI.WALL_BLOCKS_SCENT_HINT"}}</p>
+    </div>
+    <div class="form-group">
       <label>{{localize "PF2E_VISIONER.UI.COVER_LABEL"}}</label>
   <div class="cover-override-buttons pv-u-flex pv-u-gap-4" style="margin-top:4px;">
         <button type="button" class="visioner-icon-btn {{#unless coverOverride}}active{{/unless}}" 

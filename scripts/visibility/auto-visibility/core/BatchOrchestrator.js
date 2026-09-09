@@ -553,10 +553,7 @@ export class BatchOrchestrator {
       return;
     }
 
-    // Prepare tokens before any perception refresh. If client-aware filtering says
-    // none of the changed tokens are visible to this client, avoid touching token
-    // rendering at all; refreshing offscreen tokens during lighting rebuilds can
-    // produce transient canvas artifacts.
+    // Resolve computation scope before any perception refresh.
     const isMovementBatch = isMovementVisibilityBatch({
       changedTokens,
       movementSession: options.movementSession,
@@ -566,10 +563,26 @@ export class BatchOrchestrator {
     // Without this, removing e.g. deafened from a token whose audible targets are off-screen
     // leaves those pairs stale (the token keeps "not hearing" them).
     const forceFullScope = consumeFullVisibilityScopeRecalc();
-    const useFullTokenScope = shouldUseFullTokenScope({ isMovementBatch, forceFullScope });
-    const candidateTokens = useFullTokenScope
+    let useFullTokenScope = shouldUseFullTokenScope({ isMovementBatch, forceFullScope });
+    let candidateTokens = useFullTokenScope
       ? canvas.tokens?.placeables || []
       : this._getAllTokens();
+    // Persisted visibility belongs to the scene, independent of the GM's camera.
+    // Include offscreen targets too, even when the changed observer is on screen.
+    if (!useFullTokenScope) {
+      const candidateIds = new Set(candidateTokens.map((token) => token.document.id));
+      const sceneTokens = canvas.tokens?.placeables || [];
+      if (
+        sceneTokens.some(
+          (token) =>
+            !candidateIds.has(token.document.id) &&
+            !this.exclusionManager?.isExcludedToken?.(token),
+        )
+      ) {
+        useFullTokenScope = true;
+        candidateTokens = sceneTokens;
+      }
+    }
     const { allTokens, visibleChangedTokens, hasVisibleChangedTokens } = resolveVisibleBatchTokens({
       changedTokens,
       candidateTokens,

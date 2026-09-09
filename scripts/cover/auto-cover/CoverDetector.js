@@ -33,6 +33,7 @@ export class CoverDetector {
     this._featUpgradeRecords = new Map();
     this._ruleElementBlocks = new Map();
     this._snipingDuoRecords = new Map();
+    this._starlitSpanRecords = new Map();
     this._wallEvaluationContext = null;
   }
   // Define token disposition constants for use within this class
@@ -81,12 +82,15 @@ export class CoverDetector {
    * @returns {string} Cover state ('none', 'lesser', 'standard', 'greater')
    */
   detectBetweenTokens(attacker, target, options = {}) {
+    const starlitKey = `${attacker?.id}:${target?.id}`;
+    this._starlitSpanRecords.delete(starlitKey);
     const ownsWallContext = this._wallEvaluationContext === null;
     if (ownsWallContext) {
       this._wallEvaluationContext = { walls: null, coverOverrides: new Map() };
     }
     try {
       const cover = this._detectBetweenTokensCore(attacker, target, options);
+      if (cover !== 'none') this._starlitSpanRecords.delete(starlitKey);
       return this._applyPeekCoverCap(target, cover);
     } finally {
       if (ownsWallContext) this._wallEvaluationContext = null;
@@ -195,47 +199,73 @@ export class CoverDetector {
         // Apply elevation filtering (mode-aware)
         blockers = this._filterBlockersByElevation(attacker, target, blockers, intersectionMode);
 
-        // Determine token cover based on intersection mode
-        let tokenCover;
-        let tokenCoverBlockers = blockers;
-        if (intersectionMode === 'tactical') {
-          const tokenCoverResult = this._evaluateCoverByTacticalDetailed(
-            attacker,
-            target,
-            blockers,
-            elevationRange,
-            options.attackContext,
-            attackerSpan,
-            targetSpan,
-          );
-          tokenCover = tokenCoverResult.state;
-          tokenCoverBlockers = tokenCoverResult.blockers;
-        } else if (intersectionMode === 'coverage') {
-          const tokenCoverResult = this._evaluateCoverByCoverageDetailed(
-            attacker,
-            target,
-            blockers,
-            options.attackContext,
-          );
-          tokenCover = tokenCoverResult.state;
-          tokenCoverBlockers = tokenCoverResult.blockers;
-        } else {
-          const tokenCoverResult = this._evaluateCreatureSizeCoverDetailed(
-            attacker,
-            target,
-            blockers,
-            options.attackContext,
-            options,
-          );
-          tokenCover = tokenCoverResult.state;
-          tokenCoverBlockers = tokenCoverResult.blockers;
+        const evaluateTokenCover = (blockers) => {
+          // Determine token cover based on intersection mode
+          let tokenCover;
+          let tokenCoverBlockers = blockers;
+          if (intersectionMode === 'tactical') {
+            const tokenCoverResult = this._evaluateCoverByTacticalDetailed(
+              attacker,
+              target,
+              blockers,
+              elevationRange,
+              options.attackContext,
+              attackerSpan,
+              targetSpan,
+            );
+            tokenCover = tokenCoverResult.state;
+            tokenCoverBlockers = tokenCoverResult.blockers;
+          } else if (intersectionMode === 'coverage') {
+            const tokenCoverResult = this._evaluateCoverByCoverageDetailed(
+              attacker,
+              target,
+              blockers,
+              options.attackContext,
+            );
+            tokenCover = tokenCoverResult.state;
+            tokenCoverBlockers = tokenCoverResult.blockers;
+          } else {
+            const tokenCoverResult = this._evaluateCreatureSizeCoverDetailed(
+              attacker,
+              target,
+              blockers,
+              options.attackContext,
+              options,
+            );
+            tokenCover = tokenCoverResult.state;
+            tokenCoverBlockers = tokenCoverResult.blockers;
+          }
+
+          // Apply token cover overrides
+          tokenCover = this._applyTokenCoverOverrides(attacker, target, tokenCoverBlockers, tokenCover);
+
+          // Apply Levels integration for elevation-based cover adjustment
+          tokenCover = this._applyLevelsCoverAdjustment(attacker, target, tokenCover);
+
+          return tokenCover;
+        };
+
+        let tokenCover = evaluateTokenCover(blockers);
+        // Resolve strength first: Starlit Span only bypasses lesser creature cover.
+        if (tokenCover === 'lesser' && this._hasStarlitSpanCoverBenefit(attacker, options.attackContext)) {
+          const remainingBlockers = blockers.filter((blocker) => {
+            if (typeof attacker.actor.isAllyOf === 'function') {
+              return !attacker.actor.isAllyOf(blocker.actor);
+            }
+            return !this._areTokensAllies(attacker, blocker);
+          });
+          if (remainingBlockers.length !== blockers.length) {
+            tokenCover = evaluateTokenCover(remainingBlockers);
+            if (tokenCover === 'none') {
+              this._starlitSpanRecords.set(`${attacker.id}:${target.id}`, {
+                feat: 'starlit-span',
+                from: 'lesser',
+                to: 'none',
+                ts: Date.now(),
+              });
+            }
+          }
         }
-
-        // Apply token cover overrides
-        tokenCover = this._applyTokenCoverOverrides(attacker, target, tokenCoverBlockers, tokenCover);
-
-        // Apply Levels integration for elevation-based cover adjustment
-        tokenCover = this._applyLevelsCoverAdjustment(attacker, target, tokenCover);
 
         calculatedCover = tokenCover;
       } else {
@@ -1540,6 +1570,22 @@ export class CoverDetector {
     } catch {
       return false;
     }
+  }
+
+  _hasStarlitSpanCoverBenefit(attacker, attackContext) {
+    if (!this._isRangedAttackContext(attackContext)) return false;
+    if (!FeatsHandler.hasFeat(attacker, 'starlit-span')) return false;
+    const options = attacker?.actor?.getRollOptions?.(['all']);
+    return Array.isArray(options)
+      ? options.includes('self:effect:arcane-cascade')
+      : options instanceof Set && options.has('self:effect:arcane-cascade');
+  }
+
+  consumeStarlitSpanCoverIgnore(attackerId, targetId) {
+    const key = `${attackerId}:${targetId}`;
+    const record = this._starlitSpanRecords.get(key);
+    this._starlitSpanRecords.delete(key);
+    return record && Date.now() - record.ts <= 15000 ? record : null;
   }
 
   _shouldIgnoreBlockerForAimAidingRune(attacker, blocker, attackContext = null) {

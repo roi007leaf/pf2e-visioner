@@ -854,16 +854,19 @@ describe('BatchOrchestrator', () => {
     }
   });
 
-  test('processBatch skips when viewport filtering excludes all changed tokens', async () => {
+  test.each([[[]], [['A']], [['B']]])('processBatch retains full scope with viewport %j (#303)', async (visibleIds) => {
     orchestrator.viewportFilterService = {
       isClientAwareFilteringEnabled: jest.fn(() => true),
-      getViewportTokenIdSet: jest.fn(() => new Set()),
+      getViewportTokenIdSet: jest.fn(() => new Set(visibleIds)),
     };
 
     await orchestrator.processBatch(new Set(['A']));
 
-    expect(batchProcessor.process).not.toHaveBeenCalled();
-    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+    expect(batchProcessor.process).toHaveBeenCalledWith(
+      global.canvas.tokens.placeables,
+      new Set(['A']),
+      expect.objectContaining({ skipViewportFilter: true }),
+    );
   });
 
   test('processBatch ignores stale lastMovedTokenId for non-movement batches', async () => {
@@ -875,8 +878,8 @@ describe('BatchOrchestrator', () => {
 
     await orchestrator.processBatch(new Set(['A']));
 
-    expect(batchProcessor.process).not.toHaveBeenCalled();
-    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+    expect(batchProcessor.process).toHaveBeenCalledWith(expect.any(Array), new Set(['A']),
+      expect.objectContaining({ isMovementBatch: false, skipViewportFilter: true }));
   });
 
   test('processBatch ignores matching lastMovedTokenId without active movement session', async () => {
@@ -888,8 +891,8 @@ describe('BatchOrchestrator', () => {
 
     await orchestrator.processBatch(new Set(['A']));
 
-    expect(batchProcessor.process).not.toHaveBeenCalled();
-    expect(global.canvas.perception.update).not.toHaveBeenCalled();
+    expect(batchProcessor.process).toHaveBeenCalledWith(expect.any(Array), new Set(['A']),
+      expect.objectContaining({ isMovementBatch: false, skipViewportFilter: true }));
   });
 
   test('processBatch defers while changed token is still animating', async () => {

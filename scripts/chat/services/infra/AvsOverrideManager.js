@@ -495,6 +495,12 @@ export class AvsOverrideManager {
         if (wasVisibilityOverride) {
           this.#notifyVisibilityControlReleased(observerId, targetId);
         }
+        try {
+          const { default: indicator } = await import(
+            '../../../ui/OverrideValidationIndicator.js'
+          );
+          indicator.removeOverridePair?.(observerId, targetId);
+        } catch {}
         return true;
       }
     } catch (error) {

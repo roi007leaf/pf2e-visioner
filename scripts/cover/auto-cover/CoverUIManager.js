@@ -277,6 +277,7 @@ export class CoverUIManager {
       let featUpgradeInfo = message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       let ruleElementBlocks = message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       let snipingDuoCoverIgnore = message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
+      const starlitSpanCoverIgnore = message?.flags?.['pf2e-visioner']?.starlitSpanCoverIgnore;
       let offGuardSuppression = message?.flags?.['pf2e-visioner']?.offGuardSuppression;
       let coverAdjustment = message?.flags?.['pf2e-visioner']?.coverAdjustment;
 
@@ -322,6 +323,7 @@ export class CoverUIManager {
         !featUpgradeInfo &&
         !ruleElementBlocks &&
         !snipingDuoCoverIgnore &&
+        !starlitSpanCoverIgnore &&
         !offGuardSuppression &&
         !coverAdjustment
       ) {
@@ -590,6 +592,19 @@ export class CoverUIManager {
         } catch (e) { }
       }
 
+      if (starlitSpanCoverIgnore && !$html.find('.pf2e-visioner-cover-starlit-span-indicator').length) {
+        const tooltip = game.i18n.localize('PF2E_VISIONER.UI.STARLIT_SPAN_COVER_IGNORE_TOOLTIP');
+        const escapedTooltip = tooltip.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        indicatorHtml += `<span class="pf2e-visioner-cover-starlit-span-indicator"
+          data-tooltip="${escapedTooltip}" data-tooltip-direction="UP"
+          style="margin-left:4px;padding:2px 4px;background:rgba(46,204,113,0.12);
+            border:1px solid rgba(46,204,113,0.25);border-radius:3px;color:rgb(46,204,113);
+            display:inline-flex;align-items:center;gap:3px;vertical-align:middle;cursor:help;font-size:0.8em;">
+          <i class="fas fa-star"></i><i class="fas fa-shield-slash"></i>
+        </span>`;
+      }
+
       if (offGuardSuppression) {
         try {
           const featureName = offGuardSuppression?.label || 'Deny Advantage';
@@ -778,6 +793,7 @@ export class CoverUIManager {
       const hasFeatUpgrade = !!message?.flags?.['pf2e-visioner']?.coverFeatUpgrade;
       const hasRuleElementBlocks = !!message?.flags?.['pf2e-visioner']?.ruleElementBlocks;
       const hasSnipingDuoCoverIgnore = !!message?.flags?.['pf2e-visioner']?.snipingDuoCoverIgnore;
+      const hasStarlitSpanCoverIgnore = !!message?.flags?.['pf2e-visioner']?.starlitSpanCoverIgnore;
       const hasOffGuardSuppression = !!message?.flags?.['pf2e-visioner']?.offGuardSuppression;
       const hasCoverAdjustment = !!message?.flags?.['pf2e-visioner']?.coverAdjustment;
 
@@ -812,6 +828,7 @@ export class CoverUIManager {
         hasFeatUpgrade ||
         hasRuleElementBlocks ||
         hasSnipingDuoCoverIgnore ||
+        hasStarlitSpanCoverIgnore ||
         hasOffGuardSuppression ||
         hasCoverAdjustment
       );

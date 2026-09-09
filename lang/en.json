@@ -1062,6 +1062,8 @@
       }
     },
     "UI": {
+      "WALL_BLOCKS_SCENT": "Blocks scent",
+      "WALL_BLOCKS_SCENT_HINT": "Stop scent through this wall, independently of sight and sound. Open doors allow scent through.",
       "ENCOUNTER_FILTER_TEXT": "Show only encounter tokens",
       "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (feat upgrade)",
       "COVER_OVERRIDE": "Cover Override",
@@ -1236,6 +1238,7 @@
       "SNIPING_DUO_PAN": "Pan to token",
       "SNIPING_DUO_SPOTTER_NOT_FOUND": "Sniping Duo: selected spotter not found.",
       "SNIPING_DUO_COVER_IGNORE_TOOLTIP": "{FEAT}: {ALLY} does not provide cover for this Strike.",
+      "STARLIT_SPAN_COVER_IGNORE_TOOLTIP": "Starlit Span: Arcane Cascade ignores lesser cover from allies for this ranged attack.",
       "SNIPING_DUO_COVER_OVERRIDE_UNAVAILABLE": "{FEAT}: cover override unavailable.",
       "COVER_ADJUSTMENT_TOOLTIP": "Cover adjusted by rule element ({SOURCES}): {ORIGINAL} → {FINAL}",
       "FROM_LINKED_DARKNESS": "From linked Darkness template",

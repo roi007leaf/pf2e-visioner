@@ -1,3 +1,5 @@
+import { isScentBlocked as defaultIsScentBlocked } from '../helpers/scent-wall-utils.js';
+
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
 }
@@ -200,6 +202,7 @@ export function buildSystemHiddenIndicatorDecision({
   getVisibilityState = null,
   getDetectionBetween = null,
   isSoundBlocked = null,
+  isScentBlocked = defaultIsScentBlocked,
   canLifesenseDetect = () => false,
   canThoughtsenseDetect = () => false,
   canScentDetect = () => true,
@@ -236,10 +239,12 @@ export function buildSystemHiddenIndicatorDecision({
     isWithinLifesenseRange;
   const shouldShowScentIndicator =
     mayShowSystemHiddenIndicator &&
-    isSystemHidden &&
+    (isSystemHidden || (isHiddenFromObserver && detection?.sense === 'scent')) &&
+    visibilityState !== 'observed' && visibilityState !== 'concealed' &&
     !!senseContext?.observerHasScent &&
     canBeDetectedByScent &&
-    isWithinScentRange;
+    isWithinScentRange &&
+    !isScentBlocked(observer, token);
   const shouldShowThoughtsenseIndicator =
     mayShowSystemHiddenIndicator &&
     !!senseContext?.observerHasThoughtsense &&

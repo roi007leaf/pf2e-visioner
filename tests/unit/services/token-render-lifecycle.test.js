@@ -8,6 +8,43 @@ import {
 } from '../../../scripts/services/token-render-lifecycle.js';
 
 describe('token render lifecycle service', () => {
+  test.each([
+    { flags: { 'pf2e-visioner': { visibilityV2: { target: {} } } } },
+    { 'flags.pf2e-visioner.visibilityV2.target': {} },
+    { 'flags.pf2e-visioner': { '-=visibilityV2': null } },
+    { flags: { 'pf2e-visioner': { detection: { target: {} } } } },
+  ])('refreshes outgoing targets after remote visibility flag updates (#304)', async (changes) => {
+    const previousUser = game.user;
+    game.user = { isGM: false };
+    const targets = [{ document: { id: 'target' }, refresh: jest.fn() }];
+    const applyCurrentViewHardHide = jest.fn();
+    const scheduleCanvasPerceptionUpdate = jest.fn();
+    try {
+      const result = await handleTokenUpdated({ id: 'observer' }, changes, {
+        getSceneTokens: () => targets, applyCurrentViewHardHide, scheduleCanvasPerceptionUpdate,
+      });
+      expect(result.handled).toBe(true);
+      expect(applyCurrentViewHardHide).toHaveBeenCalledWith(targets[0]);
+      expect(targets[0].refresh).toHaveBeenCalled();
+      expect(scheduleCanvasPerceptionUpdate).toHaveBeenCalledWith({ refreshVision: true });
+    } finally { game.user = previousUser; }
+  });
+  test.each([true, false])('ignores unrelated module flags for GM=%s', async (isGM) => {
+    const previousUser = game.user;
+    game.user = { isGM };
+    const getSceneTokens = jest.fn(() => []);
+    try {
+      const result = await handleTokenUpdated({ id: 'observer' },
+        { flags: { 'pf2e-visioner': { customColour: 'red' } } }, { getSceneTokens });
+      expect(result.handled).toBe(false);
+      expect(getSceneTokens).not.toHaveBeenCalled();
+      if (isGM) {
+        await handleTokenUpdated({ id: 'observer' },
+          { flags: { 'pf2e-visioner': { visibilityV2: {} } } }, { getSceneTokens });
+        expect(getSceneTokens).not.toHaveBeenCalled();
+      }
+    } finally { game.user = previousUser; }
+  });
   test('delegates pre-update movement and preserves synchronous cancellation', () => {
     const handlePreUpdateTokenMovement = jest.fn(() => false);
 

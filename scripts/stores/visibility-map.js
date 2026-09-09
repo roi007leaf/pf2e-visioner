@@ -3,8 +3,12 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { releaseDetectionFilterPrimaryMesh } from '../services/Detection/detection-filter-mesh-suppression.js';
 import { getNativeVisibilityReplacement } from '../chat/services/feats/native-visibility-replacement.js';
 import { isSceneTokenVisionDisabled } from '../services/scene-token-vision.js';
+import { shouldBypassAvsForGmVision } from '../services/gm-vision-bypass.js';
+import { clearPresenceOnlyTokenRenderSuppression, hidePresenceOnlySuppressedTokenDetails } from '../services/system-hidden-presence-only-suppression.js';
+import { enforceControlledLevelTokenRendering } from '../services/Detection/multi-level-control-view.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getLogger } from '../utils/logger.js';
 import { getCachedSettingValue } from '../utils/setting-value-cache.js';
@@ -19,6 +23,10 @@ import {
   profileToLegacyVisibility,
 } from '../visibility/perception-profile.js';
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
+import { getDetectionBetween } from './detection-map.js';
+import { isClosedSightDoorBetween } from '../helpers/scent-wall-utils.js';
+import { getSystemHiddenSenseContext } from '../services/system-hidden-token-highlights.js';
+import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import {
   areTokenFlagValuesEqual,
   applyTokenFlagUpdatePasses,
@@ -44,6 +52,7 @@ export {
 } from './visibility-profile-flag-persistence.js';
 
 const log = getLogger('AVS/VisibilityMap');
+const scentSuppressedTokens = new WeakSet();
 export const AVS_EXPLICIT_VISIBLE_DETECTION_SENSE = 'avs-visible';
 const KNOWN_LEGACY_VISIBILITY_STATES = new Set([
   'observed',
@@ -230,6 +239,7 @@ function clearDetectionFilterVisuals(token) {
 
   try {
     token.detectionFilter = null;
+    releaseDetectionFilterPrimaryMesh(token);
   } catch {
     /* best-effort filter clear */
   }
@@ -279,6 +289,7 @@ function clearObservedDetectionFilterVisualsForChanges(changes = []) {
     if (!shouldClearObservedDetectionFilterForChange(change)) continue;
     const target = tokenObjectById(change.targetId);
     clearDetectionFilterVisuals(target);
+    suppressCurrentViewScentTokenArt(target);
   }
 }
 
@@ -291,6 +302,7 @@ function visibilityTestPointsForToken(token) {
 }
 
 function refreshCoreDetectionFilterForHiddenTarget(target) {
+  if (suppressCurrentViewScentTokenArt(target)) return false;
   const testVisibility = canvas?.visibility?.testVisibility;
   if (!target || typeof testVisibility !== 'function') return false;
 
@@ -325,6 +337,7 @@ function refreshHiddenDetectionFilterVisualsForChanges(changes = []) {
   for (const change of changes) {
     if (change?.to !== 'hidden') continue;
     const target = tokenObjectById(change.targetId);
+    if (suppressCurrentViewScentTokenArt(target)) continue;
     if (!shouldRefreshHiddenDetectionFilterForChange(change, target)) continue;
     if (!target || tokenHasDetectionFilterMeshVisual(target) || target._pvHiddenEcho) continue;
     refreshCoreDetectionFilterForHiddenTarget(target);
@@ -354,6 +367,7 @@ export function primeHiddenDetectionFilterVisualsForObserver(
   let primed = 0;
   for (const target of tokens ?? []) {
     if (!target || target === observer || target.controlled) continue;
+    if (suppressCurrentViewScentTokenArt(target)) continue;
     const visibility = getVisibilityBetween(observer, target);
     if (visibility === 'observed' || visibility === 'concealed') {
       if (tokenHasDetectionFilterVisual(target)) {
@@ -378,6 +392,56 @@ export function primeHiddenDetectionFilterVisualsForObserver(
     }
   }
   return primed;
+}
+
+// Core refresh and Hidden-filter priming run before asynchronous indicator creation.
+// Suppress identifying art synchronously from the current perception profiles.
+function releaseCurrentViewScentTokenArt(target) {
+  if (scentSuppressedTokens.has(target) && !target.document?.hidden) {
+    clearPresenceOnlyTokenRenderSuppression(target, { forceTokenVisible: true });
+    enforceControlledLevelTokenRendering(target);
+    // An old marker can reassert suppression until its asynchronous cleanup completes.
+    if (!target._pvSystemHiddenIndicator) scentSuppressedTokens.delete(target);
+  }
+  return false;
+}
+
+export function suppressCurrentViewScentTokenArt(target, { walls } = {}) {
+  if (!target) return false;
+  if (target.controlled || isSceneTokenVisionDisabled() || shouldBypassAvsForGmVision()) return releaseCurrentViewScentTokenArt(target);
+  let observers = getCurrentViewObservers();
+  if (!observers.length && globalThis.game?.user?.isGM === false) {
+    observers = (globalThis.canvas?.tokens?.placeables ?? []).filter((token) => token._isVisionSource?.());
+  }
+  if (!observers.length && globalThis.game?.user?.isGM) return releaseCurrentViewScentTokenArt(target);
+  let scentDetected = false;
+  for (const observer of observers) {
+    if (observer === target) return releaseCurrentViewScentTokenArt(target);
+    if (typeof observer.document?.getFlag !== 'function') return false;
+    const state = getVisibilityBetween(observer, target);
+    const override = target.document?.getFlag?.(MODULE_ID, `avs-override-from-${getTokenId(observer)}`);
+    if (override && !override.coverOnly && override.state === 'observed') return releaseCurrentViewScentTokenArt(target);
+    const sense = getPerceptionProfileBetween(observer, target)?.detectionSense
+      ?? getDetectionBetween(observer, target)?.sense;
+    // Visibility and detection maps are separate writes. During closing, Hidden may
+    // arrive while the sense still says vision; keep the same door guard across both.
+    const visualSense = !sense || sense === AVS_EXPLICIT_VISIBLE_DETECTION_SENSE || isVisualSenseType(sense);
+    if ((visualSense || sense === 'hearing') && getSystemHiddenSenseContext(observer).observerHasScent &&
+      isClosedSightDoorBetween(observer, target, walls, { soundRequired: sense === 'hearing' })) {
+      scentDetected = true;
+      continue;
+    }
+    if (state === 'observed' || state === 'concealed') return releaseCurrentViewScentTokenArt(target);
+    if (state !== 'hidden') continue;
+    const scentIndicator = target._pvSystemHiddenIndicator?._pvIndicatorMode === 'scent' &&
+      target._pvSystemHiddenIndicator?._pvObserverId === getTokenId(observer);
+    if (sense !== 'scent' && !scentIndicator) return false;
+    scentDetected = true;
+  }
+  if (!scentDetected) return false;
+  scentSuppressedTokens.add(target);
+  hidePresenceOnlySuppressedTokenDetails(target);
+  return true;
 }
 
 export function buildVisibilityMapDocumentUpdatePasses(token, visibilityMap, options = {}) {

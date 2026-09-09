@@ -250,6 +250,9 @@ export class AvsInvalidationCoordinator {
   }
 
   #clearWallInvalidationCaches() {
+    // Wall geometry changes light-source reach without moving tokens or light emitters.
+    // Discard stationary-token lighting samples as well as directional LOS results.
+    LightingPrecomputer.clearLightingCaches();
     this.cacheManager?.clearLosCache?.();
     this.visionAnalyzer?.clearCache?.();
     this.cacheManager?.clearGlobalVisibilityCache?.();

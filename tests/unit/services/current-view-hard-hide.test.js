@@ -288,6 +288,32 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     );
   });
 
+  it('releases a stale mark from unselected active vision sources (#304)', () => {
+    controlled.length = 0;
+    globalThis.game = { user: { isGM: false } };
+    const t = { document: { id: 't' } };
+    t._pvCurrentViewHardHidden = true;
+    globalThis.canvas.tokens.placeables = [
+      { document: { id: 'pc' }, _isVisionSource: () => true },
+      { document: { id: 'familiar' }, _isVisionSource: () => true },
+    ];
+    __setStoredVisibilityForTest(new Map([['pc:t', 'undetected'], ['familiar:t', 'observed']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+    __setStoredVisibilityForTest(new Map([['pc:t', 'undetected'], ['familiar:t', 'undetected']]));
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+
+  it('preserves stale marks when no valid vision source exists (#304)', () => {
+    controlled.length = 0;
+    globalThis.game = { user: { isGM: false } };
+    const t = { document: { id: 't' } };
+    t._pvCurrentViewHardHidden = true;
+    globalThis.canvas.tokens.placeables = [{ _isVisionSource: () => false }];
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+    globalThis.canvas.tokens.placeables = [{ _isVisionSource: () => { throw new Error('source'); } }];
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
+  });
+
   it('uses best-observer aggregation when one selected token perceives the target', () => {
     const target = {
       controlled: false,

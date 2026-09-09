@@ -453,6 +453,53 @@ class OverrideValidationIndicator {
     }
   }
 
+  /**
+   * Remove one released AVS override from the pending validation UI.
+   * Other observer-target pairs must remain available for validation.
+   */
+  removeOverridePair(observerId, targetId) {
+    if (!observerId || !targetId) return false;
+
+    let removed = false;
+    const keepOtherPairs = (overrides) =>
+      (Array.isArray(overrides) ? overrides : []).filter((override) => {
+        const matches =
+          override?.observerId === observerId && override?.targetId === targetId;
+        if (matches) removed = true;
+        return !matches;
+      });
+
+    this._rawOverrides = keepOtherPairs(this._rawOverrides);
+
+    for (const [tokenId, data] of Array.from(this._overrideStack.entries())) {
+      const overrides = keepOtherPairs(data?.overrides);
+      if (overrides.length > 0) {
+        this._overrideStack.set(tokenId, { ...data, overrides });
+      } else {
+        this._overrideStack.delete(tokenId);
+        if (this._currentTokenId === tokenId) this._currentTokenId = null;
+      }
+    }
+
+    if (!removed) return false;
+
+    if (this._overrideStack.size > 0) {
+      this.#showStackedIndicator(this._currentTokenId);
+      return true;
+    }
+
+    const movedTokenId = this._data?.movedTokenId || null;
+    const visible = this.#getDisplayOverrides(this._rawOverrides, movedTokenId);
+    if (visible.length > 0) {
+      this.#showDirect(visible, this._rawOverrides, this._data?.tokenName || '');
+    } else {
+      this.hide(true);
+      this._rawOverrides = [];
+    }
+
+    return true;
+  }
+
   // Public: re-apply computed styles (e.g., after settings change)
   refreshStyles() {
     try {

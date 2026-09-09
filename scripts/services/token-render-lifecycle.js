@@ -4,6 +4,8 @@ import {
 } from './movement-tracking.js';
 import { isRefreshTokenProcessingSuppressed as defaultIsRefreshTokenProcessingSuppressed } from './runtime-state.js';
 import { isSceneTokenVisionDisabled } from './scene-token-vision.js';
+import { applyCurrentViewHardHide as defaultApplyCurrentViewHardHide } from './Detection/current-view-hard-hide.js';
+import { detectionFrameCache } from './Detection/detection-visibility-context.js';
 import { clearCurrentViewMovementRenderSettles as defaultClearCurrentViewMovementRenderSettles } from './Detection/current-view-hard-hide.js';
 import { scheduleCanvasPerceptionUpdate as defaultScheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { primeHiddenDetectionFilterVisualsForObserver as defaultPrimeHiddenDetectionFilterVisualsForObserver } from '../stores/visibility-map.js';
@@ -18,6 +20,19 @@ import { handlePreUpdateTokenMovement as defaultHandlePreUpdateTokenMovement } f
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
+}
+
+function hasVisibilityFlagChange(changes) {
+  const flagNames = /^(?:-=)?(?:visibilityV2|visibility|detection)(?:\.|$)|^(?:-=)?avs-override-from-/;
+  const nested = changes?.flags?.['pf2e-visioner'] ?? changes?.['flags.pf2e-visioner'];
+  return (
+    Object.keys(nested ?? {}).some((key) => flagNames.test(key)) ||
+    Object.keys(changes ?? {}).some(
+      (key) =>
+        key.startsWith('flags.pf2e-visioner.') &&
+        flagNames.test(key.slice('flags.pf2e-visioner.'.length)),
+    )
+  );
 }
 
 function defaultIsTokenDragOrMovementActive() {
@@ -92,6 +107,9 @@ export async function handleTokenUpdated(
     schedulePendingTokenMovementCompletion = defaultSchedulePendingTokenMovementCompletion,
     refreshSystemHiddenHighlightsForMovedToken = defaultRefreshSystemHiddenHighlightsForMovedToken,
     hasActivePendingTokenMovement = defaultHasActivePendingTokenMovement,
+    applyCurrentViewHardHide = defaultApplyCurrentViewHardHide,
+    scheduleCanvasPerceptionUpdate = defaultScheduleCanvasPerceptionUpdate,
+    getSceneTokens = () => globalThis.canvas?.tokens?.placeables ?? [],
     warn = console.warn,
   } = {},
 ) {
@@ -100,6 +118,16 @@ export async function handleTokenUpdated(
   }
   try {
     if (!hasPositionChange(changes)) {
+      if (globalThis.game?.user?.isGM === false && hasVisibilityFlagChange(changes)) {
+        detectionFrameCache.clear();
+        // The updated document owns an outgoing map: all its targets may need repainting.
+        for (const target of getSceneTokens()) {
+          target.refresh?.();
+          applyCurrentViewHardHide(target);
+        }
+        scheduleCanvasPerceptionUpdate({ refreshVision: true });
+        return { handled: true };
+      }
       return { handled: false, reason: 'not-position' };
     }
 

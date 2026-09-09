@@ -551,6 +551,11 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       state = this._detectCover(attacker, target, data?.flags?.pf2e?.context);
     }
 
+    const starlitSpanCoverIgnore = coverDetector.consumeStarlitSpanCoverIgnore(
+      speakerTokenId,
+      targetTokenId,
+    );
+
     // Preserve original detected state for override comparison
     const originalDetectedState = state;
 
@@ -600,6 +605,16 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
       }
     } catch (e) {
       console.warn('PF2E Visioner | Failed to check cover override:', e);
+    }
+
+    // Only describe the benefit when this roll actually used the detected no-cover result.
+    const rolledOptions = data?.flags?.pf2e?.context?.options ?? [];
+    if (starlitSpanCoverIgnore && manualCover === 'none' && state === 'none' &&
+        rolledOptions.includes('target:cover-level:none')) {
+      data.flags ??= {};
+      data.flags['pf2e-visioner'] ??= {};
+      data.flags['pf2e-visioner'].starlitSpanCoverIgnore = starlitSpanCoverIgnore;
+      doc?.updateSource?.({ 'flags.pf2e-visioner.starlitSpanCoverIgnore': starlitSpanCoverIgnore });
     }
 
     try {
@@ -896,6 +911,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         }
 
         // Apply effect/clone/stat logic for the final state
+        if (finalState === 'none') this._injectCoverRollOptions(context, 'none', 0);
         await this._applyCoverEphemeralEffect(target, attacker, finalState, context, manualCover);
         this._ensureUnsuppressedOffGuardModifier(context, attacker, target);
       }

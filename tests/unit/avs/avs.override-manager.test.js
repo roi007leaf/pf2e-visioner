@@ -773,6 +773,34 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     expect(recalculateForTokens).not.toHaveBeenCalled();
   });
 
+  test('removeOverride evicts the released pair from the pending validation indicator', async () => {
+    const A = mkToken('A');
+    const B = mkToken('B');
+    B.document.getFlag.mockImplementation((mod, key) =>
+      mod === 'pf2e-visioner' && key === 'avs-override-from-A'
+        ? { state: 'concealed', source: 'manual_action' }
+        : undefined,
+    );
+    canvas.tokens.get.mockImplementation((id) => ({ A, B }[id] || null));
+
+    const removeOverridePair = jest.fn();
+    jest.doMock('../../../scripts/ui/OverrideValidationIndicator.js', () => ({
+      __esModule: true,
+      default: { removeOverridePair },
+    }));
+
+    const { default: AvsOverrideManager } = await import(
+      '../../../scripts/chat/services/infra/AvsOverrideManager.js'
+    );
+
+    const result = await AvsOverrideManager.removeOverride('A', 'B', {
+      deferAvsRefresh: true,
+    });
+
+    expect(result).toBe(true);
+    expect(removeOverridePair).toHaveBeenCalledWith('A', 'B');
+  });
+
   test('removeOverride clears manual cover when removing a Take Cover cover-only marker', async () => {
     const A = mkToken('A');
     const B = mkToken('B');

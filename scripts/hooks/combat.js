@@ -268,7 +268,7 @@ async function handleTurnAdvance(combat) {
   await checkAvsOverrides();
 }
 
-async function checkAvsOverrides() {
+export async function checkAvsOverrides() {
   if (!game.user?.isGM) return;
   if (!game.combat?.combatants?.size) return;
 
@@ -331,7 +331,22 @@ async function checkAvsOverrides() {
 
     if (allOverrides.length > 0) {
       const { default: indicator } = await import('../ui/OverrideValidationIndicator.js');
-      indicator.show(allOverrides, '', null, { isTurnChange: true });
+      const persistedOverrides = [];
+
+      for (const override of allOverrides) {
+        const target = canvas.tokens?.get?.(override.targetId);
+        const flagKey = `avs-override-from-${override.observerId}`;
+        const stillPersisted = !!target?.document?.getFlag?.(MODULE_ID, flagKey);
+        if (stillPersisted) {
+          persistedOverrides.push(override);
+        } else {
+          indicator.removeOverridePair?.(override.observerId, override.targetId);
+        }
+      }
+
+      if (persistedOverrides.length > 0) {
+        indicator.show(persistedOverrides, '', null, { isTurnChange: true });
+      }
     }
   } catch (e) {
     console.error('PF2E Visioner | Error checking AVS overrides on turn change:', e);

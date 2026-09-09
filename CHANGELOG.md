@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.6.0] - 2026-09-09
+
+### Added
+
+- **Starlit Span support**: While Arcane Cascade is active, ranged attacks ignore lesser cover provided by allies. Cover from enemies and terrain, as well as standard and greater cover, remains unchanged.
+- **Starlit Span chat indicator**: Attack cards display a GM-only badge beside the target's AC when Arcane Cascade removes allied lesser cover, with a tooltip explaining the benefit.
+- **Scent-blocking walls**: Added a **Blocks scent** option to wall configuration and Visioner's advanced wall settings, independent of sight and sound restrictions. It is disabled by default, and open doors allow scent through.
+
+### Fixed
+
+- **Door and darkness visibility**: Opening or closing doors updates visibility for stationary tokens, including inside darkness regions. Normal token artwork returns correctly when sight is restored.
+- **Automatic visibility range**: Removed an unintended 20-foot cutoff so visibility calculations use the intended detection range.
+- **Offscreen visibility updates**: The GM's camera position no longer causes automatic visibility updates to skip tokens outside the viewport.
+- **Player vision without a selected token**: Visibility refreshes correctly after remote changes and combines available vision sources, including owned familiars.
+- **One-way Hide overrides**: A Hide override in one direction no longer prevents visibility from updating in the opposite direction.
+- **Scent indicators and token flashes**: Creatures detected only by scent display a generic presence indicator instead of identifiable token artwork. Refreshes and door changes no longer briefly expose the token, and normal artwork returns when sight is restored.
+
 ## [8.5.11] - 2026-09-06
 
 ### Fixed

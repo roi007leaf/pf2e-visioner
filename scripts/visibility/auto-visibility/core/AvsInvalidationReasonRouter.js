@@ -73,6 +73,12 @@ export function changeAffectsVisibility(changeData, hasProperty) {
 }
 
 export function changeAffectsLineOfSight(changeData, hasProperty) {
+  if (changeData && (
+    Object.hasOwn(changeData, 'flags.pf2e-visioner.blocksScent') ||
+    Object.hasOwn(changeData, 'flags.pf2e-visioner.-=blocksScent') ||
+    Object.hasOwn(changeData.flags?.['pf2e-visioner'] ?? {}, 'blocksScent') ||
+    Object.hasOwn(changeData.flags?.['pf2e-visioner'] ?? {}, '-=blocksScent')
+  )) return true;
   return changeAffectsAnyField(changeData, WALL_LOS_FIELDS, hasProperty);
 }
 

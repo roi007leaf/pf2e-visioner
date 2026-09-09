@@ -9,6 +9,7 @@ import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/util
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
 import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
 import { HashGridIndex } from '../../../scripts/visibility/auto-visibility/core/HashGridIndex.js';
+import { DependencyInjectionContainer } from '../../../scripts/visibility/auto-visibility/core/DependencyInjectionContainer.js';
 
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
@@ -280,6 +281,44 @@ describe('BatchProcessor', () => {
       queryCircleSpy.mockRestore();
       global.canvas.scene.grid.distance = previousGridDistance;
     }
+  });
+
+  test.each([30, 150])('uses the spatial service range at %s ft through runtime injection (#302)', async (distance) => {
+    const previousGridDistance = global.canvas.scene.grid.distance;
+    global.canvas.scene.grid.distance = 5;
+    processor.maxVisibilityDistance = undefined;
+    spatialAnalyzer.getMaxVisibilityDistance = jest.fn(() => 180);
+    processor = await new DependencyInjectionContainer().get('batchProcessor', {
+      ...processor, spatialAnalyzer,
+    });
+    const tokens = [makeToken('A', 0, 0), makeToken('B', distance * 20, 0)];
+    global.canvas.tokens.placeables = tokens;
+
+    try {
+      const result = await processor.process(tokens, new Set(['A']), {});
+      expect(result.updates.map((u) => [u.observer.document.id, u.target.document.id]))
+        .toEqual(expect.arrayContaining([['A', 'B'], ['B', 'A']]));
+    } finally {
+      global.canvas.scene.grid.distance = previousGridDistance;
+    }
+  });
+
+  test('reverse Hide override preserves the hider view and persists the override (#305)', async () => {
+    const tokens = global.canvas.tokens.placeables.slice(0, 2);
+    processor.overrideService = { getActiveOverrideForTokens: (observer, target) =>
+      observer.document.id === 'B' && target.document.id === 'A' ? { state: 'hidden' } : null };
+    processor.visibilityMapService = { getVisibilityMap: (token) =>
+      token.document.id === 'A' ? { B: 'undetected' } : {} };
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+
+    const result = await processor.process(tokens, new Set(['A']), {});
+
+    expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mock.calls
+      .some(([observer, target]) => observer.document.id === 'A' && target.document.id === 'B')).toBe(true);
+    expect(result.updates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ observer: tokens[0], target: tokens[1], visibility: 'observed' }),
+      expect.objectContaining({ observer: tokens[1], target: tokens[0], visibility: 'hidden' }),
+    ]));
   });
 
   test('reports detailed processor timing buckets', async () => {

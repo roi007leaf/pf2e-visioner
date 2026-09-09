@@ -9,6 +9,7 @@ import {
   wrapTokenRefreshState,
   wrapTokenRefreshTooltip,
   wrapTokenRefreshVisibility,
+  wrapPrimaryTokenMeshRender,
 } from './detection-token-refresh.js';
 import {
   wrapTokenDocumentPrepareBaseData,
@@ -69,6 +70,14 @@ function registerCoreDetectionWrappers(libWrapperAdapter) {
 
 function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGeneration) {
   try {
+    if (Number(foundryGeneration) >= 14) {
+      libWrapperAdapter.register(
+        MODULE_ID,
+        'foundry.canvas.primary.PrimarySpriteMesh.prototype._render',
+        wrapPrimaryTokenMeshRender,
+        'MIXED',
+      );
+    }
     libWrapperAdapter.register(
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._canHover',
