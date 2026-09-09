@@ -287,6 +287,36 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
       { document: { id: 'observer-b' }, controlled: true },
     );
   });
+  it.each(['one-way', 'two-way', 'replace'])('uses a stationary %s vision master to release a hidden target', (mode) => {
+    const minion = { document: { id: 'minion', getFlag: (_module, key) => ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key] } };
+    const master = { document: { id: 'master' }, _isVisionSource: () => true };
+    controlled.splice(0, controlled.length, minion);
+    canvas.tokens.placeables = [minion, master];
+    __setStoredVisibilityForTest(new Map([['minion:t', 'undetected'], ['master:t', 'observed']]));
+    const t = { document: { id: 't' }, actor: { type: 'npc' } };
+    t._pvCurrentViewHardHidden = true;
+    t.mesh = { visible: false, renderable: false, alpha: 0 };
+    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+    expect(releaseCurrentViewHardHideIfMarked(t)).toBe(true);
+    expect(t.mesh.visible).toBe(true);
+  });
+  it.each([
+    ['one-way', 'minion', true, 'undetected', 'observed', false],
+    ['one-way', 'master', true, 'observed', 'undetected', true],
+    ['two-way', 'master', true, 'observed', 'undetected', false],
+    ['reverse', 'master', true, 'undetected', 'observed', true],
+    ['reverse', 'master', true, 'observed', 'undetected', false],
+    ['reverse', 'minion', true, 'undetected', 'observed', true],
+    ['replace', 'minion', true, 'observed', 'undetected', true],
+    ['one-way', 'minion', false, 'undetected', 'observed', true],
+  ])('%s sharing from selected %s respects source direction and eligibility', (mode, selected, active, minionState, masterState, hidden) => {
+    const minion = { document: { id: 'minion', getFlag: (_module, key) => ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key] }, _isVisionSource: () => active };
+    const master = { document: { id: 'master' }, _isVisionSource: () => active };
+    controlled.splice(0, controlled.length, selected === 'minion' ? minion : master);
+    canvas.tokens.placeables = [minion, master];
+    __setStoredVisibilityForTest(new Map([['minion:t', minionState], ['master:t', masterState]]));
+    expect(targetIsHardHiddenFromCurrentView({ document: { id: 't' }, actor: { type: 'npc' } })).toBe(hidden);
+  });
 
   it('releases a stale mark from unselected active vision sources (#304)', () => {
     controlled.length = 0;

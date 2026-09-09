@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.6.1] - 2026-09-09
+
+### Fixed
+
+- **Vision Master visibility while stationary**: Tokens seen through a Vision Master appear without requiring movement. Shared visibility respects one-way, two-way, replacement, and reverse sharing modes and only uses eligible vision sources.
+
 ## [8.6.0] - 2026-09-09
 
 ### Added

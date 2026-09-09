@@ -7,6 +7,7 @@ import { currentViewHardHideSurfaces } from './current-view-hard-hide-surfaces.j
 import { legacyLevelsFloorBlocksSightBetween } from './legacy-levels-live-sight.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import {
+  detectionFrameCache,
   getVisionerVisibilityBetweenTokens,
   isAvsActiveGivenCombatGate,
 } from './detection-visibility-context.js';
@@ -61,7 +62,7 @@ function actorOf(target) {
   return target?.actor ?? null;
 }
 
-function getStoredVisibilityState(observer, target) {
+function getOwnStoredVisibilityState(observer, target) {
   if (storedVisibilityOverrideForTest) {
     return (
       storedVisibilityOverrideForTest.get(`${tokenIdOf(observer)}:${tokenIdOf(target)}`) ||
@@ -69,6 +70,40 @@ function getStoredVisibilityState(observer, target) {
     );
   }
   return getVisionerVisibilityBetweenTokens(observer, target) || 'observed';
+}
+
+function getStoredVisibilityState(observer, target) {
+  const observerId = tokenIdOf(observer);
+  const masterId = observer?.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+  const mode = observer?.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+  const sources = [observer];
+  let replacesOwnVision = false;
+  const sharingIndex = detectionFrameCache?.getVisionSharingIndex?.();
+  const candidates = sharingIndex
+    ? [sharingIndex.byToken.get(masterId)?.token, ...(sharingIndex.byMaster.get(observerId) ?? []).map((entry) => entry.token)].filter(Boolean)
+    : globalThis.canvas?.tokens?.placeables ?? [];
+  for (const token of candidates) {
+    if (tokenIdOf(token) === observerId) continue;
+    const childMode = token.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    const sharesMaster = tokenIdOf(token) === masterId && mode !== 'reverse';
+    const sharesMinion = token.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId') === observerId &&
+      (childMode === 'two-way' || childMode === 'reverse');
+    if (!sharesMaster && !sharesMinion) continue;
+    // Core's source predicate includes sharing direction, blindness, and the current selection.
+    if (!token._isVisionSource?.()) continue;
+    sources.push(token);
+    if ((sharesMaster && mode === 'replace') || (sharesMinion && childMode === 'reverse')) {
+      replacesOwnVision = true;
+    }
+  }
+  if (replacesOwnVision) sources.shift();
+  const ranks = { observed: 0, concealed: 1, hidden: 2, undetected: 3, unnoticed: 4 };
+  let best = 'unnoticed';
+  for (const source of sources) {
+    const state = tokenIdOf(source) === tokenIdOf(target) ? 'observed' : getOwnStoredVisibilityState(source, target);
+    if (ranks[state] < ranks[best]) best = state;
+  }
+  return best;
 }
 
 function hiddenStateShouldRenderHideTarget(target) {
