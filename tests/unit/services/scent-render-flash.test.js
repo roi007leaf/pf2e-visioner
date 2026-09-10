@@ -1,5 +1,6 @@
 import { wrapTokenRefreshVisibility, wrapTokenApplyRenderFlags, wrapPrimaryTokenMeshRender } from '../../../scripts/services/Detection/detection-token-refresh.js';
 import { wrapTokenRenderDetectionFilter } from '../../../scripts/services/Detection/detection-filter-render.js';
+import { registerDetectionWrappers } from '../../../scripts/services/Detection/detection-wrapper-registration.js';
 import { primeHiddenDetectionFilterVisualsForObserver } from '../../../scripts/stores/visibility-map.js';
 import { clearPendingPerceptionProfileWrites } from '../../../scripts/stores/visibility-profile-flag-persistence.js';
 import { prepareDoorScentRenderTransition } from '../../../scripts/services/door-state-visibility-refresh.js';
@@ -26,6 +27,39 @@ describe('scent presentation before the next animation frame', () => {
     global.canvas.tokens.get = (id) => id === 'target' ? target : observer;
   });
   afterEach(() => clearPendingPerceptionProfileWrites());
+
+  test.each([13, 14])('registered detection render can suppress scent and resume sight without breaking the chain (v%i)', (foundryGeneration) => {
+    const register = jest.fn();
+    registerDetectionWrappers({ libWrapperAdapter: { register }, foundryGeneration });
+    const [, , wrapper, type] = register.mock.calls.find(([, path]) =>
+      path === 'foundry.canvas.placeables.Token.prototype._renderDetectionFilter');
+    const renderer = {};
+    const draw = jest.fn(function (arg) {
+      expect(this).toBe(target);
+      expect(arg).toBe(renderer);
+      return 'drawn';
+    });
+    const render = () => {
+      draw.mockClear();
+      const result = wrapper.call(target, draw.bind(target), renderer);
+      // libWrapper rejects and unregisters WRAPPER callbacks that skip their next call.
+      if (type === 'WRAPPER' && draw.mock.calls.length === 0) {
+        throw new Error('WRAPPER did not chain the call to the next wrapper');
+      }
+      return result;
+    };
+
+    for (let frame = 0; frame < 3; frame++) {
+      target.detectionFilter = {};
+      expect(render).not.toThrow();
+      expect(draw).not.toHaveBeenCalled();
+      expect(target.detectionFilterMesh.visible).toBe(false);
+    }
+
+    profile = { detectionState: 'observed', detectionSense: 'avs-visible' };
+    expect(render()).toBe('drawn');
+    expect(draw).toHaveBeenCalledTimes(1);
+  });
 
   test.each([wrapTokenRefreshVisibility, wrapTokenApplyRenderFlags])('Core refresh cannot expose scent art before a marker exists (%#)', (wrapper) => {
     for (let frame = 0; frame < 3; frame++) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.6.2] - 2026-09-10
+
+### Fixed
+
+- **Detection-filter rendering errors**: Fixed a libWrapper error during scent-only visibility transitions that could interrupt canvas rendering. Scent-only token artwork stays suppressed, and normal rendering resumes when sight returns.
+
 ## [8.6.1] - 2026-09-09
 
 ### Fixed

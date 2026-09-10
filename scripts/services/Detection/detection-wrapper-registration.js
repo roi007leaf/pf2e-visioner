@@ -114,11 +114,13 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGenerati
       wrapTokenControl,
       'WRAPPER',
     );
+    // Scent-only presentation intentionally skips Core's detection-filter draw.
+    // MIXED permits that early return without libWrapper rejecting the render chain.
     libWrapperAdapter.register(
       MODULE_ID,
       'foundry.canvas.placeables.Token.prototype._renderDetectionFilter',
       wrapTokenRenderDetectionFilter,
-      'WRAPPER',
+      'MIXED',
     );
     if (Number(foundryGeneration) === 13) {
       // V13 refreshes token effect icons after its nested visibility refresh. Reassert current-view
