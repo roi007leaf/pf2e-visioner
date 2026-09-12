@@ -161,7 +161,7 @@ export async function extractActionData(message) {
     const flags = actorToken?.document?.flags?.['pf2e-visioner'] || {};
     const hasHiddenOverride = Object.entries(flags).some(([k, v]) =>
       k.startsWith('avs-override-from-') &&
-      ['hidden', 'undetected'].includes(overrideToDisplayVisibility(v)));
+      ['hidden', 'undetected', 'unnoticed'].includes(overrideToDisplayVisibility(v)));
     if (hasHiddenOverride) actionType = 'consequences';
   }
 

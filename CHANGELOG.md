@@ -1,5 +1,14 @@
 # Changelog
 
+## [8.6.3] - 2026-09-12
+
+### Fixed
+
+- **Attacks from Unnoticed creatures**: Attack consequences now include Unnoticed encounter states, allowing those overrides to be released to AVS after attacking.
+- **Disappearing map tiles**: Scent-only token suppression no longer hides background or level tiles that share Foundry's primary mesh renderer.
+- **Unexpected AVS validation after attacks**: Applying attack consequences no longer presents unrelated scene overrides as changes requiring validation. Successfully released override pairs are removed from the validation queue while unrelated pending changes are preserved.
+- **AVS validation wording**: The dialog now asks users to review proposed changes without incorrectly claiming that a token named "Overrides" moved.
+
 ## [8.6.2] - 2026-09-10
 
 ### Fixed

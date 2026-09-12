@@ -10,7 +10,7 @@ describe('consequences targets', () => {
     jest.resetModules();
   });
 
-  test('discovers only observers that see attacker as hidden or undetected and caches visibility', async () => {
+  test.each(['hidden', 'undetected', 'unnoticed'])('discovers observers that see attacker as %s and caches visibility', async (state) => {
     const hiddenObserver = createMockToken({ id: 'hidden-observer' });
     const observedObserver = createMockToken({ id: 'observed-observer' });
     const attacker = createMockToken({ id: 'attacker' });
@@ -18,7 +18,7 @@ describe('consequences targets', () => {
     jest.doMock('../../../scripts/utils.js', () => ({
       __esModule: true,
       getVisibilityBetween: jest.fn((observer) =>
-        observer.id === 'hidden-observer' ? 'hidden' : 'observed',
+        observer.id === 'hidden-observer' ? state : 'observed',
       ),
     }));
 
@@ -30,10 +30,10 @@ describe('consequences targets', () => {
     const subjects = await discoverConsequencesSubjects(actionData);
 
     expect(subjects).toEqual([hiddenObserver]);
-    expect(actionData._visionerConsequencesVisibility.get('hidden-observer')).toBe('hidden');
+    expect(actionData._visionerConsequencesVisibility.get('hidden-observer')).toBe(state);
   });
 
-  test('builds consequence outcome from cached visibility and AVS default', async () => {
+  test.each(['hidden', 'undetected', 'unnoticed'])('builds consequence outcome from cached %s visibility and AVS default', async (state) => {
     game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
 
     const { buildConsequencesOutcome } = await import(
@@ -44,15 +44,15 @@ describe('consequences targets', () => {
     const outcome = await buildConsequencesOutcome(
       {
         actor: createMockToken({ id: 'attacker' }),
-        _visionerConsequencesVisibility: new Map([['observer', 'undetected']]),
+        _visionerConsequencesVisibility: new Map([['observer', state]]),
       },
       subject,
     );
 
     expect(outcome).toMatchObject({
       target: subject,
-      currentVisibility: 'undetected',
-      oldVisibility: 'undetected',
+      currentVisibility: state,
+      oldVisibility: state,
       changed: true,
       newVisibility: 'avs',
     });

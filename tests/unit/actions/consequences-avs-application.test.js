@@ -17,6 +17,55 @@ function makeToken(id, flagMap = {}) {
 }
 
 describe('consequences AVS application', () => {
+  test('returning attack consequences to AVS removes stale rows without proposing unrelated overrides', async () => {
+    const { applyConsequencesAvs } = await import(
+      '../../../scripts/chat/services/actions/Consequences/consequences-avs-application.js'
+    );
+    const attacker = makeToken('attacker', {
+      'avs-override-from-observer': { state: 'unnoticed', source: 'stealth_initiative' },
+    });
+    const observer = makeToken('observer');
+    const unrelated = makeToken('unrelated', {
+      'avs-override-from-observer': { state: 'hidden', source: 'hide_action' },
+    });
+    const previousTokens = canvas.tokens.placeables;
+    canvas.tokens.placeables = [observer, attacker, unrelated];
+    const overrideIndicator = {
+      hide: jest.fn(),
+      update: jest.fn(),
+      removeOverridePair: jest.fn(),
+    };
+    const avsOverrideManager = {
+      removeOverride: jest.fn(async (observerId, targetId) => {
+        const token = canvas.tokens.placeables.find((candidate) => candidate.id === targetId);
+        const key = `avs-override-from-${observerId}`;
+        if (!token.document.flags['pf2e-visioner'][key]) return false;
+        delete token.document.flags['pf2e-visioner'][key];
+        return true;
+      }),
+      setPairOverrides: jest.fn(),
+    };
+    try {
+      await applyConsequencesAvs({
+        actionData: { actor: attacker, messageId: 'release-to-avs' },
+        subjects: [observer],
+        attacker,
+        analyzeOutcome: async () => ({ target: observer, changed: true, newVisibility: 'avs' }),
+        applyOverrides: jest.fn(),
+        avsOverrideManager,
+        overrideIndicator,
+      });
+      expect(overrideIndicator.update).not.toHaveBeenCalled();
+      expect(overrideIndicator.hide).not.toHaveBeenCalled();
+      expect(overrideIndicator.removeOverridePair).toHaveBeenCalledWith('observer', 'attacker');
+      expect(overrideIndicator.removeOverridePair).not.toHaveBeenCalledWith('observer', 'unrelated');
+      expect(avsOverrideManager.setPairOverrides).not.toHaveBeenCalled();
+      expect(unrelated.document.flags['pf2e-visioner']['avs-override-from-observer']).toBeDefined();
+    } finally {
+      canvas.tokens.placeables = previousTokens;
+    }
+  });
+
   test('removes existing overrides, creates new consequences overrides, and caches revert data', async () => {
     const { applyConsequencesAvs } = await import(
       '../../../scripts/chat/services/actions/Consequences/consequences-avs-application.js'

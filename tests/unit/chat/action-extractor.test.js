@@ -701,6 +701,24 @@ describe('Action Extractor Tests', () => {
   });
 
   describe('Attack Roll and Consequences Detection', () => {
+    test('detects attack consequences for encounter Unnoticed overrides', async () => {
+      const token = {
+        actor: { itemTypes: { condition: [] } },
+        document: { flags: { 'pf2e-visioner': {
+          'avs-override-from-observer': {
+            state: 'unnoticed', detectionState: 'undetected', awarenessState: 'unnoticed',
+            source: 'encounter_stealth_initiative',
+          },
+        } } },
+      };
+      const result = await extractActionData({
+        id: 'unnoticed-attack',
+        flags: { pf2e: { context: { type: 'attack-roll' } } },
+        token: { object: token },
+      });
+      expect(result?.actionType).toBe('consequences');
+    });
+
     test('detects attack roll from context type', async () => {
       const mockToken = {
         actor: {

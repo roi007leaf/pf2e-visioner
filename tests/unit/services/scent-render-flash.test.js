@@ -18,6 +18,7 @@ describe('scent presentation before the next animation frame', () => {
       return null;
     });
     target = global.createMockToken({ id: 'target' });
+    target.document.documentName = 'Token';
     target.controlled = false;
     target.mesh = { visible: true, renderable: true, alpha: 1 };
     target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
@@ -27,6 +28,60 @@ describe('scent presentation before the next animation frame', () => {
     global.canvas.tokens.get = (id) => id === 'target' ? target : observer;
   });
   afterEach(() => clearPendingPerceptionProfileWrites());
+
+  test.each(['placeable', 'document'])('primary token art still follows scent suppression through a %s reference', (reference) => {
+    target.document.object = target;
+    target.mesh.object = reference === 'document' ? target.document : target;
+    const draw = jest.fn(() => 'token drawn');
+    const renderer = {};
+    wrapPrimaryTokenMeshRender.call(target.mesh, draw, renderer);
+    expect(draw).not.toHaveBeenCalled();
+    expect(target.mesh).toMatchObject({ visible: false, renderable: false, alpha: 0 });
+
+    profile = { detectionState: 'observed', detectionSense: 'avs-visible' };
+    expect(wrapPrimaryTokenMeshRender.call(target.mesh, draw, renderer)).toBe('token drawn');
+    expect(draw).toHaveBeenCalledWith(renderer);
+    expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  test.each(['placeable', 'document'])('scent observer never suppresses level tiles through a %s mesh reference', (reference) => {
+    observer.actor.system.perception = { senses: [{ type: 'scent', range: 60 }] };
+    observer.center = { x: 0, y: 0 };
+    const previousWalls = global.canvas.walls.placeables;
+    global.canvas.walls.placeables = [{ document: { c: [50, -50, 50, 50], door: 1, ds: 0, sight: 20, sound: 20 } }];
+    const register = jest.fn();
+    registerDetectionWrappers({ libWrapperAdapter: { register }, foundryGeneration: 14 });
+    const [, , render] = register.mock.calls.find(([, path]) =>
+      path === 'foundry.canvas.primary.PrimarySpriteMesh.prototype._render');
+    try {
+      for (const [id, texture] of [
+        ['vecA2lXUxgOUdkgn', 'shrine-of-eclipse-level2.webp'],
+        ['1VNbuXbgtwQF8Um4', 'shrine-of-eclipse-level1.webp'],
+      ]) {
+        const tile = {
+          document: { id, documentName: 'Tile', texture: { src: texture }, getFlag: jest.fn() },
+          center: { x: 100, y: 0 },
+          visible: true,
+          renderable: true,
+          mesh: { visible: true, renderable: true, alpha: 1 },
+        };
+        tile.document.object = tile;
+        tile.mesh.object = reference === 'document' ? tile.document : tile;
+        const renderer = {};
+        const draw = jest.fn(() => 'tile drawn');
+        for (let frame = 0; frame < 3; frame++) {
+          const result = render.call(tile.mesh, draw, renderer);
+          expect(tile).toMatchObject({ visible: true, renderable: true });
+          expect(tile.mesh).toMatchObject({ visible: true, renderable: true, alpha: 1 });
+          expect(result).toBe('tile drawn');
+        }
+        expect(draw).toHaveBeenCalledTimes(3);
+        expect(draw).toHaveBeenCalledWith(renderer);
+      }
+    } finally {
+      global.canvas.walls.placeables = previousWalls;
+    }
+  });
 
   test.each([13, 14])('registered detection render can suppress scent and resume sight without breaking the chain (v%i)', (foundryGeneration) => {
     const register = jest.fn();

@@ -5,9 +5,9 @@
     <div class="header-content">
       <p class="subtitle">
         {{#if isTurnChange}}
-          Turn change detected. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
+          Turn changed. Review <strong>{{overrideCount}}</strong> proposed AVS change{{#unless (eq overrideCount 1)}}s{{/unless}} for combat tokens.
         {{else}}
-          Token <strong><em>{{tokenName}}</em></strong> has moved. AVS wants to make <strong>{{overrideCount}}</strong> change{{#unless (eq overrideCount 1)}}s{{/unless}}.
+          Review <strong>{{overrideCount}}</strong> proposed AVS change{{#unless (eq overrideCount 1)}}s{{/unless}}.
           {{#if targetHeader.stealthPositionBypassLabel}}
             <span class="stealth-position-bypass-badge" data-tooltip="{{targetHeader.stealthPositionBypassTooltip}}">
               <i class="{{targetHeader.stealthPositionBypassIcon}}"></i>

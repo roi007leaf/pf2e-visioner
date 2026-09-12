@@ -79,17 +79,23 @@ function collectExistingOverrides(attacker, observers) {
 }
 
 async function removeOverridesForConsequences(attacker, observers, avsOverrideManager) {
+  const removedPairs = [];
   for (const observer of observers) {
     try {
       const observerId = observer?.document?.id;
       const attackerId = attacker?.document?.id;
       if (!observerId || !attackerId) continue;
-      await avsOverrideManager.removeOverride(observerId, attackerId);
-      await avsOverrideManager.removeOverride(attackerId, observerId);
+      if (await avsOverrideManager.removeOverride(observerId, attackerId)) {
+        removedPairs.push([observerId, attackerId]);
+      }
+      if (await avsOverrideManager.removeOverride(attackerId, observerId)) {
+        removedPairs.push([attackerId, observerId]);
+      }
     } catch (error) {
       console.warn('PF2E Visioner | Consequences override removal issue:', error);
     }
   }
+  return removedPairs;
 }
 
 async function buildConsequencesOutcomes({ actionData, subjects, analyzeOutcome, applyOverrides }) {
@@ -160,37 +166,13 @@ async function createConsequencesOverrides({ changed, attacker, avsOverrideManag
   return createdOverrides;
 }
 
-async function refreshConsequencesOverrideIndicator(overrideIndicator) {
+async function refreshConsequencesOverrideIndicator(overrideIndicator, removedPairs) {
   try {
     const indicator = await loadOverrideIndicator(overrideIndicator);
-    const allTokens = canvas.tokens?.placeables || [];
-    const remaining = [];
-    for (const token of allTokens) {
-      const flags = token.document?.flags?.[MODULE_ID] || {};
-      for (const [key, value] of Object.entries(flags)) {
-        if (!key.startsWith('avs-override-from-')) continue;
-        if (!value || typeof value !== 'object') continue;
-        const observerId = key.replace('avs-override-from-', '');
-        const targetId = token.document.id;
-        remaining.push({
-          observerId,
-          targetId,
-          observerName: value.observerName || observerId,
-          targetName: value.targetName || token.document.name,
-          state: overrideToDisplayVisibility(value),
-          hasCover: value.hasCover,
-          hasConcealment: value.hasConcealment,
-          expectedCover: value.expectedCover,
-          currentVisibility: null,
-          currentCover: null,
-        });
-      }
-    }
-    if (remaining.length === 0) {
-      indicator.hide(true);
-      indicator.update([], '');
-    } else {
-      indicator.update(remaining, 'Overrides');
+    // Existing flags are not validation results. Preserve unrelated queued changes
+    // and only discard pairs whose overrides were successfully released.
+    for (const [observerId, targetId] of removedPairs) {
+      indicator.removeOverridePair?.(observerId, targetId);
     }
   } catch (error) {
     console.warn('PF2E Visioner | Consequences: indicator refresh failed:', error);
@@ -240,7 +222,7 @@ export async function applyConsequencesAvs({
 }) {
   const manager = await loadAvsOverrideManager(avsOverrideManager);
   const existingOverrides = collectExistingOverrides(attacker, subjects);
-  await removeOverridesForConsequences(attacker, subjects, manager);
+  const removedPairs = await removeOverridesForConsequences(attacker, subjects, manager);
 
   const outcomes = await buildConsequencesOutcomes({
     actionData,
@@ -260,7 +242,7 @@ export async function applyConsequencesAvs({
     avsOverrideManager: manager,
   });
 
-  await refreshConsequencesOverrideIndicator(overrideIndicator);
+  await refreshConsequencesOverrideIndicator(overrideIndicator, removedPairs);
   cacheConsequencesAvsEntries(
     cache,
     actionData.messageId,

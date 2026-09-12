@@ -40,7 +40,7 @@ export async function discoverConsequencesSubjects(actionData) {
     .filter((subject) => {
       try {
         const visibility = getVisibilityBetween(subject, attacker);
-        const isValidTarget = visibility === 'undetected' || visibility === 'hidden';
+        const isValidTarget = ['hidden', 'undetected', 'unnoticed'].includes(visibility);
         if (isValidTarget) {
           const subjectId = subject?.document?.id || subject?.id;
           if (subjectId) visibilityBySubjectId.set(subjectId, visibility);
@@ -75,7 +75,7 @@ export async function buildConsequencesOutcome(actionData, subject) {
     oldVisibility: currentVisibility,
     oldVisibilityLabel:
       getVisibilityStateLabelKey(currentVisibility, { manual: true }) || currentVisibility,
-    changed: currentVisibility === 'hidden' || currentVisibility === 'undetected',
+    changed: ['hidden', 'undetected', 'unnoticed'].includes(currentVisibility),
     newVisibility: getDefaultConsequencesVisibility(),
   };
 }

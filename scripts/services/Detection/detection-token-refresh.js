@@ -32,7 +32,9 @@ const LEGACY_FILTERED_EFFECT_VISIBILITY_KEY = '_pvLegacyFilteredEffectVisibility
 export function wrapPrimaryTokenMeshRender(wrapped, ...args) {
   // Accept a placeable token or a document-backed mesh reference.
   const token = this.object?.object ?? this.object;
-  if (token?.mesh === this && suppressCurrentViewScentTokenArt(token)) return;
+  // PrimarySpriteMesh also renders tiles; mesh ownership alone does not identify a token.
+  if (token?.document?.documentName === 'Token' && token.mesh === this &&
+    suppressCurrentViewScentTokenArt(token)) return;
   return wrapped(...args);
 }
 
