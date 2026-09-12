@@ -262,7 +262,7 @@ describe('system-hidden token highlight service', () => {
           },
         }),
       ),
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       shouldEvaluateSystemHiddenIndicators(
@@ -623,7 +623,7 @@ describe('system-hidden token highlight service', () => {
     ]);
   });
 
-  test('builds blind-deaf indicator decision from stored visibility state', () => {
+  test('blinded and deafened do not add a border to a Hidden target', () => {
     const observer = {
       document: { id: 'observer', x: 0, y: 0, width: 1, height: 1 },
       actor: {
@@ -646,9 +646,8 @@ describe('system-hidden token highlight service', () => {
         getVisibilityState: jest.fn(() => 'hidden'),
       }),
     ).toMatchObject({
-      shouldShowIndicator: true,
-      indicatorMode: 'blind-deaf',
-      shouldShowBlindDeafIndicator: true,
+      shouldShowIndicator: false,
+      shouldShowBlindDeafIndicator: false,
     });
   });
 

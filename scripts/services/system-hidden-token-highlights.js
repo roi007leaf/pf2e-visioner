@@ -95,8 +95,7 @@ export function shouldEvaluateSystemHiddenIndicators(senseContext) {
     !!senseContext?.observerHasLifesense ||
     !!senseContext?.observerHasThoughtsense ||
     !!senseContext?.observerHasEcholocation ||
-    !!senseContext?.observerHasScent ||
-    !!senseContext?.observerIsBlindAndDeaf
+    !!senseContext?.observerHasScent
   );
 }
 
@@ -260,10 +259,8 @@ export function buildSystemHiddenIndicatorDecision({
     !echolocationSoundBlocked &&
     isWithinEcholocationRange &&
     detectedByEcholocation;
-  const shouldShowBlindDeafIndicator =
-    mayShowSystemHiddenIndicator &&
-    !!senseContext?.observerIsBlindAndDeaf &&
-    isHiddenFromObserver;
+  // Conditions alone do not create a sense indicator; Core renders any remaining senses.
+  const shouldShowBlindDeafIndicator = false;
   const shouldShowIndicator =
     shouldShowLifesenseIndicator ||
     shouldShowScentIndicator ||

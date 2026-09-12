@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.6.5] - 2026-09-12
+
+### Fixed
+
+- **Extra borders for blinded and deafened observers**: Removed the fallback frame and cyan pulse added solely because an observer is both Blinded and Deafened. Native detection effects, including tremorsense waves, and other special-sense indicators remain unchanged.
+
 ## [8.6.4] - 2026-09-12
 
 ### Fixed

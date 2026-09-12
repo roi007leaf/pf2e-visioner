@@ -348,9 +348,7 @@ export async function updateSystemHiddenTokenHighlights(
     // This allows lifesense to work through walls, in darkness, and with invisible creatures
     // without requiring specific conditions like blinded/deafened
     //
-    // OR when the observer is both blinded AND deafened:
-    // All other tokens should show an indicator because they are effectively undetectable
-    // (no precise or imprecise senses can work)
+    // Blinded and Deafened alone do not add a border; remaining senses use Core's effects.
     if (!shouldEvaluateSystemHiddenIndicators(senseContext)) {
       if (hasSystemHiddenIndicators(tokens)) removeSystemHiddenIndicators(tokens);
       return;
