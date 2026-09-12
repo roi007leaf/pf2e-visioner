@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.6.4] - 2026-09-12
+
+### Fixed
+
+- **Hidden tokens disappearing for deafened observers**: Explicit Hidden states, including successful Hide actions, retain their known-location soundwave marker for observers with active vision who are deafened. Hearing remains unavailable, and Undetected or Unnoticed targets remain concealed.
+
 ## [8.6.3] - 2026-09-12
 
 ### Fixed

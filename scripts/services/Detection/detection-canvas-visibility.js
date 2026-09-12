@@ -1,4 +1,5 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { MODULE_ID } from '../../constants.js';
 import { currentViewObservers } from './current-view-hard-hide.js';
 import {
   detectionFrameCache,
@@ -134,6 +135,25 @@ function currentViewObservesTargetPrecisely(target) {
   return false;
 }
 
+function preserveDeafenedHiddenMarker(target, options) {
+  if (target?.document?.documentName !== 'Token' || target.document.hidden) return false;
+  if (['hazard', 'loot'].includes(target.actor?.type)) return false;
+  const observers = options.source?.object ? [options.source.object] : currentViewObservers();
+  const knowsLocation = observers.some((observer) => {
+    if (!observer?.vision?.active || !observer.actor?.hasCondition?.('deafened')) return false;
+    if (getVisionerVisibilityBetweenTokens(observer, target) !== 'hidden') return false;
+    const override = target.document.getFlag?.(MODULE_ID, `avs-override-from-${tokenIdOf(observer)}`);
+    return override?.state === 'hidden' && override.coverOnly !== true;
+  });
+  if (!knowsLocation) return false;
+  // PF2e removes hearing when deafened. An explicit Hidden override still records
+  // a known location: reuse the marker's appearance without enabling hearing.
+  const filter = globalThis.CONFIG?.Canvas?.detectionModes?.hearing?.constructor?.getDetectionFilter?.();
+  if (!filter) return false;
+  target.detectionFilter = filter;
+  return true;
+}
+
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   if (isSelectAllTokenVisibilityBypassActive()) {
     return wrapped(points, options);
@@ -149,6 +169,7 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
     return false;
   }
   const target = options?.object;
+  if (result === false && preserveDeafenedHiddenMarker(target, options)) return true;
   if (result === true && target?.detectionFilter && currentViewObservesTargetPrecisely(target)) {
     target.detectionFilter = null;
   }
