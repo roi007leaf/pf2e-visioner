@@ -25,6 +25,18 @@ export function canRenderTooltipToken(token) {
   return true;
 }
 
+export function canObserverRenderTooltipToken(observer, target, visibilityState) {
+  if (!target || target.document?.hidden === true) return false;
+  if (SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(visibilityState)) return false;
+  if (target.visible !== false && target.renderable !== false && canRenderTooltipToken(target)) return true;
+  // Presence-only senses render a marker instead of token art. A cached sense
+  // name alone must never reveal a target whose presentation is now hidden.
+  const indicator = target._pvSystemHiddenIndicator;
+  return !!indicator && !indicator.destroyed && indicator.visible !== false &&
+    indicator.renderable !== false && indicator.alpha !== 0 &&
+    indicator._pvObserverId === (observer?.document?.id ?? observer?.id);
+}
+
 export function getVisibleOtherTokens(allTokens = [], subjectToken = null) {
   return allTokens.filter(
     (token) => token && token !== subjectToken && canRenderTooltipToken(token),
@@ -37,12 +49,13 @@ export function getCoverOverlayTargets({
   isGM = false,
   getVisibilityState = () => null,
 } = {}) {
-  return getVisibleOtherTokens(allTokens, sourceToken).filter((target) => {
-    if (isGM) return true;
+  return allTokens.filter((target) => {
+    if (!target || target === sourceToken) return false;
+    if (isGM) return canRenderTooltipToken(target);
     // Foundry's own render state (canRenderTooltipToken) doesn't know about AVS-computed
     // undetected/unnoticed targets - without this, cover badges leak positions of enemies
     // the player hasn't actually detected (unrestricted vision scenes, already-explored fog).
-    return !SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(getVisibilityState(sourceToken, target));
+    return canObserverRenderTooltipToken(sourceToken, target, getVisibilityState(sourceToken, target));
   });
 }
 
@@ -128,6 +141,8 @@ export function buildObserverTooltipVisibilityRequests({
   const visibilityMap = getVisibilityMap(observerToken);
   return targetTokens
     .map((targetToken) => {
+      const pairState = visibilityMap?.[targetToken.document?.id ?? targetToken.id];
+      if (!isGM && !canObserverRenderTooltipToken(observerToken, targetToken, pairState)) return null;
       const canRenderToken = canRenderTooltipToken(targetToken);
       const request = buildTooltipRequest({
         renderToken: targetToken,
@@ -172,7 +187,7 @@ export function buildTargetTooltipVisibilityRequests({
           observerToken,
           getVisibilityState,
         );
-        if (SENSE_BADGE_BLOCKED_VISIBILITY_STATES.has(observerVisibilityState)) return null;
+        if (!canObserverRenderTooltipToken(subjectToken, observerToken, observerVisibilityState)) return null;
       }
       const visibilityState = readPairVisibilityState(
         observerToken,
@@ -208,7 +223,7 @@ export function buildTooltipVisibilityRequests({
   if (!isGM && !subjectToken.isOwner) return [];
 
   const otherTokens =
-    mode === 'observer'
+    mode === 'observer' || !isGM
       ? allTokens.filter((token) => token && token !== subjectToken)
       : getVisibleOtherTokens(allTokens, subjectToken);
   if (otherTokens.length === 0) return [];

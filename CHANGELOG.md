@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.6.6] - 2026-09-13
+
+### Fixed
+
+- **Player tooltips revealing undetected tokens**: Visibility, cover, and factor badges respect the observing token's detection state. Targets detected through any sense remain eligible, while Undetected, Unnoticed, and unrendered targets cannot be revealed by stale sense data. GM tooltip behavior remains unchanged.
+- **Hearing using tremorsense colors**: Hidden targets detected through hearing use the normal hearing effect instead of inheriting tremorsense coloring when both senses are available. Targets detected through tremorsense retain their effect.
+
 ## [8.6.5] - 2026-09-12
 
 ### Fixed

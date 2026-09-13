@@ -20,6 +20,42 @@ function makeToken(id, { isOwner = true, isVisible = true } = {}) {
 }
 
 describe('hover tooltip visibility request planning', () => {
+  test.each(['hearing', 'tremorsense', 'lifesense', 'scent'])('allows detected %s while hiding undetected player badges', (sense) => {
+    const observer = makeToken('observer');
+    observer.vision = { los: { contains: () => false } };
+    const target = makeToken('target');
+    const options = { subjectToken: observer, allTokens: [observer, target], mode: 'observer', getDetectionBetween: () => ({ sense }) };
+    expect(buildTooltipVisibilityRequests({ ...options, getVisibilityMap: () => ({ target: 'hidden' }) })).toHaveLength(1);
+    for (const state of ['undetected', 'unnoticed']) {
+      expect(buildTooltipVisibilityRequests({ ...options, getVisibilityMap: () => ({ target: state }) })).toEqual([]);
+      expect(buildTooltipVisibilityRequests({ ...options, isGM: true, getVisibilityMap: () => ({ target: state }) })).toHaveLength(1);
+      expect(getCoverOverlayTargets({ sourceToken: observer, allTokens: [observer, target], getVisibilityState: () => state })).toEqual([]);
+    }
+  });
+
+  test('stale sense and detection mesh cannot reveal a core-hidden target to players', () => {
+    const observer = makeToken('observer');
+    const target = makeToken('target', { isVisible: false });
+    target.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    const options = { subjectToken: observer, allTokens: [observer, target], mode: 'observer', getVisibilityMap: () => ({ target: 'hidden' }), getDetectionBetween: () => ({ sense: 'hearing' }) };
+    expect(buildTooltipVisibilityRequests(options)).toEqual([]);
+    expect(buildTooltipVisibilityRequests({ ...options, isGM: true })).toHaveLength(1);
+    expect(getCoverOverlayTargets({ sourceToken: observer, allTokens: [observer, target] })).toEqual([]);
+  });
+
+  test('presence-only badges require a live marker for the current observer', () => {
+    const observer = makeToken('observer');
+    const target = makeToken('target', { isVisible: false });
+    const options = { subjectToken: observer, allTokens: [observer, target], mode: 'observer', getVisibilityMap: () => ({ target: 'hidden' }), getDetectionBetween: () => ({ sense: 'scent' }) };
+    expect(buildTooltipVisibilityRequests(options)).toEqual([]);
+    target._pvSystemHiddenIndicator = { visible: true, _pvObserverId: 'other' };
+    expect(buildTooltipVisibilityRequests(options)).toEqual([]);
+    target._pvSystemHiddenIndicator._pvObserverId = observer.id;
+    expect(buildTooltipVisibilityRequests(options)).toHaveLength(1);
+    target._pvSystemHiddenIndicator.destroyed = true;
+    expect(buildTooltipVisibilityRequests(options)).toEqual([]);
+  });
+
   afterEach(() => {
     clearPendingTokenMovementPosition('observer');
   });

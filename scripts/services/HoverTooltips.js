@@ -70,6 +70,7 @@ import {
   buildHoverTooltipVisibilityRequests,
   buildTooltipVisibilityRequests,
   getCoverOverlayTargets,
+  canObserverRenderTooltipToken,
 } from './HoverTooltip/hover-tooltip-visibility-requests.js';
 
 function getExplicitVisibilityStateLabel(state) {
@@ -1741,6 +1742,7 @@ async function showFactorIndicatorsForToken(observerToken, requestGeneration) {
   }
 
   requests.forEach(({ targetToken, observerToken, factorText, factorLines, state }) => {
+    if (!game.user.isGM && !canObserverRenderTooltipToken(observerToken, targetToken, getVisibilityBetween(observerToken, targetToken))) return;
     addFactorIndicator(targetToken, observerToken, factorText, state, factorLines);
   });
 }

@@ -10,6 +10,23 @@ import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visib
 import { peekRegistry } from '../Peek/PeekRegistry.js';
 import { isPointInCone } from '../Peek/peek-geometry.js';
 import { isVisualSenseType } from '../../visibility/StatelessVisibilityCalculator.js';
+import { getDetectionBetween } from '../../stores/detection-map.js';
+
+function alignHiddenHearingFilter(target, options) {
+  const observers = options.source?.object ? [options.source.object] : currentViewObservers();
+  const detecting = observers.filter((observer) => {
+    return ['observed', 'concealed', 'hidden'].includes(getVisionerVisibilityBetweenTokens(observer, target));
+  });
+  if (!detecting.length || !detecting.every((observer) =>
+    getVisionerVisibilityBetweenTokens(observer, target) === 'hidden' &&
+    !observer.actor?.hasCondition?.('deafened') &&
+    getDetectionBetween(observer, target)?.sense === 'hearing')) return;
+  const modes = globalThis.CONFIG?.Canvas?.detectionModes;
+  const tremorFilter = modes?.feelTremor?.constructor?.getDetectionFilter?.();
+  if (!tremorFilter || target.detectionFilter !== tremorFilter) return;
+  const hearingFilter = modes?.hearing?.constructor?.getDetectionFilter?.();
+  if (hearingFilter) target.detectionFilter = hearingFilter;
+}
 
 function tokenIdOf(token) {
   return token?.document?.id ?? token?.id ?? null;
@@ -170,6 +187,7 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
   }
   const target = options?.object;
   if (result === false && preserveDeafenedHiddenMarker(target, options)) return true;
+  if (result === true && target?.detectionFilter) alignHiddenHearingFilter(target, options);
   if (result === true && target?.detectionFilter && currentViewObservesTargetPrecisely(target)) {
     target.detectionFilter = null;
   }

@@ -163,6 +163,27 @@ describe('canvas visibility wrapper', () => {
     expect(target.detectionFilter).toEqual({ id: 'hearing-soundwave-filter' });
   });
 
+  test.each(['hearing', 'tremorsense'])('Hidden artwork follows the recorded %s sense', (sense) => {
+    global.game.user.isGM = true;
+    global.game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+    const flags = visibilityV2Flags({ target: 'hidden' });
+    flags['pf2e-visioner'].detection = { target: { sense, isPrecise: false } };
+    const observer = createMockToken({ id: 'observer', flags });
+    const target = createMockToken({ id: 'target' });
+    global.canvas = { ...global.canvas, tokens: { controlled: [observer], placeables: [observer, target], get: (id) => id === 'observer' ? observer : target } };
+    const tremor = { id: 'purple' }, hearing = { id: 'normal' };
+    const originalConfig = global.CONFIG;
+    global.CONFIG = { ...originalConfig, Canvas: { ...originalConfig?.Canvas, detectionModes: {
+      feelTremor: { constructor: { getDetectionFilter: () => tremor } },
+      hearing: { constructor: { getDetectionFilter: () => hearing } },
+    } } };
+    try {
+      const wrapped = () => { target.detectionFilter = tremor; return true; };
+      expect(wrapCanvasVisibilityTest(wrapped, [], { object: target })).toBe(true);
+      expect(target.detectionFilter).toBe(sense === 'hearing' ? hearing : tremor);
+    } finally { global.CONFIG = originalConfig; }
+  });
+
   test('active peek rejects core visibility from explored fog outside the peek polygon', () => {
     global.game.user.isGM = false;
     const observer = createMockToken({ id: 'observer' });
