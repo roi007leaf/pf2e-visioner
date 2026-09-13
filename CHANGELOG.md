@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.6.7] - 2026-09-13
+
+### Fixed
+
+- **Wall cover for oversized token footprints**: Wall-cover samples stay on the token center's side of room walls that cross its footprint, avoiding cover caused solely by the token square extending outside the room. Walls obstructing the attack through a doorway can still grant cover; open doors themselves grant none.
+
 ## [8.6.6] - 2026-09-13
 
 ### Fixed

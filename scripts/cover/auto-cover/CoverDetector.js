@@ -964,7 +964,8 @@ export class CoverDetector {
       // Count blocked sight lines
       let blocked = 0;
       for (const pt of points) {
-        if (this._isRayBlockedByWalls(p1, pt, elevationRange, attackerSpan, targetSpan)) blocked++;
+        const sample = this._constrainWallCoverSample(targetCenter, pt, p1, elevationRange, targetSpan);
+        if (this._isRayBlockedByWalls(p1, sample, elevationRange, attackerSpan, targetSpan)) blocked++;
       }
 
       // Calculate raw percentage
@@ -1579,6 +1580,40 @@ export class CoverDetector {
     return Array.isArray(options)
       ? options.includes('self:effect:arcane-cascade')
       : options instanceof Set && options.has('self:effect:arcane-cascade');
+  }
+
+  /**
+   * Token squares can extend through room walls. Keep wall-cover samples on the
+   * center's side of those walls instead of treating the outside art as obscured.
+   * Walls outside the footprint remain between the attacker and the sample.
+   */
+  _constrainWallCoverSample(center, point, source, elevationRange = null, targetSpan = null) {
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) return point;
+
+    let nearest = length;
+    for (const wall of this._getSceneWalls()) {
+      const doc = wall.document || wall;
+      if (!this._doesWallBlockFromDirection(doc, source)) continue;
+      const coords = this._getWallCoords(wall);
+      if (!coords) continue;
+      const intersection = this._lineIntersectionPoint(
+        center.x, center.y, point.x, point.y, ...coords,
+      );
+      if (!intersection) continue;
+      const distance = Math.hypot(intersection.x - center.x, intersection.y - center.y);
+      if (distance <= 0 || distance > nearest) continue;
+      if (targetSpan) {
+        if (!doesWallBlockLineOfSight(doc, targetSpan, targetSpan, distance / length)) continue;
+      } else if (elevationRange && !doesWallBlockAtElevation(doc, elevationRange)) {
+        continue;
+      }
+      nearest = Math.max(0, distance - 1);
+    }
+    if (nearest === length) return point;
+    return { x: center.x + dx * nearest / length, y: center.y + dy * nearest / length };
   }
 
   consumeStarlitSpanCoverIgnore(attackerId, targetId) {
@@ -2238,12 +2273,16 @@ export class CoverDetector {
       // Check lines from all target corners to this attacker corner
       for (let t = 0; t < targetCorners.length; t++) {
         const targetCorner = targetCorners[t];
+        const wallSample = this._constrainWallCoverSample(
+          { x: (targetRect.x1 + targetRect.x2) / 2, y: (targetRect.y1 + targetRect.y2) / 2 },
+          targetCorner, attackerCorner, elevationRange, targetSpan,
+        );
         let lineBlocked = false;
 
         // Check if this line is blocked by walls
         if (
           this._isRayBlockedByWalls(
-            targetCorner,
+            wallSample,
             attackerCorner,
             elevationRange,
             attackerSpan,
