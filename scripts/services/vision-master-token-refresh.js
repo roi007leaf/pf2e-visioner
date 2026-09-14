@@ -5,6 +5,7 @@ const VISION_MASTER_TOKEN_ID_FLAG = 'visionMasterTokenId';
 const VISION_MASTER_TOKEN_ID_PATH = `flags.${MODULE_ID}.${VISION_MASTER_TOKEN_ID_FLAG}`;
 
 function defaultHasProperty(object, path) {
+  if (Object.prototype.hasOwnProperty.call(object ?? {}, path)) return true;
   const foundryHasProperty = globalThis.foundry?.utils?.hasProperty;
   if (typeof foundryHasProperty === 'function') {
     return foundryHasProperty(object, path);
@@ -19,8 +20,12 @@ function defaultHasProperty(object, path) {
   return true;
 }
 
-function getNewMasterId(changes) {
-  return changes?.flags?.[MODULE_ID]?.[VISION_MASTER_TOKEN_ID_FLAG];
+function getNewMasterId(changes, tokenDoc) {
+  if (defaultHasProperty(changes, `flags.${MODULE_ID}.-=${VISION_MASTER_TOKEN_ID_FLAG}`)) return null;
+  if (Object.prototype.hasOwnProperty.call(changes ?? {}, VISION_MASTER_TOKEN_ID_PATH)) return changes[VISION_MASTER_TOKEN_ID_PATH];
+  const flags = changes?.flags?.[MODULE_ID];
+  if (Object.prototype.hasOwnProperty.call(flags ?? {}, VISION_MASTER_TOKEN_ID_FLAG)) return flags[VISION_MASTER_TOKEN_ID_FLAG];
+  return tokenDoc.getFlag(MODULE_ID, VISION_MASTER_TOKEN_ID_FLAG);
 }
 
 function initializeTokenVisionSource(token) {
@@ -34,7 +39,14 @@ async function defaultUpdateSharedVisionIndicator(token) {
 }
 
 export function hasVisionMasterTokenIdChange(changes, hasProperty = defaultHasProperty) {
-  return hasProperty(changes, VISION_MASTER_TOKEN_ID_PATH);
+  return hasProperty(changes, VISION_MASTER_TOKEN_ID_PATH) ||
+    hasProperty(changes, `flags.${MODULE_ID}.-=${VISION_MASTER_TOKEN_ID_FLAG}`);
+}
+
+function hasVisionSharingChange(changes, hasProperty) {
+  return hasVisionMasterTokenIdChange(changes, hasProperty) ||
+    hasProperty(changes, `flags.${MODULE_ID}.visionSharingMode`) ||
+    hasProperty(changes, `flags.${MODULE_ID}.-=visionSharingMode`);
 }
 
 export function createVisionMasterTokenRefresh({
@@ -46,14 +58,14 @@ export function createVisionMasterTokenRefresh({
   warn = console.warn,
 } = {}) {
   function capturePreUpdate(tokenDoc, changes) {
-    if (!hasVisionMasterTokenIdChange(changes, hasProperty)) return false;
+    if (!hasVisionSharingChange(changes, hasProperty)) return false;
 
     oldMasterIds.set(tokenDoc.id, tokenDoc.getFlag(MODULE_ID, VISION_MASTER_TOKEN_ID_FLAG));
     return true;
   }
 
   async function refreshAfterUpdate(tokenDoc, changes) {
-    if (!hasVisionMasterTokenIdChange(changes, hasProperty)) {
+    if (!hasVisionSharingChange(changes, hasProperty)) {
       return { refreshed: false, reason: 'unchanged' };
     }
 
@@ -66,7 +78,7 @@ export function createVisionMasterTokenRefresh({
     }
 
     const canvas = getCanvas();
-    const newMasterId = getNewMasterId(changes);
+    const newMasterId = getNewMasterId(changes, tokenDoc);
 
     initializeTokenVisionSource(token);
 
@@ -74,7 +86,7 @@ export function createVisionMasterTokenRefresh({
       initializeTokenVisionSource(canvas?.tokens?.get?.(oldMasterId));
     }
 
-    if (newMasterId && newMasterId !== null) {
+    if (newMasterId && newMasterId !== oldMasterId) {
       initializeTokenVisionSource(canvas?.tokens?.get?.(newMasterId));
     }
 

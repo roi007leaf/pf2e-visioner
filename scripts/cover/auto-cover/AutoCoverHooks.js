@@ -109,6 +109,11 @@ export class AutoCoverHooks {
 
       // Template hooks
       Hooks.on('createMeasuredTemplate', instance.onCreateMeasuredTemplate.bind(instance));
+      Hooks.on('updateMeasuredTemplate', instance.onUpdateDocument.bind(instance));
+      Hooks.on('deleteMeasuredTemplate', instance.onDeleteDocument.bind(instance));
+      Hooks.on('createRegion', instance.onCreateMeasuredTemplate.bind(instance));
+      Hooks.on('updateRegion', instance.onUpdateDocument.bind(instance));
+      Hooks.on('deleteRegion', instance.onDeleteDocument.bind(instance));
       Hooks.on('updateDocument', instance.onUpdateDocument.bind(instance));
       Hooks.on('deleteDocument', instance.onDeleteDocument.bind(instance));
 
@@ -230,7 +235,7 @@ export class AutoCoverHooks {
             '../../chat/services/take-cover-expiration-service.js'
           );
           await requestTakeCoverExpirationForToken(token, 'movement');
-        } catch { }
+        } catch {}
       }
 
       // Clean up cover for token
@@ -387,7 +392,7 @@ export class AutoCoverHooks {
           return await wrapped(check, context, event, callback);
         }
         // Handle the roll with the appropriate use case
-        await useCase.handleCheckRoll(check, context);
+        await useCase.handleCheckRoll(check, context, event);
       } catch (error) {
         console.error('PF2E Visioner | Error in Check.roll wrapper:', error);
       }
@@ -417,7 +422,12 @@ export class AutoCoverHooks {
 
     // Check for saving throw context
     if (ctx.type === 'saving-throw') {
-      return this.savingThrowUseCase;
+      const domains = Array.from(ctx.domains || []);
+      const isReflex =
+        ctx.statistic === 'reflex' ||
+        domains.includes('reflex') ||
+        options.includes('check:statistic:reflex');
+      return isReflex ? this.savingThrowUseCase : null;
     }
 
     // Check for stealth context

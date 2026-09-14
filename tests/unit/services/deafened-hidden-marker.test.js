@@ -21,7 +21,7 @@ import { getVisionerVisibilityBetweenTokens } from '../../../scripts/services/De
 describe('deafened observer with an explicit Hidden target', () => {
   let observer, target, wrapped, previousConfig;
   beforeEach(() => {
-    observer = { document: { id: 'observer' }, vision: { active: true }, actor: { hasCondition: jest.fn(() => true) } };
+    observer = { document: { id: 'observer', getFlag: jest.fn(() => ({})) }, vision: { active: true }, actor: { hasCondition: jest.fn(() => true) } };
     target = { document: { documentName: 'Token', hidden: false, getFlag: jest.fn(() => ({ state: 'hidden', source: 'hide_action' })) }, actor: { type: 'character' } };
     wrapped = jest.fn(() => false);
     previousConfig = globalThis.CONFIG;

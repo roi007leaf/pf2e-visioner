@@ -1,3 +1,4 @@
+import { isPrimaryGM } from '../services/gm-election.js';
 import { recalculateRuntimeAvsTokenIds } from '../services/avs-token-refresh.js';
 import { buildPreparedSensesSignature } from '../visibility/auto-visibility/core/TokenSenseSignatureCache.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
@@ -710,7 +711,7 @@ export function scheduleVisionerRuleElementItemRefresh(
   item,
   changes,
   {
-    isGM = defaultIsGM,
+    isGM = isPrimaryGM,
     getTokensForActor = defaultGetTokensForActor,
     scheduler = defaultScheduler,
     delayMs = 500,

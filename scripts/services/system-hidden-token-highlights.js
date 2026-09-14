@@ -233,13 +233,15 @@ export function buildSystemHiddenIndicatorDecision({
 
   const shouldShowLifesenseIndicator =
     mayShowSystemHiddenIndicator &&
-    isSystemHidden &&
+    (isSystemHidden || (isHiddenFromObserver && detection?.sense === 'lifesense')) &&
+    !!senseContext?.observerHasLifesense &&
     canBeDetectedByLifesense &&
     isWithinLifesenseRange;
   const shouldShowScentIndicator =
     mayShowSystemHiddenIndicator &&
     (isSystemHidden || (isHiddenFromObserver && detection?.sense === 'scent')) &&
-    visibilityState !== 'observed' && visibilityState !== 'concealed' &&
+    visibilityState !== 'observed' &&
+    visibilityState !== 'concealed' &&
     !!senseContext?.observerHasScent &&
     canBeDetectedByScent &&
     isWithinScentRange &&
@@ -250,7 +252,7 @@ export function buildSystemHiddenIndicatorDecision({
     canBeDetectedByThoughtsense &&
     isWithinThoughtsenseRange &&
     (isSystemHidden || isHiddenFromObserver) &&
-    getSoundBlocked({ observer, token, isSoundBlocked });
+    (detection?.sense === 'thoughtsense' || getSoundBlocked({ observer, token, isSoundBlocked }));
   const shouldShowEcholocationIndicator =
     mayShowSystemHiddenIndicator &&
     isSystemHidden &&
@@ -310,12 +312,10 @@ export async function refreshSystemHiddenHighlightsForMovedToken(
   return { refreshed: requests.length };
 }
 
-export async function refreshSystemHiddenHighlightsForControlledTokens(
-  {
-    getControlledTokens = getDefaultControlledTokens,
-    loadVisualEffects = loadDefaultVisualEffects,
-  } = {},
-) {
+export async function refreshSystemHiddenHighlightsForControlledTokens({
+  getControlledTokens = getDefaultControlledTokens,
+  loadVisualEffects = loadDefaultVisualEffects,
+} = {}) {
   const requests = buildControlledTokenHighlightRequests(getControlledTokens());
   if (requests.length === 0) {
     return { refreshed: 0 };

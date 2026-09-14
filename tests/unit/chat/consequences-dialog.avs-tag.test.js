@@ -280,9 +280,11 @@ describe('ConsequencesPreviewDialog - AVS Tag Display', () => {
 
             await ConsequencesPreviewDialog._onApplyAll();
 
-            expect(removeOverride).toHaveBeenCalledWith(observerId, attackerId);
-            expect(updateTokenVisuals).toHaveBeenCalled();
-            expect(applyNowConsequences).not.toHaveBeenCalled();
+            expect(applyNowConsequences).toHaveBeenCalledWith(
+                expect.objectContaining({ overrides: { [observerId]: 'avs' } }),
+                expect.anything(),
+            );
+            expect(removeOverride).not.toHaveBeenCalled();
         });
 
         it('should allow applying when state matches but old is AVS-controlled', () => {

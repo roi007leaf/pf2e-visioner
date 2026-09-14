@@ -1217,6 +1217,16 @@ describe('AttackRollUseCase', () => {
       expect(attackRollUseCase.autoCoverSystem.setPopupOverride).not.toHaveBeenCalled();
     });
 
+    test.each(['shift', 'skipDialog'])('applies cover when %s bypasses enabled dialogs', async (mode) => {
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockReturnValue('none');
+      global.game.user.flags = { pf2e: { settings: { showCheckDialogs: true } } };
+      attackRollUseCase.coverUIManager.showPopupAndApply.mockResolvedValue(undefined);
+      if (mode === 'skipDialog') mockContext.skipDialog = true;
+      await attackRollUseCase.handleCheckRoll(mockCheck, mockContext, { shiftKey: mode === 'shift' });
+      expect(attackRollUseCase._applyCoverEphemeralEffect).toHaveBeenCalled();
+    });
+
     test('should set popup override when manual cover is none and choice differs from detected', async () => {
       const { getCoverBetween } = await import('../../../../scripts/utils.js');
       getCoverBetween.mockReturnValue('none');

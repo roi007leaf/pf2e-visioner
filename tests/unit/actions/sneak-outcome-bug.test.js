@@ -5,6 +5,14 @@
 
 import { determineOutcome } from '../../../scripts/chat/services/infra/shared-utils.js';
 
+test.each([
+    [7, 10, 'critical-failure'], [8, 10, 'critical-failure'], [9, 10, 'failure'],
+    [17, 10, 'failure'], [18, 10, 'success'], [27, 10, 'success'], [28, 10, 'critical-success'],
+    [8, 20, 'failure'], [18, 1, 'failure'],
+])('degree boundary total %s natural %s => %s', (total, die, expected) => {
+    expect(determineOutcome(total, die, 18)).toBe(expected);
+});
+
 describe('Sneak Outcome Bug - 14 vs 15', () => {
     test('14 vs DC 15 should be Failure, not Success', () => {
         const roll = 14;

@@ -609,8 +609,12 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
 
     // Only describe the benefit when this roll actually used the detected no-cover result.
     const rolledOptions = data?.flags?.pf2e?.context?.options ?? [];
-    if (starlitSpanCoverIgnore && manualCover === 'none' && state === 'none' &&
-        rolledOptions.includes('target:cover-level:none')) {
+    if (
+      starlitSpanCoverIgnore &&
+      manualCover === 'none' &&
+      state === 'none' &&
+      rolledOptions.includes('target:cover-level:none')
+    ) {
       data.flags ??= {};
       data.flags['pf2e-visioner'] ??= {};
       data.flags['pf2e-visioner'].starlitSpanCoverIgnore = starlitSpanCoverIgnore;
@@ -794,11 +798,9 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
             this._syncClonedDefenderIntoContext(effectiveTarget, clonedActor, dctx);
             const dcObj = dctx.dc;
             if (dcObj?.slug) {
-              const didAdjustDc = this._applyAdjustedDcFromTargetActor(
-                sourceTargetActor,
-                dcObj,
-                [{ slug: 'cover', label, modifier: bonus, type: 'circumstance' }],
-              );
+              const didAdjustDc = this._applyAdjustedDcFromTargetActor(sourceTargetActor, dcObj, [
+                { slug: 'cover', label, modifier: bonus, type: 'circumstance' },
+              ]);
               const st = didAdjustDc
                 ? null
                 : clonedActor.getStatistic(dcObj.slug === 'ac' ? 'armor' : dcObj.slug)?.dc;
@@ -868,11 +870,17 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
    * @param {Object} context - Check context
    * @returns {Promise<Object>} Result with tokens and cover state
    */
-  async handleCheckRoll(check, context) {
+  async handleCheckRoll(check, context, event = null) {
     try {
       const attacker = this._resolveAttackerFromCtx(context);
       const target = this._resolveTargetFromCtx(context);
-      const checkDialogsEnabled = this._isPf2eCheckDialogEnabled();
+      const defaultDialogs = this._isPf2eCheckDialogEnabled();
+      const checkDialogsEnabled =
+        typeof context?.skipDialog === 'boolean'
+          ? !context.skipDialog
+          : event?.shiftKey
+            ? !defaultDialogs
+            : defaultDialogs;
 
       if (attacker && target && (attacker.isOwner || game.user.isGM)) {
         // Ensure visibility-driven off-guard ephemerals are up-to-date on defender before any DC calculation
@@ -887,7 +895,9 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
         const manualCover = this._getFixedCover(attacker, target);
         let detected = this._detectCover(attacker, target, context);
         if (manualCover === 'none') {
-          detected = await this._applyCoverAdjustments(attacker, target, detected, context, { consume: true });
+          detected = await this._applyCoverAdjustments(attacker, target, detected, context, {
+            consume: true,
+          });
         }
         let chosen = null;
         try {
@@ -1011,11 +1021,7 @@ class AttackRollUseCase extends BaseAutoCoverUseCase {
           : dcAdjustments.filter((adjustment) => adjustment.slug === 'pf2e-visioner-off-guard');
       const didAdjustDc =
         activeDcAdjustments.length > 0 &&
-        this._applyAdjustedDcFromTargetActor(
-          tgtActor,
-          dcObj,
-          activeDcAdjustments,
-        );
+        this._applyAdjustedDcFromTargetActor(tgtActor, dcObj, activeDcAdjustments);
       const clonedStat = didAdjustDc
         ? null
         : clonedActor.getStatistic?.(dcObj.slug === 'ac' ? 'armor' : dcObj.slug)?.dc;

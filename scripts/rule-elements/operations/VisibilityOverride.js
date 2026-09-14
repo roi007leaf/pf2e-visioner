@@ -3,6 +3,18 @@ import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
+  static async _clearVisibilityAfterSourceRemoval(observer, target, cleanupIds) {
+    const override = target.document?.getFlag?.('pf2e-visioner', `avs-override-from-${observer.id}`);
+    if (override && override.coverOnly !== true && !this._matchesAnyCleanupId(override.source, cleanupIds)) {
+      return;
+    }
+    const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+    const sources = SourceTracker.getVisibilityStateSources(target, observer.id) || [];
+    const remainingState = SourceTracker.getEffectiveState(sources, 'visibility');
+    await setVisibilityBetween(observer, target, remainingState || 'observed', {
+      skipEphemeralUpdate: true, isAutomatic: false, direction: 'observer_to_target',
+    });
+  }
   static _matchesAnyCleanupId(sourceId, cleanupIds) {
     if (!sourceId || !Array.isArray(cleanupIds) || cleanupIds.length === 0) return false;
     return cleanupIds.some((cleanupId) => {
@@ -247,7 +259,7 @@ export class VisibilityOverride {
 
     if (cleanupIds.length > 0) {
       const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
-      const { setVisibilityBetween, getVisibilityBetween } = await import(
+      const { getVisibilityBetween } = await import(
         '../../stores/visibility-map.js'
       );
 
@@ -402,17 +414,9 @@ export class VisibilityOverride {
         const before1 = getVisibilityBetween(token, subjectToken);
         const before2 = getVisibilityBetween(subjectToken, token);
 
-        // Clear both directions
-        await setVisibilityBetween(token, subjectToken, 'observed', {
-          skipEphemeralUpdate: true,
-          isAutomatic: false,
-          direction: 'observer_to_target',
-        });
-        await setVisibilityBetween(subjectToken, token, 'observed', {
-          skipEphemeralUpdate: true,
-          isAutomatic: false,
-          direction: 'observer_to_target',
-        });
+        // A later manual/action override belongs to that action, not this item.
+        await this._clearVisibilityAfterSourceRemoval(token, subjectToken, cleanupIds);
+        await this._clearVisibilityAfterSourceRemoval(subjectToken, token, cleanupIds);
 
         if (before1 !== 'observed' || before2 !== 'observed') {
           visibilityMapCleared++;
@@ -488,7 +492,6 @@ export class VisibilityOverride {
     // since direction determines WHERE sources are stored (on subject vs observer tokens)
     if (sourceId) {
       const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
-      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
 
       // Try to get observer tokens if direction is known (for targeted cleanup)
       let observerTokens = [];
@@ -513,17 +516,8 @@ export class VisibilityOverride {
         // Remove source from subject token with observer ID (direction 'from' storage)
         await SourceTracker.removeSource(subjectToken, sourceId, 'visibility', observerToken.id);
 
-        // Clear visibility map entries for both directions
-        await setVisibilityBetween(observerToken, subjectToken, 'observed', {
-          skipEphemeralUpdate: true,
-          isAutomatic: false,
-          direction: 'observer_to_target',
-        });
-        await setVisibilityBetween(subjectToken, observerToken, 'observed', {
-          skipEphemeralUpdate: true,
-          isAutomatic: false,
-          direction: 'observer_to_target',
-        });
+        await this._clearVisibilityAfterSourceRemoval(observerToken, subjectToken, [sourceId]);
+        await this._clearVisibilityAfterSourceRemoval(subjectToken, observerToken, [sourceId]);
       }
     }
 

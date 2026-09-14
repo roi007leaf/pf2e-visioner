@@ -7,6 +7,7 @@
 import { VisionAnalyzer } from './VisionAnalyzer.js';
 import { ExclusionManager } from './core/ExclusionManager.js';
 import { updateCanvasPerception } from '../../helpers/perception-refresh.js';
+import { isPrimaryGM } from '../../services/gm-election.js';
 
 export class ConditionManager {
   /** @type {ConditionManager} */
@@ -244,7 +245,9 @@ export class ConditionManager {
     actor,
     { hasInvisibility: hasInvisibilityOverride = null, token: tokenOverride = null } = {},
   ) {
-    if (!game.user.isGM) return;
+    // Condition hooks reach every GM. A second writer can record the first
+    // writer's Hidden result as the previous state and transition it again.
+    if (!isPrimaryGM()) return;
 
     const tokens = this.#resolveActorTokens(actor, tokenOverride);
 
@@ -300,7 +303,8 @@ export class ConditionManager {
     }
 
     const controlled = canvas.tokens.controlled.find(
-      (token) => token.actor === actor || token.actor?.token?.id === actor?.token?.id,
+      (token) => token.actor === actor ||
+        (!!actor?.token?.id && token.actor?.token?.id === actor.token.id),
     );
     if (controlled && !this.#exclusionManager.isExcludedToken(controlled)) {
       return [controlled];

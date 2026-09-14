@@ -83,6 +83,35 @@ describe('VisibilityOverride', () => {
   });
 
   describe('applyVisibilityOverride', () => {
+    it('retains the surviving visibility source when a stronger source is removed', async () => {
+      SourceTracker.getVisibilityStateSources.mockReturnValue([{ id: 'low-effect', state: 'concealed', priority: 100 }]);
+      SourceTracker.getEffectiveState.mockImplementation(
+        jest.requireActual('../../../../scripts/rule-elements/SourceTracker.js').SourceTracker.getEffectiveState.bind(
+          jest.requireActual('../../../../scripts/rule-elements/SourceTracker.js').SourceTracker,
+        ),
+      );
+      try {
+        await VisibilityOverride._clearVisibilityAfterSourceRemoval(mockObserverTokens[0], mockSubjectToken, ['high-effect']);
+        expect(mockSetVisibilityBetween).toHaveBeenCalledWith(
+          mockObserverTokens[0], mockSubjectToken, 'concealed', expect.anything(),
+        );
+      } finally {
+        SourceTracker.getVisibilityStateSources.mockReset();
+        SourceTracker.getEffectiveState.mockReset();
+      }
+    });
+    it('does not erase a newer manual override when an older rule effect is deleted', async () => {
+      mockSubjectToken.document.getFlag.mockImplementation((scope, key) =>
+        key === 'avs-override-from-observer-1' ? { state: 'undetected', source: 'manual_action' } : null,
+      );
+      await VisibilityOverride.removeVisibilityOverride({ source: 'blur', direction: 'from' }, mockSubjectToken, 'blur-item');
+      expect(mockSetVisibilityBetween).not.toHaveBeenCalledWith(
+        mockObserverTokens[0], mockSubjectToken, 'observed', expect.anything(),
+      );
+      expect(mockSetVisibilityBetween).toHaveBeenCalledWith(
+        mockSubjectToken, mockObserverTokens[0], 'observed', expect.anything(),
+      );
+    });
     it('should set global override flag when no predicates are used', async () => {
       const operation = {
         state: 'hidden',

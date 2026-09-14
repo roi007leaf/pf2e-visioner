@@ -929,7 +929,7 @@ describe('AvsInvalidationCoordinator item reasons', () => {
 
     expect(result).toBe(true);
     expect(visionAnalyzer.clearCache).toHaveBeenCalledWith(token);
-    expect(globalVisibilityCache.clear).toHaveBeenCalledTimes(1);
+    expect(cacheManager.clearVisibilityCache).toHaveBeenCalledTimes(1);
     expect(visibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
   });
 
@@ -944,7 +944,7 @@ describe('AvsInvalidationCoordinator item reasons', () => {
 
     expect(result).toBe(true);
     expect(visionAnalyzer.clearCache).toHaveBeenCalledWith(token);
-    expect(globalVisibilityCache.clear).not.toHaveBeenCalled();
+    expect(cacheManager.clearVisibilityCache).toHaveBeenCalledTimes(1);
     expect(visibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
   });
 

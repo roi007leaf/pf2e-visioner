@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { isPrimaryGM } from './gm-election.js';
 import { getCoverMap, setCoverMap } from '../stores/cover-map.js';
 import {
   getPerceptionProfileMap,
@@ -74,7 +75,7 @@ async function markPartyStateRestored(tokenDoc, savedAt) {
  */
 export async function saveTokenStateForParty(tokenDoc) {
   try {
-    if (!game.user.isGM) {
+    if (!isPrimaryGM()) {
       return;
     }
     if (!tokenDoc?.id || !tokenDoc?.actor?.id) {
@@ -178,7 +179,7 @@ export async function restoreTokenStateFromParty(tokenDoc) {
   let actorSignature = null;
 
   try {
-    if (!game.user.isGM) {
+    if (!isPrimaryGM()) {
       return;
     }
     if (!tokenDoc?.id || !tokenDoc?.actor?.id) {

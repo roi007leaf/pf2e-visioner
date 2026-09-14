@@ -55,7 +55,7 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'hidden', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'hidden', 'failure')).toBe('hidden');
         expect(getDefaultNewStateFor('sneak', 'hidden', 'critical-failure')).toBe('avs');
       });
 
@@ -66,7 +66,7 @@ describe('Sneak Action Comprehensive Tests', () => {
 
         expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-success')).toBe('undetected');
         expect(getDefaultNewStateFor('sneak', 'undetected', 'success')).toBe('undetected');
-        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('avs');
+        expect(getDefaultNewStateFor('sneak', 'undetected', 'failure')).toBe('hidden');
         expect(getDefaultNewStateFor('sneak', 'undetected', 'critical-failure')).toBe('avs');
       });
     });
@@ -303,8 +303,8 @@ describe('Sneak Action Comprehensive Tests', () => {
         {
           oldState: 'hidden',
           outcome: 'failure',
-          expectedNewState: 'avs',
-          shouldBeActionable: true,
+          expectedNewState: 'hidden',
+          shouldBeActionable: false,
         },
         {
           oldState: 'undetected',
@@ -455,13 +455,13 @@ describe('Sneak Action Comprehensive Tests', () => {
   });
 
   describe('Dialog AVS State Selection', () => {
-    test('failed sneak with no position data should select AVS state in dialog', () => {
+    test('failed sneak from hidden preserves hidden in the default mapping', () => {
       const {
         getDefaultNewStateFor,
       } = require('../../../scripts/chat/services/data/action-state-config.js');
 
       const newVisibility = getDefaultNewStateFor('sneak', 'hidden', 'failure');
-      expect(newVisibility).toBe('avs');
+      expect(newVisibility).toBe('hidden');
     });
 
     test('critical failure sneak should select AVS state in dialog', () => {

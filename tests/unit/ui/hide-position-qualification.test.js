@@ -1,4 +1,10 @@
 describe('hide position qualification', () => {
+  test('uses the dialog actor for concealment restrictions, while still allowing independent cover', async () => {
+    const { hideEndPositionQualifies } = await import('../../../scripts/chat/dialogs/Hide/hide-position-qualification.js');
+    const app = { actorToken: { document: { getFlag: () => ({ blur: { id: 'blur', qualifications: { hide: { qualifiesOnConcealment: false } } } }) } } };
+    expect(hideEndPositionQualifies(app, { effectiveVisibility: 'concealed', coverState: 'none' })).toBe(false);
+    expect(hideEndPositionQualifies(app, { effectiveVisibility: 'concealed', coverState: 'standard' })).toBe(true);
+  });
   test('actionability uses dialog AVS helpers after prerequisite toggles', async () => {
     const { getHidePositionActionableChange } = await import(
       '../../../scripts/chat/dialogs/Hide/hide-position-qualification.js'

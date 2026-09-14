@@ -23,7 +23,7 @@ export function getCoverMap(token) {
  * @param {Token} token
  * @param {Record<string,string>} coverMap
  */
-export async function setCoverMap(token, coverMap) {
+export async function setCoverMap(token, coverMap, options = {}) {
   if (!token?.document) return;
   // Only GMs can update token documents
   if (!game.user.isGM) return;
@@ -42,6 +42,7 @@ export async function setCoverMap(token, coverMap) {
   }
 
   // Track sources for each cover entry
+  if (options.skipSourceTracking) return result;
   try {
     const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
     for (const [targetId, state] of Object.entries(normalizedCoverMap)) {
@@ -50,7 +51,7 @@ export async function setCoverMap(token, coverMap) {
         if (targetToken) {
           await SourceTracker.addSourceToState(targetToken, 'cover', {
             id: token.id,
-            type: 'manual-cover'
+            type: 'manual-cover', state,
           }, token.id);
         }
       }
@@ -138,7 +139,8 @@ export async function setCoverBetween(observer, target, state, options = {}) {
 
   if (state === 'none') delete coverMap[targetId];
   else coverMap[targetId] = state;
-  await setCoverMap(observer, coverMap);
+  // This pair tracks its own source below. Do not relabel other map entries.
+  await setCoverMap(observer, coverMap, { skipSourceTracking: true });
 
   // Track the source for sneak/action qualification checks
   if (state === 'none' && !options.skipSourceTracking) {
@@ -156,7 +158,7 @@ export async function setCoverBetween(observer, target, state, options = {}) {
       const { SourceTracker } = await import('../rule-elements/SourceTracker.js');
       await SourceTracker.addSourceToState(target, 'cover', {
         id: observer.id,
-        type: 'manual-cover'
+        type: 'manual-cover', state,
       }, observer.id);
     } catch (error) {
       console.warn('Error tracking cover source:', error);

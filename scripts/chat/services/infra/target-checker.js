@@ -136,7 +136,7 @@ function checkConsequencesTargets(actionData, potentialTargets, checkContext) {
       console.error('Error checking concealment in checkConsequencesTargets:', error);
     }
 
-    if (visibility === 'hidden' || visibility === 'undetected') {
+    if (['hidden', 'undetected', 'unnoticed'].includes(visibility)) {
       return true;
     }
   }
@@ -263,7 +263,7 @@ function checkSeekTargets(actionData, potentialTargets, checkContext) {
     } catch (_) {}
 
     const visibility = checkContext.getVisibilityBetween(actionData.actor, target);
-    if (['hidden', 'undetected'].includes(visibility)) return true;
+    if (['hidden', 'undetected', 'unnoticed'].includes(visibility)) return true;
     if (visibility === 'concealed' && seekIgnoresConcealment(actionData, target)) return true;
     if (target.actor) {
       const conditions = target.actor.conditions?.conditions || [];

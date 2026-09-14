@@ -7,9 +7,7 @@ global.foundry = global.foundry || {};
 global.foundry.data = global.foundry.data || {};
 global.foundry.data.regionBehaviors = global.foundry.data.regionBehaviors || {};
 global.foundry.data.regionBehaviors.RegionBehaviorType = class RegionBehaviorType {
-  constructor() {
-    this.region = null;
-  }
+  get region() { return this.parent?.region ?? null; }
 
   static defineSchema() {
     return {};
@@ -46,7 +44,11 @@ global.CONST = {
 };
 
 // Import after setting up mocks
-import { VisibilityRegionBehavior } from '../../../scripts/regions/VisibilityRegionBehavior.js';
+const { VisibilityRegionBehavior } = require('../../../scripts/regions/VisibilityRegionBehavior.js');
+import AvsOverrideManager from '../../../scripts/chat/services/infra/AvsOverrideManager.js';
+jest.mock('../../../scripts/stores/visibility-map.js', () => ({
+  getVisibility: jest.fn(() => 'undetected'), getVisibilityBetween: jest.fn(() => 'undetected'), setVisibilityBetween: jest.fn(),
+}));
 
 VisibilityRegionBehavior._createEventsField = (events) => ({
   events: new Set(events.events || events),
@@ -136,7 +138,7 @@ describe('VisibilityRegionBehavior', () => {
 
     // Create region behavior instance
     regionBehavior = new VisibilityRegionBehavior();
-    regionBehavior.region = mockRegion;
+    regionBehavior.parent = { region: mockRegion };
     regionBehavior.visibilityState = 'hidden';
     regionBehavior.applyToInsideTokens = false;
     regionBehavior.twoWayRegion = false;
@@ -166,7 +168,13 @@ describe('VisibilityRegionBehavior', () => {
 
   describe('Token Region Detection', () => {
     beforeEach(() => {
-      regionBehavior.parent = mockRegion;
+      regionBehavior.parent = { region: mockRegion };
+    });
+
+    test('finds contained tokens through the native behavior document hierarchy', () => {
+      mockRegion.document.testPoint.mockImplementation(point => point.x === 100 && point.elevation === 10);
+      mockToken1.document.elevation = 10;
+      expect(regionBehavior._getTokensInRegion()).toEqual([mockToken1]);
     });
 
     test('should handle empty region', () => {
@@ -179,16 +187,49 @@ describe('VisibilityRegionBehavior', () => {
   });
 
   describe('Region Property Access', () => {
-    test('should access region through parent property', () => {
-      regionBehavior.parent = mockRegion;
+    test('resolves the region through its parent behavior document', () => {
+      regionBehavior.parent = { region: mockRegion };
 
-      expect(regionBehavior.parent).toBe(mockRegion);
+      expect(regionBehavior.region).toBe(mockRegion);
     });
   });
 
   describe('Update Generation Logic', () => {
+    test.each(['manual_action', 'region_override'])('region removal respects override source %s', async source => {
+      mockToken1.document.getFlag = () => ({ source, state: 'undetected' });
+      const remove = jest.spyOn(AvsOverrideManager, 'removeOverride').mockResolvedValue(true);
+      try {
+        await regionBehavior._applyVisibilityUpdates([{ source: 'token2', target: 'token1', state: 'observed' }]);
+        expect(remove).toHaveBeenCalledTimes(source === 'region_override' ? 1 : 0);
+      } finally { remove.mockRestore(); }
+    });
+    test('a real exit still resets when the next combatant is inside the region', () => {
+      game.combat = { combatant: { tokenId: 'token2' } };
+      try {
+        expect(regionBehavior._gatherUpdatesForToken('token1', false, [mockToken2])).toContainEqual({ source: 'token2', target: 'token1', state: 'observed' });
+      } finally { delete game.combat; }
+    });
+    test('a turn ending preserves visibility while that token remains in the region', async () => {
+      mockRegion.document.testPoint.mockImplementation(point => point.x === 100);
+      regionBehavior._applyVisibilityUpdates = jest.fn();
+      regionBehavior._pendingTokenEvents = new Map([['token1', {
+        id: 'token1', isEntering: false, eventName: CONST.REGION_EVENTS.TOKEN_TURN_END,
+      }]]);
+      await regionBehavior._processPendingEvents();
+      expect(regionBehavior._applyVisibilityUpdates).toHaveBeenCalledWith(expect.arrayContaining([
+        { source: 'token2', target: 'token1', state: 'hidden' },
+      ]));
+    });
+
+    test.each(['BEHAVIOR_ACTIVATED', 'BEHAVIOR_DEACTIVATED'])('%s updates tokens already inside without a movement event', async key => {
+      regionBehavior._getTokensInRegion = () => [mockToken1];
+      regionBehavior._scheduleTokenEvent = jest.fn();
+      await regionBehavior._handleRegionEvent({ name: CONST.REGION_EVENTS[key] });
+      expect(regionBehavior._scheduleTokenEvent).toHaveBeenCalledWith(mockToken1, key === 'BEHAVIOR_ACTIVATED', CONST.REGION_EVENTS[key]);
+    });
+
     beforeEach(() => {
-      regionBehavior.parent = mockRegion;
+      regionBehavior.parent = { region: mockRegion };
       // Mock setVisibilityBetween to avoid actual visibility updates
       jest.doMock('../../../scripts/stores/visibility-map.js', () => ({
         setVisibilityBetween: jest.fn(),
@@ -234,5 +275,18 @@ describe('VisibilityRegionBehavior', () => {
     });
   });
 
+
+  test('secondary GM does not handle region broadcasts or queued writes', async () => {
+    const previousUsers = game.users, previousUser = game.user;
+    try {
+      game.users = { activeGM: { id: 'primary' } }; game.user = { id: 'secondary', isGM: true };
+      const name = jest.fn(() => CONST.REGION_EVENTS.BEHAVIOR_ACTIVATED);
+      await regionBehavior._handleRegionEvent({ get name() { return name(); } });
+      expect(name).not.toHaveBeenCalled();
+      const source = jest.fn(() => mockToken1);
+      await regionBehavior._applyVisibilityUpdates([{ get source() { return source(); }, target: mockToken2, state: 'hidden' }]);
+      expect(source).not.toHaveBeenCalled();
+    } finally { game.users = previousUsers; game.user = previousUser; }
+  });
 
 });

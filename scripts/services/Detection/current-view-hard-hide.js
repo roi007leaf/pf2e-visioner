@@ -4,6 +4,7 @@ import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { gmObserverView } from '../GmObserverView/gm-observer-view.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import { currentViewHardHideSurfaces } from './current-view-hard-hide-surfaces.js';
+import { suppressDetectionFilterPrimaryMesh } from './detection-filter-mesh-suppression.js';
 import { legacyLevelsFloorBlocksSightBetween } from './legacy-levels-live-sight.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import {
@@ -177,6 +178,11 @@ function restoreHardHiddenChromeSurfaces(token) {
 }
 
 function disableHardHiddenInteraction(token) {
+  // Disabling hit testing does not dispatch pointer-out. Clear Core's existing
+  // hover reference so its keyboard target action cannot select an unseen token.
+  if (!globalThis.game?.user?.isGM && (token.hover || globalThis.canvas?.tokens?.hover === token)) {
+    token._onHoverOut?.(null);
+  }
   if (!token[HARD_HIDDEN_INTERACTION_KEY]) {
     token[HARD_HIDDEN_INTERACTION_KEY] = {
       eventMode: token.eventMode,
@@ -388,6 +394,9 @@ export function releaseCurrentViewHardHide(token) {
     if ('visible' in mesh) mesh.visible = !detectionFilterOwnsRenderSurface;
     if ('renderable' in mesh) mesh.renderable = !detectionFilterOwnsRenderSurface;
     if ('alpha' in mesh) mesh.alpha = token.document?.hidden ? 0.5 : 1;
+    // Transfer ownership to the filter guard so its later release restores artwork.
+    // Core can clear a transient filter after this hard-hide marker is removed.
+    if (detectionFilterOwnsRenderSurface) suppressDetectionFilterPrimaryMesh(token);
   }
   if (!detectionFilterOwnsRenderSurface) restoreHardHiddenChromeSurfaces(token);
   restoreHardHiddenInteraction(token);

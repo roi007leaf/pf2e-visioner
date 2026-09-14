@@ -143,6 +143,64 @@ describe('BatchOrchestrator', () => {
     expect(applied).toEqual([['A', 'B', 'hidden']]);
   });
 
+  test('does not apply an automatic result when AVS is disabled during calculation', async () => {
+    const get = game.settings.get;
+    let enabled = true;
+    game.settings.get = jest.fn((module, key) => key === 'autoVisibilityEnabled' ? enabled : get(module, key));
+    const calculate = batchProcessor.process.getMockImplementation();
+    batchProcessor.process.mockImplementation(async (...args) => {
+      const result = await calculate(...args);
+      enabled = false;
+      return result;
+    });
+    try {
+      await orchestrator.processBatch(new Set(['A']));
+      expect(applied).toEqual([]);
+      expect(orchestrator.isProcessing()).toBe(false);
+    } finally { game.settings.get = get; }
+  });
+
+  test('removing moving tokens before the final batch does not stall later visibility changes', async () => {
+    jest.useFakeTimers();
+    const tokens = global.canvas.tokens.placeables;
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+    orchestrator.notifyTokenMovementStart(['A']);
+    orchestrator.enqueueTokens(new Set(['A']));
+    global.canvas.tokens.placeables = []; // Deleted token or a scene switch before movement settles.
+    await jest.advanceTimersByTimeAsync(250);
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+
+    global.canvas.tokens.placeables = tokens;
+    orchestrator.enqueueTokens(new Set(['B'])); // A later sense/condition update must still drain.
+    await jest.advanceTimersByTimeAsync(250);
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+    expect(orchestrator.isTokenMovementActive({ includePendingMovementService: false })).toBe(false);
+    expect(orchestrator._pendingTokens.size).toBe(0);
+  });
+
+  test.each(['excluded', 'disabled'])('a final movement batch skipped because it is %s releases the queue', async reason => {
+    jest.useFakeTimers();
+    batchProcessor.process.mockResolvedValue(emptyBatchResult());
+    let skip = true;
+    const getFlag = global.canvas.scene.getFlag;
+    global.canvas.scene.getFlag = (_module, key) => reason === 'disabled' && key === 'disableAVS' && skip;
+    exclusionManager.isExcludedToken.mockImplementation(() => reason === 'excluded' && skip);
+    try {
+      orchestrator.notifyTokenMovementStart(['A']);
+      orchestrator.enqueueTokens(new Set(['A']));
+      await jest.advanceTimersByTimeAsync(250);
+      expect(batchProcessor.process).not.toHaveBeenCalled();
+      skip = false;
+      orchestrator.enqueueTokens(new Set(['B']));
+      await jest.advanceTimersByTimeAsync(250);
+      expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+      expect(orchestrator.isTokenMovementActive({ includePendingMovementService: false })).toBe(false);
+    } finally {
+      if (getFlag === undefined) delete global.canvas.scene.getFlag;
+      else global.canvas.scene.getFlag = getFlag;
+    }
+  });
+
   test('drops updates whose observer is excluded as observer (defeated corpse)', async () => {
     const corpse = createMockToken({ id: 'D', x: 50, y: 0 });
     global.canvas.tokens.placeables = [...global.canvas.tokens.placeables, corpse];

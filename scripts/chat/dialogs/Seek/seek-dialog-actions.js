@@ -297,8 +297,14 @@ export async function revertSeekChange(app, button) {
     }
 
     if (outcome._isWall) {
-      const { updateWallVisuals } = await import('../../../services/visual-effects.js');
-      await updateWallVisuals(outcome.wall, outcome.oldVisibility || 'observed');
+      const { applySeekChangesInternal } = await import(
+        '../../services/actions/Seek/seek-change-application.js'
+      );
+      await applySeekChangesInternal([{
+        observer: outcome.observerToken || outcome.observer || app.actionData?.actorToken || app.actionData?.actor,
+        wallId: outcome.wallId,
+        newWallState: outcome.oldVisibility || outcome.currentVisibility || 'hidden',
+      }]);
     } else {
       const revertVisibility = outcome.oldVisibility || outcome.currentVisibility;
       const observer = outcome.observerToken || outcome.observer || app.actionData?.actor;

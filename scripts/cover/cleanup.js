@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { isPrimaryGM } from '../services/gm-election.js';
 import {
   extractCoverAgainstFromPredicate,
   extractSignaturesFromPredicate,
@@ -269,8 +270,8 @@ export async function cleanupCoverEffectsForObserver(targetToken, observerToken)
 }
 
 export async function cleanupDeletedTokenCoverEffects(tokenDoc) {
-  // Only GMs can perform cleanup operations
-  if (!game.user.isGM) return;
+  // Token deletion broadcasts to every client; only one GM writes actor effects.
+  if (!isPrimaryGM()) return;
 
   if (!tokenDoc?.id || !tokenDoc?.actor?.id) return;
   try {

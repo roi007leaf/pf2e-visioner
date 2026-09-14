@@ -1,5 +1,72 @@
 # Changelog
 
+## [8.7.0] - 2026-09-14
+
+### Tests
+
+- Added a GM Observer View regression for Foundry-hidden NPCs, including a hidden controlled observer. Checks translucent, hatched token artwork, player privacy, and restoration when the mode is disabled. All nine assertions passed live; no rendering change was needed.
+
+- Expanded presence-marker recovery to five range-exit/return cycles per sense. Restored QA message tagging after GM-client reloads so later native-roll tests retain owned evidence and cleanup tracking.
+
+- Added three automated Hide/Sneak/Seek workflows covering seven DC boundary values per action, displayed degrees, Apply/Undo and player rendering. These caught the exact DC-minus-ten classification and ordinary Sneak failure bugs fixed below; all three passed after repair.
+
+- Added three automated local Seek range scenarios covering combat/exploration boundaries, limit toggles, encounter transitions, Apply/Undo and player rendering. All three passed live with cleanup completed.
+
+- Added four automated local Sneak scenarios covering start/end position controls, Legendary Sneak and Very, Very Sneaky end-cover exemptions, applied visibility, undo, and feat removal. All four passed live with cleanup completed.
+
+- Added ten local automated cases for Sneaky defer/undefer, moved end-position validation at turn end, and native Seek template placement, cancellation, range clamping and cleanup.
+
+- Added 23 automated local scenarios for localization, keyboard focus, colorblind UI, native cover rolls, shipped macros, manager controls, and presence-marker interaction/recovery. Tests restore client preferences and clean up their owned QA documents, including on failure. These additions expand coverage; they do not certify that every feature or scenario passes.
+
+### Fixed
+
+- **Disabling automatic visibility during calculation**: In-flight automatic results are discarded if AVS is disabled before application, preventing a stale batch from overwriting a newer visibility profile.
+
+- **Artwork after clearing hidden scene preparation**: Transferring a hard-hidden token to a temporary detection filter now records ownership of the suppressed primary mesh, allowing later filter removal to restore artwork instead of leaving an Observed hazard or loot token invisible.
+- **Live action-button timing**: The automated runner reads button bounds, enabled state, and occlusion together and waits through transient row replacement. Disabled or obstructed controls still fail verification.
+
+- Rolls exactly 10 below the DC now count as Critical Failure. Ordinary failed Sneak checks preserve Hidden instead of releasing the target to AVS.
+- Seek cone filtering retains its direction and angle after consuming the preview. Cancelling placement releases creation hooks and avoids creating a template from a right-click.
+- Shift-click Strikes now receive cover bonuses when bypassing an enabled roll dialog.
+- Thoughtsense markers no longer require blocked sound. Hidden lifesense markers remain available while token render state refreshes, including after returning into range.
+
+- **Timed overrides with multiple GMs**: Only the active GM advances and expires timers. Ending combat preserves the remaining permanent override instead of deleting it.
+- **Peeking cleanup**: Opening a door restores its current sight edge. Moving, switching tokens, or changing a door cancels pending approval requests, so late approvals cannot restart an obsolete peek.
+- **AVS and shared-vision changes**: Toggling combat-only visibility recalculates existing tokens. Changing shared-vision direction refreshes both participants, and multi-observer aggregation includes selected player-owned tokens.
+- **Native condition conversion**: Hidden, Concealed, and Undetected conversion runs only on the active GM, preventing duplicate condition updates.
+- **Hidden-wall discovery undo**: Reverting Seek or Search restores the observer's stored hidden-wall state, including connected walls.
+- **Party and deleted-token effects**: Party restoration and token-effect cleanup use the active GM, preventing competing writes and missing-item errors with multiple GMs connected.
+- **Stacked visibility effect removal**: Removing a stronger visibility rule preserves the effective state of a remaining weaker source instead of briefly or permanently resetting it to Observed.
+- **Foundry 14 area cover**: Native spell-area regions populate cover tracking and update it when moved or deleted. Area cover modifies Reflex saves without incorrectly increasing Fortitude or Will saves.
+- **Visibility updates stalling after scene changes**: Finishing movement for deleted or excluded tokens, or in a scene with automatic visibility disabled, releases the movement session so later sense and condition updates continue processing.
+- **Visibility refresh after sense changes**: Changes to senses, detection ranges, lighting effects, and invisibility invalidate cached visibility so stationary tokens update correctly. Removing invisibility no longer refreshes unrelated actors.
+- **Directional vision**: Rotating a limited vision cone updates automatic visibility. Targets outside the cone can still be detected through hearing and other eligible nonvisual senses.
+- **Special-sense detection and rendering**: Precise nonvisual senses display full token artwork for Observed targets. Players also clear obsolete presence indicators when targets become Observed, preventing scent animations from keeping them invisible. Imprecise senses retain their own detection indicators instead of inheriting stale visual metadata, and additional configured senses respect their detection eligibility.
+- **Foundry 14 detection modes**: Rule-driven detection changes support Foundry's current detection-mode format while preserving sense suppression and Deafened restrictions.
+- **Action results and undo**: Reverting Take Cover, Sneak, and attack consequences restores the affected visibility and cover relationships. Hide qualification respects concealment, and Seek, Search, and attack consequences include eligible Unnoticed targets.
+- **Stacked visibility and cover sources**: Removing one rule or effect preserves remaining manual and rule-based overrides. Cover adjustments apply to the final cover result.
+- **Multiple-GM effect cleanup**: Rule updates, invisibility transitions, effect deletion cleanup, and visibility-region changes use the active GM authority, preventing duplicate writes and effect-deletion errors.
+- **Player targeting privacy**: Tokens that become undetected clear stale hover state so keyboard targeting cannot reveal them.
+- **Selected-token cleanup**: Purging selected tokens correctly deletes their stored visibility, detection, and cover references on Foundry 14 while preserving unrelated tokens and settings.
+
+### Added
+
+- **Local automated QA suite**: Added 226 automated Foundry 14 scenarios covering rendered visibility, senses, movement, levels, actions, rules, regions, privacy, settings, and multiple-account behavior. Additional cases exercise timers, validation decisions, peeking approvals, connected hidden-wall discovery, scene preparation, party restoration, shared-vision modes, encounter links, real cover rolls, Sense the Unseen, GM keyboard shortcuts, and scent markers while the GM selects or deselects a player-owned token. Runs require explicit GM and player credentials, restore test state, and retain recovery records after interrupted cleanup. The runner checks the expected QA world before login and refuses to run against a different world. It automatically unpauses the QA world for testing and restores its original pause state during cleanup. The suite stays outside CI and release archives. The feature audit records remaining untested branches; passing the catalog does not imply exhaustive coverage.
+- **Remembered local test defaults**: URL, GM and player account prompts accept saved defaults with Enter. Passwords remain masked, blank player passwords require confirmation, and defaults stay outside the repository. Explicit environment variables support unattended runs.
+- **Test evidence and recovery**: Reports retain per-assertion results and screenshots. Local shipping checks reject incomplete, failed, stale-source, or improperly cleaned runs. Recovery restores owned fixtures, settings, client views, and the original pause state after interruption.
+
+### Running the local tests
+
+Use a source checkout with Node 20.17+ or 22.13+. Start the disposable `visioner-qa` world on Foundry 14 with PF2e, Visioner, lib-wrapper, and socketlib enabled. Create separate GM and player accounts; the full suite also needs a second GM for authority handover. Assign the player a lobby character.
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:live:full
+```
+
+The runner asks for the URL and accounts, offering saved defaults. It never switches away from another running world. Use `npm run test:live` for smoke tests, `npm run test:live:list` to list cases, and `npm run test:live:cleanup` to recover an interrupted run. Results appear under `artifacts/live/<run UUID>/`. A passing subset is not a full-suite pass. See the [complete test guide](https://github.com/roi007leaf/pf2e-visioner/blob/main/tests/live/README.md) for setup, selected cases, credentials, cleanup, and release-evidence checks. Test code is available in the repository, not the installed module ZIP.
+
 ## [8.6.7] - 2026-09-13
 
 ### Fixed

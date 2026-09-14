@@ -184,6 +184,26 @@ describe('canvas visibility wrapper', () => {
     } finally { global.CONFIG = originalConfig; }
   });
 
+  test.each(['scent', 'thoughtsense', 'lifesense', 'bloodsense'])(
+    'renders precise %s observation when Core has no native detection mode', (sense) => {
+      game.user.isGM = false;
+      game.settings.set('pf2e-visioner', 'autoVisibilityEnabled', true);
+      const observer = createMockToken({ id: 'observer', flags: {
+        'pf2e-visioner': { visibilityV2: {
+          target: legacyVisibilityToProfile('observed'),
+        }, detection: { target: { sense, isPrecise: true } } },
+      } });
+      observer.vision = { active: true };
+      const target = createMockToken({ id: 'target' });
+      target.document.documentName = 'Token';
+      canvas.tokens = { controlled: [observer], placeables: [observer, target], get: id => id === 'observer' ? observer : target };
+      const wrapped = jest.fn(() => false);
+      expect(wrapCanvasVisibilityTest(wrapped, [target.center], { object: target })).toBe(true);
+      target.document.hidden = true;
+      expect(wrapCanvasVisibilityTest(wrapped, [target.center], { object: target })).toBe(false);
+    },
+  );
+
   test('active peek rejects core visibility from explored fog outside the peek polygon', () => {
     global.game.user.isGM = false;
     const observer = createMockToken({ id: 'observer' });

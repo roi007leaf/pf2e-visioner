@@ -14,6 +14,20 @@ PF2E Visioner is a comprehensive visibility and cover toolkit for Foundry VTT's 
 
 Documentation: https://github.com/roi007leaf/pf2e-visioner/wiki
 
+## Local automated tests
+
+From a source checkout, run `npm ci` and `npx playwright install chromium`, then
+`npm run test:live:full`. First launch the disposable `visioner-qa` Foundry 14 / PF2e
+world with Visioner and its test dependencies enabled. The runner prompts for GM
+and player accounts, offers saved defaults, and restores test state during cleanup.
+The full suite also requires a second GM account for handover testing.
+
+Use `npm run test:live` for smoke tests and `npm run test:live:cleanup` after an
+interrupted run. Reports and screenshots are saved under `artifacts/live/`.
+See the [test setup and recovery guide](https://github.com/roi007leaf/pf2e-visioner/blob/main/tests/live/README.md)
+for prerequisites and commands. Live tests run locally only; they are excluded
+from GitHub workflows and release ZIPs.
+
 ## ✅ Requirements
 
 - Foundry VTT v13.341+

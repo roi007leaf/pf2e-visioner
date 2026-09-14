@@ -33,6 +33,17 @@ describe('RuleElementChecker', () => {
   });
 
   describe('checkRuleElements', () => {
+    it('uses a surviving scoped source after the global override is removed', () => {
+      mockTargetToken.document.getFlag.mockImplementation((_scope, key) => key === 'stateSource' ? {
+        visibilityByObserver: { 'observer-1': { sources: [
+          { id: 'remaining', state: 'concealed', direction: 'from', priority: 100 },
+        ] } },
+      } : null);
+      expect(RuleElementChecker.checkRuleElementOverride(mockObserverToken, mockTargetToken))
+        .toEqual({ state: 'concealed', source: 'remaining', priority: 100, type: 'ruleElementOverride' });
+      expect(RuleElementChecker.checkRuleElementOverride(mockTargetToken, mockObserverToken)).toBeNull();
+    });
+
     it('should return null when no rule elements are active', () => {
       mockObserverToken.document.getFlag.mockReturnValue(null);
       mockTargetToken.document.getFlag.mockReturnValue(null);

@@ -50,7 +50,8 @@ import {
 } from './visibility/perception-profile.js';
 
 function getForcedDeletion() {
-  return foundry?.data?.operators?.ForcedDeletion ?? null;
+  const ForcedDeletion = foundry?.data?.operators?.ForcedDeletion;
+  return typeof ForcedDeletion === 'function' ? new ForcedDeletion() : (ForcedDeletion ?? null);
 }
 
 function setFlagDeletion(update, flagKey) {
@@ -58,7 +59,9 @@ function setFlagDeletion(update, flagKey) {
   if (forcedDeletion) {
     update[`flags.${MODULE_ID}.${flagKey}`] = forcedDeletion;
   } else {
-    update[`flags.${MODULE_ID}.-=${flagKey}`] = null;
+    const parts = flagKey.split('.');
+    const key = parts.pop();
+    update[[`flags.${MODULE_ID}`, ...parts, `-=${key}`].join('.')] = null;
   }
 }
 
@@ -2672,60 +2675,15 @@ export class Pf2eVisionerApi {
 
           for (const token of otherTokens) {
             const update = { _id: token.id };
-            let hasChanges = false;
 
-            // Remove selected tokens from this token's canonical visibility profile map
-            const visibilityProfileMap = token.document.getFlag(MODULE_ID, 'visibilityV2') || {};
-            const cleanedVisibilityProfileMap = { ...visibilityProfileMap };
-            hasChanges = false;
-            for (const selectedId of selectedTokenIds) {
-              if (cleanedVisibilityProfileMap[selectedId]) {
-                delete cleanedVisibilityProfileMap[selectedId];
-                hasChanges = true;
-              }
-            }
-            if (hasChanges) {
-              if (Object.keys(cleanedVisibilityProfileMap).length > 0) {
-                update[`flags.${MODULE_ID}.visibilityV2`] = cleanedVisibilityProfileMap;
-              } else {
-                setFlagDeletion(update, 'visibilityV2');
-              }
-            }
-
-            // Remove selected tokens from this token's detection map
-            const detectionMap = token.document.getFlag(MODULE_ID, 'detection') || {};
-            const cleanedDetectionMap = { ...detectionMap };
-            hasChanges = false;
-            for (const selectedId of selectedTokenIds) {
-              if (cleanedDetectionMap[selectedId]) {
-                delete cleanedDetectionMap[selectedId];
-                hasChanges = true;
-              }
-            }
-            if (hasChanges) {
-              if (Object.keys(cleanedDetectionMap).length > 0) {
-                update[`flags.${MODULE_ID}.detection`] = cleanedDetectionMap;
-              } else {
-                setFlagDeletion(update, 'detection');
-              }
-            }
-
-            // Remove selected tokens from this token's cover map
-            const coverMap = token.document.getFlag(MODULE_ID, 'cover') || {};
-            const cleanedCoverMap = { ...coverMap };
-            hasChanges = false;
-            for (const selectedId of selectedTokenIds) {
-              if (cleanedCoverMap[selectedId]) {
-                delete cleanedCoverMap[selectedId];
-                hasChanges = true;
-              }
-            }
-            if (hasChanges) {
-              if (Object.keys(cleanedCoverMap).length > 0) {
-                update[`flags.${MODULE_ID}.cover`] = cleanedCoverMap;
-              } else {
-                setFlagDeletion(update, 'cover');
-              }
+            // Foundry merges nested flags, even with diff:false. Omitted entries
+            // survive; explicitly delete references and preserve unrelated pairs.
+            for (const key of ['visibilityV2', 'detection', 'cover', 'autoCoverMap']) {
+              const map = token.document.getFlag(MODULE_ID, key) || {};
+              const present = selectedTokenIds.filter(id => Object.hasOwn(map, id));
+              if (!present.length) continue;
+              if (present.length === Object.keys(map).length) setFlagDeletion(update, key);
+              else for (const id of present) setFlagDeletion(update, key + '.' + id);
             }
 
             // Only add update if there are actual changes

@@ -3,21 +3,21 @@ import { getDefaultNewStateFor } from '../../services/data/action-state-config.j
 
 export function hideEndPositionQualifies(app, endPos) {
   try {
-    if (ActionQualifier.forceEndQualifies(app.hidingToken, 'hide')) {
+    const hider = app.actorToken || app.hidingToken;
+    if (ActionQualifier.forceEndQualifies(hider, 'hide')) {
       return true;
     }
 
-    const actionCheck = ActionQualifier.canUseConcealment(app.hidingToken, 'hide');
-    if (!actionCheck || !endPos) return false;
+    if (!endPos) return false;
 
     if (
       endPos.coverState &&
       (endPos.coverState === 'standard' || endPos.coverState === 'greater')
     ) {
-      return true;
+      return ActionQualifier.canUseCover(hider, 'hide');
     }
 
-    return endPos.effectiveVisibility === 'concealed';
+    return endPos.effectiveVisibility === 'concealed' && ActionQualifier.canUseConcealment(hider, 'hide');
   } catch {
     return false;
   }

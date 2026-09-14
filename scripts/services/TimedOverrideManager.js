@@ -1,5 +1,6 @@
 import { MODULE_ID, REALTIME_CHECK_INTERVAL_MS, TIMED_OVERRIDE_TYPES } from '../constants.js';
 import { overrideToDisplayVisibility } from '../visibility/perception-profile.js';
+import { isPrimaryGM } from './gm-election.js';
 
 export class TimedOverrideManager {
   static _realtimeIntervalId = null;
@@ -31,7 +32,7 @@ export class TimedOverrideManager {
   }
 
   static async handlePauseGame(paused) {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
     if (paused) {
       if (!this._pauseStartedAt) this._pauseStartedAt = Date.now();
       return;
@@ -170,7 +171,7 @@ export class TimedOverrideManager {
   }
 
   static async processRoundExpirations(combat, updateData) {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
     if (!combat || !canvas.tokens?.placeables) return;
 
     const currentCombatant = combat.combatant;
@@ -266,7 +267,7 @@ export class TimedOverrideManager {
   }
 
   static async processRealtimeExpirations() {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
     if (!canvas.tokens?.placeables) return;
     if (game.paused) return;
 
@@ -362,7 +363,7 @@ export class TimedOverrideManager {
   }
 
   static async handleCombatEnd(combat) {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
     if (!canvas.tokens?.placeables) return;
 
     const allTokens = canvas.tokens.placeables;
@@ -396,6 +397,7 @@ export class TimedOverrideManager {
       try {
         const updatedData = {
           ...override.flagData,
+          timedOverride: null,
         };
         const cleanKey = override.flagKey.replace(`${MODULE_ID}.`, '');
         await override.token.document.setFlag(MODULE_ID, cleanKey, updatedData);

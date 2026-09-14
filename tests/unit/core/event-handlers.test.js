@@ -232,6 +232,31 @@ describe('Event Handler Tests', () => {
     test('should skip processing when system state says not to process events', () => {
       mockSystemState.shouldProcessEvents.mockReturnValue(false);
 
+      actorHandler.handleActorUpdate({ id: 'actor1' }, { system: { perception: { senses: [] } } });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      { system: { perception: { senses: [{ type: 'tremorsense', range: 30 }] } } },
+      { 'system.perception.senses': [{ type: 'tremorsense', range: 30 }] },
+    ])('invalidates prepared senses after update even when actor already contains the new values', changes => {
+      const actor = { id: 'actor1', system: { perception: { senses: [{ type: 'tremorsense', range: 30 }] } } };
+      mockCanvas.tokens.placeables = [{ actor, document: { id: 'token1' } }];
+      actorHandler.handleActorUpdate(actor, changes);
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+    });
+
+    test('ignores unrelated post-update fields and unchanged pre-update senses', () => {
+      const actor = { id: 'actor1', system: { perception: { senses: [] } } };
+      mockCanvas.tokens.placeables = [{ actor, document: { id: 'token1' } }];
+      actorHandler.handleActorUpdate(actor, { 'system.attributes.hp.value': 3 });
+      actorHandler.handlePreUpdateActor(actor, { system: { perception: { senses: [] } } });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    });
+
+    test('should skip processing when system state says not to process actor events', () => {
+      mockSystemState.shouldProcessEvents.mockReturnValue(false);
+
       const mockActor = { id: 'actor1', name: 'Test Actor' };
       const changes = { 'system.attributes.hp.value': 0 };
 

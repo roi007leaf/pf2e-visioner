@@ -80,6 +80,7 @@ describe('Seek template Foundry v13 compatibility', () => {
       center: { x: 250, y: 300 },
       radiusFeet: 15,
       templateType: 'circle',
+      geometry: { direction: 0, angle: 90 },
       levels: [],
     });
   });

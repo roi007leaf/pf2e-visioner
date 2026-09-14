@@ -235,7 +235,11 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
 
   buildCacheEntryFromChange(change) {
     // Cache observer id (row token) and the old cover to enable precise revert
-    return { observerId: change.observer?.id, oldCover: change.oldCover };
+    return {
+      observerId: change.observer?.id,
+      oldCover: change.oldCover,
+      ...(change.takeCoverProneRangedOnly === true ? { takeCoverProneRangedOnly: true } : {}),
+    };
   }
 
   entriesToRevertChanges(entries, actionData) {
@@ -245,18 +249,31 @@ export class TakeCoverActionHandler extends ActionHandlerBase {
         observer: this.getTokenById(e.observerId),
         target: actionData.actorToken || actionData.actor,
         newCover: e.oldCover,
+        takeCoverProneRangedOnly: e.takeCoverProneRangedOnly === true,
       }))
-      .filter((c) => c.observer);
+      .filter((c) => c.observer || c.takeCoverProneRangedOnly);
   }
 
   async revert(actionData, button) {
     const { setCoverBetween } = await import('../../../utils.js');
-    const changesFromCache = await this.buildChangesFromCache(actionData);
+    const { default: AvsOverrideManager } = await import('../infra/AvsOverrideManager.js');
+    const { removeTakeCoverProneRangedEffects } = await import('../../../cover/batch.js');
+    const changesFromCache = (await this.buildChangesFromCache(actionData)).filter(
+      (change) => !actionData.targetTokenId || change.observer?.id === actionData.targetTokenId,
+    );
     if (!changesFromCache.length) return;
     for (const ch of changesFromCache) {
+      if (ch.takeCoverProneRangedOnly) {
+        await removeTakeCoverProneRangedEffects(ch.target);
+        continue;
+      }
+      // Removing tracking also clears the Take Cover map entry. Restore the
+      // cached cover afterward, including nonzero cover that predates the action.
+      await AvsOverrideManager.removeTakeCoverTracking(ch.observer.id, ch.target.id);
       await setCoverBetween(ch.observer, ch.target, ch.newCover, { skipEphemeralUpdate: false });
     }
-    this.clearCache(actionData);
+    if (actionData.targetTokenId) this.removeFromCache(actionData, actionData.targetTokenId);
+    else this.clearCache(actionData);
     this.updateButtonToApply(button);
   }
 }

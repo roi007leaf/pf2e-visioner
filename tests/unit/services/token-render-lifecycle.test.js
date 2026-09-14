@@ -19,11 +19,16 @@ describe('token render lifecycle service', () => {
     const targets = [{ document: { id: 'target' }, refresh: jest.fn() }];
     const applyCurrentViewHardHide = jest.fn();
     const scheduleCanvasPerceptionUpdate = jest.fn();
+    const removeSystemHiddenIndicatorsForObservedTargets = jest.fn(async () => {});
     try {
       const result = await handleTokenUpdated({ id: 'observer' }, changes, {
         getSceneTokens: () => targets, applyCurrentViewHardHide, scheduleCanvasPerceptionUpdate,
+        removeSystemHiddenIndicatorsForObservedTargets,
       });
       expect(result.handled).toBe(true);
+      expect(removeSystemHiddenIndicatorsForObservedTargets).toHaveBeenCalled();
+      expect(removeSystemHiddenIndicatorsForObservedTargets.mock.invocationCallOrder[0])
+        .toBeLessThan(targets[0].refresh.mock.invocationCallOrder[0]);
       expect(applyCurrentViewHardHide).toHaveBeenCalledWith(targets[0]);
       expect(targets[0].refresh).toHaveBeenCalled();
       expect(scheduleCanvasPerceptionUpdate).toHaveBeenCalledWith({ refreshVision: true });

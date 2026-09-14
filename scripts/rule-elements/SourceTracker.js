@@ -95,71 +95,30 @@ export class SourceTracker {
   static async removeSource(token, sourceId, stateType = null, observerId = null) {
     if (!token?.document) return;
 
-    const currentStateSource = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
-    let modified = false;
-
-    if (observerId) {
-      ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
-        if (currentStateSource[observerKey]?.[observerId]?.sources) {
-          const sources = currentStateSource[observerKey][observerId].sources;
-          const newSources = sources.filter(s => s.id !== sourceId);
-          if (newSources.length !== sources.length) {
-            currentStateSource[observerKey][observerId].sources = newSources;
-            modified = true;
-
-            // Clean up empty observer entries
-            if (newSources.length === 0) {
-              delete currentStateSource[observerKey][observerId];
-            }
-          }
+    const stored = token.document.getFlag('pf2e-visioner', 'stateSource') || {};
+    const update = {};
+    for (const type of stateType ? [stateType] : ['visibility', 'cover']) {
+      if (!observerId && Array.isArray(stored[type]?.sources)) {
+        const sources = stored[type].sources.filter(source => source.id !== sourceId);
+        if (sources.length !== stored[type].sources.length) {
+          update[type] = { ...stored[type], sources, state: this.getEffectiveState(sources, type) };
         }
-      });
-
-      // Clean up empty observer containers
-      ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
-        if (currentStateSource[observerKey] && Object.keys(currentStateSource[observerKey]).length === 0) {
-          delete currentStateSource[observerKey];
-        }
-      });
-    } else {
-      const types = stateType ? [stateType] : ['visibility', 'cover'];
-
-      types.forEach(type => {
-        if (currentStateSource[type]?.sources) {
-          const sources = currentStateSource[type].sources;
-          const newSources = sources.filter(s => s.id !== sourceId);
-          if (newSources.length !== sources.length) {
-            currentStateSource[type].sources = newSources;
-            modified = true;
-          }
-        }
-      });
-
-      // Also remove from all observer-scoped entries when no specific observer is provided
-      ['visibilityByObserver', 'coverByObserver'].forEach(observerKey => {
-        const byObserver = currentStateSource[observerKey];
-        if (!byObserver) return;
-        for (const [obsId, data] of Object.entries(byObserver)) {
-          const srcs = Array.isArray(data?.sources) ? data.sources : [];
-          const filtered = srcs.filter(s => s.id !== sourceId);
-          if (filtered.length !== srcs.length) {
-            byObserver[obsId].sources = filtered;
-            modified = true;
-          }
-          if (Array.isArray(byObserver[obsId].sources) && byObserver[obsId].sources.length === 0) {
-            delete byObserver[obsId];
-            modified = true;
-          }
-        }
-        if (Object.keys(byObserver).length === 0) {
-          delete currentStateSource[observerKey];
-          modified = true;
-        }
-      });
+      }
+      const key = type + 'ByObserver';
+      for (const [id, data] of Object.entries(stored[key] || {})) {
+        if (observerId && id !== observerId) continue;
+        if (!Array.isArray(data?.sources)) continue;
+        const sources = data.sources.filter(source => source.id !== sourceId);
+        if (sources.length === data.sources.length) continue;
+        update[key] ??= {};
+        // Foundry merges flags. Explicit deletion prevents removed sources from
+        // surviving on the server or other clients; never mutate getFlag data.
+        if (!sources.length) update[key]['-=' + id] = null;
+        else update[key][id] = { ...data, sources, state: this.getEffectiveState(sources, type) };
+      }
     }
-
-    if (modified) {
-      await token.document.setFlag('pf2e-visioner', 'stateSource', currentStateSource);
+    if (Object.keys(update).length) {
+      await token.document.setFlag('pf2e-visioner', 'stateSource', update);
     }
   }
 

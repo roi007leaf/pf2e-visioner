@@ -5,6 +5,11 @@ const mockGetVisibilityMap = jest.fn();
 const mockSetVisibilityMap = jest.fn();
 const mockGetCoverMap = jest.fn();
 const mockSetCoverMap = jest.fn();
+const mockIsPrimaryGM = jest.fn(() => true);
+
+jest.mock('../../../scripts/services/gm-election.js', () => ({
+  isPrimaryGM: () => mockIsPrimaryGM(),
+}));
 
 jest.mock('../../../scripts/stores/visibility-map.js', () => ({
   getVisibilityMap: (...args) => mockGetVisibilityMap(...args),
@@ -23,6 +28,7 @@ describe('Party token state normalization', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsPrimaryGM.mockReturnValue(true);
 
     scene = {
       flags: {
@@ -44,6 +50,24 @@ describe('Party token state normalization', () => {
     global.canvas.scene = scene;
     global.canvas.tokens.get = jest.fn();
     global.canvas.tokens.placeables = [];
+  });
+
+  test('secondary GM cannot restore party state or rebuild its effects', async () => {
+    const { restoreTokenStateFromParty } = await import('../../../scripts/services/party-token-state.js');
+    mockIsPrimaryGM.mockReturnValue(false);
+    const actor = { id: 'actor-1', signature: 'sig-1', itemTypes: { effect: [] } };
+    const tokenDoc = { id: 'new-token', actor, parent: scene, setFlag: jest.fn() };
+    const token = { id: tokenDoc.id, actor, document: tokenDoc };
+    tokenDoc.object = token;
+    global.canvas.tokens.get.mockReturnValue(token);
+    scene.flags['pf2e-visioner'].partyTokenStateCache = { 'sig-1': {
+      tokenId: 'old-token', savedAt: Date.now(), visibility: { enemy: 'hidden' },
+      cover: {}, observerStates: {}, effects: [],
+    } };
+    await restoreTokenStateFromParty(tokenDoc);
+    expect(mockSetVisibilityMap).not.toHaveBeenCalled();
+    expect(scene.setFlag).not.toHaveBeenCalled();
+    expect(tokenDoc.setFlag).not.toHaveBeenCalled();
   });
 
   test('saveTokenStateForParty drops default observed and none states', async () => {

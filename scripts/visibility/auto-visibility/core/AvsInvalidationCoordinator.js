@@ -569,6 +569,9 @@ export class AvsInvalidationCoordinator {
     if (!this.#shouldProcessEvents()) return false;
     if (!tokenDoc?.id) return false;
 
+    this.#clearVisionAnalyzerCaches([tokenDoc.object].filter(Boolean));
+    this.#clearVisibilityAndLosCaches();
+    LightingPrecomputer.clearLightingCaches();
     this.visibilityState?.markTokenChangedImmediate?.(tokenDoc.id);
     return true;
   }
@@ -606,7 +609,7 @@ export class AvsInvalidationCoordinator {
     if (tokenIds.length === 0) return false;
 
     this.#clearVisionAnalyzerCaches(metadata.tokens);
-    this.cacheManager?.getGlobalVisibilityCache?.()?.clear?.();
+    this.cacheManager?.clearVisibilityCache?.();
     requestFullVisibilityScopeRecalc();
     if (metadata.recalculateAllTokenPairs) {
       this.#clearVisibilityAndLosCaches();
@@ -624,6 +627,7 @@ export class AvsInvalidationCoordinator {
     if (tokenIds.length === 0) return false;
 
     this.#clearVisionAnalyzerCaches(metadata.tokens);
+    this.cacheManager?.clearVisibilityCache?.();
     this.#markTokenIdsImmediate(tokenIds);
     return true;
   }
@@ -641,6 +645,8 @@ export class AvsInvalidationCoordinator {
     const tokenIds = Array.isArray(metadata.tokenIds) ? metadata.tokenIds : [];
     if (tokenIds.length === 0) return false;
 
+    tokenIds.forEach(id => this.visionAnalyzer?.invalidateVisionCache?.(id));
+    this.cacheManager?.clearVisibilityCache?.();
     requestFullVisibilityScopeRecalc();
     this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;

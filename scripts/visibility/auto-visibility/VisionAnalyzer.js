@@ -201,6 +201,19 @@ export class VisionAnalyzer {
     return Object.values(capabilities.precise).some((range) => distance <= range);
   }
 
+  /** Visual cone eligibility is separate from wall LOS used by nonvisual senses. */
+  isWithinVisionAngle(observer, target, observerPosition = null, targetPosition = null) {
+    const angle = Number(observer?.document?.sight?.angle ?? 360);
+    if (angle >= 360 || !Number.isFinite(angle)) return true;
+    // Peek uses its own origin and cone in the LOS check.
+    if (peekRegistry.get(observer?.document?.id)?.origin) return true;
+    const origin = observerPosition ?? observer?.center;
+    if (!origin) return true;
+    const direction = (Number(observer?.document?.rotation ?? 0) + 90) * Math.PI / 180;
+    return this.#getCoreVisibilityTestPoints(target, targetPosition).some(point =>
+      isPointInCone(origin, direction, angle, point));
+  }
+
   /**
    * Check if observer has line of sight to target
    * Uses shape-based collision detection like LightingCalculator
@@ -2306,7 +2319,7 @@ export class VisionAnalyzer {
           return asObject;
         }
         if (asObject && typeof asObject === 'object') {
-          return Object.values(asObject);
+          return Object.entries(asObject).map(([id, mode]) => ({ ...mode, id: mode.id ?? id }));
         }
       } catch {
         // Fall through to object-value normalization.
@@ -2314,7 +2327,7 @@ export class VisionAnalyzer {
     }
 
     if (typeof detectionModes === 'object') {
-      return Object.values(detectionModes);
+      return Object.entries(detectionModes).map(([id, mode]) => ({ ...mode, id: mode.id ?? id }));
     }
 
     return [];

@@ -83,3 +83,26 @@ describe('DetectionModeModifier', () => {
     });
   });
 });
+
+
+describe('Foundry 14 prepared detection modes', () => {
+  it('keeps dictionary mode IDs and applies limits after PF2e rebuilds modes', async () => {
+    const token = { document: { detectionModes: { hearing: { enabled: true, range: Infinity } }, getFlag: jest.fn(() => ({})), update: jest.fn(async () => {}) } };
+    await DetectionModeModifier.applyDetectionModeModifications(token, { hearing: { range: 10 } }, 'Item.qa');
+    expect(token.document.update.mock.calls[1][0].detectionModes).toEqual({ hearing: { enabled: true, range: 10 } });
+    const saved = token.document.update.mock.calls[0][0]['flags.pf2e-visioner.originalPerception.Item___qa'];
+    const document = { detectionModes: {}, getFlag: () => ({ Item___qa: saved }) };
+    const nativePrepare = jest.fn(() => { document.detectionModes = { hearing: { enabled: true, range: Infinity } }; });
+    DetectionModeModifier.wrapPrepareDetectionModes.call(document, nativePrepare);
+    expect(nativePrepare).toHaveBeenCalledTimes(1);
+    expect(document.detectionModes.hearing.range).toBe(10);
+    document.getFlag = () => ({});
+    DetectionModeModifier.wrapPrepareDetectionModes.call(document, nativePrepare);
+    expect(document.detectionModes.hearing.range).toBe(Infinity);
+  });
+  it('does not introduce hearing when native preparation removes it for deafness', () => {
+    const document = { detectionModes: {}, getFlag: () => ({ rule: { detectionModeModifications: { hearing: { range: 10 } } } }) };
+    DetectionModeModifier.wrapPrepareDetectionModes.call(document, () => {});
+    expect(document.detectionModes).toEqual({});
+  });
+});

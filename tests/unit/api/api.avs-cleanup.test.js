@@ -271,6 +271,7 @@ describe('API AVS cleanup integration', () => {
     });
     const observer = mkToken('observer', {
       'pf2e-visioner': {
+        cover: { selected: 'greater', keep: 'lesser' },
         visibility: { selected: 'hidden', keep: 'concealed' },
         visibilityV2: {
           selected: { detectionState: 'hidden', hasConcealment: true },
@@ -301,25 +302,26 @@ describe('API AVS cleanup integration', () => {
     );
     expect(selectedUpdate).not.toHaveProperty('flags.pf2e-visioner.visibility');
 
+    const coverReferenceUpdates = canvas.scene.updateEmbeddedDocuments.mock.calls.flatMap(call => call[1] ?? []);
+    expect(coverReferenceUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ _id: 'observer', 'flags.pf2e-visioner.cover.selected': foundry.data.operators.ForcedDeletion }),
+    ]));
+
     const observerUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
       .flatMap((call) => call[1] ?? [])
-      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.visibilityV2']);
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.visibilityV2.selected']);
     expect(observerUpdate).toEqual(
       expect.objectContaining({
-        'flags.pf2e-visioner.visibilityV2': {
-          keep: { detectionState: 'observed', hasConcealment: true },
-        },
+        'flags.pf2e-visioner.visibilityV2.selected': foundry.data.operators.ForcedDeletion,
       }),
     );
 
     const observerDetectionUpdate = canvas.scene.updateEmbeddedDocuments.mock.calls
       .flatMap((call) => call[1] ?? [])
-      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.detection']);
+      .find((update) => update._id === 'observer' && update['flags.pf2e-visioner.detection.selected']);
     expect(observerDetectionUpdate).toEqual(
       expect.objectContaining({
-        'flags.pf2e-visioner.detection': {
-          keep: { sense: 'hearing', isPrecise: false },
-        },
+        'flags.pf2e-visioner.detection.selected': foundry.data.operators.ForcedDeletion,
       }),
     );
   });
@@ -362,4 +364,18 @@ describe('API AVS cleanup integration', () => {
     }));
     expect(updateForObserver).not.toHaveProperty('flags.pf2e-visioner.visibility');
   });
+  test('purge instantiates Foundry 14 deletion operators', async () => {
+    const previous = foundry.data.operators.ForcedDeletion;
+    class ForcedDeletion {}
+    foundry.data.operators.ForcedDeletion = ForcedDeletion;
+    try {
+      const token = global.createMockToken({ id: 'purged', flags: { 'pf2e-visioner': { cover: { keep: 'greater' } } } });
+      canvas.tokens.placeables = [token];
+      const { Pf2eVisionerApi } = await import('../../../scripts/api.js');
+      expect(await Pf2eVisionerApi.clearAllDataForSelectedTokens([token])).toBe(true);
+      const updates = canvas.scene.updateEmbeddedDocuments.mock.calls.flatMap(call => call[1] || []);
+      expect(updates.find(update => update._id === 'purged')['flags.pf2e-visioner.cover']).toBeInstanceOf(ForcedDeletion);
+    } finally { foundry.data.operators.ForcedDeletion = previous; }
+  });
+
 });

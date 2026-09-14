@@ -32,6 +32,9 @@ export class LightingModifier {
       lightingData
     );
 
+    const { LightingPrecomputer } = await import('../../visibility/auto-visibility/core/LightingPrecomputer.js');
+    LightingPrecomputer.clearLightingCaches();
+
     if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateForTokens) {
       await window.pf2eVisioner.services.autoVisibilitySystem.recalculateForTokens([subjectToken.id]);
     } else if (window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll) {
@@ -56,6 +59,8 @@ export class LightingModifier {
     if (modifications[source]) {
       await subjectToken.document.unsetFlag('pf2e-visioner', `lightingModification.${source}`);
     }
+    const { LightingPrecomputer } = await import('../../visibility/auto-visibility/core/LightingPrecomputer.js');
+    LightingPrecomputer.clearLightingCaches();
   }
 
   /**
@@ -68,7 +73,7 @@ export class LightingModifier {
     if (!token?.document) return defaultLighting;
 
     const modifications = token.document.getFlag('pf2e-visioner', 'lightingModification') || {};
-    const modArray = Object.values(modifications);
+    const modArray = Object.values(modifications).filter(modification => modification?.lightingLevel);
 
     if (modArray.length === 0) return defaultLighting;
 
@@ -85,6 +90,6 @@ export class LightingModifier {
   static hasLightingModification(token) {
     if (!token?.document) return false;
     const modifications = token.document.getFlag('pf2e-visioner', 'lightingModification') || {};
-    return Object.keys(modifications).length > 0;
+    return Object.values(modifications).some(modification => !!modification?.lightingLevel);
   }
 }

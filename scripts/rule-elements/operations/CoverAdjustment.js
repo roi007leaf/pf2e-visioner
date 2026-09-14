@@ -54,8 +54,9 @@ export class CoverAdjustment {
   static async consumeCoverAdjustment(defenderToken, attackerId, sourceId) {
     const all = { ...(defenderToken.document.getFlag(FLAG_SCOPE, FLAG_KEY) || {}) };
     const list = (all[attackerId] || []).filter((a) => a.id !== sourceId);
-    if (list.length) all[attackerId] = list;
-    else delete all[attackerId];
+    // Flag updates merge objects. An empty array explicitly replaces the
+    // consumed list; omitting the key leaves the old adjustment in Foundry.
+    all[attackerId] = list;
     await defenderToken.document.setFlag(FLAG_SCOPE, FLAG_KEY, all);
   }
 

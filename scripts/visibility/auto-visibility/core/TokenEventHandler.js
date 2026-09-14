@@ -332,7 +332,7 @@ export class TokenEventHandler {
     const relevantKeys = keys.filter(
       (k) => k !== '_id' && !k.startsWith('flags.') && k !== 'flags',
     );
-    if (relevantKeys.length === 0 && !changes.flags?.[MODULE_ID]) {
+    if (relevantKeys.length === 0 && !changes.flags?.[MODULE_ID] && !keys.some(key => key.startsWith(`flags.${MODULE_ID}.`))) {
       this.systemState.debug(() => ({
         msg: 'handleTokenUpdate skipped - no relevant changes',
         tokenId: tokenDoc?.id,
@@ -585,11 +585,15 @@ export class TokenEventHandler {
   _analyzeChanges(changes) {
     const keys = Object.keys(changes || {});
     const hasPrefix = (prefix) => keys.some((k) => k === prefix || k.startsWith(prefix + '.'));
+    const perceptionRuleChanged = ['lightingModification', 'originalPerception', 'invisibility'].some(key =>
+      Object.hasOwn(changes.flags?.[MODULE_ID] ?? {}, key) ||
+      Object.hasOwn(changes.flags?.[MODULE_ID] ?? {}, '-=' + key) ||
+      hasPrefix('flags.' + MODULE_ID + '.' + key) || hasPrefix('flags.' + MODULE_ID + '.-=' + key));
     return {
       positionChanged:
         changes.x !== undefined || changes.y !== undefined || changes.elevation !== undefined,
       lightChanged: changes.light !== undefined || hasPrefix('light'),
-      visionChanged: changes.vision !== undefined || hasPrefix('vision'),
+      visionChanged: changes.rotation !== undefined || changes.vision !== undefined || hasPrefix('vision') || hasPrefix('sight') || hasPrefix('detectionModes') || perceptionRuleChanged,
       effectsChanged: changes.actorData?.effects !== undefined || changes.actorData !== undefined,
       wallFlagsChanged: changes.flags?.[MODULE_ID]?.walls !== undefined,
       movementActionChanged: changes.movementAction !== undefined,

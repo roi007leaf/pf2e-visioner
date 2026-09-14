@@ -10,7 +10,14 @@ export function preserveSneakOverrides(outcomes = [], previousOutcomes = []) {
   return outcomes.map((outcome) => {
     const existing = previous.find((candidate) => candidate?.token?.id === outcome?.token?.id);
     const overrideState = existing?.overrideState ?? outcome?.overrideState ?? null;
-    return { ...outcome, overrideState };
+    return { ...outcome, overrideState,
+      ...(existing && Object.hasOwn(existing, '_applied') ? {
+        _applied: existing._applied, hasRevertableChange: existing.hasRevertableChange,
+      } : {}),
+      ...(existing && Object.hasOwn(existing, '_previousOverride') ? {
+        _previousOverride: existing._previousOverride,
+      } : {}),
+    };
   });
 }
 

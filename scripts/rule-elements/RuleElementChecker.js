@@ -290,8 +290,16 @@ export class RuleElementChecker {
         // - direction='from' sources are stored on targetToken with observerId = observerToken.id (where targetToken is the subject)
 
         // For now, check all sources but log warnings for mismatched directions
-        for (const source of targetSources) {
-          if (!source.predicate?.length) continue;
+        for (const source of [...targetSources].sort((a, b) => (b.priority ?? 100) - (a.priority ?? 100))) {
+          if (!source.predicate?.length) {
+            // Removing one effect clears its global flag. Other scoped rule
+            // sources still apply to this pair, including unconditional ones.
+            if (source.state && ['from', 'to'].includes(source.direction)) {
+              return { state: source.state, source: source.id,
+                priority: source.priority ?? 100, type: 'ruleElementOverride' };
+            }
+            continue;
+          }
 
           // Determine if this source's direction matches the check direction
           // When checking observerToken->targetToken:

@@ -441,7 +441,7 @@ function tokenIsHiddenByVisionerToAnyPC(token) {
   return tokens.some((observer) => {
     if (!isPlayerCharacterToken(observer) || getTokenId(observer) === targetId) return false;
     const visibility = getVisibilityBetween(observer, token);
-    return visibility === 'hidden' || visibility === 'undetected';
+    return ['hidden', 'undetected', 'unnoticed'].includes(visibility);
   });
 }
 

@@ -24,6 +24,18 @@ function makeToken(id) {
   };
 }
 
+test.each(['lifesense', 'thoughtsense'])('%s marker survives a visible-token refresh without hearing', (sense) => {
+  const observer = { document: { x: 0, y: 0, width: 1, height: 1 },
+    actor: { system: { perception: { senses: [{ type: sense, range: 30 }] } }, hasCondition: () => true } };
+  const target = { visible: true, renderable: true, document: { x: 100, y: 0, width: 1, height: 1 },
+    actor: { system: { traits: { value: [] } } } };
+  const decision = buildSystemHiddenIndicatorDecision({ observer, token: target,
+    grid: { size: 100, distance: 5, measurePath: () => ({ distance: 1 }) },
+    getVisibilityState: () => 'hidden', getDetectionBetween: () => ({ sense, isPrecise: false }),
+    isSoundBlocked: () => false, canLifesenseDetect: () => true, canThoughtsenseDetect: () => true });
+  expect(decision).toMatchObject({ shouldShowIndicator: true, indicatorMode: sense });
+});
+
 function makePixiMock() {
   const makeDisplayObject = () => ({
     position: { set: jest.fn() },

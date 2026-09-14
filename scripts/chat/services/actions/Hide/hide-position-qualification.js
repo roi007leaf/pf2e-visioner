@@ -92,6 +92,8 @@ export async function resolveHidePositionQualification({ actionData, subject, cu
       position.endVisibility,
       position.endCoverState,
     );
+    qualification.endVisibility = position.endVisibility;
+    qualification.endCoverState = position.endCoverState;
     qualification = await applyFeatPrerequisiteOverrides(
       actionData,
       subject,

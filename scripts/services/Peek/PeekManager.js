@@ -226,6 +226,9 @@ export class PeekManager {
   }
 
   endPeek(tokenId, reason) {
+    for (const [requestId, request] of this._pendingDoorApprovals) {
+      if (request.token?.document?.id === tokenId) this._pendingDoorApprovals.delete(requestId);
+    }
     if (!this._registry.has(tokenId)) return;
     const entry = this._active.get(tokenId);
     const token = entry?.token;
@@ -261,12 +264,15 @@ export class PeekManager {
   }
 
   onTokenUpdate(doc, change) {
-    if (!('x' in change) && !('y' in change)) return;
-    if (this._registry.has(doc.id)) this.endPeek(doc.id, 'move');
+    if (!['x', 'y', 'elevation', 'level'].some(key => key in change)) return;
+    this.endPeek(doc.id, 'move');
   }
 
   onWallUpdate(doc, change) {
-    if (!('ds' in change) && !('door' in change)) return;
+    if (!['ds', 'door', 'c', 'levels'].some(key => key in change)) return;
+    for (const [requestId, request] of this._pendingDoorApprovals) {
+      if (request.doorDoc?.id === doc.id) this._pendingDoorApprovals.delete(requestId);
+    }
     for (const id of this._registry.ids()) {
       const peek = this._registry.get(id);
       if (peek?.ignoredWallIds?.includes(doc.id)) this.endPeek(id, 'door');
@@ -275,6 +281,11 @@ export class PeekManager {
 
   onControlToken() {
     const controlled = globalThis.canvas?.tokens?.controlled ?? [];
+    for (const [requestId, request] of this._pendingDoorApprovals) {
+      if (controlled.length !== 1 || controlled[0]?.document?.id !== request.token?.document?.id) {
+        this._pendingDoorApprovals.delete(requestId);
+      }
+    }
     for (const [id] of [...this._active]) {
       const remainsSoleObserver =
         controlled.length === 1 && controlled[0]?.document?.id === id;
@@ -284,6 +295,7 @@ export class PeekManager {
   }
 
   endAll(reason) {
+    this._pendingDoorApprovals.clear();
     this._clearPendingReaim();
     for (const id of this._registry.ids()) this.endPeek(id, reason);
   }

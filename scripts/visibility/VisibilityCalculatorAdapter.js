@@ -211,7 +211,9 @@ export async function tokenStateToInput(
     rayDarkness: rayDarkness,
     soundBlocked: soundBlocked, // Add sound blocking information
     scentBlocked,
-    hasLineOfSight: hasLineOfSight, // Add line of sight information
+    withinVisionAngle: options?.skipLOS ? true :
+      (visionAnalyzer.isWithinVisionAngle?.(observer, target, observerPosition, targetPosition) ?? true),
+    hasLineOfSight: hasLineOfSight, // Physical LOS also used by nonvisual senses
   };
 }
 

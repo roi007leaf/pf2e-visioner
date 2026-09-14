@@ -3,11 +3,11 @@
  */
 
 import { MODULE_ID } from '../constants.js';
-import { releaseDetectionFilterPrimaryMesh } from '../services/Detection/detection-filter-mesh-suppression.js';
+import { releaseDetectionFilterPrimaryMesh, suppressDetectionFilterMesh } from '../services/Detection/detection-filter-mesh-suppression.js';
 import { getNativeVisibilityReplacement } from '../chat/services/feats/native-visibility-replacement.js';
 import { isSceneTokenVisionDisabled } from '../services/scene-token-vision.js';
 import { shouldBypassAvsForGmVision } from '../services/gm-vision-bypass.js';
-import { clearPresenceOnlyTokenRenderSuppression, hidePresenceOnlySuppressedTokenDetails } from '../services/system-hidden-presence-only-suppression.js';
+import { clearPresenceOnlyTokenRenderSuppression, hidePresenceOnlySuppressedTokenDetails, PRESENCE_ONLY_RENDER_SUPPRESSION_KEY } from '../services/system-hidden-presence-only-suppression.js';
 import { enforceControlledLevelTokenRendering } from '../services/Detection/multi-level-control-view.js';
 import { getBestVisibilityState, getControlledObserverTokens } from '../utils.js';
 import { getLogger } from '../utils/logger.js';
@@ -244,15 +244,10 @@ function clearDetectionFilterVisuals(token) {
     /* best-effort filter clear */
   }
 
-  const detectionFilterMesh = token.detectionFilterMesh;
-  if (detectionFilterMesh) {
-    try {
-      if ('visible' in detectionFilterMesh) detectionFilterMesh.visible = false;
-      if ('renderable' in detectionFilterMesh) detectionFilterMesh.renderable = false;
-      if ('alpha' in detectionFilterMesh) detectionFilterMesh.alpha = 0;
-    } catch {
-      /* best-effort filter mesh clear */
-    }
+  try {
+    suppressDetectionFilterMesh(token);
+  } catch {
+    /* best-effort filter mesh clear */
   }
 
   if (token._pvHiddenEcho) {
@@ -397,7 +392,11 @@ export function primeHiddenDetectionFilterVisualsForObserver(
 // Core refresh and Hidden-filter priming run before asynchronous indicator creation.
 // Suppress identifying art synchronously from the current perception profiles.
 function releaseCurrentViewScentTokenArt(target) {
-  if (scentSuppressedTokens.has(target) && !target.document?.hidden) {
+  const suppressedByIndicator = target?.[PRESENCE_ONLY_RENDER_SUPPRESSION_KEY]?.mode === 'scent';
+  if ((scentSuppressedTokens.has(target) || suppressedByIndicator) && !target.document?.hidden) {
+    // The presence indicator can suppress artwork before the primary-render
+    // wrapper records it. Both paths must release their flags on observation.
+    scentSuppressedTokens.add(target);
     clearPresenceOnlyTokenRenderSuppression(target, { forceTokenVisible: true });
     enforceControlledLevelTokenRendering(target);
     // An old marker can reassert suppression until its asynchronous cleanup completes.

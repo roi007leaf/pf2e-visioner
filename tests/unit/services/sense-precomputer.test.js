@@ -54,3 +54,11 @@ describe('SensePrecomputer', () => {
     expect(second.sensingSummary.hearing).toEqual({ acuity: 'imprecise', range: 40 });
   });
 });
+
+
+test('Foundry 14 detection dictionary retains hearing identity and range', () => {
+  const token = createHearingToken('dictionary-observer');
+  token.document.detectionModes = { hearing: { enabled: true, range: 10 } };
+  const capabilities = new VisionAnalyzer().getVisionCapabilities(token);
+  expect(capabilities.sensingSummary.hearing).toEqual({ acuity: 'imprecise', range: 10 });
+});

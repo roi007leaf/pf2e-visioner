@@ -32,6 +32,7 @@ export function applyPendingSeekTemplateToActionData(
   actionData.seekTemplateCenter = center;
   actionData.seekTemplateRadiusFeet = radiusFeet;
   actionData.seekTemplateType = pending?.templateType || fallbackState?.templateType || 'circle';
+  actionData.seekTemplateGeometry = pending?.geometry || fallbackState?.geometry || null;
   actionData.seekTemplateLevels = pending?.levels || fallbackState?.levels || [];
 
   if (pending && typeof pending.rollTotal === 'number') {
@@ -75,10 +76,7 @@ export function getDirectHideChangedOutcomes(handler, outcomes = [], actionData 
 
     if (effectiveNewState === 'avs') return false;
 
-    return (
-      effectiveNewState === baseOld &&
-      oldStateAvsControlled
-    );
+    return effectiveNewState === baseOld && oldStateAvsControlled;
   });
 }
 
@@ -328,7 +326,9 @@ export function bindAutomationEvents(panel, message, actionData) {
                 actorId: actionData.actor?.id,
                 userId: msg?.author?.id || game.userId,
               });
-              fallbackState = fallbackTemplate ? getTemplateStateFromDocument(fallbackTemplate) : null;
+              fallbackState = fallbackTemplate
+                ? getTemplateStateFromDocument(fallbackTemplate)
+                : null;
             }
             applyPendingSeekTemplateToActionData(actionData, { pending, fallbackState });
           } catch {

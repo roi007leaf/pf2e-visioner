@@ -141,7 +141,7 @@ function currentViewObservesTargetPrecisely(target) {
     if (getVisionerVisibilityBetweenTokens(observer, target) !== 'observed') continue;
 
     const detectionSense =
-      detectionFrameCache.getPerceptionProfile(observer, target)?.detectionSense ?? null;
+      detectionFrameCache.getPerceptionProfile(observer, target)?.detectionSense ?? getDetectionBetween(observer, target)?.sense ?? null;
     if (detectionSense && !isVisualSenseType(detectionSense)) return true;
 
     const targetCenter = pointFrom(target?.center);
@@ -150,6 +150,17 @@ function currentViewObservesTargetPrecisely(target) {
     }
   }
   return false;
+}
+
+function hasPreciseNonVisualObservation(target, options) {
+  if (target?.document?.documentName !== 'Token' || target.document.hidden) return false;
+  const observers = options.source?.object ? [options.source.object] : currentViewObservers();
+  return observers.some(observer => {
+    if (!observer?.vision?.active || observer === target) return false;
+    if (getVisionerVisibilityBetweenTokens(observer, target) !== 'observed') return false;
+    const sense = detectionFrameCache.getPerceptionProfile(observer, target)?.detectionSense ?? getDetectionBetween(observer, target)?.sense;
+    return !!sense && !isVisualSenseType(sense);
+  });
 }
 
 function preserveDeafenedHiddenMarker(target, options) {
@@ -186,6 +197,13 @@ export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
     return false;
   }
   const target = options?.object;
+  // Core has no modes for several PF2e senses. An AVS precise observation
+  // supplies their token visibility, while Foundry still handles normal sight.
+  if (result === false && hasPreciseNonVisualObservation(target, options) &&
+    coreVisibilityAllowedByActivePeek(points, options)) {
+    target.detectionFilter = null;
+    return true;
+  }
   if (result === false && preserveDeafenedHiddenMarker(target, options)) return true;
   if (result === true && target?.detectionFilter) alignHiddenHearingFilter(target, options);
   if (result === true && target?.detectionFilter && currentViewObservesTargetPrecisely(target)) {

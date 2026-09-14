@@ -37,6 +37,7 @@ jest.mock('../../../scripts/services/Detection/multi-level-control-view.js', () 
 }));
 
 import {
+  wrapPrimaryTokenMeshRender,
   wrapTokenControl,
   wrapTokenRefreshVisibility,
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
@@ -59,6 +60,7 @@ import {
   suppressOtherLevelTokenRenderingBeforeControl,
 } from '../../../scripts/services/Detection/multi-level-control-view.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
+import { clearAllDetectionFilterVisuals } from '../../../scripts/stores/visibility-map.js';
 import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 
 function foundryHiddenToken({ visible = false } = {}) {
@@ -73,6 +75,68 @@ function foundryHiddenToken({ visible = false } = {}) {
 }
 
 describe('detection token refresh', () => {
+  it('restores Visioner-cleared detection container flags when Core resumes hearing', () => {
+    globalThis.canvas = { scene: { tokenVision: true }, tokens: {} };
+    const token = foundryHiddenToken({ visible: true });
+    token.document.hidden = false;
+    token.detectionFilter = {};
+    token.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    clearAllDetectionFilterVisuals([token]);
+    clearAllDetectionFilterVisuals([token]);
+    expect(token.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+    wrapTokenRefreshVisibility.call(token, () => { token.detectionFilter = {}; });
+    expect(token.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
+  });
+  it('does not enable a detection container disabled outside Visioner', () => {
+    const token = foundryHiddenToken({ visible: true });
+    token.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    wrapTokenRefreshVisibility.call(token, () => { token.detectionFilter = {}; });
+    expect(token.detectionFilterMesh).toEqual({ visible: false, renderable: false, alpha: 0 });
+  });
+
+  it('restores the primary render flag when Core clears a multilevel detection filter', () => {
+    globalThis.canvas = { scene: { tokenVision: true }, tokens: {} };
+    usesCoreMultiLevelSurfaceRendering.mockReturnValue(true);
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    const token = foundryHiddenToken({ visible: true });
+    token.document.hidden = false;
+    token.detectionFilter = {};
+    wrapTokenRefreshVisibility.call(token, () => {});
+    expect(token.mesh.renderable).toBe(false);
+    wrapTokenRefreshVisibility.call(token, () => {
+      token.detectionFilter = null;
+      token.mesh.visible = true;
+    });
+    expect(token.mesh.renderable).toBe(true);
+    expect(token.mesh.visible).toBe(true);
+  });
+  it('draws only the filtered pass of an unowned detected token, preserving tiles and full-art transitions', () => {
+    globalThis.game = { ready: true, user: { isGM: false } };
+    const filter = {};
+    const token = { document: { documentName: 'Token' }, controlled: false, detectionFilter: filter };
+    const mesh = token.mesh = { object: token, filters: null };
+    const draw = jest.fn();
+
+    wrapPrimaryTokenMeshRender.call(mesh, draw);
+    expect(draw).not.toHaveBeenCalled();
+    mesh.filters = [filter];
+    wrapPrimaryTokenMeshRender.call(mesh, draw);
+    expect(draw).toHaveBeenCalledTimes(1);
+
+    mesh.filters = null;
+    token.detectionFilter = null;
+    wrapPrimaryTokenMeshRender.call(mesh, draw);
+    expect(draw).toHaveBeenCalledTimes(2);
+    token.detectionFilter = filter;
+    token.controlled = true;
+    wrapPrimaryTokenMeshRender.call(mesh, draw);
+    expect(draw).toHaveBeenCalledTimes(3);
+
+    mesh.object = { document: { documentName: 'Tile' }, mesh, detectionFilter: filter };
+    wrapPrimaryTokenMeshRender.call(mesh, draw);
+    expect(draw).toHaveBeenCalledTimes(4);
+  });
+
   beforeEach(() => {
     globalThis.game = { ready: true, user: { isGM: true } };
     hasActivePendingTokenMovement.mockReturnValue(true);

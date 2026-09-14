@@ -2,6 +2,22 @@ import '../../../setup.js';
 import { PeekVisionSourceController } from '../../../../scripts/services/Peek/PeekVisionSourceController.js';
 
 describe('PeekVisionSourceController contract', () => {
+  test('ending a peek preserves a replacement open-door edge', () => {
+    const originalCanvas = globalThis.canvas;
+    const closedEdge = { sight: 20 };
+    const wall = { edge: closedEdge };
+    globalThis.canvas = { ...originalCanvas, walls: { get: () => wall } };
+    try {
+      const ctrl = new PeekVisionSourceController({ refreshPerception: jest.fn() });
+      const token = { document: { id: 'observer' }, initializeVisionSource: jest.fn() };
+      ctrl.apply(token, { origin: { x: 10, y: 10 }, ignoredWallIds: ['door'] });
+      expect(closedEdge.sight).toBe(0);
+      // Foundry rebuilds the edge before delivering updateWall to PeekManager.
+      wall.edge = { sight: 0 };
+      ctrl.clear(token);
+      expect(wall.edge.sight).toBe(0);
+    } finally { globalThis.canvas = originalCanvas; }
+  });
   test('apply requests source re-init and never updates token document', () => {
     const refresh = jest.fn();
     const ctrl = new PeekVisionSourceController({ refreshPerception: refresh });

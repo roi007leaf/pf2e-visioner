@@ -38,13 +38,13 @@ export function getDefaultOutcomeMapping() {
     hidden: {
       'critical-success': 'undetected',
       success: 'undetected',
-      failure: 'avs',
+      failure: 'hidden',
       'critical-failure': 'avs',
     },
     undetected: {
       'critical-success': 'undetected',
       success: 'undetected',
-      failure: 'avs',
+      failure: 'hidden',
       'critical-failure': 'avs',
     },
   };
@@ -74,6 +74,12 @@ export function getDefaultOutcomeMapping() {
         success: 'hidden',
         failure: 'undetected',
         'critical-failure': 'undetected',
+      },
+      unnoticed: {
+        'critical-success': 'observed',
+        success: 'hidden',
+        failure: 'unnoticed',
+        'critical-failure': 'unnoticed',
       },
     },
     hide: {

@@ -1,3 +1,5 @@
+import { isPrimaryGM } from './gm-election.js';
+
 const MODULE_ID = 'pf2e-visioner';
 const WAITING_FOR_SNEAK_START_SLUG = 'waiting-for-sneak-start';
 
@@ -116,6 +118,7 @@ export async function cleanupDeletedEffectItem(
   item,
   {
     isGM = isDefaultGM,
+    isAuthority = isPrimaryGM,
     getTokensForActor = getDefaultTokensForActor,
     isAvsEnabled = isDefaultAvsEnabled,
     syncCoverMapsForDeletedCoverEffect = defaultSyncCoverMapsForDeletedCoverEffect,
@@ -129,6 +132,7 @@ export async function cleanupDeletedEffectItem(
   try {
     if (item?.type !== 'effect') return { skipped: true, reason: 'not-effect' };
     if (!isGM()) return { skipped: true, reason: 'not-gm' };
+    if (!isAuthority()) return { skipped: true, reason: 'not-authority' };
 
     const actor = item?.parent;
     if (!actor) return { skipped: true, reason: 'no-actor' };

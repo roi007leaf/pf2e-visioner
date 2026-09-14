@@ -1,6 +1,13 @@
 import { filterOutcomesByTemplate } from '../../../scripts/chat/services/infra/shared-utils.js';
 
 describe('filterOutcomesByTemplate', () => {
+  test('retains rotated cone geometry after the native template is consumed', () => {
+    canvas.scene.grid = { size: 100, distance: 5 };
+    const outcomes = [{ target: { center: { x: 0, y: 200 } } },
+      { target: { center: { x: 200, y: 0 } } }, { target: { center: { x: 0, y: 800 } } }];
+    expect(filterOutcomesByTemplate(outcomes, { x: 0, y: 0 }, 30, 'target', 'cone',
+      'consumed-message', 'observer', { direction: 90, angle: 90 })).toEqual([outcomes[0]]);
+  });
   test('keeps unchanged outcomes inside template area', () => {
     global.canvas.grid.size = 50;
     global.canvas.scene.grid.size = 50;

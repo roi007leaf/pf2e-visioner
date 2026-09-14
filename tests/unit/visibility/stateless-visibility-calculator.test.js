@@ -2475,3 +2475,48 @@ describe('StatelessVisibilityCalculator', () => {
         });
     });
 });
+
+
+describe('additional nonvisual senses', () => {
+  const senses = ['bloodsense', 'magicsense', 'electromagnetic-sense', 'motion-sense', 'spiritsense', 'wavesense'];
+  const input = (sense, range = 30, traits = [], precise = false) => ({
+    target: { lightingLevel: 'darkness', coverLevel: 'none', concealment: false, auxiliary: [], traits },
+    observer: { precise: precise ? { [sense]: { range } } : {}, imprecise: precise ? {} : { [sense]: { range } }, conditions: { blinded: true, deafened: true } }
+  });
+  test.each(senses)('%s detects imprecisely without sight or hearing', sense => {
+    expect(calculateVisibility(input(sense))).toMatchObject({ state: 'hidden', detection: { sense, isPrecise: false } });
+    expect(calculateVisibility(input(sense, 0)).state).toBe('undetected');
+  });
+  test.each([['bloodsense', 'undead'], ['bloodsense', 'construct'], ['spiritsense', 'construct']])('%s respects %s eligibility at both acuities', (sense, trait) => {
+    for (const precise of [false, true]) expect(calculateVisibility(input(sense, 30, [trait], precise)).state).toBe('undetected');
+  });
+});
+
+
+describe('invisible target remembered location', () => {
+  test.each(['scent', 'tremorsense', 'lifesense'])('active %s wins over remembered visual location', sense => {
+    const result = calculateVisibility({
+      target: { lightingLevel: 'bright', auxiliary: ['invisible'] },
+      observer: { precise: { vision: { range: Infinity } }, imprecise: { [sense]: { range: 30 } }, conditions: { deafened: true } },
+      previousState: 'observed', hasLineOfSight: true,
+    });
+    expect(result).toMatchObject({ state: 'hidden', detection: { sense, isPrecise: false } });
+  });
+});
+
+
+describe('visual cones preserve nonvisual detection', () => {
+    test.each([
+        [{ vision: { range: Infinity } }, { hearing: { range: 30 } }, 'hidden', 'hearing'],
+        [{ vision: { range: Infinity }, lifesense: { range: 30 } }, {}, 'observed', 'lifesense'],
+    ])('outside visual cone: %j', (precise, imprecise, state, sense) => {
+        const result = calculateVisibility({
+            target: { lightingLevel: 'bright' },
+            observer: { precise, imprecise, conditions: {} },
+            hasLineOfSight: true,
+            withinVisionAngle: false,
+        });
+        expect(result.state).toBe(state);
+        expect(result.detection.sense).toBe(sense);
+    });
+});

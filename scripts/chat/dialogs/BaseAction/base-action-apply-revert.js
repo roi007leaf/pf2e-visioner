@@ -1,4 +1,5 @@
 import { MODULE_TITLE } from '../../../constants.js';
+import { overrideToDisplayVisibility } from '../../../visibility/perception-profile.js';
 import { notify } from '../../services/infra/notifications.js';
 
 function findOutcome(app, tokenId, wallId) {
@@ -45,6 +46,31 @@ async function refreshTokenVisuals() {
   await updateTokenVisuals();
 }
 
+async function capturePreviousOverride(app, outcome, targetId) {
+  if (Object.hasOwn(outcome, '_previousOverride')) return;
+  const pair = getDirectedPair(app, targetId);
+  if (!pair) return;
+  const { default: manager } = await import('../../services/infra/AvsOverrideManager.js');
+  const previous = await manager.getOverrideData(pair.observerId, pair.overrideTargetId);
+  outcome._previousOverride = previous ? JSON.parse(JSON.stringify(previous)) : null;
+}
+
+async function restorePreviousOverride(app, outcome, targetId) {
+  const pair = getDirectedPair(app, targetId);
+  if (!pair) return;
+  await removeOverrideForTarget(app, targetId);
+  if (outcome._previousOverride) {
+    const { default: manager } = await import('../../services/infra/AvsOverrideManager.js');
+    const previous = outcome._previousOverride;
+    await manager.onAVSOverride({ ...previous,
+      observer: canvas.tokens.get(pair.observerId), target: canvas.tokens.get(pair.overrideTargetId),
+      state: overrideToDisplayVisibility(previous),
+    });
+  }
+  await refreshTokenVisuals();
+  delete outcome._previousOverride;
+}
+
 function buildActionData(app, overrides = null) {
   return {
     ...app.actionData,
@@ -54,17 +80,23 @@ function buildActionData(app, overrides = null) {
   };
 }
 
-function markOutcomeApplied(outcome, state) {
+function markOutcomeApplied(outcome, state, app) {
+  outcome._applied = true;
   outcome.oldVisibility = state;
   outcome.overrideState = null;
   outcome.hasActionableChange = false;
-  outcome.hasRevertableChange = false;
+  outcome.hasRevertableChange = true;
+  // Filtered outcomes can be projection copies. Persist undo state on the
+  // dialog's current row as well, so later renders and bulk undo retain it.
+  const stored = findOutcome(app, getOutcomeTargetId(outcome), outcome.wallId);
+  if (stored && stored !== outcome) Object.assign(stored, outcome);
 }
 
 function markOutcomeReverted(outcome) {
+  outcome._applied = false;
   outcome.oldVisibility = outcome.currentVisibility;
   outcome.overrideState = null;
-  outcome.hasActionableChange = false;
+  outcome.hasActionableChange = outcome.newVisibility !== outcome.currentVisibility;
   outcome.hasRevertableChange = false;
 }
 
@@ -92,8 +124,10 @@ export async function applyBaseActionChange(event, target, context) {
   if (effectiveNewState === 'avs') {
     try {
       const targetId = getOutcomeTargetId(outcome, tokenId);
+      await capturePreviousOverride(app, outcome, targetId);
       const removed = await removeOverrideForTarget(app, targetId);
       if (removed) {
+        markOutcomeApplied(outcome, effectiveNewState, app);
         await refreshTokenVisuals();
         const targetName = outcome.target?.name || outcome.token?.name || 'token';
         notify.info(`${MODULE_TITLE}: Accepted AVS change for ${targetName}`);
@@ -125,6 +159,7 @@ export async function applyBaseActionChange(event, target, context) {
       await applyFunction(buildActionData(app, overrides), target);
       app.updateRowButtonsToApplied([{ wallId: outcome.wallId }]);
     } else {
+      await capturePreviousOverride(app, outcome, getOutcomeTargetId(outcome, tokenId));
       const rowTimerConfig = app.rowTimers?.get(tokenId);
       let timedOverride = null;
       if (rowTimerConfig) {
@@ -137,7 +172,7 @@ export async function applyBaseActionChange(event, target, context) {
         target,
       );
 
-      markOutcomeApplied(outcome, effectiveNewState);
+      markOutcomeApplied(outcome, effectiveNewState, app);
       if (rowTimerConfig) {
         app.rowTimers.delete(tokenId);
         app._updateRowTimerButton?.(tokenId);
@@ -203,7 +238,7 @@ export async function applyBaseActionTimedChange(event, target, context) {
     );
 
     if (success) {
-      markOutcomeApplied(outcome, effectiveNewState);
+      markOutcomeApplied(outcome, effectiveNewState, app);
       app.updateRowButtonsToApplied?.([{ target: { id: tokenId } }]);
       app.updateChangesCount?.();
       notify.info(
@@ -232,7 +267,7 @@ export async function revertBaseActionChange(event, target, context) {
     return;
   }
 
-  if (outcome.oldVisibility === outcome.newVisibility) {
+  if (!outcome._applied && outcome.oldVisibility === outcome.newVisibility) {
     notify.warn(`${MODULE_TITLE}: No changes to revert for this ${wallId ? 'wall' : 'token'}`);
     return;
   }
@@ -241,8 +276,7 @@ export async function revertBaseActionChange(event, target, context) {
     if (!wallId) {
       try {
         const targetId = getOutcomeTargetId(outcome, tokenId);
-        const removed = await removeOverrideForTarget(app, targetId, { checkExisting: true });
-        if (removed) await refreshTokenVisuals();
+        await restorePreviousOverride(app, outcome, targetId);
       } catch (e) {
         console.warn('Failed to remove AVS override during revert:', e);
       }
@@ -309,6 +343,7 @@ export async function applyAllBaseActionChanges(event, target, context) {
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
       const tokenId = outcome.token?.id || outcome.target?.id;
       if (!tokenId) continue;
+      await capturePreviousOverride(app, outcome, tokenId);
 
       if (effectiveNewState === 'avs') {
         const tokenName = outcome.token?.name || outcome.target?.name || 'token';
@@ -357,7 +392,7 @@ export async function applyAllBaseActionChanges(event, target, context) {
 
     outcomesWithChanges.forEach((outcome) => {
       const effectiveNewState = outcome.overrideState || outcome.newVisibility;
-      markOutcomeApplied(outcome, effectiveNewState);
+      markOutcomeApplied(outcome, effectiveNewState, app);
     });
 
     app.bulkActionState = 'applied';
@@ -388,7 +423,7 @@ export async function revertAllBaseActionChanges(event, target, context) {
   }
 
   try {
-    const appliedOutcomes = app.outcomes.filter((o) => o.oldVisibility !== o.currentVisibility);
+    const appliedOutcomes = app.outcomes.filter((o) => o._applied || o.oldVisibility !== o.currentVisibility);
 
     if (appliedOutcomes.length === 0) {
       notify.warn(`${MODULE_TITLE}: No applied changes found to revert`);
@@ -400,18 +435,18 @@ export async function revertAllBaseActionChanges(event, target, context) {
       try {
         for (const outcome of appliedOutcomes) {
           const effectiveOldState = outcome.oldVisibility;
-          if (
+          if (!outcome._applied && (
             !effectiveOldState ||
             effectiveOldState === 'avs' ||
             effectiveOldState === outcome.currentVisibility
-          ) {
+          )) {
             continue;
           }
 
           const targetId = outcome.target?.id || outcome.token?.id;
           if (!targetId) continue;
           try {
-            await removeOverrideForTarget(app, targetId);
+            await restorePreviousOverride(app, outcome, targetId);
             removedOverrides++;
           } catch (e) {
             console.warn(`Failed to remove AVS override for ${targetId}:`, e);

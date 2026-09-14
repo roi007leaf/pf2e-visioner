@@ -145,9 +145,9 @@ export class ActorEventHandler {
       return;
     }
 
-    // OPTIMIZATION: Only process if there are visibility-relevant changes
-    // Opening/closing sheets triggers updateActor with no meaningful changes
-    if (changes && !this._hasVisibilityRelevantChanges(actor, changes)) {
+    // updateActor runs after preparation: comparing against the updated actor
+    // would discard every sense change. Filter by changed paths here instead.
+    if (changes && !this._hasVisibilityRelevantChanges(actor, changes, false)) {
       this.systemState.debug(() => ({
         msg: 'ActorEventHandler:handleActorUpdate skipped - no visibility-relevant changes',
         actorId: actor.id,
@@ -182,10 +182,11 @@ export class ActorEventHandler {
    * Check if actor changes are visibility-relevant
    * @param {Actor} actor - The actor being updated
    * @param {object} changes - The changes object from preUpdateActor/updateActor
-   * @returns {boolean} True if changes are relevant to visibility AND different from current values
+   * @param {boolean} compareCurrent Compare values only before the update is applied
+   * @returns {boolean} True if changes affect visibility
    * @private
    */
-  _hasVisibilityRelevantChanges(actor, changes) {
+  _hasVisibilityRelevantChanges(actor, changes, compareCurrent = true) {
     if (!changes || typeof changes !== 'object') return false;
     if (!actor) return false;
 
@@ -206,6 +207,9 @@ export class ActorEventHandler {
     ];
 
     const hasRelevantChange = relevantPaths.some(path => {
+      if (!compareCurrent && Object.keys(changes).some(key => key === path || key.startsWith(`${path}.`))) {
+        return true;
+      }
       const parts = path.split('.');
       let currentInChanges = changes;
       let currentInActor = actor;
@@ -221,8 +225,7 @@ export class ActorEventHandler {
 
       // If we got here, the path exists in changes. Now compare with actor's current value.
       // Sheet open/close sends the same data, so if values are equal, it's not a real change.
-      const areEqual = this._deepEqual(currentInChanges, currentInActor);
-      return !areEqual;
+      return !compareCurrent || !this._deepEqual(currentInChanges, currentInActor);
     });
 
     return hasRelevantChange;

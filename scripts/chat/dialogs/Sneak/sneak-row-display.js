@@ -75,7 +75,7 @@ export async function updateSneakOutcomeDisplayForToken(app, tokenId, outcome) {
   const hasChangeFromOldVisibility = effectiveNewState !== outcome.oldVisibility;
   outcome.hasActionableChange = hasChangeFromOldVisibility;
   outcome.hasRevertableChange =
-    hasChangeFromOldVisibility ||
+    outcome._applied === true || hasChangeFromOldVisibility ||
     (outcome.oldVisibility !== outcome.currentVisibility &&
       outcome.oldVisibility !== outcome.newVisibility);
 

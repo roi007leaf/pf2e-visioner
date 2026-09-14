@@ -185,6 +185,10 @@ export function getTemplateStateFromDocument(template) {
     center,
     radiusFeet,
     templateType,
+    geometry: {
+      direction: Number(shape?.rotation ?? document?.direction ?? 0),
+      angle: Number(shape?.angle ?? document?.angle ?? 90),
+    },
     levels: normalizeTemplateLevels(document?.levels ?? template?.levels),
   };
 }
@@ -486,6 +490,7 @@ async function launchSeekTemplatePreview(
 
   const destroyPreview = () => {
     try {
+      globalThis.document?.removeEventListener('keydown', cancelPreview);
       canvas.stage.off('pointermove', moveHandler);
       canvas.stage.off('pointerdown', downHandler);
       rangeIndicator?.destroy?.({ children: true });
@@ -500,7 +505,16 @@ async function launchSeekTemplatePreview(
     preview.renderFlags?.set?.({ refreshPosition: true, refreshShape: true });
   };
 
+  const cancelPreview = (event) => {
+    if (event.key === 'Escape') destroyPreview();
+  };
+  globalThis.document?.addEventListener('keydown', cancelPreview);
+
   const downHandler = async (event) => {
+    if ((event.button ?? event.data?.originalEvent?.button ?? 0) !== 0) {
+      destroyPreview();
+      return;
+    }
     const pointer = getSnapped(event);
     const clampedPlacement = clampPlacement?.(pointer);
     const snapped = clampedPlacement?.center || pointer;
@@ -559,16 +573,23 @@ function isOwnSeekTemplateDocument(template) {
   return flags?.userId === game.userId;
 }
 
-function registerSeekTemplateCreateHooks(handler) {
+function registerSeekTemplateCreateHooks(handler, onCancel = () => {}) {
   let createRegionHookId = null;
   let createMeasuredTemplateHookId = null;
   const release = () => {
     try {
+      globalThis.document?.removeEventListener('contextmenu', cancel);
+      globalThis.document?.removeEventListener('keydown', cancel);
       if (createRegionHookId) Hooks.off('createRegion', createRegionHookId);
       if (createMeasuredTemplateHookId) {
         Hooks.off('createMeasuredTemplate', createMeasuredTemplateHookId);
       }
     } catch (_) {}
+  };
+  const cancel = (event) => {
+    if (event.type === 'keydown' && event.key !== 'Escape') return;
+    release();
+    onCancel();
   };
   const wrapped = async (doc) => {
     if (!isOwnSeekTemplateDocument(doc)) return;
@@ -577,6 +598,8 @@ function registerSeekTemplateCreateHooks(handler) {
 
   createRegionHookId = Hooks.on('createRegion', wrapped);
   createMeasuredTemplateHookId = Hooks.on('createMeasuredTemplate', wrapped);
+  globalThis.document?.addEventListener('contextmenu', cancel);
+  globalThis.document?.addEventListener('keydown', cancel);
   return release;
 }
 
@@ -639,59 +662,71 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
       validatePlacement,
     });
     await new Promise((resolve) => {
-      registerSeekTemplateCreateHooks(async (doc, releaseCreateHooks) => {
-        try {
-          releaseCreateHooks();
-          let templateState = getTemplateStateFromDocument(doc);
-          const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
-          templateState = normalized.templateState;
-          if (normalized.clamped) {
-            await updateSeekTemplateDocumentCenter(doc, templateState.center);
-          }
-          if (!(await validatePlacement(templateState.center))) {
-            await deleteRejectedSeekTemplateDocument(doc);
-            return;
-          }
-          actionData.seekTemplateCenter = templateState.center;
-          actionData.seekTemplateRadiusFeet = Number(templateState.radiusFeet) || distance;
-          actionData.seekTemplateType = templateState.templateType || templateType;
-          actionData.seekTemplateLevels = templateState.levels;
-          let dialogOpened = false;
-          // Determine presence of potential targets within template by proximity
-          const tokens = canvas?.tokens?.placeables || [];
-          const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
-          if (!dispatched && targets.length > 0) {
-            dispatched = true;
-            const { previewActionResults } = await import('../preview/preview-service.js');
-            await previewActionResults({ ...actionData, actionType: 'seek' });
-            const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
-            dialogOpened = !!SeekPreviewDialog.currentSeekDialog;
-            if (dialogOpened) {
-              await consumeSeekTemplateAfterDialog(actionData, doc);
+      registerSeekTemplateCreateHooks(
+        async (doc, releaseCreateHooks) => {
+          try {
+            releaseCreateHooks();
+            let templateState = getTemplateStateFromDocument(doc);
+            const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
+            templateState = normalized.templateState;
+            if (normalized.clamped) {
+              await updateSeekTemplateDocumentCenter(doc, templateState.center);
             }
+            if (!(await validatePlacement(templateState.center))) {
+              await deleteRejectedSeekTemplateDocument(doc);
+              return;
+            }
+            actionData.seekTemplateCenter = templateState.center;
+            actionData.seekTemplateRadiusFeet = Number(templateState.radiusFeet) || distance;
+            actionData.seekTemplateType = templateState.templateType || templateType;
+            actionData.seekTemplateGeometry = templateState.geometry;
+            actionData.seekTemplateLevels = templateState.levels;
+            let dialogOpened = false;
+            // Determine presence of potential targets within template by proximity
+            const tokens = canvas?.tokens?.placeables || [];
+            const targets = tokens.filter((t) => t && t !== actionData.actor && t.actor);
+            if (!dispatched && targets.length > 0) {
+              dispatched = true;
+              const { previewActionResults } = await import('../preview/preview-service.js');
+              await previewActionResults({ ...actionData, actionType: 'seek' });
+              const { SeekPreviewDialog } = await import('../../dialogs/SeekPreviewDialog.js');
+              dialogOpened = !!SeekPreviewDialog.currentSeekDialog;
+              if (dialogOpened) {
+                await consumeSeekTemplateAfterDialog(actionData, doc);
+              }
+            }
+            if (!dialogOpened) {
+              await persistSeekTemplateFlag(actionData, {
+                center: actionData.seekTemplateCenter,
+                radiusFeet: actionData.seekTemplateRadiusFeet,
+                templateType: actionData.seekTemplateType,
+                geometry: actionData.seekTemplateGeometry,
+                levels: actionData.seekTemplateLevels,
+                actorTokenId: actionData.actor.id,
+                rollTotal: actionData.roll?.total ?? null,
+                dieResult:
+                  actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
+                fromUserId: game.userId,
+                hasTargets: targets.length > 0,
+              });
+              updateSeekTemplateButton(actionData, true);
+            }
+          } finally {
+            restoreTokenControlsAfterSeekTemplate();
+            resolve();
           }
-          if (!dialogOpened) {
-            await persistSeekTemplateFlag(actionData, {
-              center: actionData.seekTemplateCenter,
-              radiusFeet: actionData.seekTemplateRadiusFeet,
-              templateType: actionData.seekTemplateType,
-              levels: actionData.seekTemplateLevels,
-              actorTokenId: actionData.actor.id,
-              rollTotal: actionData.roll?.total ?? null,
-              dieResult:
-                actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
-              fromUserId: game.userId,
-              hasTargets: targets.length > 0,
-            });
-            updateSeekTemplateButton(actionData, true);
-          }
-        } finally {
+        },
+        () => {
           restoreTokenControlsAfterSeekTemplate();
           resolve();
-        }
-      });
+        },
+      );
       if (!launchedPreview) {
         const pointerHandler = async (event) => {
+          if ((event.button ?? event.data?.originalEvent?.button ?? 0) !== 0) {
+            canvas.stage.off('pointerdown', pointerHandler);
+            return;
+          }
           let accepted = false;
           try {
             const local = event.data.getLocalPosition(canvas.stage);
@@ -712,6 +747,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
               actionData.seekTemplateCenter = templateState.center;
               actionData.seekTemplateRadiusFeet = Number(templateState.radiusFeet) || distance;
               actionData.seekTemplateType = templateState.templateType || templateType;
+              actionData.seekTemplateGeometry = templateState.geometry;
               actionData.seekTemplateLevels = templateState.levels;
               let dialogOpened = false;
               const tokens = canvas?.tokens?.placeables || [];
@@ -730,6 +766,7 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
                   center: actionData.seekTemplateCenter,
                   radiusFeet: actionData.seekTemplateRadiusFeet,
                   templateType: actionData.seekTemplateType,
+                  geometry: actionData.seekTemplateGeometry,
                   levels: actionData.seekTemplateLevels,
                   actorTokenId: actionData.actor.id,
                   rollTotal: actionData.roll?.total ?? null,
@@ -786,68 +823,78 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
     validatePlacement,
   });
   await new Promise((resolve) => {
-    registerSeekTemplateCreateHooks(async (doc, releaseCreateHooks) => {
-      try {
-        releaseCreateHooks();
-        usedPreview = true;
-        let templateState = getTemplateStateFromDocument(doc);
-        const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
-        templateState = normalized.templateState;
-        if (normalized.clamped) {
-          await updateSeekTemplateDocumentCenter(doc, templateState.center);
-        }
-        const center = templateState.center;
-        if (!(await validatePlacement(center))) {
-          await deleteRejectedSeekTemplateDocument(doc);
-          return;
-        }
-        const radius = Number(templateState.radiusFeet) || distance;
-        actionData.seekTemplateCenter = center;
-        actionData.seekTemplateRadiusFeet = radius;
-        actionData.seekTemplateType = templateState.templateType || templateType;
-        actionData.seekTemplateLevels = templateState.levels;
-        updateSeekTemplateButton(actionData, true);
-        const { requestGMOpenSeekWithTemplate } = await import('../../../services/socket.js');
+    registerSeekTemplateCreateHooks(
+      async (doc, releaseCreateHooks) => {
         try {
-          // Best-effort: annotate the chat message flags immediately so GM panel can switch without relying solely on sockets
-          const msg = game.messages.get(actionData.messageId);
-          if (msg) {
-            const all = canvas?.tokens?.placeables || [];
-            const targets = all.filter((t) => t && t !== actionData.actor && t.actor);
-            const { isTokenWithinTemplate } = await import('../infra/shared-utils.js');
-            const hasTargets = targets.some((t) => isTokenWithinTemplate(center, radius, t));
-            await persistSeekTemplateFlag(actionData, {
-              center,
-              radiusFeet: radius,
-              templateType: actionData.seekTemplateType,
-              levels: actionData.seekTemplateLevels,
-              actorTokenId: actionData.actor.id,
-              rollTotal: actionData.roll?.total ?? null,
-              dieResult:
-                actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
-              fromUserId: game.userId,
-              hasTargets,
-            });
+          releaseCreateHooks();
+          usedPreview = true;
+          let templateState = getTemplateStateFromDocument(doc);
+          const normalized = normalizeSeekTemplatePlacement(actionData, templateState);
+          templateState = normalized.templateState;
+          if (normalized.clamped) {
+            await updateSeekTemplateDocumentCenter(doc, templateState.center);
           }
-        } catch (_) {}
-        const roll = actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
-        const rollTotal = roll?.total ?? null;
-        const dieResult = roll?.dice?.[0]?.total ?? roll?.terms?.[0]?.total ?? null;
-        requestGMOpenSeekWithTemplate(
-          actionData.actor.id,
-          center,
-          radius,
-          actionData.messageId,
-          rollTotal,
-          dieResult,
-          actionData.seekTemplateType,
-          actionData.seekTemplateLevels,
-        );
-      } finally {
+          const center = templateState.center;
+          if (!(await validatePlacement(center))) {
+            await deleteRejectedSeekTemplateDocument(doc);
+            return;
+          }
+          const radius = Number(templateState.radiusFeet) || distance;
+          actionData.seekTemplateCenter = center;
+          actionData.seekTemplateRadiusFeet = radius;
+          actionData.seekTemplateType = templateState.templateType || templateType;
+          actionData.seekTemplateGeometry = templateState.geometry;
+          actionData.seekTemplateLevels = templateState.levels;
+          updateSeekTemplateButton(actionData, true);
+          const { requestGMOpenSeekWithTemplate } = await import('../../../services/socket.js');
+          try {
+            // Best-effort: annotate the chat message flags immediately so GM panel can switch without relying solely on sockets
+            const msg = game.messages.get(actionData.messageId);
+            if (msg) {
+              const all = canvas?.tokens?.placeables || [];
+              const targets = all.filter((t) => t && t !== actionData.actor && t.actor);
+              const { isTokenWithinTemplate } = await import('../infra/shared-utils.js');
+              const hasTargets = targets.some((t) => isTokenWithinTemplate(center, radius, t));
+              await persistSeekTemplateFlag(actionData, {
+                center,
+                radiusFeet: radius,
+                templateType: actionData.seekTemplateType,
+                geometry: actionData.seekTemplateGeometry,
+                levels: actionData.seekTemplateLevels,
+                actorTokenId: actionData.actor.id,
+                rollTotal: actionData.roll?.total ?? null,
+                dieResult:
+                  actionData.roll?.dice?.[0]?.total ?? actionData.roll?.terms?.[0]?.total ?? null,
+                fromUserId: game.userId,
+                hasTargets,
+              });
+            }
+          } catch (_) {}
+          const roll =
+            actionData.roll || game.messages.get(actionData.messageId)?.rolls?.[0] || null;
+          const rollTotal = roll?.total ?? null;
+          const dieResult = roll?.dice?.[0]?.total ?? roll?.terms?.[0]?.total ?? null;
+          requestGMOpenSeekWithTemplate(
+            actionData.actor.id,
+            center,
+            radius,
+            actionData.messageId,
+            rollTotal,
+            dieResult,
+            actionData.seekTemplateType,
+            actionData.seekTemplateLevels,
+            actionData.seekTemplateGeometry,
+          );
+        } finally {
+          restoreTokenControlsAfterSeekTemplate();
+          resolve();
+        }
+      },
+      () => {
         restoreTokenControlsAfterSeekTemplate();
         resolve();
-      }
-    });
+      },
+    );
     if (!launchedPreview) {
       restoreTokenControlsAfterSeekTemplate();
       resolve();
@@ -856,6 +903,12 @@ export async function setupSeekTemplate(actionData, skipDialog = false) {
   if (!usedPreview) {
     await new Promise((resolve) => {
       const pointerHandler = async (event) => {
+        if ((event.button ?? event.data?.originalEvent?.button ?? 0) !== 0) {
+          canvas.stage.off('pointerdown', pointerHandler);
+          restoreTokenControlsAfterSeekTemplate();
+          resolve();
+          return;
+        }
         let accepted = false;
         try {
           const local = event.data.getLocalPosition(canvas.stage);
@@ -969,6 +1022,7 @@ export async function removeSeekTemplate(actionData) {
     delete actionData.seekTemplateCenter;
     delete actionData.seekTemplateRadiusFeet;
     delete actionData.seekTemplateLevels;
+    delete actionData.seekTemplateGeometry;
 
     try {
       await clearSeekTemplateFlag(actionData.messageId);

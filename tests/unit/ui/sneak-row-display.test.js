@@ -42,6 +42,15 @@ describe('sneak row display', () => {
     expect(row.querySelector('[data-state="hidden"]').classList.contains('selected')).toBe(true);
   });
 
+  test('keeps undo available after the applied result becomes the current state', async () => {
+    const element = document.createElement('section');
+    element.innerHTML = '<table><tr data-token-id="target-1"><td class="actions"></td></tr></table>';
+    const outcome = { currentVisibility: 'hidden', oldVisibility: 'undetected', newVisibility: 'undetected', _applied: true };
+    await updateSneakOutcomeDisplayForToken(buildApp(element), 'target-1', outcome);
+    expect(element.querySelector('.revert-change')?.disabled).toBe(false);
+    expect(outcome.hasActionableChange).toBe(false);
+  });
+
   test('updates outcome row inside dialog root only', async () => {
     const outside = document.createElement('section');
     outside.innerHTML = `

@@ -1,0 +1,13 @@
+import { readFile } from 'node:fs/promises';
+import { fullCases } from './cases.mjs';
+import { assessMatrix, sourceFingerprint } from './evidence.mjs';
+import { assessRequirements } from './requirements.mjs';
+const files = process.argv.slice(2);
+if (!files.length) throw Error('Provide report.json paths from each local Foundry environment. No world is started or modified by this command.');
+const reports = await Promise.all(files.map(async file => JSON.parse(await readFile(file, 'utf8'))));
+const catalog = fullCases;
+const result = assessMatrix(catalog, reports, await sourceFingerprint());
+result.missingImplementations = assessRequirements(catalog, []).details.flatMap(r => r.missing);
+result.complete &&= result.missingImplementations.length === 0;
+console.log(JSON.stringify(result, null, 2));
+process.exitCode = result.complete ? 0 : 1;

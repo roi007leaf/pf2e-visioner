@@ -764,17 +764,17 @@ export function registerSettings() {
             console.warn('PF2E Visioner: Failed to apply Vision for NPCs setting:', error);
           }
         };
-      } else if (key === 'dimLightingThreshold') {
-        // Recalculate AVS when dim lighting threshold changes
+      } else if (key === 'dimLightingThreshold' || key === 'avsOnlyInCombat') {
+        // Recalculate immediately when a visibility setting opens the AVS gate.
         settingConfig.onChange = async () => {
           try {
             const { autoVisibility } = await import('./api.js');
             if (game.settings.get(MODULE_ID, 'autoVisibilityEnabled')) {
-              autoVisibility.recalculateAll(true); // Force recalculation
+              await autoVisibility.recalculateAll(true);
             }
           } catch (error) {
             console.warn(
-              'PF2E Visioner: Failed to trigger AVS recalculation on dim threshold change:',
+              `PF2E Visioner: Failed to recalculate AVS after ${key} changed:`,
               error,
             );
           }

@@ -8,6 +8,20 @@ function conditionItem(slug, sceneTokens) {
 }
 
 describe('system-condition hook helpers', () => {
+  test('secondary GM and player hooks never request condition conversion', async () => {
+    const originalUsers = game.users, originalUser = game.user;
+    const sync = jest.fn();
+    const token = { document: { id: 'token' }, actor: { alliance: 'opposition' } };
+    try {
+      for (const user of [{ id: 'secondary', isGM: true }, { id: 'player', isGM: false }]) {
+        game.users = { activeGM: { id: 'primary' } }; game.user = user;
+        await handleConditionItemChange(conditionItem('hidden', [token]), { sync });
+        await handleTokenCreatedForSystemConditions(token, { sync,
+          getSceneTokens: () => [token], strongestState: () => 'hidden', isEnemyOf: () => true });
+      }
+      expect(sync).not.toHaveBeenCalled();
+    } finally { game.users = originalUsers; game.user = originalUser; }
+  });
   test('handleConditionItemChange reconciles each scene token of a condition item', async () => {
     const calls = [];
     const t1 = { document: { id: 't1' }, actor: {} };

@@ -74,6 +74,9 @@ let currentSneakDialog = null;
  * Dialog for previewing and applying Sneak action results
  */
 export class SneakPreviewDialog extends BaseActionDialog {
+  getApplyDirection() {
+    return 'target_to_observer';
+  }
   constructor(sneakingToken, outcomes, changes, sneakData, options = {}) {
     if (!sneakingToken) {
       throw new Error('SneakPreviewDialog: sneakingToken is required');

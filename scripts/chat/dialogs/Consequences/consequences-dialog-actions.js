@@ -13,14 +13,6 @@ export async function applyConsequencesChange(app, button) {
   const effectiveNewState =
     outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility();
 
-  if (effectiveNewState === 'avs') {
-    await removeConsequencesAvsOverride(app, outcome);
-    app.updateRowButtonsToApplied([
-      { target: { id: outcome.target.id }, hasActionableChange: false },
-    ]);
-    app.updateChangesCount();
-    return;
-  }
 
   try {
     const { applyNowConsequences } = await import('../../services/index.js');
@@ -88,8 +80,7 @@ export async function applyAllConsequencesChanges(app) {
     return;
   }
 
-  const { overrides, avsRemovals } = collectConsequencesOverrides(changedOutcomes);
-  await removeAllConsequencesAvsOverrides(app, avsRemovals);
+  const overrides = collectConsequencesOverrides(changedOutcomes);
   await applyAllConsequencesOverrides(app, overrides);
   markConsequencesOutcomesApplied(app, changedOutcomes);
 
@@ -135,25 +126,6 @@ export async function revertAllConsequencesChanges(app) {
   app.updateChangesCount();
 }
 
-async function removeConsequencesAvsOverride(app, outcome) {
-  try {
-    const { default: AvsOverrideManager } = await import(
-      '../../services/infra/AvsOverrideManager.js'
-    );
-    const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-    const observerId = outcome.target.id;
-    if (!attackerId || !observerId) return;
-
-    await AvsOverrideManager.removeOverride(observerId, attackerId);
-    const { updateTokenVisuals } = await import('../../../services/visual-effects.js');
-    await updateTokenVisuals();
-    notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${outcome.target.name}`);
-  } catch (error) {
-    console.warn('Failed to remove AVS override:', error);
-    notify.info(`${MODULE_TITLE}: AVS will control visibility for ${outcome.target.name}`);
-  }
-}
-
 async function buildConsequencesOverrideValue(effectiveNewState, rowTimerConfig) {
   if (!rowTimerConfig) return effectiveNewState;
 
@@ -196,46 +168,10 @@ async function getChangedConsequencesOutcomes(app) {
 }
 
 function collectConsequencesOverrides(changedOutcomes) {
-  const overrides = {};
-  const avsRemovals = [];
-
-  for (const outcome of changedOutcomes) {
-    const id = outcome?.target?.id;
-    const state =
-      outcome?.overrideState || outcome?.newVisibility || getDefaultConsequencesVisibility();
-    if (!id || !state) continue;
-
-    if (state === 'avs') {
-      avsRemovals.push({ id, name: outcome.target.name });
-    } else {
-      overrides[id] = state;
-    }
-  }
-
-  return { overrides, avsRemovals };
-}
-
-async function removeAllConsequencesAvsOverrides(app, avsRemovals) {
-  if (avsRemovals.length === 0) return;
-
-  try {
-    const { default: AvsOverrideManager } = await import(
-      '../../services/infra/AvsOverrideManager.js'
-    );
-    const attackerId = app.actionData?.actor?.document?.id || app.actionData?.actor?.id;
-    if (!attackerId) return;
-
-    for (const removal of avsRemovals) {
-      await AvsOverrideManager.removeOverride(removal.id, attackerId);
-    }
-
-    const { updateTokenVisuals } = await import('../../../services/visual-effects.js');
-    await updateTokenVisuals();
-    notify.info(`${MODULE_TITLE}: Accepted AVS changes for ${avsRemovals.length} token(s)`);
-  } catch (error) {
-    console.warn('Failed to remove AVS overrides:', error);
-    notify.info(`${MODULE_TITLE}: AVS will control visibility for ${avsRemovals.length}`);
-  }
+  return Object.fromEntries(changedOutcomes.map(outcome => [
+    outcome.target.id,
+    outcome.overrideState || outcome.newVisibility || getDefaultConsequencesVisibility(),
+  ]));
 }
 
 async function applyAllConsequencesOverrides(app, overrides) {

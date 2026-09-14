@@ -110,6 +110,7 @@ export async function handleTokenUpdated(
     applyCurrentViewHardHide = defaultApplyCurrentViewHardHide,
     scheduleCanvasPerceptionUpdate = defaultScheduleCanvasPerceptionUpdate,
     getSceneTokens = () => globalThis.canvas?.tokens?.placeables ?? [],
+    removeSystemHiddenIndicatorsForObservedTargets = defaultRemoveSystemHiddenIndicatorsForObservedTargets,
     warn = console.warn,
   } = {},
 ) {
@@ -120,6 +121,9 @@ export async function handleTokenUpdated(
     if (!hasPositionChange(changes)) {
       if (globalThis.game?.user?.isGM === false && hasVisibilityFlagChange(changes)) {
         detectionFrameCache.clear();
+        // GM batch-complete hooks are local. Remote clients must also stop obsolete
+        // presence animations before repainting newly observed targets.
+        await removeSystemHiddenIndicatorsForObservedTargets();
         // The updated document owns an outgoing map: all its targets may need repainting.
         for (const target of getSceneTokens()) {
           target.refresh?.();

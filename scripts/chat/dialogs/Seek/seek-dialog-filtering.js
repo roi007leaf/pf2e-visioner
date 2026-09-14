@@ -83,7 +83,8 @@ export function calculateFilteredSeekActionability(dialog, outcome, overrideStat
     if (!outcome?._isWall) {
       const observerToken = outcome.observerToken || outcome.observer || dialog.actorToken;
       if (observerToken) {
-        currentVisibility = getVisibilityBetween(observerToken, outcome.target) || currentVisibility;
+        currentVisibility =
+          getVisibilityBetween(observerToken, outcome.target) || currentVisibility;
       }
     }
 
@@ -138,6 +139,7 @@ export async function getSeekDialogFilteredOutcomes(
         dialog.actionData.seekTemplateType || 'circle',
         dialog.actionData.messageId,
         dialog.actorToken?.id || dialog.actionData.actor?.id,
+        dialog.actionData.seekTemplateGeometry,
       );
     } catch {
       /* Template filtering is non-critical */
@@ -182,6 +184,8 @@ export async function getSeekDialogFilteredOutcomes(
   }
 
   return preserveOverrides
-    ? preserveSeekOverrides(filtered, dialog.outcomes, (outcome) => dialog.getOutcomeTokenId(outcome))
+    ? preserveSeekOverrides(filtered, dialog.outcomes, (outcome) =>
+        dialog.getOutcomeTokenId(outcome),
+      )
     : filtered;
 }

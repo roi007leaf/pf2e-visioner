@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { isPrimaryGM } from './gm-election.js';
 
 export const SYSTEM_CONDITION_OVERRIDE_SOURCE = 'system-condition';
 export const CONVERTED_SYSTEM_CONDITION_OVERRIDE_SOURCE = 'converted-system-condition';
@@ -239,6 +240,7 @@ function tokensForActor(actor) {
 }
 
 export async function handleConditionItemChange(item, deps = {}) {
+  if (!isPrimaryGM()) return;
   const { sync = syncSystemConditionOverridesForToken } = deps;
   if (item?.type !== 'condition' || !isSystemConditionSlug(item?.slug)) return;
   for (const token of tokensForActor(item.actor)) {
@@ -247,6 +249,7 @@ export async function handleConditionItemChange(item, deps = {}) {
 }
 
 export async function handleTokenCreatedForSystemConditions(tokenDoc, deps = {}) {
+  if (!isPrimaryGM()) return;
   const {
     getSceneTokens = () => globalThis.canvas?.tokens?.placeables ?? [],
     strongestState = strongestSystemConditionState,

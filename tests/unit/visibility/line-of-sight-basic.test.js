@@ -98,6 +98,28 @@ describe('VisionAnalyzer - Line of Sight (Refactored)', () => {
         jest.restoreAllMocks();
     });
 
+    describe('visual angle independent of physical LOS', () => {
+        test('rotation changes visual eligibility without blocking physical LOS', () => {
+            mockTarget.center = { x: 300, y: 100 };
+            mockObserver.document.sight = { angle: 90 };
+            mockObserver.document.rotation = 270;
+            expect(visionAnalyzer.isWithinVisionAngle(mockObserver, mockTarget)).toBe(true);
+            mockObserver.document.rotation = 90;
+            expect(visionAnalyzer.isWithinVisionAngle(mockObserver, mockTarget)).toBe(false);
+            expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBe(true);
+            mockObserver.document.sight.angle = 360;
+            expect(visionAnalyzer.isWithinVisionAngle(mockObserver, mockTarget)).toBe(true);
+        });
+
+        test('uses native target samples for partial cone visibility', () => {
+            mockObserver.document.sight = { angle: 30 };
+            mockObserver.document.rotation = 270;
+            mockTarget.center = { x: 300, y: 170 };
+            mockTarget.document.getVisibilityTestPoints = () => [mockTarget.center, { x: 300, y: 145 }];
+            expect(visionAnalyzer.isWithinVisionAngle(mockObserver, mockTarget)).toBe(true);
+        });
+    });
+
     describe('hasLineOfSight - No Walls', () => {
         test('should return true when no walls exist', () => {
             global.canvas.walls.placeables = [];

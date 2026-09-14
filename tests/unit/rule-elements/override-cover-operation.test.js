@@ -5,8 +5,15 @@ jest.mock('../../../scripts/utils.js', () => ({
     setCoverBetween: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../scripts/stores/cover-map.js', () => ({
+    setCoverBetween: jest.fn().mockResolvedValue(undefined),
+    getCoverBetween: jest.fn(() => 'none'),
+}));
+
 jest.mock('../../../scripts/rule-elements/SourceTracker.js', () => ({
     SourceTracker: {
+        getCoverStateSources: jest.fn(() => []),
+        getEffectiveState: jest.fn(() => null),
         addSourceToState: jest.fn().mockResolvedValue(undefined),
         removeSource: jest.fn().mockResolvedValue(undefined),
     },
@@ -121,8 +128,8 @@ describe('overrideCover Operation - Rule Element', () => {
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
             expect(setCoverBetween).toHaveBeenCalledTimes(2);
-            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'standard');
-            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken2, 'standard');
+            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'standard', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
+            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken2, 'standard', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
 
             expect(SourceTracker.addSourceToState).toHaveBeenCalledTimes(2);
         });
@@ -139,8 +146,8 @@ describe('overrideCover Operation - Rule Element', () => {
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
             expect(setCoverBetween).toHaveBeenCalledTimes(2);
-            expect(setCoverBetween).toHaveBeenCalledWith(mockTargetToken1, mockSubjectToken, 'greater');
-            expect(setCoverBetween).toHaveBeenCalledWith(mockTargetToken2, mockSubjectToken, 'greater');
+            expect(setCoverBetween).toHaveBeenCalledWith(mockTargetToken1, mockSubjectToken, 'greater', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
+            expect(setCoverBetween).toHaveBeenCalledWith(mockTargetToken2, mockSubjectToken, 'greater', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
         });
 
         test('should respect range limits', async () => {
@@ -156,8 +163,8 @@ describe('overrideCover Operation - Rule Element', () => {
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
             expect(setCoverBetween).toHaveBeenCalledTimes(1);
-            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'standard');
-            expect(setCoverBetween).not.toHaveBeenCalledWith(mockSubjectToken, mockTargetToken2, 'standard');
+            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'standard', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
+            expect(setCoverBetween).not.toHaveBeenCalledWith(mockSubjectToken, mockTargetToken2, 'standard', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
         });
 
         test('should apply cover to targeted tokens only', async () => {
@@ -174,7 +181,7 @@ describe('overrideCover Operation - Rule Element', () => {
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
             expect(setCoverBetween).toHaveBeenCalledTimes(1);
-            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'lesser');
+            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'lesser', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
         });
 
         test('should apply different cover states', async () => {
@@ -193,7 +200,7 @@ describe('overrideCover Operation - Rule Element', () => {
 
                 await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
-                expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, expect.anything(), state);
+                expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, expect.anything(), state, { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
             }
         });
     });
@@ -377,7 +384,7 @@ describe('overrideCover Operation - Rule Element', () => {
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
             expect(setCoverBetween).toHaveBeenCalledTimes(1);
-            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'greater');
+            expect(setCoverBetween).toHaveBeenCalledWith(mockSubjectToken, mockTargetToken1, 'greater', { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
         });
     });
 
@@ -408,7 +415,7 @@ describe('overrideCover Operation - Rule Element', () => {
 
             await CoverOverride.applyCoverOverride(operation, mockSubjectToken, mockRuleElement);
 
-            expect(setCoverBetween).not.toHaveBeenCalledWith(mockSubjectToken, mockSubjectToken, expect.anything());
+            expect(setCoverBetween).not.toHaveBeenCalledWith(mockSubjectToken, mockSubjectToken, expect.anything(), { skipSourceTracking: true, skipTakeCoverTrackingSync: true });
         });
 
         test('should handle empty target list', async () => {

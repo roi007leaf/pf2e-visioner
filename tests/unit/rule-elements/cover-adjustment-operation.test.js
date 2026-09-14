@@ -7,7 +7,11 @@ function makeToken(id) {
     document: {
       id,
       flags,
-      async setFlag(scope, key, value) { (flags[scope] ??= {})[key] = value; return value; },
+      async setFlag(scope, key, value) {
+        // Foundry merges flag objects; omitted observer keys are not deleted.
+        (flags[scope] ??= {})[key] = { ...flags[scope]?.[key], ...value };
+        return flags[scope][key];
+      },
       getFlag(scope, key) { return flags[scope]?.[key]; },
     },
   };

@@ -180,7 +180,7 @@ export function determineOutcome(total, die, dc) {
   let outcome;
   if (margin >= 10) outcome = 'critical-success';
   else if (margin >= 0) outcome = 'success';
-  else if (margin >= -10) outcome = 'failure';
+  else if (margin > -10) outcome = 'failure';
   else outcome = 'critical-failure';
 
   // Natural 20/1 step adjustment across the board with extremes clamped
@@ -573,6 +573,19 @@ export function filterOutcomesBySeekDistance(outcomes, seeker, tokenProperty = '
  * @param {string} actorTokenId - Optional actor token ID to find the actual template object
  * @returns {boolean}
  */
+function pointWithinSeekCone(point, center, radiusFeet, geometry) {
+  if (!point || !center) return false;
+  const size = canvas.scene?.grid?.size ?? canvas.grid?.size ?? 100;
+  const distance = canvas.scene?.grid?.distance ?? canvas.grid?.distance ?? 5;
+  const dx = point.x - center.x,
+    dy = point.y - center.y;
+  if ((Math.hypot(dx, dy) * distance) / size > radiusFeet) return false;
+  const direction = Number(geometry.direction ?? 0);
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const delta = ((angle - direction + 540) % 360) - 180;
+  return Math.abs(delta) <= Number(geometry.angle ?? 90) / 2;
+}
+
 export function isTokenWithinTemplate(
   center,
   radiusFeet,
@@ -580,6 +593,7 @@ export function isTokenWithinTemplate(
   templateType = 'circle',
   messageId = null,
   actorTokenId = null,
+  geometry = null,
 ) {
   try {
     if (!center || !token) return false;
@@ -615,6 +629,9 @@ export function isTokenWithinTemplate(
       }
     }
 
+    if (templateType === 'cone' && geometry) {
+      return pointWithinSeekCone(token.center, center, radiusFeet, geometry);
+    }
     if (templateType === 'circle') {
       const tokenCenter = token.center || {
         x: token.x + (token.w ?? token.width * canvas.grid.size) / 2,
@@ -655,6 +672,7 @@ export function filterOutcomesByTemplate(
   templateType = 'circle',
   messageId = null,
   actorTokenId = null,
+  geometry = null,
 ) {
   try {
     if (!Array.isArray(outcomes) || !center || !Number.isFinite(radiusFeet) || radiusFeet <= 0)
@@ -711,6 +729,12 @@ export function filterOutcomesByTemplate(
     }
 
     return outcomes.filter((outcome) => {
+      if (templateType === 'cone' && geometry) {
+        const point = outcome?._isWall
+          ? getWallCenter(outcome.wall)
+          : getTokenCenter(outcome?.[tokenProperty]);
+        return pointWithinSeekCone(point, center, radiusFeet, geometry);
+      }
       if (template && template.shape) {
         if (outcome?._isWall && outcome?.wall) {
           const wallCenter = getWallCenter(outcome.wall);

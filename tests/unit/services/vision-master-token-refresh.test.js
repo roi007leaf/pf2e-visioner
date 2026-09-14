@@ -33,6 +33,19 @@ function makeTokenDoc(id, { object = makeToken(id), currentMasterId = null } = {
 }
 
 describe('vision master token refresh service', () => {
+  test('mode-only changes refresh the linked source without changing masters', async () => {
+    const subject = makeToken('subject'), master = makeToken('master');
+    const controller = createVisionMasterTokenRefresh({ getCanvas: () => ({
+      tokens: { get: id => id === 'master' ? master : null }, perception: { update: jest.fn() },
+    }) });
+    const doc = makeTokenDoc('subject', { object: subject, currentMasterId: 'master' });
+    const change = { flags: { [MODULE_ID]: { visionSharingMode: 'two-way' } } };
+    expect(controller.capturePreUpdate(doc, change)).toBe(true);
+    const result = await controller.refreshAfterUpdate(doc, change);
+    expect(result.refreshed).toBe(true);
+    expect(subject.initializeVisionSource).toHaveBeenCalled();
+    expect(master.initializeVisionSource).toHaveBeenCalled();
+  });
   beforeEach(() => {
     jest.clearAllMocks();
   });

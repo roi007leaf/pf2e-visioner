@@ -121,7 +121,7 @@ export function refreshEveryonesPerception() {
 
       // Removed redundant updateWallVisuals call - wall visual updates are properly handled
       // by TokenEventHandler._handleWallFlagChanges when wall flags actually change
-    } catch { }
+    } catch {}
 
     _perceptionRefreshTimeout = null;
   }, 10); // 10ms debounce to prevent spam
@@ -280,7 +280,7 @@ async function pointOutRequestHandler({ pointerTokenId, targetTokenId, messageId
       });
       try {
         await msg.render(true);
-      } catch { }
+      } catch {}
     }
 
     // Update GM panel actions if already rendered
@@ -342,6 +342,7 @@ export function requestGMOpenSeekWithTemplate(
   dieResult,
   templateType = 'circle',
   levels = [],
+  geometry = null,
 ) {
   if (!_socketService.socket) return;
   _socketService.executeAsGM(SEEK_TEMPLATE_CHANNEL, {
@@ -353,6 +354,7 @@ export function requestGMOpenSeekWithTemplate(
     dieResult,
     templateType,
     levels,
+    geometry,
     userId: game.userId,
   });
 }
@@ -366,6 +368,7 @@ async function seekTemplateHandler({
   dieResult,
   templateType = 'circle',
   levels = [],
+  geometry = null,
   userId,
 }) {
   try {
@@ -424,6 +427,7 @@ async function seekTemplateHandler({
           radiusFeet,
           templateType,
           levels,
+          geometry,
           actorTokenId,
           rollTotal: typeof rollTotal === 'number' ? rollTotal : null,
           dieResult: typeof dieResult === 'number' ? dieResult : null,
@@ -437,11 +441,11 @@ async function seekTemplateHandler({
         if (playerUser) {
           executeSocketForUser(REFRESH_CHANNEL, userId);
         }
-      } catch { }
+      } catch {}
       // Re-render the chat message so the injected panel can be updated/removed appropriately
       try {
         await msg.render(true);
-      } catch { }
+      } catch {}
     }
 
     // If the automation panel is already injected for this message on the GM, swap its action to "Open Seek Results"
@@ -490,17 +494,21 @@ export function peekUpdateHandler(payload) {
   if (!game.user?.isGM) return;
   if (!payload || payload.sceneId !== canvas?.scene?.id) return;
   const now = Date.now();
-  peekRegistry.set(payload.tokenId, {
-    origin: payload.origin,
-    direction: payload.direction,
-    fov: payload.fov,
-    range: payload.range ?? 0,
-    ignoredWallIds: payload.ignoredWallIds ?? [],
-    points: payload.points ?? null,
-    userColor: payload.userColor ?? null,
-    userName: payload.userName ?? payload.tokenId,
-    userId: payload.userId ?? null,
-  }, now);
+  peekRegistry.set(
+    payload.tokenId,
+    {
+      origin: payload.origin,
+      direction: payload.direction,
+      fov: payload.fov,
+      range: payload.range ?? 0,
+      ignoredWallIds: payload.ignoredWallIds ?? [],
+      points: payload.points ?? null,
+      userColor: payload.userColor ?? null,
+      userName: payload.userName ?? payload.tokenId,
+      userId: payload.userId ?? null,
+    },
+    now,
+  );
   peekRegistry.pruneStale(5000, now);
   recalcPeekToken(payload.tokenId);
   schedulePeekRevealRefresh(payload.userId, {
@@ -511,7 +519,10 @@ export function peekUpdateHandler(payload) {
   peekGmOverlay.render();
 }
 
-export function collectPeekRefreshTokenIds(payload, { tokens = globalThis.canvas?.tokens?.placeables } = {}) {
+export function collectPeekRefreshTokenIds(
+  payload,
+  { tokens = globalThis.canvas?.tokens?.placeables } = {},
+) {
   const ids = [];
   const seen = new Set();
   const add = (id) => {
@@ -580,11 +591,15 @@ export function schedulePeekRevealRefresh(userId, payload) {
     if (sent) return;
     sent = true;
     if (fallbackTimer) {
-      try { clearTimeout(fallbackTimer); } catch (_) {}
+      try {
+        clearTimeout(fallbackTimer);
+      } catch (_) {}
       fallbackTimer = null;
     }
     if (hookFn) {
-      try { globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn); } catch (_) {}
+      try {
+        globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn);
+      } catch (_) {}
     }
     clearPending();
     sendPeekRevealRefresh(userId, payload);
@@ -593,18 +608,23 @@ export function schedulePeekRevealRefresh(userId, payload) {
     if (sent) return;
     sent = true;
     if (fallbackTimer) {
-      try { clearTimeout(fallbackTimer); } catch (_) {}
+      try {
+        clearTimeout(fallbackTimer);
+      } catch (_) {}
       fallbackTimer = null;
     }
     if (hookFn) {
-      try { globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn); } catch (_) {}
+      try {
+        globalThis.Hooks?.off?.('pf2eVisionerAvsBatchComplete', hookFn);
+      } catch (_) {}
     }
   };
   try {
     if (typeof globalThis.Hooks?.once === 'function') {
       hookFn = (batch = {}) => {
         const changed = batch.changedTokens;
-        if (Array.isArray(changed) && payload?.tokenId && !changed.includes(payload.tokenId)) return;
+        if (Array.isArray(changed) && payload?.tokenId && !changed.includes(payload.tokenId))
+          return;
         send();
       };
       globalThis.Hooks.once('pf2eVisionerAvsBatchComplete', hookFn);
@@ -666,12 +686,18 @@ export async function peekRevealRefreshHandler(
   };
   await refresh();
   for (const delay of [75, 200]) {
-    if (typeof setTimer === 'function') setTimer(() => { void refresh(); }, delay);
+    if (typeof setTimer === 'function')
+      setTimer(() => {
+        void refresh();
+      }, delay);
   }
   return true;
 }
 
-export async function doorPeekApprovalRequestHandler(payload, { confirm = confirmDoorPeekApproval } = {}) {
+export async function doorPeekApprovalRequestHandler(
+  payload,
+  { confirm = confirmDoorPeekApproval } = {},
+) {
   try {
     if (!globalThis.game?.user?.isGM) return;
     if (!payload || payload.sceneId !== globalThis.canvas?.scene?.id) return;
@@ -711,13 +737,24 @@ export async function confirmDoorPeekApproval(payload) {
   const { VisionerConfirmDialog } = await import('../ui/dialogs/ConfirmDialog.js');
   const token = globalThis.canvas?.tokens?.get?.(payload.tokenId);
   const wall = globalThis.canvas?.walls?.get?.(payload.wallId);
-  const userName = payload.userName || globalThis.game?.users?.get?.(payload.userId)?.name || 'Player';
+  const userName =
+    payload.userName || globalThis.game?.users?.get?.(payload.userId)?.name || 'Player';
   const tokenName =
-    payload.tokenName || token?.name || token?.document?.name || token?.actor?.name || payload.tokenId;
+    payload.tokenName ||
+    token?.name ||
+    token?.document?.name ||
+    token?.actor?.name ||
+    payload.tokenId;
   const doorName = wall?.document?.name || wall?.name || payload.wallId;
   return VisionerConfirmDialog.confirm({
-    title: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.APPROVAL_TITLE') ?? 'Approve Door Peek',
-    content: buildDoorPeekApprovalContent({ userName, tokenName, doorName, wallId: payload.wallId }),
+    title:
+      globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.APPROVAL_TITLE') ?? 'Approve Door Peek',
+    content: buildDoorPeekApprovalContent({
+      userName,
+      tokenName,
+      doorName,
+      wallId: payload.wallId,
+    }),
     yes: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.APPROVE') ?? 'Approve',
     no: globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.DENY') ?? 'Deny',
     variant: 'info',
@@ -778,7 +815,9 @@ function resolveCanvasWall(wallId) {
   if (!wallId) return null;
   return (
     globalThis.canvas?.walls?.get?.(wallId) ||
-    globalThis.canvas?.walls?.placeables?.find?.((wall) => wall?.id === wallId || wall?.document?.id === wallId) ||
+    globalThis.canvas?.walls?.placeables?.find?.(
+      (wall) => wall?.id === wallId || wall?.document?.id === wallId,
+    ) ||
     globalThis.canvas?.scene?.walls?.get?.(wallId) ||
     globalThis.canvas?.scene?.getEmbeddedDocument?.('Wall', wallId) ||
     null
@@ -842,7 +881,10 @@ function recalcPeekToken(tokenId) {
 }
 
 export function emitPeekUpdate(channel, data) {
-  _socketService.executeAsGM(channel === PEEK_END_CHANNEL ? PEEK_END_CHANNEL : PEEK_UPDATE_CHANNEL, data);
+  _socketService.executeAsGM(
+    channel === PEEK_END_CHANNEL ? PEEK_END_CHANNEL : PEEK_UPDATE_CHANNEL,
+    data,
+  );
 }
 
 let _peekPruneTimer = null;

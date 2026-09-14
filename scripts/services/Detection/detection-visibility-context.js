@@ -31,9 +31,8 @@ export const NON_VISUAL_DETECTION_MODE_IDS = new Set([
 ]);
 
 function getDetectionAggregationObserverTokens() {
-  if (game.user?.isGM) {
-    return canvas?.tokens?.controlled || [];
-  }
+  const controlled = canvas?.tokens?.controlled || [];
+  if (controlled.length > 0 || game.user?.isGM) return controlled;
   return getControlledObserverTokens();
 }
 

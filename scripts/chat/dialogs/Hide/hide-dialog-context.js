@@ -120,7 +120,7 @@ async function applyHidePositionQualification(app, filteredOutcomes) {
         );
         let qualifies = app._endPositionQualifiesForHide(endPos);
         qualifies = await applyHideFeatQualification(hider, outcome, endPos, qualifies);
-        qualifies = await applyHideRuleQualification(hider, qualifies);
+        qualifies = await applyHideRuleQualification(hider, qualifies, endPos);
 
         const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
         const baseCalculated =
@@ -185,7 +185,7 @@ async function applyHideFeatQualification(hider, outcome, endPos, qualifies) {
   }
 }
 
-async function applyHideRuleQualification(hider, qualifies) {
+async function applyHideRuleQualification(hider, qualifies, endPos) {
   try {
     const { ActionQualificationIntegration } = await import(
       '../../../rule-elements/ActionQualificationIntegration.js'
@@ -194,10 +194,12 @@ async function applyHideRuleQualification(hider, qualifies) {
       startQualifies: true,
       endQualifies: qualifies,
       bothQualify: qualifies,
+      endVisibility: endPos?.effectiveVisibility,
+      endCoverState: endPos?.coverState,
       reason: 'Hide (dialog) prerequisites',
     });
 
-    return ruleResult.endQualifies || qualifies;
+    return ruleResult.endQualifies;
   } catch {
     return qualifies;
   }

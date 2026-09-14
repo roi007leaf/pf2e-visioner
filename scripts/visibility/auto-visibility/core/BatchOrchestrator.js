@@ -386,6 +386,16 @@ export class BatchOrchestrator {
     };
   }
 
+  _retireMovementSession(session, revision) {
+    // A final batch can become irrelevant after deletion, exclusion or a scene
+    // switch. Retire it even without results, but never consume newer movement.
+    if (!session || revision !== this._movementRevision ||
+      session.sessionId !== this._movementSession?.sessionId) return;
+    this._movementSession = null;
+    this._movingTokenIds.clear();
+    this._movingTokenAnimationStartedAt.clear();
+  }
+
   _getAnimatingChangedTokenIds(changedTokens) {
     return collectUnsettledChangedTokenIds({
       changedTokens,
@@ -490,6 +500,9 @@ export class BatchOrchestrator {
     const movementSession = options.movementSession || null;
     const isFinalMovementBatch = !!movementSession;
     const movementRevisionAtStart = this._movementRevision;
+    const automaticEnabledAtStart = game.settings.get(this.moduleId, 'autoVisibilityEnabled') === true;
+    const automaticDisabledDuringBatch = () => automaticEnabledAtStart &&
+      game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false;
 
     // Check if AVS is disabled for the current scene
     const disableAVS = canvas?.scene?.getFlag?.(this.moduleId, 'disableAVS');
@@ -506,6 +519,7 @@ export class BatchOrchestrator {
       if (scenePreflightPlan.shouldClearPendingTokens) {
         this._pendingTokens.clear();
       }
+      this._retireMovementSession(movementSession, movementRevisionAtStart);
       return;
     }
 
@@ -598,6 +612,7 @@ export class BatchOrchestrator {
         reason: visibilityPreflightPlan.reason,
         changedCount: changedTokens.size,
       }));
+      this._retireMovementSession(movementSession, movementRevisionAtStart);
       return;
     }
 
@@ -689,6 +704,10 @@ export class BatchOrchestrator {
       );
       timings.batchProcessing = this.nowProvider() - stageStart;
       timings.detailedBatchTimings = batchResult.detailedTimings || {};
+      if (automaticDisabledDuringBatch()) {
+        detectionBatch.discard();
+        return;
+      }
 
       if (Array.isArray(batchResult?.updates) && this.exclusionManager?.isExcludedToken) {
         batchResult.updates = batchResult.updates.filter(
@@ -713,6 +732,10 @@ export class BatchOrchestrator {
 
       stageStart = this.nowProvider();
       await this.workflowFactory.runOverrideValidationBeforeResultApplication({ isMovementBatch });
+      if (automaticDisabledDuringBatch()) {
+        detectionBatch.discard();
+        return;
+      }
 
       const { uniqueUpdateCount } = await this.workflowFactory.runPostResults({
         batchResult,
@@ -746,9 +769,7 @@ export class BatchOrchestrator {
 
       // Clear movement session after successful batch
       if (movementSession) {
-        this._movementSession = null;
-        this._movingTokenIds.clear();
-        this._movingTokenAnimationStartedAt.clear();
+        this._retireMovementSession(movementSession, movementRevisionAtStart);
       }
 
       // Fire custom hook to notify other systems that AVS batch is complete
@@ -1151,9 +1172,14 @@ export class BatchOrchestrator {
     if (!game.user.isGM || !batchResult.updates || batchResult.updates.length === 0) {
       return 0;
     }
+    const automaticEnabledBeforeValidation = game.settings.get(this.moduleId, 'autoVisibilityEnabled') === true;
     batchResult.updates = await this._validateVisibleUpdatesAgainstCurrentVisibility(
       batchResult.updates,
     );
+    if (automaticEnabledBeforeValidation && game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false) {
+      batchResult.appliedUpdates = [];
+      return 0;
+    }
 
     const applicationPlan = buildBatchResultApplicationPlan({
       updates: batchResult.updates,

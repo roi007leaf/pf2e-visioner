@@ -277,7 +277,8 @@ async function enforcePreciseSenseObservedLimit(actionData, subject, newVisibili
     const hasLoS = visionAnalyzer.hasLineOfSight?.(observerToken, subject, true) ?? true;
     const hasVisualPrecise = !!(visCaps?.hasVision && !visCaps?.isBlinded && hasLoS);
     const hasNonVisualPrecise = visionAnalyzer.hasPreciseNonVisualInRange(observerToken, subject);
-    const sensingSummaryForOutcome = visionAnalyzer.getVisionCapabilities(observerToken).sensingSummary;
+    const sensingSummaryForOutcome =
+      visionAnalyzer.getVisionCapabilities(observerToken).sensingSummary;
     const hasPreciseNonVisualFromSummary = sensingSummaryForOutcome.precise?.some((sense) => {
       const type = String(sense.type || '').toLowerCase();
       const isVisual =
@@ -319,18 +320,17 @@ function buildBaseOutcome(actionData, subject, data) {
     usedImpreciseSenseRange: data.sense.usedImpreciseSenseRange ?? null,
     usedSenseType: data.sense.usedSenseType || null,
     usedSensePrecision: data.sense.usedSensePrecision || null,
-    unmetConditions:
-      data.sense.impreciseReason === 'unmet-conditions' ? true : undefined,
+    unmetConditions: data.sense.impreciseReason === 'unmet-conditions' ? true : undefined,
     outOfRange: data.sense.impreciseReason === 'out-of-range' ? true : undefined,
     senseType: data.sense.impreciseSenseType,
     senseRange: data.sense.impreciseSenseRange,
     unmetCondition: data.sense.impreciseUnmet,
     ...(data.invisibleSeekCap?.applied
       ? {
-        invisibleSeekCapApplied: true,
-        invisibleSeekCapState: data.invisibleSeekCap.state,
-        invisibleSeekCapReason: data.invisibleSeekCap.reason,
-      }
+          invisibleSeekCapApplied: true,
+          invisibleSeekCapState: data.invisibleSeekCap.state,
+          invisibleSeekCapReason: data.invisibleSeekCap.reason,
+        }
       : {}),
     ...data.wallMeta,
   };
@@ -348,6 +348,7 @@ async function applyTemplateFilter(actionData, subject, base, deps) {
       actionData.seekTemplateType || 'circle',
       actionData.messageId,
       actionData.actorToken?.id || actionData.actor?.id,
+      actionData.seekTemplateGeometry,
     );
 
     return inside ? base : { ...base, changed: false };
@@ -392,7 +393,7 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
         isHiddenWall: !!subject?._isWall,
         outcome,
       }) ?? newVisibility;
-  } catch { }
+  } catch {}
 
   const sense = await determineSenseResult(actionData, subject, deps);
   if (sense.blockedOutcome) {
@@ -420,12 +421,7 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
     newVisibility = 'observed';
   }
 
-  newVisibility = await enforcePreciseSenseObservedLimit(
-    actionData,
-    subject,
-    newVisibility,
-    deps,
-  );
+  newVisibility = await enforcePreciseSenseObservedLimit(actionData, subject, newVisibility, deps);
   const invisibleSeekCap = getInvisibleSeekObservedLimit(subject, current, newVisibility, sense);
   newVisibility = invisibleSeekCap.visibility;
 

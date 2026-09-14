@@ -183,3 +183,12 @@ describe('sense suppression core vision integration', () => {
     });
   });
 });
+
+
+test('prepared mode rule limits coexist with the sense suppression wrapper', () => {
+  const document = createTokenDocument([]);
+  document.getFlag = () => ({ rule: { detectionModeModifications: { hearing: { range: 10 } } } });
+  const wrapper = createSenseSuppressionDetectionModesWrapper({ getSuppressedSensesForObserver: () => new Set() });
+  wrapper.call(document, () => { document.detectionModes = { hearing: { enabled: true, range: Infinity } }; });
+  expect(document.detectionModes.hearing.range).toBe(10);
+});

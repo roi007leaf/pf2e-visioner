@@ -44,10 +44,10 @@ export class PeekVisionSourceController {
 
   _excludeEdges(wallIds) {
     for (const wallId of wallIds) {
-      if (this._edgeSightBackup.has(wallId)) continue;
       const edge = this._edgeFor(wallId);
       if (!edge) continue;
-      this._edgeSightBackup.set(wallId, edge.sight);
+      if (this._edgeSightBackup.get(wallId)?.edge === edge) continue;
+      this._edgeSightBackup.set(wallId, { edge, sight: edge.sight });
       try {
         edge.sight = 0;
       } catch (_) {}
@@ -55,11 +55,14 @@ export class PeekVisionSourceController {
   }
 
   _restoreEdges() {
-    for (const [wallId, sight] of this._edgeSightBackup) {
+    for (const [wallId, backup] of this._edgeSightBackup) {
       const edge = this._edgeFor(wallId);
-      if (edge) {
+      // Wall updates can replace the edge before the peek ends. Its new sight
+      // restriction belongs to Foundry; restoring the old value would close an
+      // open door locally until another perception rebuild.
+      if (edge && edge === backup.edge) {
         try {
-          edge.sight = sight;
+          edge.sight = backup.sight;
         } catch (_) {}
       }
     }

@@ -119,7 +119,7 @@ export class TemplateManager {
 
   async onUpdateDocument(document, changes) {
     try {
-      if (document?.documentName !== 'MeasuredTemplate') return;
+      if (!this._templatesData.has(document?.id)) return;
 
       // If position or shape changed, we might need to recalculate cover
       if (
@@ -128,8 +128,10 @@ export class TemplateManager {
         changes.distance !== undefined ||
         changes.direction !== undefined ||
         changes.angle !== undefined ||
-        changes.t !== undefined
+        changes.t !== undefined || changes.shapes !== undefined || changes.elevation !== undefined ||
+        changes.levels !== undefined
       ) {
+        await this.registerTemplate(document, game.user?.id ?? game.userId);
       }
     } catch (e) {
       console.error('PF2E Visioner | Error in updateDocument hook:', e);
@@ -138,7 +140,7 @@ export class TemplateManager {
 
   async onDeleteDocument(document) {
     try {
-      if (document?.documentName !== 'MeasuredTemplate') return;
+      if (!this._templatesData.has(document?.id)) return;
       // Check if this is a MeasuredTemplate document
 
       if (this._templatesData.has(document?.id) && document?.id) {
@@ -230,19 +232,24 @@ export class TemplateManager {
       return null;
     }
 
+    const isRegion = document.documentName === 'Region';
+    if (isRegion && !(document.displayMeasurements && document.highlightMode === 'coverage')) return null;
+
     // Only process templates created by this user
-    if (userId !== game?.userId) {
+    if (userId !== (game?.user?.id ?? game?.userId)) {
       return null;
     }
 
     // Get template details
-    const x = Number(document?.x ?? 0);
-    const y = Number(document?.y ?? 0);
+    const shape = isRegion ? document.shapes?.[0] : null;
+    if (isRegion && !shape) return null;
+    const x = Number(shape?.x ?? document?.x ?? 0);
+    const y = Number(shape?.y ?? document?.y ?? 0);
     const center = { x, y };
-    const tType = String(document.t || document.type || 'circle');
-    const radiusFeet = Number(document.distance) || 0;
-    const dirDeg = Number(document.direction ?? 0);
-    const halfAngle = Number(document.angle ?? 90) / 2;
+    const tType = String(shape?.type || document.t || document.type || 'circle');
+    const radiusFeet = isRegion ? (Number(shape.radius ?? shape.length) || 0) * (canvas.scene?.grid?.distance || 5) / (canvas.grid?.size || 100) : Number(document.distance) || 0;
+    const dirDeg = Number(shape?.rotation ?? document.direction ?? 0);
+    const halfAngle = Number(shape?.angle ?? document.angle ?? 90) / 2;
 
     // Try to determine the caster/creator of the template
     let creator = null;
@@ -262,6 +269,11 @@ export class TemplateManager {
     }
 
     // If not found via spell origin, check for controlled token
+    const previous = this._templatesData.get(document.id);
+    if (!creatorId && previous?.creatorId) {
+      creatorId = previous.creatorId;
+      creatorType = previous.creatorType;
+    }
     if (!creatorId) {
       creator = canvas?.tokens?.controlled?.[0] ?? game?.user?.character?.getActiveTokens?.()?.[0];
       if (creator) {
@@ -277,7 +289,10 @@ export class TemplateManager {
     const radiusWorld = radiusSquares * gridSize;
 
     const candidates = canvas?.tokens?.placeables?.filter?.((t) => t?.actor) || [];
-    const tokensInside = this._findTokensInsideTemplate(
+    const tokensInside = isRegion ? candidates.filter(token => {
+      if (document.levels?.size && !document.levels.has(token.document?.level)) return false;
+      return document.testPoint({ ...token.center, elevation: token.document?.elevation ?? 0 });
+    }) : this._findTokensInsideTemplate(
       candidates,
       center,
       radiusWorld,

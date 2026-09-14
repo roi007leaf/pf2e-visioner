@@ -5,6 +5,7 @@
  * entering and exiting regions.
  */
 
+import { isPrimaryGM } from '../services/gm-election.js';
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { VISIBILITY_STATES } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
@@ -76,7 +77,7 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   async _handleRegionEvent(event) {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
 
     const name = event?.name ?? event?.type;
     if (!name) return;
@@ -140,6 +141,9 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
     try {
       if (token) this._scheduleTokenEvent(token, isEntering, name);
+      else if ([CONST.REGION_EVENTS.BEHAVIOR_ACTIVATED, CONST.REGION_EVENTS.BEHAVIOR_DEACTIVATED].includes(name)) {
+        for (const inside of this._getTokensInRegion()) this._scheduleTokenEvent(inside, isEntering, name);
+      }
     } catch (error) {
       console.error('PF2e Visioner | Error scheduling visibility update for token:', error);
     }
@@ -283,32 +287,12 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
         }
       }
     } else {
-      // Exiting: reset to observed
-      // If this is a turn/round change event, and the current combatant is
-      // still inside the region, don't remove visibility (avoid removing on turn change)
-      let skipResetDueToCombat = false;
-      try {
-        if (game && game.combat && game.combat.combatant) {
-          const currentCombatant =
-            game.combat.combatant?.token?.id ?? game.combat.combatant?.tokenId ?? null;
-          if (currentCombatant) {
-            // If the current combatant is inside the region and matches the exiting token,
-            // we should not reset visibility due to turn-change artifacts.
-            if (tokensInRegion && tokensInRegion.find((t) => t.id === currentCombatant))
-              skipResetDueToCombat = true;
-          }
-        }
-      } catch {}
-
-      if (!skipResetDueToCombat) {
-        const tokensToReset = [
-          ...inRegion.filter((t) => t.id !== token.id),
-          ...allTokens.filter((t) => !inRegion.includes(t) && t.id !== token.id),
-        ];
-        for (const otherToken of tokensToReset) {
-          updates.push({ source: token.id, target: otherToken.id, state: 'observed' });
-          updates.push({ source: otherToken.id, target: token.id, state: 'observed' });
-        }
+      // Turn/round boundaries are resolved from containment before reaching
+      // this branch. Actual exits and deactivation must release the region.
+      for (const otherToken of allTokens) {
+        if (otherToken.id === token.id) continue;
+        updates.push({ source: token.id, target: otherToken.id, state: 'observed' });
+        updates.push({ source: otherToken.id, target: token.id, state: 'observed' });
       }
     }
     return updates;
@@ -334,8 +318,13 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
       // Gather updates for all pending tokens
       let allUpdates = [];
       for (const e of entries) {
+        const isTurnBoundary = [CONST.REGION_EVENTS.TOKEN_TURN_START, CONST.REGION_EVENTS.TOKEN_TURN_END,
+          CONST.REGION_EVENTS.TOKEN_ROUND_START, CONST.REGION_EVENTS.TOKEN_ROUND_END].includes(e.eventName);
+        // Ending a turn does not mean the token left the region. Use the
+        // event token's containment, independently of the new active combatant.
+        const isEntering = isTurnBoundary ? tokensInRegion.some(t => t.id === e.id) : e.isEntering;
         allUpdates = allUpdates.concat(
-          this._gatherUpdatesForToken(e.id, e.isEntering, tokensInRegion),
+          this._gatherUpdatesForToken(e.id, isEntering, tokensInRegion),
         );
       }
 
@@ -411,12 +400,12 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
   }
 
   _getTokensInRegion() {
-    const region = this.parent;
+    const region = this.region;
     if (!region) return [];
 
-    const pointInRegion = (x, y) => {
+    const pointInRegion = (token) => {
       try {
-        return RegionHelper.isPointInside(region, { x, y });
+        return RegionHelper.isTokenInside(region, token);
       } catch {
         return false;
       }
@@ -456,12 +445,12 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
         )
           return false;
       }
-      return pointInRegion(center.x, center.y);
+      return pointInRegion(token);
     });
   }
 
   async _applyVisibilityUpdates(updates) {
-    if (!game.user?.isGM) return;
+    if (!isPrimaryGM()) return;
 
     if (!updates || updates.length === 0) return;
     try {
@@ -498,6 +487,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
               state,
             });
           } else if (state === 'observed') {
+            const existing = targetToken.document?.getFlag?.('pf2e-visioner', `avs-override-from-${sourceToken.id}`);
+            if (existing && existing.source !== 'region_override') continue;
             removalsToProcess.push({
               observerId: sourceToken.document.id,
               targetId: targetToken.document.id,

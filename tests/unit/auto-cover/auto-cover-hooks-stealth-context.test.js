@@ -1,6 +1,14 @@
 import '../../setup.js';
 
 describe('AutoCoverHooks stealth context routing', () => {
+  test.each(['fortitude', 'will'])('never applies Reflex cover to %s saves', async statistic => {
+    const { AutoCoverHooks } = await import('../../../scripts/cover/auto-cover/AutoCoverHooks.js');
+    const hooks = new AutoCoverHooks();
+    expect(hooks._getUseCaseForContext({ type: 'saving-throw', domains: [statistic, 'saving-throw'],
+      options: new Set(['area-effect', `check:statistic:${statistic}`]) })).toBeNull();
+    expect(hooks._getUseCaseForContext({ type: 'saving-throw', domains: ['reflex', 'saving-throw'],
+      options: new Set(['area-effect', 'check:statistic:reflex']) })).toBe(hooks.savingThrowUseCase);
+  });
   test('does not route plain Stealth skill checks to the initiative cover use case', async () => {
     jest.resetModules();
 

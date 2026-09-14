@@ -805,6 +805,25 @@ describe('Integration Tests', () => {
     });
 
     describe('checkHideWithRuleElements', () => {
+      it.each([false, true])('honors a separate concealment qualification while preserving cover (%s)', async (hasCover) => {
+        mockToken.document.getFlag = jest.fn((scope, key) => {
+          if (key === 'actionQualifications') return {
+            blur: { id: 'blur', qualifications: { hide: { qualifiesOnConcealment: false } } },
+          };
+          if (key === 'stateSource') return {
+            visibility: { sources: [{ id: 'blur', priority: 100 }] },
+            cover: { sources: hasCover ? [{ id: 'wall', priority: 100 }] : [] },
+          };
+          return null;
+        });
+        const { ActionQualificationIntegration } = await import(
+          '../../../scripts/rule-elements/ActionQualificationIntegration.js'
+        );
+        const result = await ActionQualificationIntegration.checkHideWithRuleElements(mockToken, mockQualification);
+        expect(result.endQualifies).toBe(hasCover);
+        expect(result.bothQualify).toBe(hasCover);
+      });
+
       it('should pass when token has qualifying concealment', async () => {
         mockToken.document.getFlag = jest.fn((scope, key) => {
           if (key === 'actionQualifications') {

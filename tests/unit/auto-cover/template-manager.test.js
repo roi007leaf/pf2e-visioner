@@ -1,4 +1,5 @@
 import templateManager from '../../../scripts/cover/auto-cover/TemplateManager.js';
+import autoCoverSystem from '../../../scripts/cover/auto-cover/AutoCoverSystem.js';
 
 describe('TemplateManager', () => {
   beforeEach(() => {
@@ -142,6 +143,31 @@ describe('TemplateManager', () => {
       const templateData = templateManager.getTemplateData('test-template');
       expect(templateData).toBeTruthy();
       expect(templateData.id).toBe('test-template');
+    });
+
+    test('tracks native area Regions through movement and target removal, preserving caster', async () => {
+      const caster = { id: 'caster', actor: { id: 'caster-actor' } };
+      const target = { id: 'target', actor: { id: 'target-actor' }, document: { elevation: 0 }, center: { x: 600, y: 500 } };
+      canvas.tokens.controlled = [caster]; canvas.tokens.placeables = [target];
+      const detect = jest.spyOn(autoCoverSystem, 'detectCoverFromPoint').mockReturnValue('standard');
+      try {
+        const region = { id: 'area', documentName: 'Region', displayMeasurements: true, highlightMode: 'coverage',
+          shapes: [{ type: 'circle', x: 400, y: 500, radius: 500 }], flags: {},
+          testPoint: point => point.x > region.shapes[0].x };
+        await templateManager.onCreateMeasuredTemplate(region, {}, 'test-user');
+        expect(templateManager.getLatestTemplateForTarget('target')?.data.creatorId).toBe('caster');
+        expect(templateManager.getLatestTemplateForTarget('target')?.data.targets.target.state).toBe('standard');
+        canvas.tokens.controlled = [target];
+        region.shapes[0].x = 500; detect.mockReturnValue('none');
+        await templateManager.onUpdateDocument(region, { shapes: region.shapes });
+        expect(templateManager.getLatestTemplateForTarget('target')?.data.creatorId).toBe('caster');
+        expect(templateManager.getLatestTemplateForTarget('target')?.data.targets.target.state).toBe('none');
+        region.shapes[0].x = 1000;
+        await templateManager.onUpdateDocument(region, { shapes: region.shapes });
+        expect(templateManager.getLatestTemplateForTarget('target')).toBeNull();
+        await templateManager.onDeleteDocument(region);
+        expect(templateManager.getTemplateData('area')).toBeNull();
+      } finally { detect.mockRestore(); }
     });
 
     test('should handle null template document', async () => {

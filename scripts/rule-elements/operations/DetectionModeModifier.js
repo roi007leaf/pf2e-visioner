@@ -9,14 +9,11 @@ export class DetectionModeModifier {
     }
 
     static sanitizeDetectionModes(detectionModes) {
-        if (!Array.isArray(detectionModes)) return [];
-        return detectionModes.map(mode => {
-            const sanitized = this._clone(mode);
-            if (sanitized.range !== null && !Number.isFinite(sanitized.range)) {
-                sanitized.range = null;
-            }
-            return sanitized;
-        });
+        const modes = this._clone(detectionModes || []);
+        for (const mode of Object.values(modes)) {
+            if (mode.range !== null && !Number.isFinite(mode.range)) mode.range = null;
+        }
+        return modes;
     }
 
     static async applyDetectionModeModifications(token, modeModifications, ruleElementId, predicate = null) {
@@ -40,6 +37,7 @@ export class DetectionModeModifier {
             originalPerception[escapedRuleElementId].detectionModes = this.sanitizeDetectionModes(token.document.detectionModes);
         }
 
+        originalPerception[escapedRuleElementId].detectionModeModifications = this._clone(modeModifications);
         const detectionModes = this.sanitizeDetectionModes(token.document.detectionModes);
 
         Object.entries(modeModifications).forEach(([modeName, modifications]) => {
@@ -63,19 +61,15 @@ export class DetectionModeModifier {
     }
 
     static modifyDetectionMode(detectionModes, modeName, modifications) {
-        const modeIndex = detectionModes.findIndex(m =>
-            m.id?.toLowerCase() === modeName.toLowerCase()
-        );
-
-        if (modeIndex === -1) {
-            return;
-        }
-
-        const mode = detectionModes[modeIndex];
+        const mode = Array.isArray(detectionModes)
+            ? detectionModes.find(m => m.id?.toLowerCase() === modeName.toLowerCase())
+            : Object.entries(detectionModes).find(([id]) => id.toLowerCase() === modeName.toLowerCase())?.[1];
+        if (!mode) return;
         this.modifyDetectionModeProperties(mode, modifications);
     }
 
     static modifyDetectionModeProperties(detectionMode, modifications) {
+        if (modifications.enabled !== undefined) detectionMode.enabled = modifications.enabled;
         if (modifications.range !== undefined) {
             detectionMode.range = modifications.range;
         }
@@ -91,11 +85,21 @@ export class DetectionModeModifier {
     }
 
     static modifyAllDetectionModes(detectionModes, modifications) {
-        detectionModes.forEach(mode => {
-            if (modifications.maxRange !== undefined && mode.range !== null) {
-                mode.range = Math.min(mode.range, modifications.maxRange);
+        Object.values(detectionModes).forEach(mode => this.modifyDetectionModeProperties(mode, modifications));
+    }
+
+    // PF2e reconstructs these derived modes on every preparation. Apply active rule
+    // limits afterwards without persisting or recreating modes disabled by conditions.
+    static wrapPrepareDetectionModes(wrapped, ...args) {
+        const result = wrapped(...args);
+        const sources = this.getFlag?.('pf2e-visioner', 'originalPerception') || {};
+        for (const source of Object.values(sources)) {
+            for (const [mode, modifications] of Object.entries(source?.detectionModeModifications || {})) {
+                if (mode === 'all') DetectionModeModifier.modifyAllDetectionModes(this.detectionModes, modifications);
+                else DetectionModeModifier.modifyDetectionMode(this.detectionModes, mode, modifications);
             }
-        });
+        }
+        return result;
     }
 
     static async restoreDetectionModes(token, ruleElementId) {
@@ -110,12 +114,6 @@ export class DetectionModeModifier {
 
         const detectionModes = originalPerception[escapedRuleElementId].detectionModes;
 
-        try {
-            const sanitized = this.sanitizeDetectionModes(detectionModes);
-            await token.document.update({ detectionModes: sanitized });
-        } catch (error) {
-            console.warn('PF2E Visioner | Failed to restore detection modes:', error);
-        }
 
         const currentPerception = token.document.getFlag('pf2e-visioner', 'originalPerception') || {};
 
@@ -124,11 +122,18 @@ export class DetectionModeModifier {
                 [`flags.pf2e-visioner.originalPerception.-=${escapedRuleElementId}`]: null
             });
         } else {
-            delete currentPerception[escapedRuleElementId].detectionModes;
             await token.document.update({
-                [`flags.pf2e-visioner.originalPerception.${escapedRuleElementId}`]: currentPerception[escapedRuleElementId]
+                [`flags.pf2e-visioner.originalPerception.${escapedRuleElementId}.-=detectionModes`]: null,
+                [`flags.pf2e-visioner.originalPerception.${escapedRuleElementId}.-=detectionModeModifications`]: null,
             });
         }
+        try {
+            const sanitized = this.sanitizeDetectionModes(detectionModes);
+            await token.document.update({ detectionModes: sanitized });
+        } catch (error) {
+            console.warn('PF2E Visioner | Failed to restore detection modes:', error);
+        }
+
     }
 
     static getDetectionModeCapabilities(token) {
@@ -138,7 +143,8 @@ export class DetectionModeModifier {
 
         const capabilities = {};
 
-        detectionModes.forEach(mode => {
+        const entries = Array.isArray(detectionModes) ? detectionModes : Object.entries(detectionModes).map(([id, mode]) => ({ ...mode, id }));
+        entries.forEach(mode => {
             if (mode.enabled && mode.range !== null) {
                 capabilities[mode.id] = {
                     range: mode.range,

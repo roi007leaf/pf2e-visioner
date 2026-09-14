@@ -13,6 +13,23 @@ describe('ConditionManager invisibility removal', () => {
     jest.useRealTimers();
   });
 
+  test('secondary GM does not record or apply the same invisibility transition again', async () => {
+    const target = createMockToken({ id: 'invisible-target' });
+    const observer = createMockToken({ id: 'observer' });
+    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.placeables = [target, observer];
+    global.game.modules.get.mockReturnValue({ api: { getVisibility: () => 'hidden' } });
+    const users = global.game.users;
+    global.game.users = { activeGM: { id: 'another-gm' } };
+    try {
+      await ConditionManager.getInstance().handleInvisibilityChange(target.actor, {
+        hasInvisibility: true, token: target,
+      });
+      expect(target.document.setFlag).not.toHaveBeenCalled();
+      expect(global.canvas.perception.update).not.toHaveBeenCalled();
+    } finally { global.game.users = users; }
+  });
+
   test('forced invisibility removal clears flags even when actor condition state is stale', async () => {
     const actor = {
       id: 'actor-1',
@@ -49,7 +66,7 @@ describe('ConditionManager invisibility removal', () => {
     expect(global.canvas.perception.update).toHaveBeenCalled();
   });
 
-  test('records observer-to-target visibility before invisibility is applied', async () => {
+  test.each([false, true])('records target invisibility with another linked actor controlled: %s', async (controlOther) => {
     const actor = {
       id: 'actor-1',
       hasCondition: jest.fn(() => false),
@@ -91,7 +108,7 @@ describe('ConditionManager invisibility removal', () => {
     };
 
     global.game.modules.get.mockReturnValue({ api });
-    global.canvas.tokens.controlled = [];
+    global.canvas.tokens.controlled = controlOther ? [observerSeeingTarget] : [];
     global.canvas.tokens.placeables = [target, observerSeeingTarget, observerHiddenFromTarget];
 
     await ConditionManager.getInstance().handleInvisibilityChange(actor, {

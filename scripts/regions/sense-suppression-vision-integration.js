@@ -1,3 +1,4 @@
+import { DetectionModeModifier } from '../rule-elements/operations/DetectionModeModifier.js';
 import { MODULE_ID } from '../constants.js';
 import { SenseSuppressionRegionBehavior } from './SenseSuppressionRegionBehavior.js';
 
@@ -156,7 +157,7 @@ export function createSenseSuppressionDetectionModesWrapper(
 ) {
   return function senseSuppressionDetectionModesWrapper(wrapped, ...args) {
     restoreBooleanOverrides(this);
-    const result = wrapped.call(this, ...args);
+    const result = DetectionModeModifier.wrapPrepareDetectionModes.call(this, wrapped.bind(this), ...args);
     try {
       const position = tokenDocumentCenter(this);
       const suppressed = suppressionBehavior.getSuppressedSensesForObserver(position);

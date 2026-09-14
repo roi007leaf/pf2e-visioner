@@ -55,7 +55,9 @@ export class CoverOverride {
   static async setCoverState(attackerToken, defenderToken, state, sourceData) {
     try {
       const { setCoverBetween } = await import('../../utils.js');
-      await setCoverBetween(attackerToken, defenderToken, state);
+      await setCoverBetween(attackerToken, defenderToken, state, {
+        skipSourceTracking: true, skipTakeCoverTrackingSync: true,
+      });
 
       await SourceTracker.addSourceToState(defenderToken, 'cover', sourceData, attackerToken.id);
     } catch (error) {
@@ -85,14 +87,28 @@ export class CoverOverride {
         // Also clean up any old sources from the same item (for backward compatibility)
         // This handles cases where the source ID changed between versions
         await this.cleanupOldSourcesFromItem(targetToken, ruleElement, subjectToken.id);
+        await this.restoreCoverAfterSourceRemoval(subjectToken, targetToken);
       } else {
         // Source was stored on subjectToken with targetToken as observerId
         await SourceTracker.removeSource(subjectToken, sourceId, 'cover', targetToken.id);
 
         // Clean up old sources
         await this.cleanupOldSourcesFromItem(subjectToken, ruleElement, targetToken.id);
+        await this.restoreCoverAfterSourceRemoval(targetToken, subjectToken);
       }
     }
+  }
+
+  static async restoreCoverAfterSourceRemoval(observer, target) {
+    const { setCoverBetween, getCoverBetween } = await import('../../stores/cover-map.js');
+    const sources = SourceTracker.getCoverStateSources(target, observer.id);
+    const remaining = SourceTracker.getEffectiveState(sources, 'cover');
+    // Older manual sources lacked a state; keep their current cover choice.
+    const state = remaining || (sources.some(source => source.type === 'manual-cover')
+      ? getCoverBetween(observer, target) : 'none');
+    await setCoverBetween(observer, target, state, {
+      skipSourceTracking: true, skipTakeCoverTrackingSync: true,
+    });
   }
 
   static async cleanupOldSourcesFromItem(token, ruleElement, observerId) {

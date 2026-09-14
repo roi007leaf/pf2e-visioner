@@ -63,7 +63,11 @@ export class ActionQualificationIntegration {
         ? SourceTracker.getVisibilityStateSources(token)
         : SourceTracker.getCoverStateSources(token);
 
-      const qualifyingSources = SourceTracker.getQualifyingSources(token, action, stateType);
+      const qualifyingSources = SourceTracker.getQualifyingSources(token, action, stateType).filter(
+        source => stateType === 'visibility'
+          ? ActionQualifier.canUseConcealment(token, action, source.id)
+          : ActionQualifier.canUseCover(token, action, source.id)
+      );
       const hasDisqualifying = SourceTracker.hasDisqualifyingSource(sources, action);
       const messages = SourceTracker.getCustomMessages(sources, action);
 
@@ -102,8 +106,16 @@ export class ActionQualificationIntegration {
     const concealmentCheck = this.checkSourceQualifications(token, 'hide', 'visibility');
     const coverCheck = this.checkSourceQualifications(token, 'hide', 'cover');
 
-    const hasQualifyingConcealment = concealmentCheck.qualifies;
-    const hasQualifyingCover = coverCheck.qualifies;
+    // Geometry may provide concealment or cover without a rule-element source.
+    // Keep that independent basis, subject to the corresponding restriction.
+    const hasQualifyingConcealment = concealmentCheck.qualifies || (
+      concealmentCheck.totalSources === 0 && currentQualification.endVisibility === 'concealed' &&
+      ActionQualifier.canUseConcealment(token, 'hide')
+    );
+    const hasQualifyingCover = coverCheck.qualifies || (
+      coverCheck.totalSources === 0 && ['standard', 'greater'].includes(currentQualification.endCoverState) &&
+      ActionQualifier.canUseCover(token, 'hide')
+    );
 
     if (!hasQualifyingConcealment && !hasQualifyingCover && !forceEnd) {
       currentQualification.endQualifies = false;

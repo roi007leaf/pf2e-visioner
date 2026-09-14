@@ -362,6 +362,20 @@ export class EventDrivenVisibilitySystem {
     this.#visibilityStateManager.recalculateForTokens(validIds);
   }
 
+  getDiagnostics() {
+    return {
+      initialized: this.#initialized,
+      enabled: this.#systemStateProvider?.isEnabled(),
+      processingAllowed: this.#systemStateProvider?.shouldProcessEvents(),
+      updatingEffects: this.#systemStateProvider?.isUpdatingEffects(),
+      processingBatch: this.#batchOrchestrator?.isProcessing(),
+      pendingTokens: [...(this.#batchOrchestrator?._pendingTokens ?? [])],
+      changedTokens: [...(this.#visibilityStateManager?.getChangedTokens() ?? [])],
+      stateManagerProcessing: this.#visibilityStateManager?.isProcessingBatch(),
+      movement: this.getMovementPerformanceSnapshot(),
+    };
+  }
+
   getMovementPerformanceSnapshot() {
     const movementSnapshot = this.#batchOrchestrator?.getMovementPerformanceSnapshot?.() ?? {
       active: false,

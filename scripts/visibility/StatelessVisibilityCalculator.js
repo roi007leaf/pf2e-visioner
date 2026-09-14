@@ -7,7 +7,7 @@
  * @module StatelessVisibilityCalculator
  */
 
-import { LightingLevel, SenseType, VisibilityState } from '../constants.js';
+import { LightingLevel, SenseType, VisibilityState, SPECIAL_SENSES } from '../constants.js';
 import { getLogger } from '../utils/logger.js';
 import { legacyVisibilityToProfile } from './perception-profile.js';
 const log = getLogger('AVS/StatelessCalculator');
@@ -41,6 +41,19 @@ function normalizeSenseType(senseType) {
 export function isVisualSenseType(senseType) {
   const type = normalizeSenseType(senseType);
   return VISUAL_SENSE_TYPES.has(type) || type.includes('vision') || type.includes('sight');
+}
+
+// Additional advertised senses share their target eligibility with the sense catalog.
+const ADDITIONAL_NONVISUAL_SENSES = new Set([
+  'bloodsense', 'magicsense', 'electromagnetic-sense', 'motion-sense', 'spiritsense', 'wavesense',
+]);
+
+function additionalSenseCanDetect(type, target) {
+  const config = SPECIAL_SENSES[type];
+  const traits = target.traits ?? [];
+  if (traits.includes('construct')) return config.detectsConstructs;
+  if (traits.includes('undead')) return config.detectsUndead;
+  return config.detectsLiving;
 }
 
 function hasPositiveSenseRange(senseData) {
@@ -118,6 +131,7 @@ function profileMetadataForResult(result, target) {
  * @param {boolean} input.rayDarkness.passesThroughDarkness - Whether ray passes through darkness
  * @param {number} input.rayDarkness.rank - Darkness rank along the ray (1-3 = magical, 4+ = greater magical)
  * @param {string} input.rayDarkness.lightingLevel - Lighting level of darkness along ray (one of LightingLevel enum values)
+ * @param {boolean} input.withinVisionAngle - Whether the visual cone includes any target sample
  * @param {boolean} input.soundBlocked - Whether sound is blocked between observer and target (walls with sound restriction)
  * @param {boolean} input.scentBlocked - Whether a wall explicitly blocks scent between observer and target
  *
@@ -173,19 +187,11 @@ export function calculateVisibility(input) {
   }
 
   // 2b. Determine visual detection capability (affected by LOS, lighting, invisibility)
-  const visualDetection = determineVisualDetection(observer, target, rayDarkness, hasLineOfSight);
+  const visualLineOfSight = input.withinVisionAngle === false ? false : hasLineOfSight;
+  const visualDetection = determineVisualDetection(observer, target, rayDarkness, visualLineOfSight);
   if (visualDetection.canDetect) {
     const visualResult = applyVisualModifiers(visualDetection, observer, target);
     allDetectionResults.push(visualResult);
-  }
-
-  // 2b-2. Invisibility with previous state: degrade based on what observer knew before
-  const isInvisible = target.auxiliary.includes('invisible');
-  if (!visualDetection.canDetect && isInvisible && previousState && hasLineOfSight !== false) {
-    const invisibilityResult = resolveInvisibilityFromPreviousState(previousState);
-    if (invisibilityResult) {
-      allDetectionResults.push(invisibilityResult);
-    }
   }
 
   // 2c. Check imprecise senses (provide worse detection than precise senses)
@@ -195,6 +201,16 @@ export function calculateVisibility(input) {
   });
   if (impreciseResult) {
     allDetectionResults.push(impreciseResult);
+  }
+
+  // Remembered location is a fallback, not active visual detection. A working
+  // imprecise sense must supply its own rendering metadata for the same Hidden state.
+  const isInvisible = target.auxiliary.includes('invisible');
+  const activelyDetected = allDetectionResults.some(result =>
+    [VisibilityState.OBSERVED, VisibilityState.CONCEALED, VisibilityState.HIDDEN].includes(result.state));
+  if (!activelyDetected && !visualDetection.canDetect && isInvisible && previousState && hasLineOfSight !== false) {
+    const remembered = resolveInvisibilityFromPreviousState(previousState);
+    if (remembered) allDetectionResults.push(remembered);
   }
 
   // 3. Return the best detection result based on priority
@@ -516,6 +532,8 @@ function checkPreciseNonVisualSenses(
       }
       continue;
     }
+
+    if (ADDITIONAL_NONVISUAL_SENSES.has(type) && !additionalSenseCanDetect(type, target)) continue;
 
     // Scent can cross visual obstructions, unless a wall explicitly blocks scent.
     if (type === SenseType.SCENT && scentBlocked) {
@@ -933,6 +951,16 @@ function checkImpreciseSenses(
         isPrecise: false,
         sense: SenseType.SCENT,
       },
+    });
+  }
+
+  for (const [sense, data] of Object.entries(imprecise)) {
+    const type = normalizeSenseType(sense);
+    if (!ADDITIONAL_NONVISUAL_SENSES.has(type) || !hasPositiveSenseRange(data) || !additionalSenseCanDetect(type, target)) continue;
+    workingSenses.push({
+      priority: 3,
+      state: VisibilityState.HIDDEN,
+      detection: { isPrecise: false, sense: type },
     });
   }
 

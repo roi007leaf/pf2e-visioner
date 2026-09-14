@@ -4,6 +4,7 @@ import { registerDetectionWrappers } from '../../../scripts/services/Detection/d
 import { primeHiddenDetectionFilterVisualsForObserver } from '../../../scripts/stores/visibility-map.js';
 import { clearPendingPerceptionProfileWrites } from '../../../scripts/stores/visibility-profile-flag-persistence.js';
 import { prepareDoorScentRenderTransition } from '../../../scripts/services/door-state-visibility-refresh.js';
+import { suppressPresenceOnlyTokenRender } from '../../../scripts/services/system-hidden-presence-only-suppression.js';
 
 describe('scent presentation before the next animation frame', () => {
   let observer, target, profile;
@@ -152,6 +153,17 @@ describe('scent presentation before the next animation frame', () => {
     primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
     expect(target.visible).toBe(true);
     expect(target.mesh).toMatchObject({ visible: true, renderable: true, alpha: 1 });
+  });
+
+  test.each([false, true])('precise scent releases indicator suppression while respecting Foundry hidden=%s', hidden => {
+    target.renderable = true;
+    target.document.hidden = hidden;
+    suppressPresenceOnlyTokenRender(target, { mode: 'scent', observerId: 'observer' });
+    profile = { detectionState: 'observed', detectionSense: 'scent' };
+    primeHiddenDetectionFilterVisualsForObserver(observer, [observer, target]);
+    expect(target.visible).toBe(!hidden);
+    expect(target.renderable).toBe(!hidden);
+    expect(target.mesh).toMatchObject({ visible: !hidden, renderable: !hidden, alpha: hidden ? 0 : 1 });
   });
 
   test('scent cleanup preserves Foundry-hidden tokens', () => {

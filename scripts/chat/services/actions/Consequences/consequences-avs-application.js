@@ -182,14 +182,10 @@ async function refreshConsequencesOverrideIndicator(overrideIndicator, removedPa
 function buildRemovedOverrideEntries(existingOverrides) {
   return existingOverrides.map((record) => ({
     type: 'avs-removed',
-    observerId:
-      record.direction === 'observer_to_attacker'
-        ? record.observer.document.id
-        : record.target.document.id,
-    targetId:
-      record.direction === 'observer_to_attacker'
-        ? record.target.document.id
-        : record.observer.document.id,
+    // Collection already records the actual observer and target for each
+    // direction. Swapping the reverse pair again overwrites the forward undo.
+    observerId: record.observer.document.id,
+    targetId: record.target.document.id,
     original: {
       state: overrideToDisplayVisibility(record.data),
       source: record.data?.source,
@@ -221,6 +217,10 @@ export async function applyConsequencesAvs({
   isOutcomeActionable = null,
 }) {
   const manager = await loadAvsOverrideManager(avsOverrideManager);
+  // Preview rows and filters select the pairs to change, including AVS releases.
+  if (actionData.overrides && Object.keys(actionData.overrides).length) {
+    subjects = subjects.filter(subject => Object.hasOwn(actionData.overrides, subject.id));
+  }
   const existingOverrides = collectExistingOverrides(attacker, subjects);
   const removedPairs = await removeOverridesForConsequences(attacker, subjects, manager);
 
@@ -262,7 +262,9 @@ export async function revertConsequencesAvs({
   getTokenById,
   avsOverrideManager = null,
 }) {
-  const entries = cache?.get(actionData.messageId) || [];
+  const cachedEntries = cache?.get(actionData.messageId) || [];
+  const entries = cachedEntries.filter(entry => !actionData.targetTokenId ||
+    entry.observerId === actionData.targetTokenId || entry.targetId === actionData.targetTokenId);
   const toRestore = entries.filter((entry) => entry.type === 'avs-removed');
   const toRemove = entries.filter((entry) => entry.type === 'avs-created');
   if (toRestore.length === 0 && toRemove.length === 0) {
@@ -307,6 +309,10 @@ export async function revertConsequencesAvs({
     }
   }
 
-  if (cache) cache.delete(actionData.messageId);
+  if (cache) {
+    const remaining = cachedEntries.filter(entry => !entries.includes(entry));
+    if (remaining.length) cache.set(actionData.messageId, remaining);
+    else cache.delete(actionData.messageId);
+  }
   return { performed: true, toRestore, toRemove, actionsPerformed };
 }

@@ -34,6 +34,7 @@ import {
   applyAllSeekChanges,
   applySeekChange,
   revertAllSeekChanges,
+  revertSeekChange,
 } from '../../../scripts/chat/dialogs/Seek/seek-dialog-actions.js';
 
 describe('seek dialog actions', () => {
@@ -60,6 +61,22 @@ describe('seek dialog actions', () => {
       ...overrides,
     };
   }
+
+  test('reverting a discovered wall restores its connected group only for the seeker', async () => {
+    const walls = ['w1', 'w2'].map((id, index) => ({ id, getFlag: (_module, key) => ({
+      wallIdentifier: id, connectedWalls: [index ? 'w1' : 'w2'], hiddenWall: true,
+    })[key] }));
+    canvas.scene.walls = { get: id => walls.find(w => w.id === id), contents: walls };
+    canvas.walls.placeables = walls.map(document => ({ id: document.id, document }));
+    const observer = { id: 'seeker', document: { getFlag: () => ({ w1: 'observed', w2: 'observed', unrelated: 'observed' }), setFlag: jest.fn() } };
+    const app = buildApp({ actionData: { actorToken: observer }, outcomes: [{ _isWall: true,
+      wallId: 'w1', wall: { id: 'w1' }, currentVisibility: 'hidden', oldVisibility: 'hidden' }] });
+    await revertSeekChange(app, { dataset: { wallId: 'w1' } });
+    expect(observer.document.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'walls', {
+      w1: 'hidden', w2: 'hidden', unrelated: 'observed',
+    });
+    expect(app.updateRowButtonsToReverted).toHaveBeenCalledTimes(1);
+  });
 
   test('apply all sends token and wall overrides through seek service', async () => {
     const tokenOutcome = {

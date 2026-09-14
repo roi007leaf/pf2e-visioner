@@ -1,6 +1,30 @@
 import '../../setup.js';
 
 describe('LightingPrecomputer', () => {
+    test('refreshes stationary lighting when a rule is applied and removed', async () => {
+        const { LightingModifier } = await import('../../../scripts/rule-elements/operations/LightingModifier.js');
+        const { LightingPrecomputer } = await import('../../../scripts/visibility/auto-visibility/core/LightingPrecomputer.js');
+        const { LightingCalculator } = await import('../../../scripts/visibility/auto-visibility/LightingCalculator.js');
+        const token = createMockToken({ id: 'lighting-rule-target', x: 100, y: 100 });
+        const modifications = {};
+        token.document.getFlag = jest.fn(() => modifications);
+        token.document.setFlag = jest.fn(async (_scope, key, value) => { modifications[key.split('.').at(-1)] = value; });
+        token.document.unsetFlag = jest.fn(async (_scope, key) => { delete modifications[key.split('.').at(-1)]; });
+        const calculator = jest.spyOn(LightingCalculator, 'getInstance').mockReturnValue({
+            getLightLevelAt: () => ({ level: LightingModifier.getEffectiveLighting(token, 'bright') }),
+        });
+        try {
+            LightingPrecomputer.clearLightingCaches();
+            const before = await LightingPrecomputer.precompute([token]);
+            await LightingModifier.applyLightingModification({ source: 'rule', lightingLevel: 'darkness' }, token);
+            const applied = await LightingPrecomputer.precompute([token], undefined, before);
+            expect(applied.map.get(token.id).level).toBe('darkness');
+            await LightingModifier.removeLightingModification({ source: 'rule' }, token);
+            const removed = await LightingPrecomputer.precompute([token], undefined, applied);
+            expect(removed.map.get(token.id).level).toBe('bright');
+        } finally { calculator.mockRestore(); }
+    });
+
     test('returns null map when LightingCalculator getInstance returns undefined', async () => {
         const LC = await import('../../../scripts/visibility/auto-visibility/LightingCalculator.js');
         const originalGetInstance = LC.LightingCalculator.getInstance;

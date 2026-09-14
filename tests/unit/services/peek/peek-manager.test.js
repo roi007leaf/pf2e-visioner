@@ -424,6 +424,27 @@ describe('PeekManager door GM approval gate', () => {
     expect(d.renderer.apply).not.toHaveBeenCalled();
   });
 
+  test.each(['move', 'level', 'door', 'control', 'teardown'])('cancels pending approval after %s and ignores late approval', async reason => {
+    const approvalRequester = jest.fn(() => true);
+    const d = deps(); const mgr = new PeekManager({ ...d, approvalRequester });
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+    await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 });
+    const requestId = approvalRequester.mock.calls[0][0].requestId;
+    if (reason === 'move') mgr.onTokenUpdate(token.document, { x: 500 });
+    if (reason === 'level') mgr.onTokenUpdate(token.document, { level: 'upstairs' });
+    if (reason === 'door') mgr.onWallUpdate(door, { ds: 1 });
+    if (reason === 'control') {
+      const previous = canvas.tokens.controlled;
+      canvas.tokens.controlled = [];
+      try { mgr.onControlToken(); } finally { canvas.tokens.controlled = previous; }
+    }
+    if (reason === 'teardown') mgr.endAll('teardown');
+    expect(mgr._pendingDoorApprovals.size).toBe(0);
+    expect(await mgr.handleDoorPeekApprovalResponse({ requestId, approved: true })).toBe(false);
+    expect(d.registry.has('peeker')).toBe(false);
+  });
+
   test('GM door peek bypasses approval even when setting is enabled', async () => {
     global.game.user.isGM = true;
     const approvalRequester = jest.fn(() => true);

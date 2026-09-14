@@ -614,7 +614,7 @@ describe('Hide Action Comprehensive Tests', () => {
       expect(determineOutcome(20, 10, 15)).toBe('success'); // +5 margin
       expect(determineOutcome(25, 10, 15)).toBe('critical-success'); // +10 margin
       expect(determineOutcome(14, 10, 15)).toBe('failure'); // -1 margin
-      expect(determineOutcome(5, 10, 15)).toBe('failure'); // -10 margin, but need <= -10 for crit failure
+      expect(determineOutcome(5, 10, 15)).toBe('critical-failure'); // Exactly 10 below DC
 
       // Natural 20/1 effects
       expect(determineOutcome(14, 20, 15)).toBe('success'); // Nat 20 promotes failure to success

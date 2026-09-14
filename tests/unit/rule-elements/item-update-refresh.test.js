@@ -507,3 +507,17 @@ describe('rule-element item update refresh', () => {
     });
   });
 });
+
+test('only the elected GM schedules persistent rule edits', () => {
+  const previousUsers = game.users, previousUser = game.user;
+  const scheduler = jest.fn();
+  try {
+    game.users = { activeGM: { id: 'primary' } }; game.user = { id: 'secondary', isGM: true };
+    const options = { scheduler, getTokensForActor: () => [makeToken('target')] };
+    expect(scheduleVisionerRuleElementItemRefresh(makeItem(), { 'system.rules': [] }, options)).toBe(false);
+    expect(scheduler).not.toHaveBeenCalled();
+    game.user = { id: 'primary', isGM: true };
+    expect(scheduleVisionerRuleElementItemRefresh(makeItem(), { 'system.rules': [] }, options)).toBe(true);
+    expect(scheduler).toHaveBeenCalledTimes(1);
+  } finally { game.users = previousUsers; game.user = previousUser; }
+});

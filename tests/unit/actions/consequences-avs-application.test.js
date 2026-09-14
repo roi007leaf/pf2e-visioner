@@ -17,6 +17,40 @@ function makeToken(id, flagMap = {}) {
 }
 
 describe('consequences AVS application', () => {
+  test('round-trip preserves different overrides in both directions', async () => {
+    const { applyConsequencesAvs, revertConsequencesAvs } = await import(
+      '../../../scripts/chat/services/actions/Consequences/consequences-avs-application.js'
+    );
+    const attacker = makeToken('attacker', {
+      'avs-override-from-observer': { state: 'hidden', source: 'hide_action' },
+    });
+    const observer = makeToken('observer', {
+      'avs-override-from-attacker': { state: 'observed', source: 'manual' },
+    });
+    const tokens = { attacker, observer };
+    const cache = new Map();
+    const manager = {
+      removeOverride: async (from, to) => {
+        delete tokens[to].document.flags['pf2e-visioner'][`avs-override-from-${from}`];
+        return true;
+      },
+      setPairOverrides: async (from, changes, options) => {
+        for (const [to, value] of changes) tokens[to].document.flags['pf2e-visioner'][`avs-override-from-${from.id}`] = {
+          state: value.state, source: options.source,
+        };
+      },
+    };
+    await applyConsequencesAvs({
+      actionData: { actor: attacker, messageId: 'both' }, subjects: [observer], attacker,
+      analyzeOutcome: async () => ({ target: observer, changed: true, newVisibility: 'avs' }),
+      applyOverrides: jest.fn(), cache, avsOverrideManager: manager, overrideIndicator: {},
+    });
+    await revertConsequencesAvs({ actionData: { messageId: 'both' }, cache,
+      getTokenById: id => tokens[id], avsOverrideManager: manager });
+    expect(attacker.document.getFlag('pf2e-visioner', 'avs-override-from-observer')).toEqual({ state: 'hidden', source: 'hide_action' });
+    expect(observer.document.getFlag('pf2e-visioner', 'avs-override-from-attacker')).toEqual({ state: 'observed', source: 'manual' });
+  });
+
   test('returning attack consequences to AVS removes stale rows without proposing unrelated overrides', async () => {
     const { applyConsequencesAvs } = await import(
       '../../../scripts/chat/services/actions/Consequences/consequences-avs-application.js'

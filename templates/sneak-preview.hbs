@@ -355,7 +355,7 @@
                     Undefer
                   </button>
                 </div>
-              {{else if outcome.hasActionableChange}}
+              {{else if (or outcome.hasActionableChange outcome.hasRevertableChange)}}
                 <button type="button" class="row-timer-toggle" data-token-id="{{outcome.token.id}}" data-tooltip="{{localize 'PF2E_VISIONER.TIMED_OVERRIDE.SET_DURATION_FOR_ROW'}}">
                   <i class="fas fa-clock"></i>
                 </button>

@@ -1,6 +1,6 @@
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { suppressCurrentViewScentTokenArt } from '../../stores/visibility-map.js';
-import { suppressDetectionFilterPrimaryMesh } from './detection-filter-mesh-suppression.js';
+import { releaseDetectionFilterMesh, releaseDetectionFilterPrimaryMesh, suppressDetectionFilterPrimaryMesh } from './detection-filter-mesh-suppression.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { isSceneTokenVisionDisabled } from '../scene-token-vision.js';
 import {
@@ -33,8 +33,14 @@ export function wrapPrimaryTokenMeshRender(wrapped, ...args) {
   // Accept a placeable token or a document-backed mesh reference.
   const token = this.object?.object ?? this.object;
   // PrimarySpriteMesh also renders tiles; mesh ownership alone does not identify a token.
-  if (token?.document?.documentName === 'Token' && token.mesh === this &&
-    suppressCurrentViewScentTokenArt(token)) return;
+  if (token?.document?.documentName === 'Token' && token.mesh === this) {
+    if (suppressCurrentViewScentTokenArt(token)) return;
+    // V14 draws the primary mesh separately from Token's detection-filter pass,
+    // including on single-level scenes. Only the latter may show a detected
+    // target. Core temporarily attaches this exact filter when drawing it.
+    if (!isSceneTokenVisionDisabled() && !shouldBypassAvsForGmVision() &&
+      detectionFilterOwnsRenderSurface(token) && !this.filters?.includes(token.detectionFilter)) return;
+  }
   return wrapped(...args);
 }
 
@@ -147,6 +153,9 @@ function afterCoreRefresh(token, before) {
   // A nested _applyRenderFlags -> _refreshVisibility pass may leave the inner observer
   // presentation in place. Remove only Visioner's owned presentation before reading Core truth.
   gmObserverView.beforeCoreTokenRefresh(token);
+  // Core may clear the filter without passing through our visibility store.
+  // Release only the render flag we own before applying current-view guards.
+  if (!detectionFilterOwnsRenderSurface(token)) releaseDetectionFilterPrimaryMesh(token);
   const coreVisible = token?.visible === true;
   const observerViewActive = gmObserverView.isActive();
   const visionerState = observerViewActive ? observerViewStateForCurrentView(token) : null;
@@ -163,6 +172,9 @@ function afterCoreRefresh(token, before) {
     enforceControlledLevelTokenRendering(token);
   } catch {
     /* keep Foundry visibility if the guard fails */
+  }
+  if (token._pvCurrentViewHardHidden !== true && detectionFilterOwnsRenderSurface(token)) {
+    releaseDetectionFilterMesh(token);
   }
   rememberSoundwaveDetectionBeforeCoreRefresh(token);
   // Token#_refreshVisibility forces a controlled token's primary mesh visible. Reassert the

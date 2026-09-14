@@ -36,6 +36,22 @@ import { isSelectAllTokenVisibilityBypassActive } from '../../../scripts/service
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
 import { isAvsActiveGivenCombatGate } from '../../../scripts/services/Detection/detection-visibility-context.js';
 import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
+import { releaseDetectionFilterPrimaryMesh } from '../../../scripts/services/Detection/detection-filter-mesh-suppression.js';
+
+it('releases primary artwork when a filter clears after hard-hide handoff', () => {
+  const token = {
+    document: { id: 'handoff-target', hidden: false },
+    visible: false, renderable: false, detectionFilter: {},
+    mesh: { visible: false, renderable: false, alpha: 0 },
+  };
+  releaseCurrentViewHardHide(token);
+  expect(token.mesh.renderable).toBe(false);
+  // Core reveals the token and clears its transient detection filter on the next refresh.
+  token.detectionFilter = null;
+  token.mesh.visible = true;
+  releaseDetectionFilterPrimaryMesh(token);
+  expect(token.mesh.renderable).toBe(true);
+});
 
 beforeEach(() => {
   clearCurrentViewMovementRenderSettles();
@@ -1417,4 +1433,16 @@ describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', ()
     expect(a.renderable).toBe(true);
     expect(b.mesh.visible).toBe(true);
   });
+});
+
+
+test('hard-hide clears stale player hover used by Core keyboard targeting', () => {
+  globalThis.game = { user: { isGM: false } };
+  controlled.push({ document: { id: 'observer' }, controlled: true });
+  __setStoredVisibilityForTest(new Map([['observer:target', 'unnoticed']]));
+  const token = { document: { id: 'target' }, hover: true, mesh: {}, _onHoverOut: jest.fn(() => { token.hover = false; }) };
+  canvas.tokens.hover = token;
+  applyCurrentViewHardHide(token);
+  expect(token._onHoverOut).toHaveBeenCalledTimes(1);
+  expect(token.hover).toBe(false);
 });

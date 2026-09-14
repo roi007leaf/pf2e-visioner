@@ -153,3 +153,17 @@ describe('deleted effect cleanup service', () => {
     expect(cleanupDeletedVisionerRuleElements).toHaveBeenCalledWith(effect, [token], log);
   });
 });
+
+test('only the elected GM cleans up broadcast effect deletions', async () => {
+  const previousUsers = game.users, previousUser = game.user;
+  const sync = jest.fn(async () => ({ changed: false }));
+  try {
+    game.users = { activeGM: { id: 'primary' } }; game.user = { id: 'secondary', isGM: true };
+    const options = { getTokensForActor: () => [], syncCoverMapsForDeletedCoverEffect: sync };
+    await cleanupDeletedEffectItem(makeEffect(), options);
+    expect(sync).not.toHaveBeenCalled();
+    game.user = { id: 'primary', isGM: true };
+    await cleanupDeletedEffectItem(makeEffect(), options);
+    expect(sync).toHaveBeenCalledTimes(1);
+  } finally { game.users = previousUsers; game.user = previousUser; }
+});

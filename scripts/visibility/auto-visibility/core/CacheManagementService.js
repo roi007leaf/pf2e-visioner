@@ -1,3 +1,5 @@
+import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
+
 /**
  * CacheManagementService - Centralized cache management for visibility system
  * Handles global LOS cache, visibility cache, and validation cache operations
@@ -109,9 +111,9 @@ export class CacheManagementService {
     }
 
     #clearSenseCache() {
-        import('../../../services/SensePrecomputer.js').then(({ SensePrecomputer }) => {
-            SensePrecomputer.clear();
-        }).catch(() => { });
+        // Immediate batches must not race an asynchronous import and reuse
+        // capabilities captured before a condition or sense changed.
+        SensePrecomputer.clear();
     }
 
     clearAllCaches() {
