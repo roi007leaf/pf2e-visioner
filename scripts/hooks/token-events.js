@@ -3,6 +3,7 @@
  */
 
 import { MODULE_ID } from '../constants.js';
+import { trackTokenDeletion } from '../stores/token-deletion-guard.js';
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import {
   addTokenEventListener,
@@ -189,6 +190,7 @@ export async function onTokenDeleted(...args) {
  * Hook into token rendering to catch tokens when they're fully ready
  */
 export function registerTokenHooks() {
+  globalThis.libWrapper?.register(MODULE_ID, 'CONFIG.Token.documentClass.deleteDocuments', trackTokenDeletion, 'WRAPPER');
   // Hook into token creation (use preCreateToken for better timing)
   Hooks.on('preCreateToken', onTokenCreated);
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## [8.7.2] - 2026-09-14
+
+### Fixed
+
+- AVS persistence now rechecks token existence after movement waits and before each bulk-write pass. Tokens deleted during those waits are skipped without aborting surviving writes; single-token writes and write metrics follow the same behavior. Added a deterministic live deletion-during-wait regression.
+
+- Automatic AVS batches now run only on the active GM and discard unfinished results when authority changes. Pending token deletions are excluded from flag writes, and movement waits stop before accessing destroyed token transforms. Added two-GM rapid-deletion coverage and cancellation/handover regressions.
+
+- Prevented tooltip listener accumulation during token movement/deletion. Visioner now deactivates Foundry's tooltip only when active and otherwise clears pending activation; repeatedly deactivating an already-hidden tooltip left `transitionend` listeners waiting for transitions that never occurred.
+
+- Opening a door during a GM-controlled NPC's movement now reveals it to players as soon as Core sight detects it, instead of waiting for the animation to end. Remote native movement is recognized without bypassing manual visibility overrides or hidden loot/hazard protections.
+
+### Tests
+
+- Added AVS-on/off dungeon performance scenes with 30 tokens, 55 wall segments, eight pillars, a corridor door, 12 animated ambient lights, seven token lights, and three overlapping native darkness regions. GM/player frame measurements cover idle, observer/target movement, door changes, and region-light updates, with active-source and door-occlusion checks plus normal QA cleanup.
+
+- Added 100-token rendered-FPS workloads with AVS on/off, cache-disabled GM/player client startup timing, and a five-minute movement/token-lifecycle soak with post-GC heap, DOM-node, and event-listener growth checks. The soak supports longer local runs through `VISIONER_LIVE_SOAK_MINUTES` (5–120). Temporary documents, debugging sessions, and cache overrides are cleaned up automatically.
+
+- Added four automated local rendered-FPS cases comparing AVS on/off and token lights on/off in 30-token/24-wall scenes. GM and player clients each measure idle and repeated movement windows through top-level PIXI screen-render events, excluding texture passes. Reports include average/1%-low FPS, p95/p99 frame times, stalls, configuration metadata and listener-cleanup checks. These run with `npm run test:live:performance` and remain outside CI/release archives.
+
+- Added 14 automated live detection scenarios: five special-sense grid-range boundaries, precise echolocation/tremorsense fallback, low elevation changes, overlapping bright/dim lights and suppression regions, rapid lighting/observer updates, scene switching during animation, and separate door-driven reveal/hide checks before animation ends. Fixtures and temporary scene documents use normal QA cleanup and recovery. The opening-door regression exposed and now verifies the delayed player reveal fix.
+
 ## [8.7.1] - 2026-09-14
 
 ### Fixed

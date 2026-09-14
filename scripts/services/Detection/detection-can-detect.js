@@ -25,7 +25,13 @@ export function createCanDetectVisibilityWrapper(threshold) {
 
     const visibility = getVisionerVisibilityBetweenTokens(observerToken, target);
 
-    if (hasActivePendingTokenMovement()) {
+    // Remote clients do not locally track a GM's unowned NPC move. Foundry's committed
+    // movement animation still lets this pair use current sight when a door changes.
+    if (
+      hasActivePendingTokenMovement() ||
+      target?.movementAnimationPromise ||
+      observerToken?.movementAnimationPromise
+    ) {
       return resolveDetectionDuringMovement(observerToken, target, visibility, modeId, canDetect);
     }
 

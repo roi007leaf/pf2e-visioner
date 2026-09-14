@@ -23,7 +23,7 @@ function record(c, label, measurement, passed) {
   c.assert(passed, `${label}: ${JSON.stringify(measurement)}`);
 }
 
-async function benchmark(c, mode, count) {
+export async function preparePerformanceFixture(c, count, lights = false) {
   await c.setting('autoVisibilityEnabled', true);
   await c.setting('avsOnlyInCombat', false);
   const fixture = await c.gm.evaluate(async ({ f, runId, count, lights }) => {
@@ -44,18 +44,23 @@ async function benchmark(c, mode, count) {
     })));
     return { tokens: canvas.scene.tokens.size, walls: canvas.scene.walls.size,
       tokenLights: canvas.scene.tokens.filter(t => t.light.dim > 0 || t.light.bright > 0).length };
-  }, { f: c.fixture, runId: c.runId, count, lights: mode === 'movement-lights' });
+  }, { f: c.fixture, runId: c.runId, count, lights });
   await c.player.waitForFunction(count => canvas.tokens.placeables.length === count, count);
   fixture.browser = await c.player.evaluate(() => ({ width: innerWidth, height: innerHeight, devicePixelRatio,
     hardwareConcurrency: navigator.hardwareConcurrency, userAgent: navigator.userAgent, visibility: document.visibilityState }));
   c.equal(fixture.tokens, count, 'Requested performance workload exists');
-  if (mode === 'movement-lights') c.assert(fixture.tokenLights >= 6, 'Token-light workload is active');
+  if (lights) c.assert(fixture.tokenLights >= 6, 'Token-light workload is active');
   await c.gm.waitForFunction(async () => {
     const { autoVisibilitySystem } = await import('/modules/pf2e-visioner/scripts/visibility/auto-visibility/index.js');
     const d = autoVisibilitySystem.getDiagnostics();
     return !d.processingBatch && !d.stateManagerProcessing && !d.updatingEffects && !d.pendingTokens.length && !d.changedTokens.length;
   });
   await c.check({ state: 'observed', visible: true }, true, 'performance-fixture-visible');
+  return fixture;
+}
+
+async function benchmark(c, mode, count) {
+  const fixture = await preparePerformanceFixture(c, count, mode === 'movement-lights');
   if (mode.startsWith('movement')) {
     // One warm-up, then four measured native animations. Existing sampler checks
     // intermediate positions as well as frame times, so a skipped animation fails.

@@ -245,7 +245,6 @@ function shouldDeferRenderingToCoreDuringMove(target) {
   // A held drag is only a preview: Core may render temporary LOS from the clone, but the player
   // has not committed movement and must not see stored Undetected targets. Once movement commits,
   // pending-movement tracking allows Core LOS to reveal ordinary targets during the animation.
-  if (!hasActivePendingTokenMovement()) return false;
   if (!target?.document?.id) return false;
   if (target.controlled) return false;
   if (isSelectAllTokenVisibilityBypassActive()) return false;
@@ -254,6 +253,9 @@ function shouldDeferRenderingToCoreDuringMove(target) {
 
   const observers = currentViewVisionerObserversForTarget(target);
   if (observers.length === 0) return false;
+  // A remote GM's NPC move has no local pending entry on the player client.
+  const movingTarget = hasActivePendingTokenMovement() || !!target.movementAnimationPromise;
+  if (!movingTarget && !observers.some((observer) => observer?.movementAnimationPromise)) return false;
 
   let deferrable = false;
   for (const observer of observers) {
@@ -261,6 +263,7 @@ function shouldDeferRenderingToCoreDuringMove(target) {
     const state = getStoredVisibilityState(observer, target);
     if (!RENDER_HIDDEN_FROM_OBSERVER_STATES.has(state)) continue;
     if (hasUndetectedAvsOverride(observer, target)) return false;
+    if (!movingTarget && !observer?.movementAnimationPromise) continue;
     if (!legacyLevelsFloorBlocksSightBetween(observer, target)) deferrable = true;
   }
   return deferrable;

@@ -19,6 +19,27 @@ jest.mock('../../../scripts/stores/detection-map.js', () => ({
 }));
 
 describe('HoverTooltips keybind state', () => {
+  test('repeated cleanup deactivates only an active native tooltip and clears pending activation', async () => {
+    const { cleanupHoverTooltips } = await import('../../../scripts/services/HoverTooltips.js');
+    const tooltip = document.createElement('aside');
+    const clearPending = jest.fn();
+    const deactivate = jest.fn(() => {
+      tooltip.classList.remove('active');
+      game.tooltip.element = null;
+      tooltip.addEventListener('transitionend', () => {}, { once: true });
+      clearPending();
+    });
+    game.tooltip = { tooltip, element: null, clearPending, deactivate };
+    for (let i = 0; i < 100; i++) cleanupHoverTooltips();
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(clearPending).toHaveBeenCalled();
+    tooltip.classList.add('active');
+    game.tooltip.element = document.createElement('span');
+    cleanupHoverTooltips();
+    cleanupHoverTooltips();
+    expect(deactivate).toHaveBeenCalledTimes(1);
+  });
+
   beforeEach(() => {
     jest.resetModules();
     document.body.innerHTML = '';

@@ -492,6 +492,7 @@ export class BatchOrchestrator {
    * @returns {Promise<void>}
    */
   async processBatch(changedTokens, options = {}) {
+    if (!isPrimaryGM()) return;
     const admissionPlan = buildProcessBatchAdmissionPlan({
       changedTokens,
       processingBatch: this.processingBatch,
@@ -726,7 +727,7 @@ export class BatchOrchestrator {
       );
       timings.batchProcessing = this.nowProvider() - stageStart;
       timings.detailedBatchTimings = batchResult.detailedTimings || {};
-      if (automaticDisabledDuringBatch()) {
+      if (automaticDisabledDuringBatch() || !isPrimaryGM()) {
         detectionBatch.discard();
         return;
       }
@@ -754,7 +755,7 @@ export class BatchOrchestrator {
 
       stageStart = this.nowProvider();
       await this.workflowFactory.runOverrideValidationBeforeResultApplication({ isMovementBatch });
-      if (automaticDisabledDuringBatch()) {
+      if (automaticDisabledDuringBatch() || !isPrimaryGM()) {
         detectionBatch.discard();
         return;
       }

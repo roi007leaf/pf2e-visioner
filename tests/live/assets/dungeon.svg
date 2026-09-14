@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1400" viewBox="0 0 1800 1400">
+  <defs><pattern id="stone" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="#55504a"/><path d="M0 0H100V100H0Z M0 50H100 M50 0V50 M25 50V100" fill="none" stroke="#363330" stroke-width="3"/></pattern></defs>
+  <rect width="1800" height="1400" fill="#181716"/><rect x="50" y="50" width="1700" height="1300" fill="url(#stone)" stroke="#82786b" stroke-width="15"/>
+  <path d="M50 400H1750 M50 700H1750 M450 50V400 M850 50V400 M1250 50V400 M450 700V1350 M850 700V1350 M1250 700V1350" stroke="#272420" stroke-width="14"/>
+  <path d="M250 400H400 M650 400H800 M1050 400H1200 M1450 400H1600 M250 700H400 M650 700H800 M1050 700H1200 M1450 700H1600" stroke="#625a4f" stroke-width="18"/>
+</svg>

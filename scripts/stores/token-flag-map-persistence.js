@@ -2,6 +2,7 @@ import {
   CACHE_INVALIDATION_REASONS,
   invalidateCaches,
 } from '../utils/cache-invalidation.js';
+import { isTokenDocumentPendingDeletion } from './token-deletion-guard.js';
 
 function isPlainObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -77,6 +78,11 @@ function normalizeUpdatePasses(updatePasses = []) {
     .filter((updates) => updates.length > 0);
 }
 
+function tokenStillExists(scene, id) {
+  return (typeof scene?.tokens?.has !== 'function' || scene.tokens.has(id)) &&
+    !isTokenDocumentPendingDeletion(scene?.tokens?.get?.(id));
+}
+
 export function buildTokenFlagWriteMetrics({
   requestedEntries = 0,
   updatePasses = [],
@@ -112,25 +118,32 @@ export async function applyTokenFlagUpdatePasses({
   onMetrics = null,
 } = {}) {
   const passes = normalizeUpdatePasses(updatePasses);
-  const written = passes.reduce((sum, updates) => sum + updates.length, 0);
-  const metrics = buildTokenFlagWriteMetrics({ requestedEntries, updatePasses: passes });
-  if (!written) {
-    onMetrics?.(metrics);
+  if (!passes.length) {
+    onMetrics?.(buildTokenFlagWriteMetrics({ requestedEntries }));
     return { written: 0 };
   }
 
   const uniqueTokens = Array.from(new Set(tokensToWaitFor.filter(Boolean)));
   await Promise.all(uniqueTokens.map((token) => waitForToken(token)));
 
+  const appliedPasses = [];
   if (typeof scene?.updateEmbeddedDocuments === 'function') {
     for (const updates of passes) {
-      await scene.updateEmbeddedDocuments('Token', updates, updateOptions);
+      // Movement waits and prior writes yield to token deletion. Re-read scene
+      // membership immediately before each pass instead of persisting stale IDs.
+      const survivingUpdates = updates.filter(update => tokenStillExists(scene, update._id));
+      if (!survivingUpdates.length) continue;
+      await scene.updateEmbeddedDocuments('Token', survivingUpdates, updateOptions);
+      appliedPasses.push(survivingUpdates);
     }
   } else {
     await fallback();
+    appliedPasses.push(...passes);
   }
 
-  invalidate?.(invalidationReason, { written });
+  const metrics = buildTokenFlagWriteMetrics({ requestedEntries, updatePasses: appliedPasses });
+  const written = metrics.updateCount;
+  if (written) invalidate?.(invalidationReason, { written });
   onMetrics?.(metrics);
   return { written };
 }
@@ -166,6 +179,10 @@ export async function setTokenFlagMap({
   }
 
   await waitForToken(token);
+  if (!tokenStillExists(document.parent, document.id)) {
+    onMetrics?.(skippedMetrics);
+    return { written: 0, skipped: 1 };
+  }
   const update = buildTokenFlagSetUpdate({ document, moduleId, flagKey, value: map });
   await document.update?.(omitDocumentId(update), updateOptions);
   invalidate?.(invalidationReason, { written: 1, flagKey, tokenId: document.id });

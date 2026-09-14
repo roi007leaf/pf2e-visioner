@@ -41,7 +41,9 @@ import { releaseDetectionFilterPrimaryMesh } from '../../../scripts/services/Det
 it('releases primary artwork when a filter clears after hard-hide handoff', () => {
   const token = {
     document: { id: 'handoff-target', hidden: false },
-    visible: false, renderable: false, detectionFilter: {},
+    visible: false,
+    renderable: false,
+    detectionFilter: {},
     mesh: { visible: false, renderable: false, alpha: 0 },
   };
   releaseCurrentViewHardHide(token);
@@ -303,19 +305,33 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
       { document: { id: 'observer-b' }, controlled: true },
     );
   });
-  it.each(['one-way', 'two-way', 'replace'])('uses a stationary %s vision master to release a hidden target', (mode) => {
-    const minion = { document: { id: 'minion', getFlag: (_module, key) => ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key] } };
-    const master = { document: { id: 'master' }, _isVisionSource: () => true };
-    controlled.splice(0, controlled.length, minion);
-    canvas.tokens.placeables = [minion, master];
-    __setStoredVisibilityForTest(new Map([['minion:t', 'undetected'], ['master:t', 'observed']]));
-    const t = { document: { id: 't' }, actor: { type: 'npc' } };
-    t._pvCurrentViewHardHidden = true;
-    t.mesh = { visible: false, renderable: false, alpha: 0 };
-    expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
-    expect(releaseCurrentViewHardHideIfMarked(t)).toBe(true);
-    expect(t.mesh.visible).toBe(true);
-  });
+  it.each(['one-way', 'two-way', 'replace'])(
+    'uses a stationary %s vision master to release a hidden target',
+    (mode) => {
+      const minion = {
+        document: {
+          id: 'minion',
+          getFlag: (_module, key) =>
+            ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key],
+        },
+      };
+      const master = { document: { id: 'master' }, _isVisionSource: () => true };
+      controlled.splice(0, controlled.length, minion);
+      canvas.tokens.placeables = [minion, master];
+      __setStoredVisibilityForTest(
+        new Map([
+          ['minion:t', 'undetected'],
+          ['master:t', 'observed'],
+        ]),
+      );
+      const t = { document: { id: 't' }, actor: { type: 'npc' } };
+      t._pvCurrentViewHardHidden = true;
+      t.mesh = { visible: false, renderable: false, alpha: 0 };
+      expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
+      expect(releaseCurrentViewHardHideIfMarked(t)).toBe(true);
+      expect(t.mesh.visible).toBe(true);
+    },
+  );
   it.each([
     ['one-way', 'minion', true, 'undetected', 'observed', false],
     ['one-way', 'master', true, 'observed', 'undetected', true],
@@ -325,14 +341,31 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     ['reverse', 'minion', true, 'undetected', 'observed', true],
     ['replace', 'minion', true, 'observed', 'undetected', true],
     ['one-way', 'minion', false, 'undetected', 'observed', true],
-  ])('%s sharing from selected %s respects source direction and eligibility', (mode, selected, active, minionState, masterState, hidden) => {
-    const minion = { document: { id: 'minion', getFlag: (_module, key) => ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key] }, _isVisionSource: () => active };
-    const master = { document: { id: 'master' }, _isVisionSource: () => active };
-    controlled.splice(0, controlled.length, selected === 'minion' ? minion : master);
-    canvas.tokens.placeables = [minion, master];
-    __setStoredVisibilityForTest(new Map([['minion:t', minionState], ['master:t', masterState]]));
-    expect(targetIsHardHiddenFromCurrentView({ document: { id: 't' }, actor: { type: 'npc' } })).toBe(hidden);
-  });
+  ])(
+    '%s sharing from selected %s respects source direction and eligibility',
+    (mode, selected, active, minionState, masterState, hidden) => {
+      const minion = {
+        document: {
+          id: 'minion',
+          getFlag: (_module, key) =>
+            ({ visionMasterTokenId: 'master', visionSharingMode: mode })[key],
+        },
+        _isVisionSource: () => active,
+      };
+      const master = { document: { id: 'master' }, _isVisionSource: () => active };
+      controlled.splice(0, controlled.length, selected === 'minion' ? minion : master);
+      canvas.tokens.placeables = [minion, master];
+      __setStoredVisibilityForTest(
+        new Map([
+          ['minion:t', minionState],
+          ['master:t', masterState],
+        ]),
+      );
+      expect(
+        targetIsHardHiddenFromCurrentView({ document: { id: 't' }, actor: { type: 'npc' } }),
+      ).toBe(hidden);
+    },
+  );
 
   it('releases a stale mark from unselected active vision sources (#304)', () => {
     controlled.length = 0;
@@ -343,9 +376,19 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
       { document: { id: 'pc' }, _isVisionSource: () => true },
       { document: { id: 'familiar' }, _isVisionSource: () => true },
     ];
-    __setStoredVisibilityForTest(new Map([['pc:t', 'undetected'], ['familiar:t', 'observed']]));
+    __setStoredVisibilityForTest(
+      new Map([
+        ['pc:t', 'undetected'],
+        ['familiar:t', 'observed'],
+      ]),
+    );
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
-    __setStoredVisibilityForTest(new Map([['pc:t', 'undetected'], ['familiar:t', 'undetected']]));
+    __setStoredVisibilityForTest(
+      new Map([
+        ['pc:t', 'undetected'],
+        ['familiar:t', 'undetected'],
+      ]),
+    );
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
   });
 
@@ -356,7 +399,13 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     t._pvCurrentViewHardHidden = true;
     globalThis.canvas.tokens.placeables = [{ _isVisionSource: () => false }];
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
-    globalThis.canvas.tokens.placeables = [{ _isVisionSource: () => { throw new Error('source'); } }];
+    globalThis.canvas.tokens.placeables = [
+      {
+        _isVisionSource: () => {
+          throw new Error('source');
+        },
+      },
+    ];
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(true);
   });
 
@@ -477,9 +526,7 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
           id: 'target',
           hidden: false,
           getFlag: jest.fn((_module, key) =>
-            key === 'avs-override-from-observer-a'
-              ? { state, source: 'manual_action' }
-              : null,
+            key === 'avs-override-from-observer-a' ? { state, source: 'manual_action' } : null,
           ),
         },
         actor: { type: 'npc', itemTypes: { condition: [] } },
@@ -1114,6 +1161,18 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     expect(t._pvCurrentViewHardHidden).toBe(false);
   });
 
+  it.each(['target', 'observer'])(
+    'trusts native remote %s movement without local pending tracking',
+    (moving) => {
+      hasActivePendingTokenMovement.mockReturnValue(false);
+      const t = undetectedToken({ visible: true });
+      (moving === 'target' ? t : controlled[0]).movementAnimationPromise = Promise.resolve();
+      expect(applyCurrentViewHardHide(t)).toBe(false);
+      expect(t.mesh.visible).toBe(true);
+      expect(t._pvCurrentViewHardHidden).toBe(false);
+    },
+  );
+
   it('does not trust temporary Core visibility through a legacy Levels floor', () => {
     const savedConfig = globalThis.CONFIG;
     globalThis.game = {
@@ -1435,12 +1494,18 @@ describe('releaseCurrentViewHardHide (restore on GM deselect / omniscience)', ()
   });
 });
 
-
 test('hard-hide clears stale player hover used by Core keyboard targeting', () => {
   globalThis.game = { user: { isGM: false } };
   controlled.push({ document: { id: 'observer' }, controlled: true });
   __setStoredVisibilityForTest(new Map([['observer:target', 'unnoticed']]));
-  const token = { document: { id: 'target' }, hover: true, mesh: {}, _onHoverOut: jest.fn(() => { token.hover = false; }) };
+  const token = {
+    document: { id: 'target' },
+    hover: true,
+    mesh: {},
+    _onHoverOut: jest.fn(() => {
+      token.hover = false;
+    }),
+  };
   canvas.tokens.hover = token;
   applyCurrentViewHardHide(token);
   expect(token._onHoverOut).toHaveBeenCalledTimes(1);

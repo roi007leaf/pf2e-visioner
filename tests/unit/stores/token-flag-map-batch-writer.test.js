@@ -8,8 +8,58 @@ import {
   hasTokenFlagMapChanged,
   setTokenFlagMap,
 } from '../../../scripts/stores/token-flag-map-persistence.js';
+import { trackTokenDeletion, isTokenDocumentPendingDeletion } from '../../../scripts/stores/token-deletion-guard.js';
 
 describe('token flag map batch writer', () => {
+  test.each(['cancel', 'reject'])('skips tokens with pending deletion and restores writes after %s', async mode => {
+    const document = { id: 'pending' };
+    const scene = { tokens: new Map([['pending', document]]), updateEmbeddedDocuments: jest.fn() };
+    const wrapped = jest.fn(async () => {
+      expect(isTokenDocumentPendingDeletion(document)).toBe(true);
+      expect(await applyTokenFlagUpdatePasses({ scene, updatePasses: [[{ _id: document.id }]] })).toEqual({ written: 0 });
+      expect(scene.updateEmbeddedDocuments).not.toHaveBeenCalled();
+      if (mode === 'reject') throw Error('deletion rejected');
+      return [];
+    });
+    const deletion = trackTokenDeletion(wrapped, [document.id], { parent: scene });
+    if (mode === 'reject') await expect(deletion).rejects.toThrow('deletion rejected');
+    else await deletion;
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(isTokenDocumentPendingDeletion(document)).toBe(false);
+    expect(await applyTokenFlagUpdatePasses({ scene, updatePasses: [[{ _id: document.id }]] })).toEqual({ written: 1 });
+  });
+  test('rechecks membership after waiting and between persistence passes', async () => {
+    const tokens = new Map([['gone', {}], ['later', {}], ['live', {}]]);
+    const scene = { tokens, updateEmbeddedDocuments: jest.fn(async () => { tokens.delete('later'); }) };
+    const onMetrics = jest.fn();
+    const result = await applyTokenFlagUpdatePasses({
+      scene, requestedEntries: 3, tokensToWaitFor: [{}],
+      waitForToken: async () => { tokens.delete('gone'); },
+      updatePasses: [[{ _id: 'gone' }, { _id: 'later' }, { _id: 'live' }], [{ _id: 'gone' }, { _id: 'later' }, { _id: 'live' }]],
+      invalidate: jest.fn(), onMetrics,
+    });
+    expect(scene.updateEmbeddedDocuments.mock.calls.map(call => call[1].map(u => u._id))).toEqual([['later', 'live'], ['live']]);
+    expect(result.written).toBe(3);
+    expect(onMetrics).toHaveBeenCalledWith(expect.objectContaining({ updatedTokenCount: 2, updateCount: 3, skippedEntries: 1 }));
+  });
+
+  test('does not send an empty batch or invalidate caches after all tokens are deleted', async () => {
+    const scene = { tokens: new Map(), updateEmbeddedDocuments: jest.fn() };
+    const invalidate = jest.fn();
+    expect(await applyTokenFlagUpdatePasses({ scene, updatePasses: [[{ _id: 'gone' }]], invalidate })).toEqual({ written: 0 });
+    expect(scene.updateEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test('single-map persistence skips a document deleted during its wait', async () => {
+    const parent = { tokens: new Map() };
+    const document = { id: 'gone', parent, getFlag: () => ({}), update: jest.fn() };
+    parent.tokens.set(document.id, document);
+    expect(await setTokenFlagMap({ token: { document }, map: { target: 'hidden' }, moduleId: 'pf2e-visioner', flagKey: 'test',
+      waitForToken: async () => parent.tokens.delete(document.id) })).toEqual({ written: 0, skipped: 1 });
+    expect(document.update).not.toHaveBeenCalled();
+  });
+
   test('compares nested flag values without JSON stringify', () => {
     expect(
       areTokenFlagValuesEqual(

@@ -1,3 +1,5 @@
+import { isTokenDocumentPendingDeletion } from './token-deletion-guard.js';
+
 function getRenderableToken(token) {
   return token?.object ?? token ?? null;
 }
@@ -12,6 +14,7 @@ export function isTokenActivelyAnimating(token) {
 
 export function getTokenRenderDocumentDelta(token) {
   const renderableToken = getRenderableToken(token);
+  if (renderableToken?.destroyed || renderableToken?._destroyed) return null;
   const documentToken = token?.document ?? token ?? null;
   const renderX = Number(renderableToken?.x);
   const renderY = Number(renderableToken?.y);
@@ -39,6 +42,10 @@ export function getTokenRenderDocumentDelta(token) {
 }
 
 export function shouldDeferTokenDocumentUpdate(token) {
+  const document = token?.document ?? token;
+  const renderable = getRenderableToken(token);
+  if (renderable?.destroyed || renderable?._destroyed || isTokenDocumentPendingDeletion(document)) return false;
+  if (document?.parent?.tokens?.has && !document.parent.tokens.has(document.id)) return false;
   return isTokenActivelyAnimating(token) || (getTokenRenderDocumentDelta(token)?.distance ?? 0) > 1;
 }
 

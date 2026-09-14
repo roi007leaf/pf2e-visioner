@@ -9,7 +9,7 @@ Secret actions use the native roll dialog's public mode for deterministic dice;
 these cases do not certify secret-roll privacy.
 
 All scenarios are automated. No guided mode, review prompts, or human pass/fail
-verdicts. The full catalog contains **244 scenarios**, including five additional performance workloads, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and 41 workflows
+verdicts. The full catalog contains **270 scenarios**, including two deletion-race regressions, sixteen performance scenarios, fourteen detection-boundary/transition additions, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and 41 workflows
 replacing the former 24 bundled reviews. A workflow records each assertion and
 screenshots; a failed or blocked prerequisite never counts as a pass.
 
@@ -33,7 +33,7 @@ npm ci
 npx playwright install chromium
 npm run test:live                 # quick smoke suite
 npm run test:live:full            # every automated scenario
-npm run test:live:performance     # six local performance scenarios only
+npm run test:live:performance     # sixteen local performance scenarios; includes five-minute soak
 npm run test:live:list            # exact case names and prerequisites
 npm run test:live:harness         # local runner/cleanup tests; no Foundry needed
 npm run test:live:cleanup         # recover an interrupted run

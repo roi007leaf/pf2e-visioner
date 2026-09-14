@@ -3,6 +3,7 @@ import { MODULE_ID } from "../../../constants.js";
 import { getLogger } from "../../../utils/logger.js";
 import { getCachedSettingValue } from "../../../utils/setting-value-cache.js";
 import { isSceneTokenVisionDisabled } from '../../../services/scene-token-vision.js';
+import { isPrimaryGM } from '../../../services/gm-election.js';
 
 /**
  * SystemStateProvider - Provides access to system state information
@@ -105,7 +106,7 @@ export class SystemStateProvider {
         if (isSceneTokenVisionDisabled()) {
             return false;
         }
-        if (!this.isEnabled() || !this.isGM()) {
+        if (!this.isEnabled() || !this.isGM() || !isPrimaryGM()) {
             return false;
         }
 

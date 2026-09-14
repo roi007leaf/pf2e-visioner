@@ -7,8 +7,18 @@ import { gapWorkflows } from './gap-workflows.mjs';
 import { actionGapWorkflows } from './action-gap-workflows.mjs';
 import { playerActionWorkflows } from './player-action-workflows.mjs';
 import { performanceWorkflows } from './performance-workflows.mjs';
+import { detectionGapWorkflows } from './detection-gap-workflows.mjs';
+import { fpsWorkflows } from './fps-workflows.mjs';
+import { performanceLifecycleWorkflows } from './performance-lifecycle-workflows.mjs';
+import { scenePerformanceWorkflows } from './scene-performance-workflows.mjs';
+import { deletionRaceWorkflows } from './deletion-race-workflows.mjs';
 
 export const workflows = {
+  ...fpsWorkflows,
+  ...performanceLifecycleWorkflows,
+  ...scenePerformanceWorkflows,
+  ...deletionRaceWorkflows,
+  ...detectionGapWorkflows,
   ...performanceWorkflows,
   ...playerActionWorkflows,
   ...actionGapWorkflows,

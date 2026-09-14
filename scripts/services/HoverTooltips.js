@@ -56,6 +56,7 @@ import {
   resolveTooltipSenseUsed,
 } from './HoverTooltip/hover-tooltip-sense-state.js';
 import {
+  deactivateActiveTooltip,
   destroyCoverTooltipIndicator,
   destroyVisibilityBadge,
   destroyVisibilityTooltipIndicator,
@@ -657,7 +658,7 @@ export function initializeHoverTooltips() {
 
     // Deactivate tooltips
     try {
-      game.tooltip.deactivate();
+      deactivateActiveTooltip();
     } catch (e) { }
 
     // Hide factors overlay
@@ -1545,7 +1546,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
 function hideAllVisibilityIndicators() {
   // Deactivate any active tooltips
   try {
-    game.tooltip.deactivate();
+    deactivateActiveTooltip();
   } catch (e) {
     console.warn('PF2E Visioner: Error deactivating tooltips', e);
   }
@@ -1590,7 +1591,7 @@ function hideAllVisibilityIndicators() {
  */
 function hideAllCoverIndicators() {
   try {
-    game.tooltip.deactivate();
+    deactivateActiveTooltip();
   } catch (_) { }
   HoverTooltips.coverIndicators.forEach((indicator) => {
     try {

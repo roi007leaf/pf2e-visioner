@@ -1,8 +1,41 @@
 # Automated live coverage inventory
 
-**244 automated scenarios; zero guided scenarios.** The former 24 manual reviews
+**270 automated scenarios; zero guided scenarios.** The former 24 manual reviews
 became 42 separate automated workflows. Counts describe executable definitions,
 not successful live verification or exhaustive line/branch coverage.
+
+Two deletion regressions cover deleting a real token while flag persistence waits
+(with surviving writes verified) and rapid native token creation/deletion with two
+GMs connected. Automatic AVS authority must belong only to the active GM. These
+and the original five-minute soak now pass; see the feature audit for evidence.
+
+Two dungeon performance cases add connected rooms/corridor, 55 blocking wall
+segments, pillars, 12 animated ambient lights, seven token lights and three native
+darkness regions. Both GM/player clients measure idle, moving observer/target,
+door changes and region changes with AVS on/off. Door occlusion is independently
+checked before timing, and active light sources/region meshes are required.
+
+Four further performance cases cover 100-token FPS with AVS on/off, cache-disabled
+GM/player client startup, and a configurable five-minute-to-two-hour retained-memory
+soak. Repeated inactive tooltip deactivation caused listener growth; competing GM
+automatic batches and stale write targets caused the deletion race. Both fixes
+are verified by the complete original soak. See the feature audit for evidence.
+
+Four `fps-30*` cases measure actual top-level PIXI screen renders on GM/player
+clients with AVS on/off and token lights on/off. Each measures idle and three
+movement windows with FPS, slow-frame distributions, state/art checks and listener
+cleanup. See [performance tests](performance.md) for exact boundaries and budgets.
+
+Fourteen `detection-*` scenarios add special-sense range checks at 25/30/35 feet,
+with return transitions, for scent, tremorsense, lifesense, thoughtsense and
+echolocation. Additional cases exercise precise echolocation falling back to
+imprecise tremorsense under deafness, elevation/landing recovery, overlapping
+bright/dim lights, removal of one of two suppression regions, rapid lighting
+changes, rapid player observer selection, player scene teardown during animation,
+and independent opening/closing door detection updates before native animation ends.
+The opening-door case exposed a delayed player reveal, now fixed and verified with
+all 14 additions passing. These are bounded
+regressions, not an exhaustive combination matrix or third-party certification.
 
 Five `performance-*` workloads augment the existing small animation benchmark.
 See [performance tests](performance.md) for workload sizes, measurement boundaries,

@@ -1,5 +1,15 @@
 const DEFAULT_DESTROY_OPTIONS = { children: true, texture: true, baseTexture: true };
 
+export function deactivateActiveTooltip(manager = globalThis.game?.tooltip) {
+  // Foundry 14 attaches a transitionend listener even when already hidden. No
+  // transition follows in that case, so repeated idle cleanup retains listeners.
+  if (manager?.element || manager?.tooltip?.classList?.contains('active')) {
+    manager.deactivate();
+  } else {
+    manager?.clearPending?.();
+  }
+}
+
 export function removeTooltipDomElement(element) {
   try {
     element?.remove?.();

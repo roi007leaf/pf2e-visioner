@@ -8,6 +8,11 @@ import { gapCases } from './gap-cases.mjs';
 import { actionGapCases } from './action-gap-cases.mjs';
 import { playerActionCases } from './player-action-workflows.mjs';
 import { performanceCases } from './performance-workflows.mjs';
+import { detectionGapCases } from './detection-gap-workflows.mjs';
+import { fpsCases } from './fps-workflows.mjs';
+import { performanceLifecycleCases } from './performance-lifecycle-workflows.mjs';
+import { scenePerformanceCases } from './scene-performance-workflows.mjs';
+import { deletionRaceCases } from './deletion-race-workflows.mjs';
 // Every case gets fresh documents. These are live contracts, not mocked calculators.
 export const smokeCases = [
   { name: 'darkvision-in-darkness', darkness: true, steps: [{ expect: { state: 'observed', visible: true, filter: null }, art: true }] },
@@ -56,6 +61,11 @@ export const smokeCases = [
 ];
 
 export const fullCases = [
+  ...fpsCases,
+  ...performanceLifecycleCases,
+  ...scenePerformanceCases,
+  ...deletionRaceCases,
+  ...detectionGapCases,
   ...actionGapCases,
   ...playerActionCases,
   ...performanceCases,

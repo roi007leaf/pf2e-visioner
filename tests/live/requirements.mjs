@@ -1,9 +1,19 @@
 import { casePassed } from './coverage.mjs';
 import { missingCases } from './missing-cases.mjs';
 import { auditCases } from './audit-cases.mjs';
+import { detectionGapCases } from './detection-gap-workflows.mjs';
+import { fpsCases } from './fps-workflows.mjs';
+import { performanceLifecycleCases } from './performance-lifecycle-workflows.mjs';
+import { scenePerformanceCases } from './scene-performance-workflows.mjs';
+import { deletionRaceCases } from './deletion-race-workflows.mjs';
 // Required functional contracts. Missing implementations are explicit blockers,
 // not omitted from the denominator or replaced with a passing placeholder.
 export const requirements = [
+  ['Deletion during AVS persistence waits', deletionRaceCases.map(c => c.name)],
+  ['Dungeon walls, lights and lighting regions', scenePerformanceCases.map(c => c.name)],
+  ['Client startup and retained memory', performanceLifecycleCases.map(c => c.name)],
+  ['Rendered FPS on GM and player clients', fpsCases.map(c => c.name)],
+  ['Detection boundaries and transitions', detectionGapCases.map(c => c.name)],
   ['Live performance budgets', ['performance-movement', 'performance-movement-lights', 'performance-observer-switch', 'performance-recalculate-12', 'performance-recalculate-30']],
   ['Player Seek templates', ['player-seek-template-circle', 'player-seek-template-cone', 'player-seek-template-cancel-config', 'player-seek-template-cancel-placement']],
   ['Player-originated native actions', ['player-native-hide', 'player-native-sneak', 'player-native-seek', 'player-native-strike', 'player-native-create-a-diversion']],
