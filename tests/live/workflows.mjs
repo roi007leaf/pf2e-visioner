@@ -5,8 +5,12 @@ import * as features from './feature-workflows.mjs';
 import { auditWorkflows } from './audit-workflows.mjs';
 import { gapWorkflows } from './gap-workflows.mjs';
 import { actionGapWorkflows } from './action-gap-workflows.mjs';
+import { playerActionWorkflows } from './player-action-workflows.mjs';
+import { performanceWorkflows } from './performance-workflows.mjs';
 
 export const workflows = {
+  ...performanceWorkflows,
+  ...playerActionWorkflows,
   ...actionGapWorkflows,
   ...gapWorkflows,
   ...auditWorkflows,

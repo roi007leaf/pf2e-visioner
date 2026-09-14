@@ -1,6 +1,6 @@
 {
   "name": "pf2e-visioner",
-  "version": "8.7.0",
+  "version": "8.7.1",
   "description": "Advanced per-token visibility and cover management for Pathfinder 2E",
   "main": "scripts/main.js",
   "scripts": {
@@ -8,6 +8,7 @@
     "test:watch": "jest --maxWorkers=50% --watch",
     "test:live": "node tests/live/run.mjs",
     "test:live:full": "node tests/live/run.mjs --full",
+    "test:live:performance": "node tests/live/run.mjs --performance",
     "test:live:cleanup": "node tests/live/run.mjs --cleanup-only",
     "test:live:list": "node tests/live/run.mjs --list",
     "test:live:harness": "node --test tests/live/*.checks.mjs",

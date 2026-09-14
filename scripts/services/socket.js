@@ -402,11 +402,11 @@ async function seekTemplateHandler({
       const { isTokenWithinTemplate } = await import('../chat/services/infra/shared-utils.js');
 
       const tokensInTemplate = targets.some((t) =>
-        isTokenWithinTemplate(center, radiusFeet, t, templateType, messageId, actorTokenId),
+        isTokenWithinTemplate(center, radiusFeet, t, templateType, messageId, actorTokenId, geometry),
       );
 
       const wallsInTemplate = walls.some((wall) =>
-        isTokenWithinTemplate(center, radiusFeet, wall, templateType, messageId, actorTokenId),
+        isTokenWithinTemplate(center, radiusFeet, wall, templateType, messageId, actorTokenId, geometry),
       );
 
       // Has targets if either tokens or walls are in the template

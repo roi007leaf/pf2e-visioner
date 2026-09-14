@@ -136,7 +136,12 @@ export class BatchOrchestrator {
           this.processingBatch = value;
         },
         callHook: (hookName, ...args) => Hooks.callAll(hookName, ...args),
-        scheduleFinalizationTask: (task) => setTimeout(task, 0),
+        scheduleFinalizationTask: (task) => {
+          const generation = this._batchGeneration;
+          return setTimeout(() => {
+            if (generation === this._batchGeneration) task();
+          }, 0);
+        },
         processBatch: (tokens, processOptions) => this.processBatch(tokens, processOptions),
         clearPendingTokens: () => this._pendingTokens.clear(),
         clearPendingMovementSessionData: () => {
@@ -171,6 +176,7 @@ export class BatchOrchestrator {
 
     // Coalescing and precompute cache
     this._pendingTokens = new Set();
+    this._batchGeneration = 0;
     this._coalesceTimer = null;
     this._lastPrecompute = { map: null, stats: null, posKeyMap: null, lightingHash: null, ts: 0 };
     // Short-lived LOS memo reused across immediate micro-batches
@@ -298,6 +304,21 @@ export class BatchOrchestrator {
         : null,
       totals: { ...this._movementPerformanceTotals },
     };
+  }
+
+  /** Cancel work dispatched before AVS was disabled, including scheduled follow-ups. */
+  cancelPendingBatches() {
+    this._batchGeneration++;
+    clearTimeout(this._coalesceTimer);
+    clearTimeout(this._movementStopTimer);
+    this._coalesceTimer = null;
+    this._movementStopTimer = null;
+    this._pendingTokens.clear();
+    this._pendingMovementSessionData = null;
+    this._movementSession = null;
+    this._isTokenMoving = false;
+    this._movingTokenIds.clear();
+    this._movingTokenAnimationStartedAt.clear();
   }
 
   _flushMovementStop() {
@@ -500,9 +521,10 @@ export class BatchOrchestrator {
     const movementSession = options.movementSession || null;
     const isFinalMovementBatch = !!movementSession;
     const movementRevisionAtStart = this._movementRevision;
+    const batchGenerationAtStart = this._batchGeneration;
     const automaticEnabledAtStart = game.settings.get(this.moduleId, 'autoVisibilityEnabled') === true;
-    const automaticDisabledDuringBatch = () => automaticEnabledAtStart &&
-      game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false;
+    const automaticDisabledDuringBatch = () => batchGenerationAtStart !== this._batchGeneration ||
+      (automaticEnabledAtStart && game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false);
 
     // Check if AVS is disabled for the current scene
     const disableAVS = canvas?.scene?.getFlag?.(this.moduleId, 'disableAVS');
@@ -1173,10 +1195,12 @@ export class BatchOrchestrator {
       return 0;
     }
     const automaticEnabledBeforeValidation = game.settings.get(this.moduleId, 'autoVisibilityEnabled') === true;
+    const generationBeforeValidation = this._batchGeneration;
     batchResult.updates = await this._validateVisibleUpdatesAgainstCurrentVisibility(
       batchResult.updates,
     );
-    if (automaticEnabledBeforeValidation && game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false) {
+    if (generationBeforeValidation !== this._batchGeneration ||
+      (automaticEnabledBeforeValidation && game.settings.get(this.moduleId, 'autoVisibilityEnabled') === false)) {
       batchResult.appliedUpdates = [];
       return 0;
     }

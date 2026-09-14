@@ -36,6 +36,8 @@ export function preflight() {
     modules: game.modules.filter(m => m.active).map(m => ({ id: m.id, version: m.version })),
     clientSettings: { gmObserverView: game.settings.get(MODULE, 'gmObserverView') },
     systemClientSettings: { gmVision: game.settings.get('pf2e', 'gmVision') },
+    diceConfiguration: foundry.utils.deepClone(game.settings.get('core', foundry.dice.Roll.DICE_CONFIGURATION_SETTING)),
+    manualRollPermission: { existed: Object.hasOwn(game.user._source.permissions, 'MANUAL_ROLLS'), value: game.user._source.permissions.MANUAL_ROLLS ?? false },
     openApps: [...new Set([...Object.values(ui.windows), ...(foundry.applications.instances?.values?.() ?? [])])].map(app => app.id),
     settings: Object.fromEntries(['autoVisibilityEnabled', 'avsOnlyInCombat', 'enableHoverTooltips', 'allowPlayerTooltips'].map(key => [key, game.settings.get(MODULE, key)])),
   };
@@ -339,6 +341,7 @@ export async function cleanup(runId) {
 }
 
 export async function restore(saved) {
+  if (saved.diceConfiguration) await game.settings.set('core', foundry.dice.Roll.DICE_CONFIGURATION_SETTING, saved.diceConfiguration);
   // Windows belong to these isolated QA browser contexts. Close only those
   // opened after preflight, including native item/config/check dialogs.
   if (saved.openApps && typeof ui !== 'undefined') {

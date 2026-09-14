@@ -160,6 +160,42 @@ describe('BatchOrchestrator', () => {
     } finally { game.settings.get = get; }
   });
 
+  test('disabling AVS cancels coalesced work before it can overwrite a manual profile', async () => {
+    jest.useFakeTimers();
+    orchestrator.enqueueTokens(new Set(['A']));
+    orchestrator.cancelPendingBatches();
+    await jest.advanceTimersByTimeAsync(250);
+    expect(batchProcessor.process).not.toHaveBeenCalled();
+    expect(applied).toEqual([]);
+    expect(orchestrator._pendingTokens.size).toBe(0);
+  });
+
+  test('disabling AVS invalidates a follow-up already dispatched by finalization', async () => {
+    jest.useFakeTimers();
+    const calculate = batchProcessor.process.getMockImplementation();
+    batchProcessor.process.mockImplementationOnce(async (...args) => {
+      orchestrator.enqueueTokens(new Set(['B']));
+      return calculate(...args);
+    });
+    await orchestrator.processBatch(new Set(['A']));
+    orchestrator.cancelPendingBatches();
+    await jest.advanceTimersByTimeAsync(250);
+    expect(batchProcessor.process).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancellation discards in-flight work but permits a later explicit recalculation', async () => {
+    const calculate = batchProcessor.process.getMockImplementation();
+    batchProcessor.process.mockImplementationOnce(async (...args) => {
+      const result = await calculate(...args);
+      orchestrator.cancelPendingBatches();
+      return result;
+    });
+    await orchestrator.processBatch(new Set(['A']));
+    expect(applied).toEqual([]);
+    await orchestrator.processBatch(new Set(['A']));
+    expect(applied).toEqual([['A', 'B', 'hidden']]);
+  });
+
   test('removing moving tokens before the final batch does not stall later visibility changes', async () => {
     jest.useFakeTimers();
     const tokens = global.canvas.tokens.placeables;

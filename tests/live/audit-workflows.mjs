@@ -308,7 +308,8 @@ async function perceptionProfileApi(c) {
   await c.gm.waitForFunction(async () => {
     const { autoVisibilitySystem } = await import('/modules/pf2e-visioner/scripts/visibility/auto-visibility/index.js');
     const d = autoVisibilitySystem.getDiagnostics();
-    return d.enabled === false && !d.processingBatch && !d.stateManagerProcessing && !d.updatingEffects;
+    return d.enabled === false && !d.processingBatch && !d.stateManagerProcessing && !d.updatingEffects &&
+      d.pendingTokens.length === 0 && d.changedTokens.length === 0;
   });
   for (let cycle = 0; cycle < 5; cycle++) await perceptionProfileApiCycle(c);
 }

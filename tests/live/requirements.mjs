@@ -4,6 +4,10 @@ import { auditCases } from './audit-cases.mjs';
 // Required functional contracts. Missing implementations are explicit blockers,
 // not omitted from the denominator or replaced with a passing placeholder.
 export const requirements = [
+  ['Live performance budgets', ['performance-movement', 'performance-movement-lights', 'performance-observer-switch', 'performance-recalculate-12', 'performance-recalculate-30']],
+  ['Player Seek templates', ['player-seek-template-circle', 'player-seek-template-cone', 'player-seek-template-cancel-config', 'player-seek-template-cancel-placement']],
+  ['Player-originated native actions', ['player-native-hide', 'player-native-sneak', 'player-native-seek', 'player-native-strike', 'player-native-create-a-diversion']],
+  ['Player character actions', ['player-character-hide', 'player-character-sneak', 'player-character-seek', 'player-character-create-a-diversion']],
   ...[...new Set(auditCases.map(c => c.area))].map(area => [
     `Feature audit: ${area}`, auditCases.filter(c => c.area === area).map(c => c.name),
   ]),

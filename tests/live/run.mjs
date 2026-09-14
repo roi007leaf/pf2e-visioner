@@ -157,6 +157,14 @@ async function screenshot(page, fixture, file, art, sampleRect) {
 }
 async function restoreSessions(record) {
   const failures = [];
+  try { if (record.player.manualRollPermission) await gm.page.evaluate(async ({ world, userId, saved }) => {
+    if (!game.user.isGM || game.world.id !== world) throw Error('QA GM required to restore permission');
+    const user = game.users.get(userId);
+    await user.update(saved.existed ? { 'permissions.MANUAL_ROLLS': saved.value } : { 'permissions.-=MANUAL_ROLLS': null });
+    if (Object.hasOwn(user._source.permissions, 'MANUAL_ROLLS') !== saved.existed ||
+      (saved.existed && user._source.permissions.MANUAL_ROLLS !== saved.value)) throw Error('Manual roll permission restoration failed');
+  }, { world: record.world, userId: record.player.user, saved: record.player.manualRollPermission });
+  } catch (error) { failures.push(error); }
   for (const session of [gm, gm2, player].filter(Boolean)) {
     try { await rpc(session.page, 'cleanupAuditTransients', record.runId); } catch (error) { failures.push(error); }
   }
@@ -219,12 +227,13 @@ async function run() {
     console.table(fullCases.map(c => ({ case: c.name, mode: 'automated', area: c.area ?? 'core', smoke: smokeCases.includes(c), steps: c.steps.length })));
     return;
   }
-  if (process.argv.includes('--release') && (process.env.VISIONER_LIVE_CASE || !process.argv.includes('--full'))) {
+  if (process.argv.includes('--release') && (process.env.VISIONER_LIVE_CASE || process.argv.includes('--performance') || !process.argv.includes('--full'))) {
     throw Error('Shipping validation requires --full, without a case filter');
   }
   if (process.argv.includes('--guided')) throw Error('Manual reviews were removed. Use --full for the automated suite.');
   for (const c of fullCases) for (const step of c.steps) if (step.workflow && !Object.hasOwn(workflows, step.workflow)) throw Error(`Missing workflow: ${step.workflow}`);
-  const allCases = process.argv.includes('--full') ? fullCases : smokeCases;
+  const allCases = process.argv.includes('--performance') ? fullCases.filter(c => c.area === 'performance' || c.name === 'movement-animation-performance')
+    : process.argv.includes('--full') ? fullCases : smokeCases;
   const requested = process.env.VISIONER_LIVE_CASE?.split(',').map(name => name.trim()).filter(Boolean);
   const unknown = requested?.filter(name => !allCases.some(c => c.name === name)) ?? [];
   if (unknown.length && !process.argv.includes('--cleanup-only')) throw Error(`Unknown live cases (or --full missing): ${unknown.join(', ')}`);

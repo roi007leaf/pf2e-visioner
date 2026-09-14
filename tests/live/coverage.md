@@ -1,8 +1,33 @@
 # Automated live coverage inventory
 
-**226 automated scenarios; zero guided scenarios.** The former 24 manual reviews
+**244 automated scenarios; zero guided scenarios.** The former 24 manual reviews
 became 42 separate automated workflows. Counts describe executable definitions,
 not successful live verification or exhaustive line/branch coverage.
+
+Five `performance-*` workloads augment the existing small animation benchmark.
+See [performance tests](performance.md) for workload sizes, measurement boundaries,
+fixed budgets, and hardware limitations. Performance-only runs do not certify
+the full catalog and remain excluded from CI and release ZIPs.
+
+Four `player-seek-template-*` cases exercise a player character's circle/cone
+placement, configuration cancellation, and placement cancellation. Placement
+checks pending-message ownership/shape, GM Open Results and Apply/Undo, both
+clients' state, revealed player artwork, and the player's Remove Template control
+clearing template documents and pending message data on both clients.
+Cancellation checks unchanged visibility, no GM results, no template documents,
+and released native creation hooks. Player reload clears transient placement
+listeners even on failure; persistent fixtures remain covered by recovery.
+
+Nine player-originated scenarios cover Hide, Sneak, Seek and Create a Diversion
+with both player-owned NPCs and characters, plus an NPC Strike. Native rolls run
+on the non-GM client, enter a natural 20 through Foundry's manual-dice dialog,
+and verify player message authorship. Sneak uses the player's Start Sneak button
+and token movement. GM chat controls apply and undo actual roll results; both
+clients must receive the expected visibility state. Seek also checks revealed
+token pixels. Players must not receive GM Apply controls. Secret actions select
+public mode in the native roll dialog because PF2e disallows manual blind rolls.
+This does not cover secret-roll privacy, natural 1 adjustments, player character
+weapon Strikes, Point Out, Take Cover or every action variant.
 
 Three `action-gap-degrees-*` workflows exercise Hide, Sneak and Seek at DC offsets
 -11, -10, -9, -1, 0, +9 and +10. Native PF2e DCs supply fixture thresholds;

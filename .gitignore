@@ -12,3 +12,4 @@ output/playwright/
 artifacts/
 .playwright-mcp/
 .serena/
+output/

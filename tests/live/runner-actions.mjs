@@ -71,6 +71,8 @@ export async function interactiveMutation(page, operation, value, start, diagnos
   const started = Date.now();
   const originalApps = await page.evaluate(() => [...new Set([...Object.values(ui.windows), ...(foundry.applications.instances?.values?.() ?? [])])].map(a => a.id));
   let done = false, failure, output;
+  const submittedRollDialogs = new Set();
+  const submittedResolvers = new Set();
   // The operation can await a native roll dialog. Drive only known roll/cover
   // controls while retaining and awaiting the actual mutation promise.
   const pending = start().then(result => { output = result; }, error => { failure = error; }).finally(() => { done = true; });
@@ -78,13 +80,34 @@ export async function interactiveMutation(page, operation, value, start, diagnos
   try {
     while (!done) {
       await prepareVisualSurface(page);
+      const resolver = page.locator('.roll-resolver').last();
+      if (value?.manualDie !== undefined && await resolver.count() && await resolver.isVisible()) {
+        const resolverId = await resolver.getAttribute('id');
+        if (!submittedResolvers.has(resolverId)) {
+          const inputs = resolver.locator('label[data-method="manual"] input:not(:disabled)');
+          for (let i = 0; i < await inputs.count(); i++) {
+            const input = inputs.nth(i);
+            const max = Number(await input.getAttribute('max'));
+            await input.fill(String(Math.min(value.manualDie, max)));
+          }
+          await resolver.locator('button[type="submit"]').click();
+          submittedResolvers.add(resolverId);
+        }
+      }
       const cover = page.locator('.pv-cover-quick-override').last();
       if (await cover.count() && await cover.isVisible()) {
         if (value?.cover !== undefined) await cover.locator(`[data-state="${value.cover}"]`).click();
         await cover.locator('[data-action="roll"]').click();
       }
       const roll = page.locator('.check-modifiers-content button[type="submit"]').last();
-      if (await roll.count() && await roll.isVisible()) await roll.click();
+      if (await roll.count() && await roll.isVisible()) {
+        const id = await roll.evaluate(el => el.closest('.window-app, .application')?.id);
+        if (!submittedRollDialogs.has(id)) {
+          if (value?.manualDie !== undefined) await page.locator('.check-modifiers-content select[name="messageMode"]').last().selectOption('public');
+          await roll.click();
+          submittedRollDialogs.add(id);
+        }
+      }
       if (operation === 'action-roll' && value?.action === 'take-cover') {
         const choice = await page.evaluate(async () => {
           const run = canvas.scene?.getFlag('pf2e-visioner', 'liveTestRun');

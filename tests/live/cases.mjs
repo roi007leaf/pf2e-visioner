@@ -6,6 +6,8 @@ import { missingCases } from './missing-cases.mjs';
 import { auditCases } from './audit-cases.mjs';
 import { gapCases } from './gap-cases.mjs';
 import { actionGapCases } from './action-gap-cases.mjs';
+import { playerActionCases } from './player-action-workflows.mjs';
+import { performanceCases } from './performance-workflows.mjs';
 // Every case gets fresh documents. These are live contracts, not mocked calculators.
 export const smokeCases = [
   { name: 'darkvision-in-darkness', darkness: true, steps: [{ expect: { state: 'observed', visible: true, filter: null }, art: true }] },
@@ -55,6 +57,8 @@ export const smokeCases = [
 
 export const fullCases = [
   ...actionGapCases,
+  ...playerActionCases,
+  ...performanceCases,
   ...gapCases,
   ...auditCases,
   ...smokeCases,

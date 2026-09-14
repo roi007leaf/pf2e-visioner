@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.7.1] - 2026-09-14
+
+### Fixed
+
+- Disabling automatic visibility now cancels queued and scheduled batches and invalidates unfinished calculations, preventing stale work from overwriting a later manually stored perception profile.
+
+- Player-placed Seek cones now preserve their angle and direction when the GM checks for targets. Previously, a cone containing creatures could incorrectly lose its Open Results button after handoff.
+
+### Tests
+
+- Manual-dice automation submits each resolver once, preventing a second click from racing Foundry's closing dialog during longer suites.
+
+- Added five automated live performance workloads: 30-token movement with/without seven token lights, 24-token observer switching, and full AVS recalculation with 12/30 tokens. Workloads include 24 walls, warm-up runs, repeated timing samples, fixed failure budgets, state/render checks, and normal fixture cleanup. `npm run test:live:performance` runs these plus the existing animation benchmark locally; measurements stay in the run report.
+
+- Added four player Seek template scenarios: circle/cone placement through the player's chat controls, pending-template handoff to the GM, Apply/Undo on both clients, and cancellation during configuration or placement. Checks include player ownership, template shape, revealed artwork, creation-hook release on cancellation, and temporary-template cleanup.
+
+- Added nine player-originated live scenarios: Hide, Sneak, Seek, and Create a Diversion with both player-owned NPCs and characters, plus a player-owned NPC Strike. Native PF2e rolls use automated manual-dice entry; tests verify player authorship, GM-only Apply controls, Sneak start and movement, GM Apply/Undo, both clients' visibility states, and revealed Seek artwork. QA manual-roll permission and dice configuration are restored through normal cleanup and recovery. These local tests remain excluded from CI and release archives.
+
 ## [8.7.0] - 2026-09-14
 
 ### Tests

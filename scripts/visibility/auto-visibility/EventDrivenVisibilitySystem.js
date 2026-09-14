@@ -273,6 +273,7 @@ export class EventDrivenVisibilitySystem {
 
     // Clear all pending changes through VisibilityStateManager
     this.#visibilityStateManager.clear();
+    this.#batchOrchestrator.cancelPendingBatches();
   }
 
   /**
