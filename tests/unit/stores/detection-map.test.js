@@ -23,7 +23,22 @@ describe('Detection Map Store', () => {
   });
 
   afterEach(() => {
+    discardDetectionBatch();
     jest.useRealTimers();
+  });
+
+  test.each([false, true])('unchanged pairs do not copy the entire detection map (batch=%s)', async (batch) => {
+    const detection = { sense: 'hearing', isPrecise: false };
+    const readUnrelated = jest.fn(() => ({ sense: 'vision', isPrecise: true }));
+    const currentMap = { target: detection };
+    Object.defineProperty(currentMap, 'unrelated', { enumerable: true, get: readUnrelated });
+    observer.document.getFlag = jest.fn(() => currentMap);
+    if (batch) startDetectionBatch();
+    for (let i = 0; i < 100; i++) await setDetectionBetween(observer, target, { ...detection });
+    expect(readUnrelated).not.toHaveBeenCalled();
+    await flushDetectionBatch();
+    expect(observer.document.update).not.toHaveBeenCalled();
+    expect(currentMap.target).toBe(detection);
   });
 
   test('setDetectionMap persists without triggering render or animation', async () => {

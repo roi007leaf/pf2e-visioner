@@ -118,7 +118,12 @@ export class EphemeralEffectIndex {
         if (rules.length === 0) {
           effectsToDelete.push(aggregate.id, ...duplicateIds);
         } else if (changed) {
-          effectsToUpdate.push({ _id: aggregate.id, 'system.rules': rules });
+          // Multiple linked-token updates can remove and then restore the same
+          // signature. Persist only a net change: even an identical Item write
+          // rebuilds the actor and all of its linked tokens in PF2e.
+          if (JSON.stringify(aggregate.system?.rules) !== JSON.stringify(rules)) {
+            effectsToUpdate.push({ _id: aggregate.id, 'system.rules': rules });
+          }
           effectsToDelete.push(...duplicateIds);
         }
       } else if (rules.length > 0) {

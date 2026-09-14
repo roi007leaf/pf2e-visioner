@@ -6,6 +6,7 @@ import {
   buildSystemHiddenIndicatorDecision,
   getSystemHiddenIndicatorCandidates,
   getSystemHiddenSenseContext,
+  observerHasPerceptionSense,
   getSystemHiddenTokenDistance,
   getMatchingControlledTokenForRefresh,
   refreshSystemHiddenHighlightsForControlledTokens,
@@ -23,6 +24,27 @@ function makeToken(id) {
     },
   };
 }
+
+test.each([
+  [{ type: 'SCENT' }],
+  { contents: [{ slug: 'scent' }] },
+  new Map([['scent', { id: 'scent' }]]),
+  new Set([{ type: 'scent' }]),
+  { scent: { type: 'scent' } },
+])('sense presence lookup supports native collection shape %#', (senses) => {
+  expect(observerHasPerceptionSense({ actor: { perception: { senses } } }, 'scent')).toBe(true);
+});
+
+test('sense presence lookup reads live entries without copying unrelated sense fields', () => {
+  const sense = { type: 'darkvision' };
+  Object.defineProperty(sense, 'unrelated', { enumerable: true, get: () => { throw Error('Do not copy senses for a presence query'); } });
+  const observer = { actor: { system: { perception: { senses: [sense] } } } };
+  expect(observerHasPerceptionSense(observer, 'scent')).toBe(false);
+  sense.type = 'scent';
+  expect(observerHasPerceptionSense(observer, 'scent')).toBe(true);
+  observer.actor.system.perception.senses.length = 0;
+  expect(observerHasPerceptionSense(observer, 'scent')).toBe(false);
+});
 
 test.each(['lifesense', 'thoughtsense'])('%s marker survives a visible-token refresh without hearing', (sense) => {
   const observer = { document: { x: 0, y: 0, width: 1, height: 1 },

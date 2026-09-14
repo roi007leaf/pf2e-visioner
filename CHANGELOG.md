@@ -1,5 +1,33 @@
 # Changelog
 
+## [8.7.3] - 2026-09-14
+
+### Fixed
+
+- Prevent foreground AVS calculation continuations from starving rendered frames. Expensive directional calculations yield in short slices through the ordinary task queue; background GMs retain scheduler yielding. A Chromium trace identified back-to-back prioritized continuations behind the remaining ~100 ms movement gaps.
+
+- Avoid constructing a full special-sense context on every token render just to check scent availability. The direct presence check reads current sense data without copying unrelated fields or retaining stale sense state.
+
+- Combine AVS effect updates across observers before writing each receiving actor. This prevents repeated intermediate effect creation/deletion and linked-token rebuilds after large batches. Synthetic token actors remain separate, and large preparation batches yield to rendering.
+
+- Skip aggregate off-guard Item writes when linked-token updates remove and restore identical final rules. This avoids unnecessary PF2e actor/token rebuilds while preserving real rule changes and duplicate-effect cleanup.
+
+- Reduced large-scene AVS movement stalls by reusing cached settings, reading stored visibility maps once per observer per batch, and yielding between expensive calculation chunks. Soundwave bookkeeping now skips unnecessary sight checks and uses Core's zero-tolerance tests for dense token visibility points.
+
+- Avoid copying detection maps for unchanged senses, bound spatial searches to occupied cells, and reuse native visibility points within each LOS calculation. Foundry 14 receives those points in one zero-tolerance visibility test, matching its native token check.
+
+### Tests
+
+- Final performance follow-up passed 30 targeted live scenarios plus three fresh-browser heavy-scene repeats on identical source. GM movement in the cold repeats measured 93–121 FPS with 13–19 ms p95 frame times; cleanup completed for every run. See `docs/performance-follow-up.md` for exact evidence, environment and remaining limits.
+
+- Added native live coverage for linked-token effect no-op writes across targets and observers, plus real Hidden/Observed effect transitions. Three fresh-browser heavy-scene repeats passed after the foreground scheduling correction. Exact measurements, enabled companion modules, earlier failed repeats and remaining limits are in `tests/live/performance.md`.
+
+- Added regressions for bounded setting/map reads, batch yielding without dropped visibility results, and soundwave sight-test work. Local FPS tests support Maximum quality with uncapped-ticker metadata, optional CPU profiles, and restoration of both clients' original quality/FPS settings.
+
+- Added regressions for unchanged detection-map writes, spatial bounds after rebuilds, native visibility-point reuse, foreground/background yielding and live sense changes. All 4,896 automated tests pass; earlier passes and heavy-scene failures remain documented in `tests/live/performance.md`.
+
+- Expanded retained-memory audit evidence with tooltip-handler ownership checks and both clients' results on failure. See `docs/live-memory-audit.md` for measurements and limits, and `tests/live/performance.md` for local commands.
+
 ## [8.7.2] - 2026-09-14
 
 ### Fixed

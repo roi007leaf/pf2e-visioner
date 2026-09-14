@@ -137,6 +137,19 @@ function getObserverPerceptionSenses(observer) {
     .filter(Boolean);
 }
 
+// Render guards only need presence. Avoid copying every Sense data model and
+// building the full indicator context for every target on every frame.
+export function observerHasPerceptionSense(observer, type) {
+  const actor = observer?.actor;
+  for (const senses of [actor?.system?.perception?.senses, actor?.perception?.senses]) {
+    for (const sense of normalizeSenseCollection(senses)) {
+      if (sense && typeof sense === 'object' &&
+        String(sense.type ?? sense.slug ?? sense.id ?? '').toLowerCase() === type) return true;
+    }
+  }
+  return false;
+}
+
 function getStoredDetection({ observer, token, getDetectionBetween }) {
   try {
     return getDetectionBetween?.(observer, token) ?? null;

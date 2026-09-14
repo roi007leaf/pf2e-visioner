@@ -49,6 +49,11 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
   return batchUpdateVisibilityEffects(observerToken, targetUpdates, options);
 }
 
+export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, options = {}) {
+  const { batchUpdateVisibilityEffectsForObservers } = await import('./batch.js');
+  return batchUpdateVisibilityEffectsForObservers(observerUpdates, options);
+}
+
 /**
  * Create an ephemeral effect rule for a specific observer signature
  * @param {string} signature - The observer's signature

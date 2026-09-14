@@ -1081,7 +1081,7 @@ export class BatchOrchestrator {
     }
 
     try {
-      const { batchUpdateVisibilityEffects } = await import('../../../visibility/ephemeral.js');
+      const { batchUpdateVisibilityEffectsForObservers } = await import('../../../visibility/ephemeral.js');
 
       setSuppressRefreshTokenProcessing(true);
       setSuppressLightingRefresh(true);
@@ -1092,9 +1092,7 @@ export class BatchOrchestrator {
           isIgnoredTarget: (target) => this._isHazardOrLoot(target),
         });
 
-        for (const { observer, targets } of effectSyncPlan) {
-          await batchUpdateVisibilityEffects(observer, targets);
-        }
+        await batchUpdateVisibilityEffectsForObservers(effectSyncPlan);
       } finally {
         // Clear the suppression flags after a short delay
         // This ensures any queued refreshToken/lightingRefresh events are processed while suppressed

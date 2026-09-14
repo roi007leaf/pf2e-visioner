@@ -82,14 +82,19 @@ function coreVisualDetectionSeesTarget(observer, target, visionSource) {
 
   try {
     const center = target?.center;
-    const points = target?.document?.getVisibilityTestPoints?.() ?? [
+    const nativePoints = target?.document?.getVisibilityTestPoints?.();
+    const points = nativePoints ?? [
       {
         x: center.x,
         y: center.y,
         elevation: target?.document?.elevation ?? 0,
       },
     ];
-    const config = createTestConfig.call(visibility, points, { object: target });
+    // Core already supplies dense points for tokens and tests them with zero tolerance.
+    // Expanding each one by nine offsets repeats work and can see past Core's boundary.
+    const config = createTestConfig.call(visibility, points, {
+      object: target, tolerance: nativePoints ? 0 : 2,
+    });
     let tested = false;
     for (const id of ['basicSight', 'lightPerception']) {
       const mode = modes[id];
@@ -310,7 +315,7 @@ export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
   if (!target) return;
   if (target.detectionFilter === getSoundwaveFilter()) {
     previouslySoundwaveDetectedTargets.add(target);
-  } else if (!target.controlled) {
+  } else if (!target.controlled && previouslySoundwaveDetectedTargets.has(target)) {
     const visuallyObserved = currentViewVisionerObserversForTarget(target).some(
       (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );

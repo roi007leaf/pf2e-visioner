@@ -25,7 +25,7 @@ import {
 import { waitForTokenDocumentUpdateSafe } from './document-update-guard.js';
 import { getDetectionBetween } from './detection-map.js';
 import { isClosedSightDoorBetween } from '../helpers/scent-wall-utils.js';
-import { getSystemHiddenSenseContext } from '../services/system-hidden-token-highlights.js';
+import { observerHasPerceptionSense } from '../services/system-hidden-token-highlights.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import {
   areTokenFlagValuesEqual,
@@ -425,7 +425,7 @@ export function suppressCurrentViewScentTokenArt(target, { walls } = {}) {
     // Visibility and detection maps are separate writes. During closing, Hidden may
     // arrive while the sense still says vision; keep the same door guard across both.
     const visualSense = !sense || sense === AVS_EXPLICIT_VISIBLE_DETECTION_SENSE || isVisualSenseType(sense);
-    if ((visualSense || sense === 'hearing') && getSystemHiddenSenseContext(observer).observerHasScent &&
+    if ((visualSense || sense === 'hearing') && observerHasPerceptionSense(observer, 'scent') &&
       isClosedSightDoorBetween(observer, target, walls, { soundRequired: sense === 'hearing' })) {
       scentDetected = true;
       continue;

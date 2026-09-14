@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../constants.js';
+import { yieldToBrowser } from '../utils/yield-to-browser.js';
 import {
   createAggregateEffectData,
   createEphemeralEffectRule,
@@ -37,56 +38,77 @@ function shouldSuppressObservedTargetForObserver(observerToken) {
 }
 
 export async function batchUpdateVisibilityEffects(observerToken, targetUpdates, options = {}) {
+  return batchUpdateVisibilityEffectsForObservers(
+    [{ observer: observerToken, targets: targetUpdates }],
+    options,
+  );
+}
+
+/** Combine an AVS result's ordered observer updates before writing each receiving actor. */
+export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, options = {}) {
   if (!game.user?.isGM) return;
-  if (!observerToken?.actor || !targetUpdates?.length) return;
+  if (!observerUpdates?.length) return;
   if (options.deferDuringPendingMovement !== false && hasActivePendingTokenMovement()) return;
-  try {
-    const oType = observerToken?.actor?.type;
-    if (oType && ['loot', 'vehicle', 'party'].includes(oType)) return;
-  } catch (_) { }
   const effectTarget =
     options.effectTarget || (options.direction === 'target_to_observer' ? 'observer' : 'subject');
   const updatesByReceiver = new Map();
-  for (const update of targetUpdates) {
-    if (!update.target?.actor) continue;
+  const now = () => globalThis.performance?.now?.() ?? Date.now();
+  let sliceStartedAt = now();
+  const yieldIfNeeded = async () => {
+    if (now() - sliceStartedAt < 8) return;
+    await yieldToBrowser();
+    sliceStartedAt = now();
+  };
+  for (const entry of observerUpdates) {
+    const { observer: observerToken, targets: targetUpdates } = entry ?? {};
+    if (!observerToken?.actor || !targetUpdates?.length) continue;
     try {
-      const tType = update.target.actor?.type;
-      if (tType && ['loot', 'vehicle', 'party'].includes(tType)) continue;
-    } catch (_) { }
-    const receiver = effectTarget === 'observer' ? observerToken : update.target;
-    const source = effectTarget === 'observer' ? update.target : observerToken;
-    const suppressionContext = update.profileMetadata || update.perceptionProfile || {};
-    const suppressionActive =
-      ['hidden', 'undetected'].includes(update.state) &&
-      OffGuardSuppression.shouldSuppressOffGuardForState(
+      const oType = observerToken.actor.type;
+      if (oType && ['loot', 'vehicle', 'party'].includes(oType)) continue;
+    } catch (_) {}
+    for (const update of targetUpdates) {
+      if (!update.target?.actor) continue;
+      try {
+        const tType = update.target.actor?.type;
+        if (tType && ['loot', 'vehicle', 'party'].includes(tType)) continue;
+      } catch (_) {}
+      const receiver = effectTarget === 'observer' ? observerToken : update.target;
+      const source = effectTarget === 'observer' ? update.target : observerToken;
+      const suppressionContext = update.profileMetadata || update.perceptionProfile || {};
+      const suppressionActive =
+        ['hidden', 'undetected'].includes(update.state) &&
+        OffGuardSuppression.shouldSuppressOffGuardForState(
+          source,
+          update.state,
+          receiver,
+          suppressionContext,
+        );
+      // Linked tokens share an actor; synthetic actors sharing a base id do not.
+      const receiverId = receiver.actor.uuid ?? receiver.actor;
+      if (
+        update.state === 'observed' ||
+        update.state === 'concealed' ||
+        update.state === 'undetected' ||
+        options.removeAllEffects ||
+        suppressionActive
+      ) {
+        await cleanupLegacyVisibilityPair(observerToken, update.target);
+      }
+      if (!updatesByReceiver.has(receiverId))
+        updatesByReceiver.set(receiverId, { receiver, updates: [] });
+      updatesByReceiver.get(receiverId).updates.push({
         source,
-        update.state,
-        receiver,
-        suppressionContext,
-      );
-    const receiverId = receiver.actor.id;
-    if (
-      update.state === 'observed' ||
-      update.state === 'concealed' ||
-      update.state === 'undetected' ||
-      options.removeAllEffects ||
-      suppressionActive
-    ) {
-      await cleanupLegacyVisibilityPair(observerToken, update.target);
+        state: update.state,
+        suppressionActive,
+      });
     }
-    if (!updatesByReceiver.has(receiverId))
-      updatesByReceiver.set(receiverId, { receiver, updates: [] });
-    updatesByReceiver.get(receiverId).updates.push({
-      source,
-      state: update.state,
-      suppressionActive,
-    });
+    await yieldIfNeeded();
   }
   for (const { receiver, updates } of updatesByReceiver.values()) {
     try {
       const rType = receiver?.actor?.type;
       if (rType && ['loot', 'vehicle', 'party'].includes(rType)) continue;
-    } catch (_) { }
+    } catch (_) {}
     await runWithEffectLock(receiver.actor, async () => {
       const effects = receiver.actor.itemTypes.effect;
       const effectIndex = new EphemeralEffectIndex({
@@ -128,12 +150,11 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
           effectIndex.addSignature('undetected', signature, createEphemeralEffectRule);
         }
       }
-      const { effectsToCreate, effectsToUpdate, effectsToDelete } =
-        effectIndex.buildMutationPlan({
-          createAggregateEffectData,
-          options,
-          receiverId: receiver.actor.id,
-        });
+      const { effectsToCreate, effectsToUpdate, effectsToDelete } = effectIndex.buildMutationPlan({
+        createAggregateEffectData,
+        options,
+        receiverId: receiver.actor.id,
+      });
       if (effectsToDelete.length > 0) {
         // Only GMs can delete effects
         if (game.user.isGM) {
@@ -145,5 +166,6 @@ export async function batchUpdateVisibilityEffects(observerToken, targetUpdates,
       if (effectsToCreate.length > 0)
         await receiver.actor.createEmbeddedDocuments('Item', effectsToCreate);
     });
+    await yieldIfNeeded();
   }
 }

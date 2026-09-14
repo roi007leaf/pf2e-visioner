@@ -4,6 +4,7 @@
  */
 
 import { VisionAnalyzer } from '../../../scripts/visibility/auto-visibility/VisionAnalyzer.js';
+import { clearSettingValueCache, setCachedSettingValue } from '../../../scripts/utils/setting-value-cache.js';
 
 // Mock required modules
 jest.mock('../../../scripts/helpers/size-elevation-utils.js', () => ({
@@ -111,6 +112,7 @@ describe('VisionAnalyzer - Hybrid Consensus Validation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSettingValueCache();
 
     // Reset canvas walls
     global.canvas.walls.placeables = [];
@@ -156,6 +158,14 @@ describe('VisionAnalyzer - Hybrid Consensus Validation', () => {
       const result = visionAnalyzer.hasLineOfSight(mockObserver, mockTarget);
       expect(result).toBeUndefined();
     });
+
+    test('respects a setting change after LOS has already populated the cache', () => {
+      global.game.settings.get.mockReturnValue(false);
+      expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBe(true);
+      // Registration's onChange updates the cache before scheduling recalculation.
+      setCachedSettingValue('disableLineOfSightCalculation', true);
+      expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBeUndefined();
+    });
   });
 
   describe('Vision Polygon Integration', () => {
@@ -167,6 +177,37 @@ describe('VisionAnalyzer - Hybrid Consensus Validation', () => {
           intersectCircle: jest.fn(),
         },
       };
+    });
+
+    test('shares native token test points within one LOS check, then refreshes them on the next check', () => {
+      global.game.settings.get.mockReturnValue(false);
+      mockObserver.vision.los.intersectCircle.mockReturnValue({ points: [1, 1, 2, 2] });
+      mockTarget.document.getVisibilityTestPoints = jest.fn(() => [{ ...mockTarget.center, elevation: 0 }]);
+      expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBe(true);
+      expect(mockTarget.document.getVisibilityTestPoints).toHaveBeenCalledTimes(1);
+      mockTarget.center = { x: 300, y: 300 };
+      expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBe(true);
+      expect(mockTarget.document.getVisibilityTestPoints).toHaveBeenCalledTimes(2);
+    });
+
+    test('submits all native token points once to Foundry 14 without tolerance expansion', () => {
+      const oldRelease = game.release;
+      const oldVisibility = canvas.visibility;
+      try {
+        game.release = { generation: 14 };
+        game.settings.get.mockReturnValue(false);
+        mockObserver.vision.los.intersectCircle.mockReturnValue({ points: [1, 1, 2, 2] });
+        const points = [{ x: 225, y: 225, elevation: 0 }, { x: 220, y: 220, elevation: 0 }];
+        mockTarget.document.getVisibilityTestPoints = jest.fn(() => points);
+        canvas.visibility = { testVisibility: jest.fn(() => false) };
+        expect(visionAnalyzer.hasLineOfSight(mockObserver, mockTarget)).toBe(false);
+        expect(canvas.visibility.testVisibility).toHaveBeenCalledTimes(1);
+        expect(canvas.visibility.testVisibility).toHaveBeenCalledWith(points,
+          expect.objectContaining({ object: mockTarget, source: mockObserver.vision, tolerance: 0 }));
+      } finally {
+        game.release = oldRelease;
+        canvas.visibility = oldVisibility;
+      }
     });
 
     test('should use vision polygon when available and both systems agree on true', () => {

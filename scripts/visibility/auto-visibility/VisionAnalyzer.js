@@ -31,6 +31,7 @@ import { peekRegistry } from '../../services/Peek/PeekRegistry.js';
 import { isPointInCone } from '../../services/Peek/peek-geometry.js';
 import { getActiveSceneHearingRange } from '../../services/scene-hearing-range.js';
 import { getLogger } from '../../utils/logger.js';
+import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 
 const log = getLogger('VisionAnalyzer');
@@ -229,7 +230,7 @@ export class VisionAnalyzer {
     }
 
     // Check if LOS calculation is disabled
-    const losDisabled = game.settings.get(MODULE_ID, 'disableLineOfSightCalculation');
+    const losDisabled = getCachedSettingValue('disableLineOfSightCalculation', false);
     if (losDisabled) {
       return undefined;
     }
@@ -432,7 +433,10 @@ export class VisionAnalyzer {
         const intersection = los.intersectCircle(circle, { density: 8, scalingFactor: 1.0 });
         const circleVisible = intersection?.points?.length > 0;
         const visible = circleVisible || this.#doesLosContainTokenShape(los, target, targetPos);
-        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos);
+        // Native points require wall-constrained geometry. Reuse them for the
+        // two synchronous checks, but never retain them across movement calls.
+        const nativeTargetPoints = target?.document?.getVisibilityTestPoints?.();
+        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos, nativeTargetPoints);
 
         // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
         // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
@@ -443,7 +447,7 @@ export class VisionAnalyzer {
 
         // Run full geometric LOS check (same logic as the fallback below)
         const observerCenter = { x: observerPos.x, y: observerPos.y };
-        const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos);
+        const targetPoints = this.#getCoreVisibilityTestPoints(target, targetPos, nativeTargetPoints);
 
         let hybridObserverSpan = null;
         let hybridTargetSpan = null;
@@ -960,7 +964,7 @@ export class VisionAnalyzer {
     ];
   }
 
-  #getCoreVisibilityTestPoints(token, centerPos = null) {
+  #getCoreVisibilityTestPoints(token, centerPos = null, nativePoints = undefined) {
     const tokenCenter = token?.center;
     const centerMatchesToken =
       !centerPos ||
@@ -969,7 +973,7 @@ export class VisionAnalyzer {
         Math.abs(Number(centerPos.y ?? 0) - Number(tokenCenter.y ?? 0)) <= 0.5);
 
     if (centerMatchesToken) {
-      const points = token?.document?.getVisibilityTestPoints?.();
+      const points = nativePoints ?? token?.document?.getVisibilityTestPoints?.();
       if (Array.isArray(points) && points.length) return points;
     }
 
@@ -1325,9 +1329,9 @@ export class VisionAnalyzer {
     return null;
   }
 
-  #testFoundryVisibility(observer, target, targetPos) {
+  #testFoundryVisibility(observer, target, targetPos, nativePoints = undefined) {
     try {
-      const testPoints = target?.document?.getVisibilityTestPoints?.() ?? [
+      const testPoints = nativePoints ?? target?.document?.getVisibilityTestPoints?.() ?? [
         {
           x: targetPos.x,
           y: targetPos.y,
@@ -1364,6 +1368,16 @@ export class VisionAnalyzer {
     const points = Array.isArray(testPoints) ? testPoints : [testPoints];
 
     if (canvas?.visibility?.testVisibility) {
+      if (Number(globalThis.game?.release?.generation) >= 14) {
+        return {
+          available: true,
+          api: 'canvas.visibility.testVisibility',
+          // Match Token#isVisible: native dense points form one zero-tolerance test.
+          result: canvas.visibility.testVisibility(points, {
+            object: target, source: observer.vision, level, tolerance: 0,
+          }),
+        };
+      }
       return {
         available: true,
         api: 'canvas.visibility.testVisibility',

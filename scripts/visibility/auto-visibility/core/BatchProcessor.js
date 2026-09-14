@@ -5,6 +5,7 @@ import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { sceneDistanceToPixels } from '../../../helpers/geometry-utils.js';
 import { getLogger } from '../../../utils/logger.js';
 import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
+import { yieldToBrowser } from '../../../utils/yield-to-browser.js';
 import { GlobalLosCache } from '../utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../utils/GlobalVisibilityCache.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -329,6 +330,7 @@ export class BatchProcessor {
         ? dependencies.movementSightLineResolver
         : null;
     this.maxVisibilityDistance = dependencies.maxVisibilityDistance;
+    this.yieldToBrowser = dependencies.yieldToBrowser || yieldToBrowser;
     this.nowProvider =
       dependencies.nowProvider ||
       (() => {
@@ -668,7 +670,11 @@ export class BatchProcessor {
     };
     const applyFeatVisibilityReplacement = (observerToken, targetToken, visibility) => {
       if (!visibility) return { visibility, profileMetadata: {} };
-      const featResult = FeatsHandler.getVisibilityReplacement(observerToken, targetToken, visibility);
+      const featResult = FeatsHandler.getVisibilityReplacement(
+        observerToken,
+        targetToken,
+        visibility,
+      );
       if (!featResult) return { visibility, profileMetadata: {} };
       return {
         visibility: featResult.state,
@@ -677,6 +683,13 @@ export class BatchProcessor {
     };
 
     const mainLoopStart = this.nowProvider();
+    let sliceStartedAt = mainLoopStart;
+    const yieldIfNeeded = async () => {
+      // Leave room for Core rendering on high-refresh displays at Maximum quality.
+      if (this.nowProvider() - sliceStartedAt < 4) return;
+      await this.yieldToBrowser();
+      sliceStartedAt = this.nowProvider();
+    };
     for (const changedTokenId of changedTokenIds) {
       const changedToken = idToToken.get(changedTokenId);
       if (!changedToken) {
@@ -726,6 +739,9 @@ export class BatchProcessor {
       detailedTimings.spatialFiltering += this.nowProvider() - stageStart;
 
       for (const otherToken of relevantTokens) {
+        // Resolved promises do not let the browser render. A large AVS batch must
+        // yield to a new task periodically rather than monopolize one frame.
+        await yieldIfNeeded();
         if (otherToken.document.id === changedTokenId) continue;
 
         const aId = changedToken.document.id;
@@ -922,8 +938,14 @@ export class BatchProcessor {
 
         stageStart = this.nowProvider();
         const los1 = directionalLosResolver.get(changedToken, otherToken, losKey1);
+        detailedTimings.losCalculations += this.nowProvider() - stageStart;
+        // One cold pair can exceed the frame budget. Yield between directions,
+        // excluding scheduler wait time from the calculation timing buckets.
+        await yieldIfNeeded();
+        stageStart = this.nowProvider();
         const los2 = directionalLosResolver.get(otherToken, changedToken, losKey2);
         detailedTimings.losCalculations += this.nowProvider() - stageStart;
+        await yieldIfNeeded();
         const distance =
           Math.sqrt(Math.pow(posA.x - posB.x, 2) + Math.pow(posA.y - posB.y, 2)) / canvas.grid.size;
         let skipVisibilityCalc1 = false;
@@ -1007,6 +1029,9 @@ export class BatchProcessor {
           }
         }
         // Direction 2: otherToken -> changedToken (only calculate if no override)
+        detailedTimings.visibilityCalculations += this.nowProvider() - stageStart;
+        await yieldIfNeeded();
+        stageStart = this.nowProvider();
         if (!hasOverride2 && !skipVisibilityCalc2) {
           breakdown.pairsConsidered++;
           const vKey2 = posCache.makeDirectionalKey(bId, posKeyB, aId, posKeyA);

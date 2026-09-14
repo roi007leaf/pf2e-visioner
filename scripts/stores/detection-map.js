@@ -118,25 +118,16 @@ export function getDetectionBetween(observer, target) {
 export async function setDetectionBetween(observer, target, detection) {
   if (!observer?.document?.id || !target?.document?.id) return;
 
-  let detectionMap;
-  let currentDetection;
   const observerId = observer.document.id;
   const targetId = target.document.id;
-
-  if (batchMode) {
-    detectionMap = batchedUpdates.get(observerId);
-    if (!detectionMap) {
-      detectionMap = { ...getDetectionMap(observer) };
-    }
-    currentDetection = detectionMap[targetId];
-  } else {
-    detectionMap = { ...getDetectionMap(observer) };
-    currentDetection = detectionMap[targetId];
-  }
-
-  const hasChanged = isDetectionChanged(currentDetection, detection);
+  const pendingMap = batchMode ? batchedUpdates.get(observerId) : null;
+  const currentMap = pendingMap ?? getDetectionMap(observer);
+  const hasChanged = isDetectionChanged(currentMap[targetId], detection);
 
   if (hasChanged) {
+    // Most recalculated pairs keep their sense. Copy document flags only when
+    // something changes; a pending batch already owns its mutable copy.
+    const detectionMap = pendingMap ?? { ...currentMap };
     if (detection === null) {
       delete detectionMap[targetId];
     } else {

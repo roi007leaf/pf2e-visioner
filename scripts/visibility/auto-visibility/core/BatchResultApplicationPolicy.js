@@ -41,6 +41,7 @@ export function buildBatchResultApplicationPlan({
 } = {}) {
   let uniqueUpdateCount = 0;
   const observerMaps = new Map();
+  const storedObserverMaps = new Map();
   const dirtyObserverSet = new Set();
   const appliedUpdates = [];
   const matchesOverrideVisibility =
@@ -72,12 +73,19 @@ export function buildBatchResultApplicationPlan({
 
     if (!observerMaps.has(observer)) {
       observerMaps.set(observer, { ...getVisibilityMap(observer) });
+      // Planning is synchronous; persisted maps cannot change between pairs.
+      // Normalize each observer's full map once, rather than once per target.
+      storedObserverMaps.set(
+        observer,
+        typeof getStoredVisibilityMap === 'function'
+          ? getStoredVisibilityMap(observer) || {}
+          : null,
+      );
     }
 
     const visibilityMap = observerMaps.get(observer);
     const from = visibilityMap[targetId] ?? 'observed';
-    const storedVisibilityMap =
-      typeof getStoredVisibilityMap === 'function' ? getStoredVisibilityMap(observer) || {} : null;
+    const storedVisibilityMap = storedObserverMaps.get(observer);
     const storedFrom = storedVisibilityMap ? (storedVisibilityMap[targetId] ?? 'observed') : from;
     const resolvedVisibility = resolveVisibilityForUpdate?.(update, from) ?? update.visibility;
     const resolvedUpdate =

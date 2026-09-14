@@ -20,6 +20,7 @@ import {
 } from '../services/sense-distance.js';
 import { isDarknessSource } from '../utils/darkness-source.js';
 import { getLogger } from '../utils/logger.js';
+import { getCachedSettingValue } from '../utils/setting-value-cache.js';
 import { calculateVisibility } from './StatelessVisibilityCalculator.js';
 
 const log = getLogger('AVS/VisibilityAdapter');
@@ -493,11 +494,7 @@ function extractImpreciseSenses(capabilities, distanceInFeet, { hearingDistanceI
 }
 
 function systemConditionOverridesEnabled() {
-  try {
-    return !!globalThis.game?.settings?.get?.(MODULE_ID, 'systemConditionOverrides');
-  } catch {
-    return false;
-  }
+  return !!getCachedSettingValue('systemConditionOverrides', false);
 }
 
 /**

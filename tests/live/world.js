@@ -36,6 +36,7 @@ export function preflight() {
     modules: game.modules.filter(m => m.active).map(m => ({ id: m.id, version: m.version })),
     clientSettings: { gmObserverView: game.settings.get(MODULE, 'gmObserverView') },
     systemClientSettings: { gmVision: game.settings.get('pf2e', 'gmVision') },
+    coreClientSettings: Object.fromEntries(['performanceMode', 'maxFPS'].map(key => [key, game.settings.get('core', key)])),
     diceConfiguration: foundry.utils.deepClone(game.settings.get('core', foundry.dice.Roll.DICE_CONFIGURATION_SETTING)),
     manualRollPermission: { existed: Object.hasOwn(game.user._source.permissions, 'MANUAL_ROLLS'), value: game.user._source.permissions.MANUAL_ROLLS ?? false },
     openApps: [...new Set([...Object.values(ui.windows), ...(foundry.applications.instances?.values?.() ?? [])])].map(app => app.id),
@@ -357,6 +358,14 @@ export async function restore(saved) {
   for (const [key, value] of Object.entries(saved.systemClientSettings ?? {})) {
     if (key !== 'gmVision' || game.settings.settings.get(`pf2e.${key}`)?.scope !== 'client') throw Error('Unexpected system client setting');
     if (game.settings.get('pf2e', key) !== value) await game.settings.set('pf2e', key, value);
+  }
+  for (const [key, value] of Object.entries(saved.coreClientSettings ?? {})) {
+    if (!['performanceMode', 'maxFPS'].includes(key) || game.settings.settings.get(`core.${key}`)?.scope !== 'client') throw Error('Unexpected Core client setting');
+    const coreDeadline = Date.now() + 30000;
+    while (canvas.loading && Date.now() < coreDeadline) await new Promise(resolve => setTimeout(resolve, 100));
+    if (canvas.loading) throw Error('Canvas loading prevented Core setting restoration');
+    if (game.settings.get('core', key) !== value) await game.settings.set('core', key, value);
+    if (game.settings.get('core', key) !== value) throw Error(`Core setting restoration failed: ${key}`);
   }
   if (saved.scene && game.scenes.has(saved.scene)) {
     const deadline = Date.now() + 30000;

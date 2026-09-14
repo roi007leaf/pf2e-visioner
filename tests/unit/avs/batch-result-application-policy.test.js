@@ -17,6 +17,24 @@ function target(id, overrideData = null) {
 }
 
 describe('BatchResultApplicationPolicy', () => {
+  test('reads each stored observer map once per plan, without retaining it across batches', () => {
+    const a = observer('A');
+    const updates = Array.from({ length: 100 }, (_, i) => ({
+      observer: a,
+      target: target(`T${i}`),
+      visibility: 'observed',
+    }));
+    const stored = Object.fromEntries(updates.map((u) => [u.target.document.id, 'hidden']));
+    const getStoredVisibilityMap = jest.fn(() => stored);
+    const options = { updates, getStoredVisibilityMap };
+    const plan = buildVisibilityMapApplicationPlan(options);
+    expect(plan.appliedUpdates).toHaveLength(100);
+    expect(plan.dirtyObservers).toEqual([a]);
+    expect(getStoredVisibilityMap).toHaveBeenCalledTimes(1);
+    getStoredVisibilityMap.mockReturnValue({});
+    expect(buildVisibilityMapApplicationPlan(options).appliedUpdates).toHaveLength(0);
+    expect(getStoredVisibilityMap).toHaveBeenCalledTimes(2);
+  });
   test('dedupes updates by observer-target pair and keeps the latest update', () => {
     const observerA = observer('A');
     const targetB = target('B');

@@ -14,6 +14,40 @@ import { DependencyInjectionContainer } from '../../../scripts/visibility/auto-v
 const makeToken = (id, x, y) =>
   createMockToken({ id, x, y, width: 1, height: 1, actor: createMockActor() });
 
+test('default batch yield lets an already queued browser task run before resuming', async () => {
+  jest.useFakeTimers();
+  const previousScheduler = globalThis.scheduler;
+  globalThis.scheduler = { yield: jest.fn(() => Promise.resolve()) };
+  try {
+    const events = [];
+    const processor = new BatchProcessor({ visionAnalyzer: {}, getCacheInvalidationRevision: () => 0 });
+    setTimeout(() => events.push('browser-task'), 0);
+    const pending = processor.yieldToBrowser().then(() => events.push('resume'));
+    await Promise.resolve();
+    expect(events).toEqual([]);
+    await jest.runAllTimersAsync();
+    await pending;
+    expect(events).toEqual(['browser-task', 'resume']);
+  } finally {
+    globalThis.scheduler = previousScheduler;
+    jest.useRealTimers();
+  }
+});
+
+test('background batches keep scheduler yielding instead of relying on throttled timers', async () => {
+  const previousScheduler = globalThis.scheduler;
+  const visibility = jest.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+  globalThis.scheduler = { yield: jest.fn().mockResolvedValue() };
+  try {
+    const processor = new BatchProcessor({ visionAnalyzer: {}, getCacheInvalidationRevision: () => 0 });
+    await processor.yieldToBrowser();
+    expect(globalThis.scheduler.yield).toHaveBeenCalledTimes(1);
+  } finally {
+    visibility.mockRestore();
+    globalThis.scheduler = previousScheduler;
+  }
+});
+
 function preparedSense(type, { acuity = 'imprecise', range = 60 } = {}) {
   const sense = { key: type };
   Object.defineProperty(sense, 'value', {
@@ -265,6 +299,40 @@ describe('BatchProcessor', () => {
       ]),
     );
     expect(res.breakdown.pairsConsidered).toBeGreaterThan(0);
+  });
+
+  test('gives the browser time between expensive pairs without dropping directional results', async () => {
+    let time = 0;
+    processor.nowProvider = () => (time += 10);
+    processor.yieldToBrowser = jest.fn().mockResolvedValue(undefined);
+    const res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {
+      hasDarknessSources: false,
+    });
+    expect(processor.yieldToBrowser).toHaveBeenCalled();
+    expect(res.updates.map((u) => `${u.observer.document.id}-${u.target.document.id}`).sort())
+      .toEqual(['A-B', 'A-C', 'B-A', 'C-A']);
+  });
+
+  test('yields between expensive directions inside one pair', async () => {
+    let time = 0;
+    const events = [];
+    processor.nowProvider = () => time;
+    processor.yieldToBrowser = jest.fn(async () => events.push('yield'));
+    processor.visionAnalyzer.hasLineOfSight.mockImplementation(observer => {
+      events.push(`los-${observer.document.id}`);
+      time += 12;
+      return true;
+    });
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockImplementation(async observer => {
+      events.push(`visibility-${observer.document.id}`);
+      time += 12;
+      return 'hidden';
+    });
+    const result = await processor.process(global.canvas.tokens.placeables.slice(0, 2), new Set(['A']), { hasDarknessSources: false });
+    expect(events.slice(events.indexOf('los-A'), events.indexOf('visibility-B') + 1)).toEqual([
+      'los-A', 'yield', 'los-B', 'yield', 'visibility-A', 'yield', 'visibility-B',
+    ]);
+    expect(result.updates.map(u => `${u.observer.document.id}-${u.target.document.id}`).sort()).toEqual(['A-B', 'B-A']);
   });
 
   test('converts max visibility distance from scene units to pixels for spatial queries', async () => {

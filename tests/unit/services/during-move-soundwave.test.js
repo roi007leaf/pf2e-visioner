@@ -420,6 +420,9 @@ describe('observerSightContainsTarget (live vision polygon contains the target c
     };
 
     expect(observerSightContainsTarget(observer, litTarget)).toBe(false);
+    expect(canvas.visibility._createVisibilityTestConfig).toHaveBeenCalledWith(
+      [target.center], { object: litTarget, tolerance: 0 },
+    );
     expect(
       targetShouldShowSoundwave(
         litTarget,
@@ -504,6 +507,14 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
   let savedCanvas;
   let nowSpy;
   let mockNow;
+
+  test('does not discover observers just to forget a token never remembered as a soundwave', async () => {
+    const getObservers = jest.fn(() => []);
+    const mod = await loadWith({ pendingMovement: true, getObservers });
+    const target = makeTarget();
+    mod.rememberSoundwaveDetectionBeforeCoreRefresh(target);
+    expect(getObservers).not.toHaveBeenCalled();
+  });
 
   async function loadWith({
     pendingMovement,

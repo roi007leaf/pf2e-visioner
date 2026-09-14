@@ -1,4 +1,5 @@
 import { extractConcealment } from '../../../scripts/visibility/VisibilityCalculatorAdapter.js';
+import { setCachedSettingValue } from '../../../scripts/utils/setting-value-cache.js';
 
 function targetWithConcealedCondition() {
   return {
@@ -14,6 +15,16 @@ function setSetting(value) {
 }
 
 describe('extractConcealment + systemConditionOverrides', () => {
+  test('reads the setting once across pairs and observes its onChange cache update', () => {
+    setSetting(false);
+    const read = jest.spyOn(game.settings, 'get');
+    const target = targetWithConcealedCondition();
+    for (let i = 0; i < 100; i++) expect(extractConcealment(target, {})).toBe(true);
+    expect(read).toHaveBeenCalledTimes(1);
+    setCachedSettingValue('systemConditionOverrides', true);
+    expect(extractConcealment(target, {})).toBe(false);
+    expect(read).toHaveBeenCalledTimes(1);
+  });
   afterEach(() => {
     delete globalThis.game;
   });
@@ -30,7 +41,10 @@ describe('extractConcealment + systemConditionOverrides', () => {
 
   test('explicit pf2e-visioner concealment flag still wins regardless of the setting', () => {
     setSetting(true);
-    const target = { document: { flags: { 'pf2e-visioner': { concealment: true } } }, actor: { conditions: [] } };
+    const target = {
+      document: { flags: { 'pf2e-visioner': { concealment: true } } },
+      actor: { conditions: [] },
+    };
     expect(extractConcealment(target, {})).toBe(true);
   });
 });

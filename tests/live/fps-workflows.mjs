@@ -1,7 +1,8 @@
 import { preparePerformanceFixture, timingSummary } from './performance-workflows.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 export function summarizeRenderedFrames({ timestamps, durationMs, hidden, cap }) {
-  if (!Number.isFinite(durationMs) || durationMs < 3000 || !Number.isFinite(cap) || cap <= 0 ||
+  if (!Number.isFinite(durationMs) || durationMs < 3000 || !Number.isFinite(cap) || cap < 0 ||
     timestamps.length < 2 || timestamps.some((n, i) => !Number.isFinite(n) || n < 0 || n > durationMs || (i && n <= timestamps[i - 1]))) {
     throw Error('Valid rendered-frame timestamps, FPS cap and measurement duration required');
   }
@@ -14,7 +15,7 @@ export function summarizeRenderedFrames({ timestamps, durationMs, hidden, cap })
     onePercentLowFps: 1000 / (tail.reduce((a, b) => a + b, 0) / tail.length),
     p95FrameMs: times.p95Ms, p99FrameMs: [...gaps].sort((a, b) => a - b)[Math.ceil(gaps.length * 0.99) - 1],
     worstGapMs: Math.max(...allGaps), stallsOver50Ms: allGaps.filter(n => n > 50).length,
-    hidden, cap, limits: { minAverageFps: Math.min(30, cap * 0.75), maxP95FrameMs: Math.max(50, 2000 / cap), maxGapMs: 250 } };
+    hidden, cap, uncapped: cap === 0, limits: { minAverageFps: Math.min(30, (cap || 60) * 0.75), maxP95FrameMs: Math.max(50, 2000 / (cap || 60)), maxGapMs: 250 } };
   result.passed = !hidden && result.averageFps >= result.limits.minAverageFps &&
     result.p95FrameMs <= result.limits.maxP95FrameMs && result.worstGapMs <= result.limits.maxGapMs;
   return result;
@@ -38,7 +39,7 @@ export async function startSample(page, c) {
     if (globalThis.visionerQaFps) throw Error('Previous FPS sampler was not cleaned up');
     const renderer = canvas.app.renderer;
     if (!renderer.on || !renderer.off || !('renderingToScreen' in renderer)) throw Error('Supported PIXI render events required');
-    const cap = Math.min(game.settings.get('core', 'maxFPS') || 60, 60);
+    const cap = canvas.app.ticker.maxFPS;
     const stack = [], timestamps = [], positions = new Set(), start = performance.now();
     const state = globalThis.visionerQaFps = { hidden: document.hidden, stop: null, promise: null };
     const before = () => stack.push(renderer.renderingToScreen);
@@ -66,6 +67,7 @@ export async function startSample(page, c) {
       };
     });
     return { cap, configuredCap: game.settings.get('core', 'maxFPS'), tickerMaxFps: canvas.app.ticker.maxFPS,
+      performanceMode: game.settings.get('core', 'performanceMode'), maximumMode: CONST.CANVAS_PERFORMANCE_MODES.MAX,
       rendererType: renderer.type, width: renderer.screen.width, height: renderer.screen.height, resolution: renderer.resolution,
       devicePixelRatio, hardwareConcurrency: navigator.hardwareConcurrency, userAgent: navigator.userAgent };
   }, { f: c.fixture, runId: c.runId });
@@ -80,6 +82,22 @@ export async function stopSample(page) {
 }
 
 async function renderedFps(c, lights, avs, count = 30) {
+  const profilePhase = process.env.VISIONER_FPS_PROFILE_PHASE ?? 'movement-1';
+  if (process.env.VISIONER_FPS_PROFILE === '1' && !['idle', 'movement-1', 'movement-2', 'movement-3'].includes(profilePhase)) {
+    throw Error('FPS profile phase must be idle or movement-1 through movement-3');
+  }
+  if (process.env.VISIONER_FPS_MAXIMUM === '1') {
+    for (const page of [c.gm, c.player]) {
+      for (const key of ['maxFPS', 'performanceMode']) {
+        await page.waitForFunction(() => canvas.ready && !canvas.loading);
+        await page.evaluate(async ({ key, f, runId }) => {
+          if (canvas.scene?.id !== f.scene || canvas.scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA canvas required');
+          await game.settings.set('core', key, key === 'maxFPS' ? 60 : CONST.CANVAS_PERFORMANCE_MODES.MAX);
+        }, { key, f: c.fixture, runId: c.runId });
+      }
+      await page.waitForFunction(() => canvas.ready && !canvas.loading && canvas.performance.mode === CONST.CANVAS_PERFORMANCE_MODES.MAX && canvas.app.ticker.maxFPS === 0);
+    }
+  }
   const workload = await preparePerformanceFixture(c, count, lights);
   await c.setting('autoVisibilityEnabled', avs);
   await c.gm.waitForFunction(async () => {
@@ -94,6 +112,13 @@ async function renderedFps(c, lights, avs, count = 30) {
       // Warm-up and focus settling are outside all measured windows.
       await page.waitForTimeout(1000);
       for (const phase of ['idle', 'movement-1', 'movement-2', 'movement-3']) {
+        let profiler;
+        try {
+        if (process.env.VISIONER_FPS_PROFILE === '1' && role === 'gm' && phase === profilePhase) {
+          profiler = await page.context().newCDPSession(page);
+          await profiler.send('Profiler.enable');
+          await profiler.send('Profiler.start');
+        }
         const browser = await startSample(page, c);
         if (phase !== 'idle') await c.gm.evaluate(async ({ f, runId }) => {
           if (!game.user.isGM || canvas.scene.id !== f.scene || canvas.scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned GM fixture required');
@@ -111,6 +136,16 @@ async function renderedFps(c, lights, avs, count = 30) {
         measurement.passed &&= raw.listenersRestored && raw.balanced && (phase === 'idle' || raw.distinctPositions >= 3);
         c.evidence.push({ label: `${role}-${phase}-rendered-fps`, measurement, status: measurement.passed ? 'passed' : 'failed' });
         if (!measurement.passed) failures.push({ role, phase, measurement });
+        } finally {
+          if (profiler) {
+            try {
+              const { profile } = await profiler.send('Profiler.stop');
+              await mkdir(`artifacts/live/${c.runId}`, { recursive: true });
+              const suffix = phase === 'movement-1' ? '' : `-${phase}`;
+              await writeFile(`artifacts/live/${c.runId}/fps-${count}-${avs ? 'on' : 'off'}${suffix}.cpuprofile`, JSON.stringify(profile));
+            } finally { await profiler.detach(); }
+          }
+        }
       }
       await c.check({ state: 'observed', visible: true, targetX: 800 }, true, `${role}-fps-final-art`, { session: role });
     }

@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import { preparePerformanceFixture, timingSummary } from './performance-workflows.mjs';
 
-export const performanceLifecycleCases = ['cold-client-startup', 'retained-memory-soak'].map(mode => ({
+export const performanceLifecycleCases = ['cold-client-startup', 'retained-memory-soak', 'linked-effect-noop'].map(mode => ({
   name: `performance-${mode}`, area: 'performance', disposableWorld: true, secondObserver: true,
   settings: ['autoVisibilityEnabled', 'avsOnlyInCombat'],
   steps: [{ workflow: `performance-${mode}` }],
@@ -9,7 +9,58 @@ export const performanceLifecycleCases = ['cold-client-startup', 'retained-memor
 export const performanceLifecycleWorkflows = {
   'performance-cold-client-startup': coldStartup,
   'performance-retained-memory-soak': memorySoak,
+  'performance-linked-effect-noop': linkedEffectNoop,
 };
+
+async function linkedEffectNoop(c) {
+  await preparePerformanceFixture(c, 4);
+  await c.setting('autoVisibilityEnabled', false);
+  const measurement = await c.gm.evaluate(async ({ f, runId }) => {
+    if (!game.user.isGM || canvas.scene?.id !== f.scene || canvas.scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA scene required');
+    const { batchUpdateVisibilityEffects, batchUpdateVisibilityEffectsForObservers } = await import('/modules/pf2e-visioner/scripts/visibility/batch.js');
+    const observer = canvas.tokens.get(f.observer), target = canvas.tokens.get(f.target);
+    const linked = canvas.tokens.placeables.find(t => t.id !== target.id && t.actor === target.actor);
+    if (!linked || target.actor.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned linked actor required');
+    const hiddenEffect = () => target.actor.itemTypes.effect.find(e => e.getFlag('pf2e-visioner', 'aggregateOffGuard') && e.getFlag('pf2e-visioner', 'visibilityState') === 'hidden');
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }]);
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'hidden' }]);
+    const before = hiddenEffect();
+    if (!before) throw Error('Native hidden effect was not created');
+    const rulesBefore = JSON.stringify(before.system.rules);
+    let updates = 0;
+    const hook = Hooks.on('updateItem', item => { if (item.parent === target.actor) updates++; });
+    let sameEffect, sameRules;
+    try {
+      await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }, { target: linked, state: 'hidden' }]);
+      sameEffect = hiddenEffect()?.id === before.id;
+      sameRules = JSON.stringify(hiddenEffect()?.system.rules) === rulesBefore;
+    } finally { Hooks.off('updateItem', hook); }
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'observed' }]);
+    const removedAfterObserved = !hiddenEffect();
+    await batchUpdateVisibilityEffects(observer, [{ target, state: 'hidden' }]);
+    const restoredAfterHidden = !!hiddenEffect();
+    await batchUpdateVisibilityEffects(target, [{ target: observer, state: 'observed' }]);
+    await batchUpdateVisibilityEffects(target, [{ target: observer, state: 'hidden' }]);
+    const receiverEffect = () => observer.actor.itemTypes.effect.find(e => e.getFlag('pf2e-visioner', 'aggregateOffGuard') && e.getFlag('pf2e-visioner', 'visibilityState') === 'hidden');
+    const aggregateId = receiverEffect()?.id;
+    if (!aggregateId) throw Error('Shared observer aggregate was not created');
+    let crossObserverWrites = 0;
+    const hooks = ['createItem', 'updateItem', 'deleteItem'].map(name => [name, Hooks.on(name, item => {
+      if (item.parent === observer.actor) crossObserverWrites++;
+    })]);
+    try {
+      await batchUpdateVisibilityEffectsForObservers([
+        { observer: target, targets: [{ target: observer, state: 'observed' }] },
+        { observer: linked, targets: [{ target: observer, state: 'hidden' }] },
+      ]);
+    } finally { for (const [name, hook] of hooks) Hooks.off(name, hook); }
+    return { updates, sameEffect, sameRules, removedAfterObserved, restoredAfterHidden,
+      crossObserverWrites, crossObserverEffectPreserved: receiverEffect()?.id === aggregateId };
+  }, { f: c.fixture, runId: c.runId });
+  const passed = measurement.updates === 0 && measurement.sameEffect && measurement.sameRules && measurement.removedAfterObserved && measurement.restoredAfterHidden && measurement.crossObserverWrites === 0 && measurement.crossObserverEffectPreserved;
+  c.evidence.push({ label: 'linked-effect-noop-native-items', measurement, status: passed ? 'passed' : 'failed' });
+  c.assert(passed, `Linked effect updates: ${JSON.stringify(measurement)}`);
+}
 
 export function retainedGrowth(samples) {
   if (samples.length < 4 || samples.some(s => ['heap', 'nodes', 'listeners'].some(k => !Number.isFinite(s[k]) || s[k] < 0))) throw Error('Four valid post-GC samples required');
@@ -77,7 +128,24 @@ async function memorySoak(c) {
         await client.session.send('HeapProfiler.collectGarbage');
         const heap = await client.session.send('Runtime.getHeapUsage');
         const dom = await client.session.send('Memory.getDOMCounters');
-        client.samples.push({ heap: heap.usedSize, nodes: dom.nodes, listeners: dom.jsEventListeners });
+        const visioner = await client.page.evaluate(async () => {
+          const { HoverTooltips: tooltips } = await import('/modules/pf2e-visioner/scripts/services/HoverTooltips.js');
+          const { TimedOverrideManager: timers } = await import('/modules/pf2e-visioner/scripts/services/TimedOverrideManager.js');
+          const hooks = globalThis.Hooks.events;
+          return {
+            hooks: hooks && Object.keys(hooks).length ? Object.fromEntries(Object.entries(hooks).map(([key, entries]) => [key, entries.length])) : null,
+            tooltipHandlers: tooltips.tokenEventHandlers.size,
+            staleTooltipHandlers: [...tooltips.tokenEventHandlers.keys()].filter(id => !canvas.tokens.get(id)).length,
+            visibilityIndicators: tooltips.visibilityIndicators.size,
+            coverIndicators: tooltips.coverIndicators.size,
+            visibilityBadges: tooltips.visibilityBadges.size,
+            keyTooltipTokens: tooltips.keyTooltipTokens.size,
+            factorTokens: tooltips.factorsOverlayTokens.size,
+            timerCheckerActive: timers._realtimeIntervalId !== null,
+            sceneTokens: canvas.scene.tokens.size,
+          };
+        });
+        client.samples.push({ heap: heap.usedSize, nodes: dom.nodes, listeners: dom.jsEventListeners, visioner });
       }
     };
     const cycle = async index => {
@@ -117,6 +185,11 @@ async function memorySoak(c) {
       const measurement = { ...retainedGrowth(client.samples), workload, cycles, durationMs: performance.now() - start, role: client.role };
       c.evidence.push({ label: `${client.role}-post-gc-retained-growth`, measurement, status: measurement.passed ? 'passed' : 'failed' });
       if (!measurement.passed) failures.push(client.role);
+      const settledHandlersReleased = client.samples.slice(-3).every(s => s.visioner.staleTooltipHandlers === 0);
+      c.evidence.push({ label: `${client.role}-settled-deleted-token-handlers`,
+        samples: client.samples.map(s => s.visioner.staleTooltipHandlers),
+        status: settledHandlersReleased ? 'passed' : 'failed' });
+      if (!settledHandlersReleased) failures.push(`${client.role}-tooltip-handlers`);
     }
     c.assert(!failures.length, `Retained memory growth budget: ${failures.join(', ')}`);
   } finally {

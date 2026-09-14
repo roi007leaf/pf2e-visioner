@@ -8,10 +8,14 @@ export class HashGridIndex {
     const gs = canvas?.grid?.size || 100;
     this._cellSize = Math.max(16, Math.floor(cellSize || gs));
     this._cells = new Map(); // key: `${cx},${cy}` -> Array<{id, token, x, y}>
+    this._minCx = this._minCy = Infinity;
+    this._maxCx = this._maxCy = -Infinity;
   }
 
   build(tokens, getPosByToken) {
     this._cells.clear();
+    this._minCx = this._minCy = Infinity;
+    this._maxCx = this._maxCy = -Infinity;
     const cs = this._cellSize;
     for (const t of tokens || []) {
       const id = t?.document?.id;
@@ -20,6 +24,11 @@ export class HashGridIndex {
       if (!p) continue;
       const cx = Math.floor(p.x / cs);
       const cy = Math.floor(p.y / cs);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+      this._minCx = Math.min(this._minCx, cx);
+      this._minCy = Math.min(this._minCy, cy);
+      this._maxCx = Math.max(this._maxCx, cx);
+      this._maxCy = Math.max(this._maxCy, cy);
       const key = `${cx},${cy}`;
       let arr = this._cells.get(key);
       if (!arr) this._cells.set(key, (arr = []));
@@ -31,10 +40,12 @@ export class HashGridIndex {
     const out = [];
     if (!rect) return out;
     const cs = this._cellSize;
-    const minCx = Math.floor(rect.x / cs);
-    const minCy = Math.floor(rect.y / cs);
-    const maxCx = Math.floor((rect.x + rect.width) / cs);
-    const maxCy = Math.floor((rect.y + rect.height) / cs);
+    // Visibility ranges can dwarf the occupied scene. Empty outer cells cannot
+    // contribute candidates, so bound work by the indexed extent.
+    const minCx = Math.max(this._minCx, Math.floor(rect.x / cs));
+    const minCy = Math.max(this._minCy, Math.floor(rect.y / cs));
+    const maxCx = Math.min(this._maxCx, Math.floor((rect.x + rect.width) / cs));
+    const maxCy = Math.min(this._maxCy, Math.floor((rect.y + rect.height) / cs));
 
     for (let cy = minCy; cy <= maxCy; cy++) {
       for (let cx = minCx; cx <= maxCx; cx++) {

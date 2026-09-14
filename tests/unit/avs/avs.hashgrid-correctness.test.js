@@ -11,6 +11,21 @@ describe('HashGridIndex vs SpatialBatchIndex correctness', () => {
   }
   function getPos(t) { return { x: t.x, y: t.y }; }
 
+  test('large queries do not visit empty cells beyond the indexed extent, including after rebuild', () => {
+    const hash = new HashGridIndex(50);
+    hash.build([mkToken('a', -25, -25), mkToken('b', 25, 25)], getPos);
+    const lookup = jest.spyOn(hash._cells, 'get');
+    expect(hash.queryCircle(0, 0, 2000).map(p => p.id)).toEqual(['a', 'b']);
+    expect(lookup.mock.calls.length).toBeLessThanOrEqual(4);
+    hash.build([mkToken('c', 4000, 4000)], getPos);
+    lookup.mockClear();
+    expect(hash.queryCircle(0, 0, 2000)).toEqual([]);
+    expect(lookup).not.toHaveBeenCalled();
+    expect(hash.queryRect({ x: 4000, y: 4000, width: 0, height: 0 }).map(p => p.id)).toEqual(['c']);
+    hash.build([], getPos);
+    expect(hash.queryCircle(4000, 4000, 2000)).toEqual([]);
+  });
+
   test('queryRect and queryCircle return same ids', () => {
     const tokens = [];
     // 10x10 grid of 100 tokens, spaced 50px apart

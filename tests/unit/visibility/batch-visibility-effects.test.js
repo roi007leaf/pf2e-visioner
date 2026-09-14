@@ -1,6 +1,8 @@
 import '../../setup.js';
 
-import { batchUpdateVisibilityEffects } from '../../../scripts/visibility/batch.js';
+import { batchUpdateVisibilityEffects, batchUpdateVisibilityEffectsForObservers } from '../../../scripts/visibility/batch.js';
+import { createEphemeralEffectRule } from '../../../scripts/helpers/visibility-helpers.js';
+import { BatchOrchestrator } from '../../../scripts/visibility/auto-visibility/core/BatchOrchestrator.js';
 
 const makeActor = (id, signature, effects = []) => ({
   id,
@@ -37,6 +39,91 @@ describe('batchUpdateVisibilityEffects', () => {
 
   afterEach(() => {
     global.game.user = originalGameUser;
+  });
+
+  test('linked targets returning to the same aggregate rules cause no Item writes', async () => {
+    const effect = {
+      id: 'shared-hidden',
+      flags: { 'pf2e-visioner': { aggregateOffGuard: true, visibilityState: 'hidden', effectTarget: 'subject' } },
+      system: { rules: [createEphemeralEffectRule('observer-sig')] },
+    };
+    const actor = makeActor('shared-actor', 'shared-sig', [effect]);
+    const observer = makeToken('observer', 'Observer', makeActor('observer-actor', 'observer-sig'));
+    await batchUpdateVisibilityEffects(observer, [
+      { target: makeToken('linked-1', 'First linked token', actor), state: 'observed' },
+      { target: makeToken('linked-2', 'Second linked token', actor), state: 'hidden' },
+    ]);
+    expect(actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(actor.updateEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(effect.system.rules).toEqual([createEphemeralEffectRule('observer-sig')]);
+  });
+
+  test('AVS combines linked observers before mutating their shared receiver effect', async () => {
+    const effect = {
+      id: 'existing-hidden',
+      flags: { 'pf2e-visioner': { aggregateOffGuard: true, visibilityState: 'hidden', effectTarget: 'subject' } },
+      system: { rules: [createEphemeralEffectRule('shared-observer')] },
+    };
+    const effects = [effect];
+    const actor = makeActor('receiver', 'receiver-sig', effects);
+    actor.deleteEmbeddedDocuments.mockImplementation(async (_type, ids) => {
+      for (const id of ids) effects.splice(effects.findIndex(e => e.id === id), 1);
+      return [];
+    });
+    const source = makeActor('source', 'shared-observer');
+    const target = makeToken('target', 'Target', actor);
+    await BatchOrchestrator.prototype._syncEphemeralEffectsForUpdates.call({ _isHazardOrLoot: () => false }, [
+      { observer: makeToken('observer-1', 'First observer', source), target, visibility: 'observed' },
+      { observer: makeToken('observer-2', 'Second observer', source), target, visibility: 'hidden' },
+    ]);
+    expect(actor.deleteEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(actor.createEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(actor.updateEmbeddedDocuments).not.toHaveBeenCalled();
+    expect(effects).toEqual([effect]);
+  });
+
+  test('combines distinct observer signatures into one actor write and yields preparation work', async () => {
+    const actor = makeActor('receiver', 'receiver-sig');
+    const target = makeToken('target', 'Target', actor);
+    let browserTaskRan = false;
+    const timer = setTimeout(() => { browserTaskRan = true; }, 0);
+    actor.createEmbeddedDocuments.mockImplementation(async () => {
+      expect(browserTaskRan).toBe(true);
+      return [];
+    });
+    let time = 0;
+    const clock = jest.spyOn(performance, 'now').mockImplementation(() => time += 10);
+    try {
+      await batchUpdateVisibilityEffectsForObservers(['one', 'two'].map(signature => ({
+        observer: makeToken(signature, signature, makeActor(signature, signature)),
+        targets: [{ target, state: 'hidden' }],
+      })));
+      expect(browserTaskRan).toBe(true);
+      expect(actor.createEmbeddedDocuments).toHaveBeenCalledTimes(1);
+      expect(actor.createEmbeddedDocuments.mock.calls[0][1][0].system.rules).toEqual([
+        createEphemeralEffectRule('one'), createEphemeralEffectRule('two'),
+      ]);
+    } finally {
+      clock.mockRestore();
+      clearTimeout(timer);
+    }
+  });
+
+  test('does not combine synthetic receiving actors sharing the same base actor id', async () => {
+    const first = makeActor('shared-base', 'first');
+    const second = makeActor('shared-base', 'second');
+    first.uuid = 'Scene.test.Token.first.Actor.shared-base';
+    second.uuid = 'Scene.test.Token.second.Actor.shared-base';
+    const observer = makeToken('observer', 'Observer', makeActor('observer', 'observer-sig'));
+    await batchUpdateVisibilityEffects(observer, [
+      { target: makeToken('first', 'First', first), state: 'hidden' },
+      { target: makeToken('second', 'Second', second), state: 'undetected' },
+    ]);
+    expect(first.createEmbeddedDocuments).toHaveBeenCalledTimes(1);
+    expect(second.createEmbeddedDocuments).toHaveBeenCalledTimes(1);
+    expect(first.createEmbeddedDocuments.mock.calls[0][1][0].flags['pf2e-visioner'].visibilityState).toBe('hidden');
+    expect(second.createEmbeddedDocuments.mock.calls[0][1][0].flags['pf2e-visioner'].visibilityState).toBe('undetected');
   });
 
   test('removes legacy off-guard effects when pair becomes observed', async () => {

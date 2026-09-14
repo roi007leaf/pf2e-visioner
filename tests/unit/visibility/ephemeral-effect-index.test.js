@@ -19,6 +19,40 @@ function rule(signature) {
 }
 
 describe('EphemeralEffectIndex', () => {
+  test('does not rewrite identical final rules after linked-token remove/add operations', () => {
+    const index = new EphemeralEffectIndex({
+      effects: [aggregate('hidden-effect', 'hidden', [rule('shared')])],
+      moduleId: 'pf2e-visioner',
+    });
+    index.removeSignature('hidden', 'shared');
+    index.addSignature('hidden', 'shared', rule);
+    expect(index.buildMutationPlan({})).toEqual({
+      effectsToCreate: [], effectsToUpdate: [], effectsToDelete: [],
+    });
+  });
+
+  test('still writes changed rule contents for the same signature', () => {
+    const index = new EphemeralEffectIndex({
+      effects: [aggregate('hidden-effect', 'hidden', [rule('shared')])],
+      moduleId: 'pf2e-visioner',
+    });
+    index.removeSignature('hidden', 'shared');
+    index.addSignature('hidden', 'shared', signature => ({ ...rule(signature), uuid: 'changed-effect' }));
+    expect(index.buildMutationPlan({}).effectsToUpdate).toEqual([
+      { _id: 'hidden-effect', 'system.rules': [{ ...rule('shared'), uuid: 'changed-effect' }] },
+    ]);
+  });
+
+  test('deletes identical duplicate aggregates without rewriting the primary', () => {
+    const index = new EphemeralEffectIndex({
+      effects: [aggregate('primary', 'hidden', [rule('shared')]), aggregate('duplicate', 'hidden', [rule('shared')])],
+      moduleId: 'pf2e-visioner',
+    });
+    expect(index.buildMutationPlan({})).toEqual({
+      effectsToCreate: [], effectsToUpdate: [], effectsToDelete: ['duplicate'],
+    });
+  });
+
   test('updates aggregate rules without repeated aggregate scans', () => {
     const index = new EphemeralEffectIndex({
       effects: [aggregate('hidden-effect', 'hidden', [rule('old')])],
