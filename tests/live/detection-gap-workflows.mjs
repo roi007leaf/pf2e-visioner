@@ -4,6 +4,8 @@ const specialSenses = ['scent', 'tremorsense', 'lifesense', 'thoughtsense', 'ech
 const special = (type, acuity = 'imprecise', range = 30) => ({ type, acuity, range });
 const observed = { state: 'observed', visible: true, filter: null };
 export const detectionGapCases = [
+  { name: 'detection-movement-soundwave-handoff', area: 'performance', senses: [], darkness: true,
+    disposableWorld: true, steps: [{ workflow: 'detection-movement-soundwave-handoff' }] },
   ...borderSenses.map(sense => ({ name: `detection-${sense}-upper-level-suppression`, area: 'detection-transitions',
     senses: [special(sense)], darkness: true,
     disposableWorld: true, settings: ['core.scrollingStatusText'],
@@ -21,6 +23,7 @@ export const detectionGapCases = [
   })),
 ];
 export const detectionGapWorkflows = Object.fromEntries([
+  ['detection-movement-soundwave-handoff', movementSoundwaveHandoff],
   ...borderSenses.map(sense => [`detection-${sense}-upper-level-suppression`, c => borderUpperLevelSuppression(c, sense)]),
   ...specialSenses.map(sense => [`detection-boundary-${sense}`, c => rangeBoundary(c, sense)]),
   ['detection-sense-fallback', senseFallback], ['detection-tremor-elevation', tremorElevation],
@@ -30,6 +33,112 @@ export const detectionGapWorkflows = Object.fromEntries([
   ['detection-door-animation-reveal', c => doorAnimation(c, true)],
   ['detection-door-animation-hide', c => doorAnimation(c, false)],
 ]);
+
+async function movementSoundwaveHandoff(c) {
+  await c.mutate('hearing-range', 30);
+  const workload = await c.gm.evaluate(async ({ f, runId }) => {
+    const scene = canvas.scene;
+    if (!game.user.isGM || scene.id !== f.scene || scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA scene required');
+    const observer = canvas.tokens.get(f.observer), target = canvas.tokens.get(f.target);
+    await observer.document.update({ x: 700 }, { animate: false });
+    const base = target.document.toObject();
+    const tokens = Array.from({ length: 28 }, (_, index) => {
+      const data = foundry.utils.deepClone(base); delete data._id;
+      data.name = `QA Soundwave Load ${index}`;
+      data.x = 100 + index % 14 * 100; data.y = 900 + Math.floor(index / 14) * 100;
+      return data;
+    });
+    await scene.createEmbeddedDocuments('Token', tokens);
+    const [wall] = await scene.createEmbeddedDocuments('Wall', [{
+      c: [650, 0, 650, 800], sight: 20, light: 20, move: 0, sound: 20,
+      flags: { 'pf2e-visioner': { liveTestRun: runId } },
+    }]);
+    return { tokens: scene.tokens.size, wall: wall.id };
+  }, { f: c.fixture, runId: c.runId });
+  c.equal(workload.tokens, 30, 'Soundwave performance workload has 30 tokens');
+  await c.player.waitForFunction(({ f, count }) =>
+    canvas.scene?.id === f.scene && canvas.tokens.placeables.length === count && canvas.tokens.get(f.observer)?.document.x === 700,
+  { f: c.fixture, count: workload.tokens });
+  await c.check({ state: 'hidden', filter: 'hearing', visible: true }, false, 'audible-side-baseline');
+  await c.indicator(true);
+
+  // Same four-direction transition that exposed Rootfall's stale primary mesh.
+  for (const [index, x] of [500, 700, 500, 700].entries()) {
+    await measureSoundwaveMove(c, x, x < 650 ? 'undetected' : 'hidden', `wall-cycle-${index + 1}`);
+  }
+
+  await c.gm.evaluate(async ({ f, runId, wall }) => {
+    const scene = canvas.scene;
+    if (scene.id !== f.scene || scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA scene required');
+    await scene.deleteEmbeddedDocuments('Wall', [wall]);
+  }, { f: c.fixture, runId: c.runId, wall: workload.wall });
+  await measureSoundwaveMove(c, 100, 'undetected', 'hearing-range-exit');
+  await measureSoundwaveMove(c, 700, 'hidden', 'hearing-range-return');
+  await c.indicator(true);
+}
+
+async function measureSoundwaveMove(c, x, expectedState, label) {
+  await c.player.bringToFront();
+  await c.player.evaluate(f => {
+    const observer = canvas.tokens.get(f.observer), target = canvas.tokens.get(f.target);
+    const trace = window.visionerQaSoundwaveMove = {
+      frames: [], positions: [], last: performance.now(), active: true, handle: null, timer: null,
+    };
+    const tick = now => {
+      trace.timer = setTimeout(() => {
+        if (!trace.active) return;
+        const state = game.modules.get('pf2e-visioner').api.getVisibility(f.observer, f.target);
+        trace.frames.push({
+          gap: now - trace.last, state, coreVisible: target.isVisible,
+          visible: target.visible, renderable: target.renderable, filter: !!target.detectionFilter,
+          wave: !!(target.detectionFilterMesh?.visible && target.detectionFilterMesh?.renderable && Number(target.detectionFilterMesh?.alpha) > 0),
+          primary: !!(target.mesh?.visible && target.mesh?.renderable),
+        });
+        trace.last = now; trace.positions.push(observer.x);
+        trace.handle = requestAnimationFrame(tick);
+      }, 0);
+    };
+    trace.handle = requestAnimationFrame(tick);
+  }, c.fixture);
+  let data;
+  try {
+    await c.gm.evaluate(async ({ f, x, runId }) => {
+      const token = canvas.tokens.get(f.observer);
+      if (canvas.scene?.id !== f.scene || token.document.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA observer required');
+      await token.document.update({ x }, { animate: true, animation: { duration: 800 } });
+    }, { f: c.fixture, x, runId: c.runId });
+    await c.player.waitForTimeout(1700);
+  } finally {
+    data = await c.player.evaluate(() => {
+      const trace = window.visionerQaSoundwaveMove;
+      if (!trace) return null;
+      trace.active = false; cancelAnimationFrame(trace.handle); clearTimeout(trace.timer);
+      delete window.visionerQaSoundwaveMove;
+      return { frames: trace.frames, positions: trace.positions };
+    });
+  }
+  c.assert(data && data.frames.length > 0 && data.positions.length > 0,
+    `${label} captured player render samples`);
+  const gaps = data.frames.slice(2).map(frame => frame.gap).sort((a, b) => a - b);
+  const p95 = gaps[Math.floor(gaps.length * 0.95)], max = gaps.at(-1);
+  const intermediatePositions = new Set(data.positions.filter(position =>
+    position !== data.positions[0] && Math.abs(position - x) > 1)).size;
+  const fullArtLeaks = data.frames.filter(frame =>
+    frame.state === 'undetected' && frame.visible && frame.renderable && !frame.filter && frame.primary).length;
+  const rippleLeaks = data.frames.filter(frame =>
+    frame.state === 'undetected' && frame.visible && (frame.filter || frame.wave)).length;
+  const movement = { samples: gaps.length, intermediatePositions,
+    firstX: data.positions[0], finalX: data.positions.at(-1), distinctPositions: new Set(data.positions).size };
+  c.assert(gaps.length >= 10 && intermediatePositions >= 2 && Math.abs(data.positions.at(-1) - x) < 1,
+    `${label} used native animated movement: ${JSON.stringify(movement)}`);
+  c.equal(fullArtLeaks, 0, `${label} never painted full art while Undetected`);
+  c.equal(rippleLeaks, 0, `${label} never painted soundwaves while Undetected`);
+  c.assert(p95 <= 100 && max <= 750,
+    `${label} frame budget: ${JSON.stringify({ samples: gaps.length, p95, max, limits: { p95: 100, max: 750 } })}`);
+  await c.check(expectedState === 'hidden'
+    ? { state: 'hidden', filter: 'hearing', visible: true }
+    : { state: 'undetected', visible: false, filter: null }, false, `${label}-settled`);
+}
 
 async function borderUpperLevelSuppression(c, sense) {
   // Journaled world setting: restored after success, failure, or recovery.

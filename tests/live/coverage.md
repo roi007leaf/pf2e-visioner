@@ -1,6 +1,6 @@
 # Automated live coverage inventory
 
-**282 automated scenarios; zero guided scenarios.** The former 24 manual reviews
+**283 automated scenarios; zero guided scenarios.** The former 24 manual reviews
 became 42 separate automated workflows. Counts describe executable definitions,
 not successful live verification or exhaustive line/branch coverage.
 
@@ -59,7 +59,7 @@ clients with AVS on/off and token lights on/off. Each measures idle and three
 movement windows with FPS, slow-frame distributions, state/art checks and listener
 cleanup. See [performance tests](performance.md) for exact boundaries and budgets.
 
-Fourteen `detection-*` scenarios add special-sense range checks at 25/30/35 feet,
+Fifteen `detection-*` scenarios add special-sense range checks at 25/30/35 feet,
 with return transitions, for scent, tremorsense, lifesense, thoughtsense and
 echolocation. Additional cases exercise precise echolocation falling back to
 imprecise tremorsense under deafness, elevation/landing recovery, overlapping
@@ -67,7 +67,10 @@ bright/dim lights, removal of one of two suppression regions, rapid lighting
 changes, rapid player observer selection, player scene teardown during animation,
 and independent opening/closing door detection updates before native animation ends.
 The opening-door case exposed a delayed player reveal, now fixed and verified with
-all 14 additions passing. These are bounded
+all 15 additions passing. The movement soundwave handoff regression adds
+repeated hearing wall and range crossings, post-paint Hidden/Undetected render
+assertions, and a 30-token workload under the standard 100 ms p95 and 750 ms
+maximum frame-gap budgets. These are bounded
 regressions, not an exhaustive combination matrix or third-party certification.
 
 Five `performance-*` workloads augment the existing small animation benchmark.
@@ -145,7 +148,7 @@ Remaining branches are recorded in [the feature audit](../../docs/live-feature-a
 | --- | --- |
 | Visibility / AVS | Public API states and rejection, manual states, override reset, manager direction, Apply/Revert, player rendering |
 | Senses / lighting | Blindness/deafness, sight and special senses, acuity/range changes, target eligibility, dim/dark/magical lighting, cones |
-| Movement / levels | Held drag cancellation and commit, animation timing, doors, native two-level pillar, floor/opening/same-level transitions |
+| Movement / levels | Held drag cancellation and commit, animation timing, hearing wall/range transitions, doors, native two-level pillar, floor/opening/same-level transitions |
 | Cover | API grades, wall/tile configuration and persistence, regions, creature blockers, Take Cover movement/attack/removal and turn persistence |
 | Privacy | Real player versus GM, hover badges/tooltips, targeting/nameplates, hidden hazards and loot |
 | Actions / encounters | Native Hide/Sneak/Seek, fixed success/failure previews, individual/bulk Apply/Revert, Strike consequences, Diversion, Point Out, Stealth initiative, Search |

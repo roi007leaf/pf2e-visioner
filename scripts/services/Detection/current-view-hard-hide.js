@@ -304,7 +304,7 @@ export function clearCurrentViewMovementRenderSettles() {
   movementCoreVisibleReveals = new WeakMap();
 }
 
-export function applyCurrentViewHardHide(token) {
+export function applyCurrentViewHardHide(token, { allowMovementReveal = true } = {}) {
   if (gmObserverView.isActive()) {
     gmObserverView.beforeCoreTokenRefresh(token);
     const coreVisible = token?.visible === true;
@@ -314,7 +314,8 @@ export function applyCurrentViewHardHide(token) {
     return false;
   }
 
-  const shouldDefer = shouldDeferRenderingToCoreDuringMove(token);
+  if (!allowMovementReveal) movementCoreVisibleReveals.delete(token);
+  const shouldDefer = allowMovementReveal && shouldDeferRenderingToCoreDuringMove(token);
   if (shouldDefer) {
     rememberMovementCoreReveal(token, token.visible === true);
     let released = false;
@@ -327,7 +328,7 @@ export function applyCurrentViewHardHide(token) {
     return false;
   }
   const shouldHardHide = targetIsHardHiddenFromCurrentView(token);
-  if (shouldHardHide && shouldPreserveMovementCoreReveal(token)) {
+  if (shouldHardHide && allowMovementReveal && shouldPreserveMovementCoreReveal(token)) {
     releaseCurrentViewHardHideForLiveSight(token);
     return false;
   }

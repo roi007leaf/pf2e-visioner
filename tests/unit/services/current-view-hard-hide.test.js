@@ -1281,6 +1281,17 @@ describe('applyCurrentViewHardHide - defer to core during movement (undetected -
     });
   });
 
+  it.each([true, false])('does not preserve a discarded out-of-sight ripple as a visual reveal (moving=%s)', (moving) => {
+    const t = undetectedToken({ visible: true });
+    expect(applyCurrentViewHardHide(t)).toBe(false);
+    hasActivePendingTokenMovement.mockReturnValue(moving);
+    expect(applyCurrentViewHardHide(t, { allowMovementReveal: false })).toBe(true);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.renderable).toBe(false);
+    hasActivePendingTokenMovement.mockReturnValue(false);
+    expect(applyCurrentViewHardHide(t)).toBe(true);
+  });
+
   it('keeps undetected targets hard-hidden during a held drag before movement commits', () => {
     hasActivePendingTokenMovement.mockReturnValue(false);
     draggedToken = controlled[0];

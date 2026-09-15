@@ -1,5 +1,6 @@
 import { hasActivePendingTokenMovement } from './movement-tracking.js';
 import {
+  applyCurrentViewHardHide,
   currentViewVisionerObserversForTarget,
   releaseCurrentViewHardHideForLiveSight,
   targetIsHardHiddenFromCurrentView,
@@ -18,6 +19,7 @@ import { legacyLevelsFloorBlocksSightBetween } from './Detection/legacy-levels-l
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import { isPartyActorToken } from '../utils/token-actor.js';
+import { releaseDetectionFilterMesh, suppressDetectionFilterMesh } from './Detection/detection-filter-mesh-suppression.js';
 
 let running = false;
 let cachedSoundwaveFilter = null;
@@ -28,9 +30,8 @@ let cachedSoundwaveFilter = null;
 const WAVE_RECOMPUTE_INTERVAL_MS = 100;
 let lastWaveComputeAt = 0;
 
-// Whether an out-of-sight target is still heard barely changes as the observer slides, so cache the
-// expensive imprecise-sense query (getSensingCapabilities + isSoundBlocked raycast) per pair for the
-// duration of one move. Cleared when the move ends.
+// Reuse pair queries within one throttled recompute only. Movement can cross a sound wall or
+// sense range boundary, so a result must not survive into the next position sample.
 const senseMemo = new Map();
 
 // During a committed move Foundry recomputes and RESETS each non-controlled token's detectionFilter
@@ -43,6 +44,7 @@ const senseMemo = new Map();
 // Overrides are removed when the target regains sight or the move ends, restoring normal rendering.
 const filterOverrides = new Map();
 let previouslySoundwaveDetectedTargets = new WeakSet();
+const activeSoundwaveTargets = new Set();
 
 // After a move ends the AVS recompute of the persisted state (observed -> hidden) is async. If we
 // dropped the filter overrides the instant the move stopped, the target would render 'observed' for
@@ -154,13 +156,13 @@ export function impreciselySensedOutOfSight(observer, target) {
       if (!isVisualSenseType(senseType) && inRange(senseData)) return false;
     }
     // An imprecise sense in range (tremorsense, scent) means the target is sensed = hidden.
-    for (const senseData of Object.values(capabilities.imprecise || {})) {
-      if (inRange(senseData)) return true;
+    for (const [senseType, senseData] of Object.entries(capabilities.imprecise || {})) {
+      if (!inRange(senseData)) continue;
+      if (senseType === 'hearing' && analyzer.isSoundBlocked(observer, target)) continue;
+      return true;
     }
-    // Hearing is implicit for most creatures: hidden unless deafened or the sound is blocked.
-    const legacy = analyzer.getVisionCapabilities(observer) || {};
-    if (legacy.isDeafened) return false;
-    return !analyzer.isSoundBlocked(observer, target);
+    // The analyzer already includes implicit hearing, its scene range, and deafened restrictions.
+    return false;
   } catch {
     return false;
   }
@@ -228,6 +230,11 @@ export function targetShouldShowSoundwave(
 export function setSoundwaveMeshVisible(target, visible) {
   const mesh = target?.detectionFilterMesh;
   if (!mesh) return;
+  if (!visible) {
+    suppressDetectionFilterMesh(target);
+    return;
+  }
+  releaseDetectionFilterMesh(target);
   if ('visible' in mesh && mesh.visible !== visible) mesh.visible = visible;
   if ('renderable' in mesh && mesh.renderable !== visible) mesh.renderable = visible;
   if ('alpha' in mesh) {
@@ -315,16 +322,43 @@ function showControlledTokenFullArt(target) {
   }
 }
 
+function suppressCoreInvisibleHardHiddenTarget(target, { requireRemembered = true } = {}) {
+  if (!target || target.controlled) return false;
+  if (requireRemembered && !previouslySoundwaveDetectedTargets.has(target)) return false;
+  let coreVisible = true;
+  try {
+    coreVisible = target.isVisible !== false;
+  } catch {
+    return false;
+  }
+  if (coreVisible || !targetIsHardHiddenFromCurrentView(target)) return false;
+  removeSoundwaveFilterOverride(target);
+  try {
+    target.detectionFilter = null;
+  } catch {
+    /* apply the remaining hard-hide surfaces even if Core rejects filter assignment */
+  }
+  setSoundwaveMeshVisible(target, false);
+  applyCurrentViewHardHide(target, { allowMovementReveal: false });
+  previouslySoundwaveDetectedTargets.delete(target);
+  activeSoundwaveTargets.delete(target);
+  return true;
+}
+
 export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
   if (isSceneTokenVisionDisabled()) return;
   if (!target) return;
   if (target.detectionFilter === getSoundwaveFilter()) {
     previouslySoundwaveDetectedTargets.add(target);
+    activeSoundwaveTargets.add(target);
   } else if (!target.controlled && previouslySoundwaveDetectedTargets.has(target)) {
     const visuallyObserved = currentViewVisionerObserversForTarget(target).some(
       (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );
-    if (visuallyObserved) previouslySoundwaveDetectedTargets.delete(target);
+    if (visuallyObserved) {
+      previouslySoundwaveDetectedTargets.delete(target);
+      activeSoundwaveTargets.delete(target);
+    }
   }
 }
 
@@ -334,6 +368,7 @@ export function installSoundwaveFilterOverride(target) {
   const filter = getSoundwaveFilter();
   if (!id || !filter) return false;
   previouslySoundwaveDetectedTargets.add(target);
+  activeSoundwaveTargets.add(target);
   if (filterOverrides.has(target)) return false;
   const state = { stored: target.detectionFilter ?? null };
   try {
@@ -384,12 +419,26 @@ export function settleSoundwaveOverrides() {
     clearDuringMoveSoundwaveState();
     return;
   }
-  if (filterOverrides.size === 0) return;
+  if (filterOverrides.size === 0 && activeSoundwaveTargets.size === 0) return;
   for (const entry of [...filterOverrides.values()]) {
     const target = entry.target;
     const observers = currentViewVisionerObserversForTarget(target).filter(
       (observer) => !isPartyActorToken(observer),
     );
+    const backInSight = observers.some(
+      (observer) => observer !== target && observerSightContainsTarget(observer, target),
+    );
+    // AVS can settle to Undetected instead of Hidden. Neither our fallback nor a stale Core
+    // filter may keep that target's ripple alive until the safety timeout.
+    if (!backInSight && targetIsHardHiddenFromCurrentView(target)) {
+      entry.state.stored = null;
+      removeSoundwaveFilterOverride(target);
+      setSoundwaveMeshVisible(target, false);
+      // The temporary ripple forced Core-visible during movement. That is not a visual reveal
+      // worth preserving after this confirmed out-of-sight Undetected result.
+      applyCurrentViewHardHide(target, { allowMovementReveal: false });
+      continue;
+    }
     // Foundry's own visibility recompute has produced a real filter (persisted settled to a
     // hidden-render state) -> hand off; the getter was already returning `stored`, so the ripple
     // continues seamlessly with no 'observed' frame.
@@ -398,13 +447,16 @@ export function settleSoundwaveOverrides() {
       continue;
     }
     // Target is back in an observer's sight -> it should render observed; drop the override.
-    const backInSight = observers.some(
-      (observer) => observer !== target && observerSightContainsTarget(observer, target),
-    );
     if (backInSight) {
       removeSoundwaveFilterOverride(target);
     }
     // else: the settle recompute has not landed yet - keep the ripple so there is no flash.
+  }
+  // Core may clear its filter before delayed AVS persistence changes Hidden to Undetected. Keep
+  // recently filtered targets under observation even after their accessor override is gone.
+  for (const target of [...activeSoundwaveTargets]) {
+    if (filterOverrides.has(target)) continue;
+    suppressCoreInvisibleHardHiddenTarget(target);
   }
   if (++settleTicks >= MAX_SETTLE_TICKS) clearDuringMoveSoundwaveState();
 }
@@ -420,6 +472,7 @@ export function clearDuringMoveSoundwaveState() {
     reconcileRenderSurfaceAfterSoundwave(entry.target);
   }
   filterOverrides.clear();
+  activeSoundwaveTargets.clear();
   senseMemo.clear();
   lastWaveComputeAt = 0;
   settleTicks = 0;
@@ -464,6 +517,14 @@ export function refreshSoundwavesForActiveMovement() {
     showSoundwaveRenderSurface(target);
   }
 
+  // AVS state can become Undetected between 10 Hz sense decisions. Core immediately reports the
+  // target invisible, but its old soundwave surfaces may remain renderable until the next batch.
+  // Reconcile only targets known to have carried a ripple; this keeps expensive discovery off the
+  // per-frame path for every other scene token.
+  for (const target of activeSoundwaveTargets) {
+    suppressCoreInvisibleHardHiddenTarget(target);
+  }
+
   const now = globalThis.performance?.now?.() ?? 0;
   const recomputeDue = now - lastWaveComputeAt >= WAVE_RECOMPUTE_INTERVAL_MS;
 
@@ -490,7 +551,10 @@ export function refreshSoundwavesForActiveMovement() {
       continue;
     }
     const hardHiddenFromStoredState = targetIsHardHiddenFromCurrentView(target);
-    if (hardHiddenFromStoredState && !filterOverrides.has(target)) continue;
+    if (hardHiddenFromStoredState && !filterOverrides.has(target)) {
+      suppressCoreInvisibleHardHiddenTarget(target, { requireRemembered: false });
+      continue;
+    }
     const observers = currentViewVisionerObserversForTarget(target).filter(
       (observer) => !isPartyActorToken(observer),
     );
@@ -508,12 +572,20 @@ export function refreshSoundwavesForActiveMovement() {
   }
   if (targetsWithObservers.length === 0 || !recomputeDue) return;
   lastWaveComputeAt = now;
+  senseMemo.clear();
   for (const { target, observers } of targetsWithObservers) {
     const protectedCoreSoundwave =
       filterOverrides.get(target)?.state.stored === getSoundwaveFilter();
     const hasLiveSight = observers.some(
       (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );
+    if (!hasLiveSight && targetIsHardHiddenFromCurrentView(target)) {
+      removeSoundwaveFilterOverride(target);
+      target.detectionFilter = null;
+      setSoundwaveMeshVisible(target, false);
+      applyCurrentViewHardHide(target, { allowMovementReveal: false });
+      continue;
+    }
     // Preserve Core hearing only while no observer has effective visual detection. Checking raw
     // geometry here is insufficient for moving light sources; conversely, keeping this override
     // after light perception succeeds delays soundwave removal until movement settlement.
@@ -589,7 +661,7 @@ export function ensureDuringMoveSoundwaveRefresh() {
   const tick = () => {
     const moving = isMovementOrDragActive();
     // Keep ticking past move-end while overrides are still handing off to Foundry's own rendering.
-    if (!moving && filterOverrides.size === 0) {
+    if (!moving && filterOverrides.size === 0 && activeSoundwaveTargets.size === 0) {
       running = false;
       clearDuringMoveSoundwaveState();
       return;

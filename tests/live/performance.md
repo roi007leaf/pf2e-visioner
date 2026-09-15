@@ -5,6 +5,16 @@ credential prompts, world guard, recovery journal, and cleanup apply. Tests also
 run within `npm run test:live:full`. A performance-only run cannot satisfy
 `--release` or the full shipping matrix.
 
+`detection-movement-soundwave-handoff` adds a 30-token darkness workload. It
+moves the controlled observer repeatedly across a sound-blocking wall and the
+hearing range boundary, then checks post-paint Hidden/Undetected render surfaces.
+It rejects full-art and soundwave leaks. Every movement must keep frame gaps at
+or below 100 ms p95 and 750 ms maximum.
+
+Fresh run `b501b16b-b62f-4e27-ab65-7af693c65977` passed all six transitions:
+p95 frame gaps were 6.2 ms, the worst gap was 18.2 ms, and no Undetected frame
+painted full artwork or soundwaves. Source stayed unchanged and cleanup completed.
+
 ## Rendered canvas FPS
 
 ### Dungeon scene workload

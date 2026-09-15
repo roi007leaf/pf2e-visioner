@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.7.6] - 2026-09-15
+
+### Fixed
+
+- Hidden-token soundwaves now respect hearing range and sound-blocking walls throughout animated movement. Moving an observer out of range or across a sound wall immediately settles the target to Undetected without briefly retaining soundwaves or revealing full token artwork.
+- Detection-filter rendering now permits the filtered token mesh only during its dedicated filter pass. The ordinary primary-art pass remains suppressed, preventing stale full-art frames when Hidden and Undetected rendering hand off during repeated movement.
+- Movement cleanup keeps watching only targets with an active temporary soundwave until AVS settles, then removes them immediately. This avoids scanning every token each frame while still handling delayed visibility updates.
+
+### Tests
+
+- Added an automated 30-token live regression with four repeated sound-wall crossings and hearing-range exit/return movement. It checks post-paint full-art and soundwave surfaces on every sampled frame and enforces 100 ms p95 and 750 ms maximum frame-gap budgets.
+- The live regression passed all six transitions with 6.2 ms p95 frame gaps, an 18.2 ms worst gap, zero Undetected full-art frames, zero stale soundwave frames, unchanged source, and complete cleanup.
+- All 4,927 unit tests and 51 live-harness checks passed. The local live catalog now contains 283 automated scenarios and remains excluded from CI and release archives.
+
 ## [8.7.5] - 2026-09-15
 
 ### Fixed

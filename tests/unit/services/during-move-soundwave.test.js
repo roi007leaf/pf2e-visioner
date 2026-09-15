@@ -509,6 +509,160 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
   let nowSpy;
   let mockNow;
 
+  test.each([
+    { range: Infinity, distance: 55, blocked: true, expected: false },
+    { range: 30, distance: 55, blocked: false, expected: false },
+    { range: 60, distance: 55, blocked: false, expected: true },
+  ])('movement hearing respects range and sound walls: %j', async ({ range, distance, blocked, expected }) => {
+    const mod = await loadWith({ pendingMovement: true, visionAnalyzer: {
+      distanceFeet: () => distance,
+      getSensingCapabilities: () => ({ precise: { vision: Infinity }, imprecise: { hearing: range } }),
+      getVisionCapabilities: () => ({ isDeafened: false }),
+      isSoundBlocked: () => blocked,
+    } });
+    expect(mod.impreciselySensedOutOfSight({}, {})).toBe(expected);
+  });
+
+  test('rechecks hearing when a wall begins blocking during the same move', async () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = { Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } } };
+    try {
+    let blocked = false;
+    const t = { ...makeTarget(), detectionFilter: null };
+    globalThis.canvas = { tokens: { placeables: [t], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, getVisibility: () => 'concealed', visionAnalyzer: {
+      distanceFeet: () => 55,
+      getSensingCapabilities: () => ({ precise: {}, imprecise: { hearing: Infinity } }),
+      getVisionCapabilities: () => ({ isDeafened: false }),
+      isSoundBlocked: () => blocked,
+    } });
+    mod.refreshSoundwavesForActiveMovement();
+    expect(t.detectionFilter).toBeTruthy();
+    blocked = true;
+    mod.refreshSoundwavesForActiveMovement();
+    expect(t.detectionFilter).toBeNull();
+    expect(t.detectionFilterMesh.visible).toBe(false);
+    mod.clearDuringMoveSoundwaveState();
+    } finally { globalThis.CONFIG = savedConfig; }
+  });
+
+  test.each([null, 'stale-core-filter'])('settled Undetected immediately releases a soundwave with stored filter %s', async stored => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = { Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } } };
+    try {
+    const t = { ...makeTarget(), detectionFilter: null, visible: true, renderable: true, mesh: { visible: true, renderable: true } };
+    globalThis.canvas = { tokens: { placeables: [t], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: false, getVisibility: () => 'undetected', isHardHidden: () => true });
+    expect(mod.installSoundwaveFilterOverride(t)).toBe(true);
+    t.detectionFilter = stored;
+    mod.settleSoundwaveOverrides();
+    expect(Object.getOwnPropertyDescriptor(t, 'detectionFilter')?.get).toBeUndefined();
+    expect(t.detectionFilter).toBeNull();
+    expect(t.detectionFilterMesh.visible).toBe(false);
+    expect(t.visible).toBe(false);
+    expect(t.mesh.renderable).toBe(false);
+    mod.clearDuringMoveSoundwaveState();
+    } finally { globalThis.CONFIG = savedConfig; }
+  });
+
+  test('hard-hides a newly Undetected target after Core clears its movement filter', async () => {
+    const t = {
+      ...makeTarget(),
+      detectionFilter: null,
+      isVisible: false,
+      visible: true,
+      renderable: true,
+      mesh: { visible: true, renderable: true },
+    };
+    globalThis.canvas = { tokens: { placeables: [t], preview: { children: [] } } };
+    const mod = await loadWith({
+      pendingMovement: true,
+      getVisibility: () => 'undetected',
+      isHardHidden: () => true,
+    });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(t.visible).toBe(false);
+    expect(t.renderable).toBe(false);
+    expect(t.mesh).toEqual({ visible: false, renderable: false });
+    expect(t.detectionFilterMesh.visible).toBe(false);
+  });
+
+  test('hard-hides Core-invisible Undetected target inside movement decision throttle', async () => {
+    const savedConfig = globalThis.CONFIG;
+    const soundwave = {};
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => soundwave } } } },
+    };
+    try {
+      let hardHidden = false;
+      let coreVisible = true;
+      const t = {
+        ...makeTarget(),
+        detectionFilter: soundwave,
+        visible: true,
+        renderable: true,
+        mesh: { visible: true, renderable: true },
+        get isVisible() { return coreVisible; },
+      };
+      globalThis.canvas = { tokens: { placeables: [t], preview: { children: [] } } };
+      nowSpy.mockImplementation(() => 1000);
+      const mod = await loadWith({
+        pendingMovement: true,
+        getVisibility: () => (hardHidden ? 'undetected' : 'hidden'),
+        isHardHidden: () => hardHidden,
+      });
+      mod.refreshSoundwavesForActiveMovement();
+      expect(Object.getOwnPropertyDescriptor(t, 'detectionFilter')?.get).toBeDefined();
+
+      hardHidden = true;
+      coreVisible = false;
+      t.detectionFilter = null;
+      mod.refreshSoundwavesForActiveMovement();
+
+      expect(t.visible).toBe(false);
+      expect(t.renderable).toBe(false);
+      expect(t.mesh).toEqual({ visible: false, renderable: false });
+      expect(t.detectionFilterMesh.visible).toBe(false);
+    } finally {
+      globalThis.CONFIG = savedConfig;
+    }
+  });
+
+  test('keeps watching a filterless ripple target until delayed move-end AVS settles', async () => {
+    const savedConfig = globalThis.CONFIG;
+    globalThis.CONFIG = {
+      Canvas: { detectionModes: { hearing: { constructor: { getDetectionFilter: () => ({}) } } } },
+    };
+    try {
+      let hardHidden = false;
+      let coreVisible = true;
+      const t = {
+        ...makeTarget(),
+        detectionFilter: null,
+        visible: true,
+        renderable: true,
+        mesh: { visible: true, renderable: true },
+        get isVisible() { return coreVisible; },
+      };
+      globalThis.canvas = { tokens: { placeables: [t], preview: { children: [] } } };
+      const mod = await loadWith({ pendingMovement: false, isHardHidden: () => hardHidden });
+      expect(mod.installSoundwaveFilterOverride(t)).toBe(true);
+      mod.removeSoundwaveFilterOverride(t);
+      mod.settleSoundwaveOverrides();
+      expect(t.visible).toBe(true);
+
+      hardHidden = true;
+      coreVisible = false;
+      mod.settleSoundwaveOverrides();
+      expect(t.visible).toBe(false);
+      expect(t.detectionFilterMesh.visible).toBe(false);
+    } finally {
+      globalThis.CONFIG = savedConfig;
+    }
+  });
+
   test('does not discover observers just to forget a token never remembered as a soundwave', async () => {
     const getObservers = jest.fn(() => []);
     const mod = await loadWith({ pendingMovement: true, getObservers });
@@ -551,6 +705,13 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
         hasActivePendingTokenMovement: () => pendingMovement,
       }));
       jest.doMock('../../../scripts/services/Detection/current-view-hard-hide.js', () => ({
+        applyCurrentViewHardHide: (target) => {
+          if (!isHardHidden(target)) return false;
+          target.visible = false;
+          target.renderable = false;
+          if (target.mesh) { target.mesh.visible = false; target.mesh.renderable = false; }
+          return true;
+        },
         currentViewVisionerObserversForTarget: getObservers,
         releaseCurrentViewHardHideForLiveSight: releaseHardHideForLiveSight,
         targetIsHardHiddenFromCurrentView: isHardHidden,

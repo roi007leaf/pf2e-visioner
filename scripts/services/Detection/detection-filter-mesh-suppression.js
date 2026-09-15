@@ -19,6 +19,23 @@ export function releaseDetectionFilterPrimaryMesh(token) {
   mesh.renderable = true;
 }
 
+export function withDetectionFilterPrimaryMesh(token, render) {
+  const mesh = token?.mesh;
+  if (!token?.detectionFilter || !mesh || !suppressedMeshes.has(mesh)) return render();
+  // Core draws the filter by calling the primary mesh directly. Permit that draw only;
+  // keep the separate, unfiltered primary pass suppressed before and after it.
+  const visible = mesh.visible;
+  const renderable = mesh.renderable;
+  mesh.visible = true;
+  mesh.renderable = true;
+  try {
+    return render();
+  } finally {
+    mesh.visible = visible;
+    mesh.renderable = renderable;
+  }
+}
+
 // Core may assign a new filter without a stored visibility transition. Keep
 // ownership of the container flags we clear so that refresh can release them.
 const clearedFilterMeshes = new WeakMap();
