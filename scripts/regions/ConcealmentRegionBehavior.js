@@ -71,10 +71,13 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
         }
 
         // Check if behavior is enabled (check both enabled and disabled flags)
-        const isEnabled = behavior.enabled !== false && behavior.disabled !== true;
+        const isEnabled = (behavior.system?.enabled ?? behavior.enabled) !== false && behavior.disabled !== true;
         if (!isEnabled) {
             return false;
         }
+
+        const nativeIntersection = RegionHelper.intersectsNativeRegion(region, originPoint, targetPoint);
+        if (nativeIntersection !== null) return nativeIntersection;
 
         const raySegment = {
             p1: { x: originPoint.x, y: originPoint.y },
@@ -153,7 +156,7 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
                     // Check if this is our concealment behavior and it's enabled
                     if (behavior.type === `${MODULE_ID}.Pf2eVisionerConcealment`) {
                         // In Foundry v13, check both 'enabled' and absence of 'disabled'
-                        const isEnabled = behavior.enabled !== false && behavior.disabled !== true;
+                        const isEnabled = (behavior.system?.enabled ?? behavior.enabled) !== false && behavior.disabled !== true;
                         hasConcealmentBehavior = isEnabled;
                         break;
                     }

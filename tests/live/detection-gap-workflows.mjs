@@ -1,7 +1,13 @@
+import { PNG } from 'pngjs';
+const borderSenses = ['scent', 'lifesense', 'thoughtsense'];
 const specialSenses = ['scent', 'tremorsense', 'lifesense', 'thoughtsense', 'echolocation'];
 const special = (type, acuity = 'imprecise', range = 30) => ({ type, acuity, range });
 const observed = { state: 'observed', visible: true, filter: null };
 export const detectionGapCases = [
+  ...borderSenses.map(sense => ({ name: `detection-${sense}-upper-level-suppression`, area: 'detection-transitions',
+    senses: [special(sense)], darkness: true,
+    disposableWorld: true, settings: ['core.scrollingStatusText'],
+    steps: [{ workflow: `detection-${sense}-upper-level-suppression` }] })),
   ...specialSenses.map(sense => ({
     name: `detection-boundary-${sense}`, area: 'detection-boundaries', senses: [special(sense, sense === 'echolocation' ? 'precise' : 'imprecise')],
     steps: [{ workflow: `detection-boundary-${sense}` }],
@@ -15,6 +21,7 @@ export const detectionGapCases = [
   })),
 ];
 export const detectionGapWorkflows = Object.fromEntries([
+  ...borderSenses.map(sense => [`detection-${sense}-upper-level-suppression`, c => borderUpperLevelSuppression(c, sense)]),
   ...specialSenses.map(sense => [`detection-boundary-${sense}`, c => rangeBoundary(c, sense)]),
   ['detection-sense-fallback', senseFallback], ['detection-tremor-elevation', tremorElevation],
   ['detection-overlapping-lights', overlappingLights], ['detection-overlapping-suppression', overlappingSuppression],
@@ -23,6 +30,123 @@ export const detectionGapWorkflows = Object.fromEntries([
   ['detection-door-animation-reveal', c => doorAnimation(c, true)],
   ['detection-door-animation-hide', c => doorAnimation(c, false)],
 ]);
+
+async function borderUpperLevelSuppression(c, sense) {
+  // Journaled world setting: restored after success, failure, or recovery.
+  // Native level redraws must not destroy active scrolling status text.
+  await c.setting('core.scrollingStatusText', false);
+  await c.player.waitForTimeout(2200);
+  await runBorderUpperLevelSuppression(c, sense);
+}
+
+async function runBorderUpperLevelSuppression(c, sense) {
+  // All documents belong to the runner's disposable scene; its journal removes
+  // that scene and actors even when an assertion or browser operation fails.
+  await c.mutate('native-levels');
+  await c.mutate('floor');
+  await c.rpc(c.player, 'view', c.fixture);
+  await c.mutate('condition', 'deafened');
+  const present = { presenceMode: sense, presenceVisible: true };
+  const absent = { presenceVisible: false, visible: false };
+  await c.check(present, false, 'upper-target-in-range-without-suppression');
+  const regionId = await c.gm.evaluate(async ({ f, runId, sense }) => {
+    const scene = canvas.scene;
+    if (!game.user.isGM || scene.id !== f.scene || scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId) throw Error('Owned QA scene required');
+    const [region] = await scene.createEmbeddedDocuments('Region', [{
+      name: `QA Upper Level ${sense} suppression`,
+      flags: { 'pf2e-visioner': { liveTestRun: runId } },
+      elevation: { bottom: 10, top: 20 },
+      shapes: [{ type: 'rectangle', x: 700, y: 400, width: 300, height: 300, rotation: 0, hole: false }],
+      behaviors: [{ type: 'pf2e-visioner.Pf2eVisionerSenseSuppression',
+        system: { enabled: true, senses: [sense], affectsObserver: false, affectsTarget: true } }],
+    }]);
+    return region.id;
+  }, { f: c.fixture, runId: c.runId, sense });
+  const selection = await c.gm.evaluate(() => canvas.tokens.controlled.map(t => t.id));
+  try {
+    // First and second observer positions are both within scent range. Neither
+    // stored detection nor the separate presence overlay may leak.
+    for (const x of [400, 500, 400]) {
+      await c.mutate('observer-move', { x });
+      await c.check(absent, false, `suppressed-from-zone-${x}`);
+      await clickObserver(c, true);
+      await c.check(absent, false, `suppressed-with-gm-selected-${x}`);
+      await clickObserver(c, false);
+      await c.check(absent, false, `suppressed-after-gm-release-${x}`);
+    }
+    await ownedScene(c, 'region-delete', regionId);
+    await c.mutate('observer-move', { x: 401 });
+    await c.check(present, false, 'removing-suppression-restores-marker');
+    // Compare independent clients under all GM vision modes. Real clicks also
+    // exercise Core's selection hooks and user activity broadcasts.
+    for (const mode of ['normal', 'observer', 'gm-vision']) {
+      await c.gm.evaluate(value => game.settings.set('pf2e', 'gmVision', value), mode === 'gm-vision');
+      await c.mutate('gm-observer-view', mode === 'observer');
+      for (let cycle = 0; cycle < 3; cycle++) {
+        await clickObserver(c, true);
+        await c.check(present, false, `${sense}-${mode}-gm-selected-${cycle}`);
+        await assertBorderPixels(c, sense, `${mode}-selected-${cycle}`);
+        await clickObserver(c, false);
+        await c.check(present, false, `${sense}-${mode}-gm-released-${cycle}`);
+        await assertBorderPixels(c, sense, `${mode}-released-${cycle}`);
+      }
+    }
+    await c.mutate('move', 1200);
+    await c.check(absent, false, 'upper-target-outside-scent-range');
+    await c.mutate('move', 800);
+    await c.check(present, false, 'returning-in-range-restores-marker');
+  } finally {
+    await c.gm.evaluate(ids => {
+      canvas.tokens.releaseAll();
+      for (const id of ids) canvas.tokens.get(id)?.control({ releaseOthers: false });
+    }, selection);
+  }
+}
+
+async function clickObserver(c, selected) {
+  await c.gm.bringToFront();
+  // Observer View can recenter the camera while the GM tab is backgrounded.
+  // Join that animation before converting token coordinates into a click.
+  await c.gm.evaluate(async () => {
+    await foundry.canvas.animation.CanvasAnimation.getAnimation('canvas.animatePan')?.promise;
+  });
+  const point = await c.gm.evaluate(f => {
+    const token = canvas.tokens.get(f.observer);
+    const p = canvas.stage.toGlobal(token.center);
+    return { x: p.x, y: p.y, selected: token.controlled };
+  }, c.fixture);
+  if (point.selected !== selected) {
+    if (!selected) await c.gm.keyboard.down('Shift');
+    try { await c.gm.mouse.click(point.x, point.y, { delay: 100 }); }
+    finally { if (!selected) await c.gm.keyboard.up('Shift'); }
+  }
+  await c.gm.waitForFunction(({ id, selected }) => canvas.tokens.get(id)?.controlled === selected,
+    { id: c.fixture.observer, selected });
+  await c.gm.mouse.move(10, 10);
+  await c.player.bringToFront();
+  await c.player.waitForTimeout(1000);
+  c.equal(await c.player.evaluate(() => canvas.tokens.controlled.map(t => t.id)),
+    [c.fixture.observer], 'GM click preserves player observer selection');
+}
+
+async function assertBorderPixels(c, sense, label) {
+  await c.player.bringToFront();
+  await c.player.mouse.move(10, 10);
+  const { rect } = await c.rpc(c.player, 'snapshot', c.fixture);
+  const png = PNG.sync.read(await c.player.screenshot());
+  let pixels = 0;
+  for (let y = Math.max(0, rect.y - 8); y < Math.min(png.height, rect.y + rect.height + 8); y++) {
+    for (let x = Math.max(0, rect.x - 8); x < Math.min(png.width, rect.x + rect.width + 8); x++) {
+      const i = (y * png.width + x) * 4;
+      const [r, g, b] = png.data.subarray(i, i + 3);
+      const match = sense === 'scent' ? r > 35 && r > g * 1.25 && g > b * 1.35 && b < 90
+        : sense === 'lifesense' ? g > 60 && b > 70 && r < g * 0.6
+          : r > 45 && b > 60 && g < r * 0.5;
+      if (match) pixels++;
+    }
+  }
+  c.assert(pixels > 30, `${sense} ${label}: player border rendered (${pixels} pixels)`);
+}
 
 async function rangeBoundary(c, sense) {
   await c.mutate('condition', 'blinded');

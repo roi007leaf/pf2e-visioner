@@ -122,6 +122,9 @@ export class CoverRegionBehavior extends RegionBehaviorBase {
             return false;
         }
 
+        const nativeIntersection = RegionHelper.intersectsNativeRegion(region, originPoint, targetPoint);
+        if (nativeIntersection !== null) return nativeIntersection;
+
         const raySegment = {
             p1: { x: originPoint.x, y: originPoint.y },
             p2: { x: targetPoint.x, y: targetPoint.y }

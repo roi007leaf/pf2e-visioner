@@ -130,6 +130,9 @@ export class CoverDetector {
 
       const p1 = attacker.center ?? attacker.getCenterPoint();
       const p2 = target.center ?? target.getCenterPoint();
+      // PIXI centers are 2D; region containment needs each token's floor elevation.
+      const regionOrigin = { ...p1, elevation: attacker.document?.elevation ?? p1.elevation ?? p1.z ?? 0 };
+      const regionTarget = { ...p2, elevation: target.document?.elevation ?? p2.elevation ?? p2.z ?? 0 };
 
       // Calculate elevation spans for 3D wall height checks
       let elevationRange = null;
@@ -165,7 +168,7 @@ export class CoverDetector {
         if (!allowGreaterOverride && adjusted === 'greater') {
           adjusted = 'standard';
         }
-        return this._applyRegionCover(p1, p2, this._highestCoverState(adjusted, tileCover));
+        return this._applyRegionCover(regionOrigin, regionTarget, this._highestCoverState(adjusted, tileCover));
       }
 
       // Check if there's any blocking terrain (walls) in the way
@@ -287,7 +290,7 @@ export class CoverDetector {
       }
 
       calculatedCover = this._highestCoverState(calculatedCover, tileCover);
-      const finalCover = this._applyRegionCover(p1, p2, calculatedCover);
+      const finalCover = this._applyRegionCover(regionOrigin, regionTarget, calculatedCover);
       return finalCover;
     } catch (error) {
       console.error('PF2E Visioner | CoverDetector.detectForAttack error:', error);

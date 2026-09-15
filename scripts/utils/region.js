@@ -48,6 +48,17 @@ export default class RegionHelper {
     }
 
     // Generic point-in-region support
+    static intersectsNativeRegion(region, origin, target) {
+        const document = region?.document ?? region;
+        if (typeof document?.segmentizeMovementPath !== 'function') return null;
+        const point = p => ({ x: p.x, y: p.y, elevation: p.elevation ?? p.z ?? 0 });
+        const a = point(origin), b = point(target);
+        // Core uses exact composite polygons and the elevation slab, including
+        // holes, rotation and vertical crossings. Bounds alone cannot do this.
+        if (a.x === b.x && a.y === b.y && a.elevation === b.elevation) return document.testPoint(a);
+        return document.segmentizeMovementPath([a, b], [{ x: 0, y: 0 }], 0).length > 0;
+    }
+
     static isPointInside(region, point) {
         try {
             if (!region || !point) return false;

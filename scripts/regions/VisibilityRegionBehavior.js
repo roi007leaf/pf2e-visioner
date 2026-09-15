@@ -90,7 +90,8 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
         token = event.target;
       else if (event && typeof event === 'object' && event?.id && event?.center) token = event;
       else if (event?.data?.token)
-        token = canvas.tokens.get(event.data.token?.id ?? event.data.token);
+        token = canvas.tokens.get(event.data.token?.id ?? event.data.token) ??
+          (typeof event.data.token === 'object' ? event.data.token : { id: event.data.token });
 
       // Additional common shapes for combat/turn/round events
       if (!token && event?.tokenId) token = canvas.tokens.get(event.tokenId);
@@ -302,6 +303,36 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
     this._ensurePending();
 
     if (!this._pendingTokenEvents.size) return;
+
+    // Changing the controlled token's native level rebuilds canvas tokens.
+    // Keep queued region events until their placeables exist again.
+    // Core emits canvasReady before clearing loading; ready is authoritative.
+    if (canvas.ready === false) {
+      if (!this._pendingCanvasReadyHook) {
+        const sceneId = this.region?.parent?.id ?? canvas.scene?.id;
+        const clear = () => {
+          if (this._pendingCanvasReadyHook) Hooks.off('canvasReady', this._pendingCanvasReadyHook);
+          this._pendingCanvasReadyHook = null;
+          clearTimeout(this._pendingCanvasReadyTimeout);
+          this._pendingCanvasReadyTimeout = null;
+        };
+        this._pendingCanvasReadyHook = Hooks.once('canvasReady', () => {
+          clear();
+          if (canvas.scene?.id !== sceneId || !isPrimaryGM() ||
+            (this.region?.id && !canvas.scene?.regions?.has(this.region.id))) {
+            this._pendingTokenEvents.clear();
+            return;
+          }
+          return this._processPendingEvents();
+        });
+        // A failed draw must not retain this behavior through a permanent hook.
+        this._pendingCanvasReadyTimeout = setTimeout(() => {
+          clear();
+          this._pendingTokenEvents.clear();
+        }, 60000);
+      }
+      return;
+    }
 
     // Snapshot and clear pending
     const entries = Array.from(this._pendingTokenEvents.values());

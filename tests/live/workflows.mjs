@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { regionAuditWorkflows } from './region-audit-workflows.mjs';
 import * as ui from './ui-workflows.mjs';
 import * as behavior from './behavior-workflows.mjs';
 import * as features from './feature-workflows.mjs';
@@ -14,6 +15,7 @@ import { scenePerformanceWorkflows } from './scene-performance-workflows.mjs';
 import { deletionRaceWorkflows } from './deletion-race-workflows.mjs';
 
 export const workflows = {
+  ...regionAuditWorkflows,
   ...fpsWorkflows,
   ...performanceLifecycleWorkflows,
   ...scenePerformanceWorkflows,

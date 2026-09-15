@@ -84,7 +84,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     );
   });
 
-  test('applyOverrides creates one-way for hide_action', async () => {
+  test.each(['hide_action', 'region_override'])('applyOverrides creates one-way for %s', async (source) => {
     const A = mkToken('A', 'Observer');
     const B = mkToken('B', 'Target');
 
@@ -104,7 +104,7 @@ describe('AvsOverrideManager (AVS overrides lifecycle)', () => {
     const ok = await AvsOverrideManager.applyOverrides(
       A,
       [{ target: B, state: 'hidden' }],
-      { source: 'hide_action' },
+      { source },
     );
 
     expect(ok).toBe(true);

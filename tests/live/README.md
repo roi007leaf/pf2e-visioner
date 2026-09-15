@@ -8,8 +8,42 @@ restored, including through `npm run test:live:cleanup` after interruption.
 Secret actions use the native roll dialog's public mode for deterministic dice;
 these cases do not certify secret-roll privacy.
 
+The `detection-{scent,lifesense,thoughtsense}-upper-level-suppression` regressions
+check upper-level targets inside sense-suppression regions from a player-owned
+observer below. Each verifies marker removal, restoration after region removal,
+and range boundaries. Real GM select/release clicks repeat three times under
+normal view, Observer View, and GM Vision; player screenshots must retain the
+correct border color. The runner cleans up its scene, levels,
+regions, and actors even after failure. Run just this case in PowerShell:
+
+```powershell
+$env:VISIONER_LIVE_CASE = 'detection-scent-upper-level-suppression,detection-lifesense-upper-level-suppression,detection-thoughtsense-upper-level-suppression'
+try { npm run test:live:full } finally { Remove-Item Env:VISIONER_LIVE_CASE }
+```
+
+The four `region-audit-*` cases test native checkbox form saves and behavior
+matrices for Concealment, Cover, Sense Suppression and Visibility. Run them with:
+
+```powershell
+$env:VISIONER_LIVE_CASE = 'region-audit-concealment,region-audit-cover,region-audit-suppression,region-audit-visibility'
+try { npm run test:live:full } finally { Remove-Item Env:VISIONER_LIVE_CASE }
+```
+
+Four `region-multilevel-*` cases repeat floor changes with native Foundry levels
+for all four behaviors. They check a region above the target's same map footprint,
+observer/target floor changes, suppression direction, disabling/re-enabling and
+removal. Back-to-back floor changes also exercise queued visibility events during
+canvas rebuilds. Run them with:
+
+```powershell
+$env:VISIONER_LIVE_CASE = 'region-multilevel-concealment,region-multilevel-cover,region-multilevel-suppression,region-multilevel-visibility'
+try { npm run test:live:full } finally { Remove-Item Env:VISIONER_LIVE_CASE }
+```
+
+See [coverage inventory](coverage.md) for assertion scope and remaining boundaries.
+
 All scenarios are automated. No guided mode, review prompts, or human pass/fail
-verdicts. The full catalog contains **270 scenarios**, including two deletion-race regressions, sixteen performance scenarios, fourteen detection-boundary/transition additions, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and 41 workflows
+verdicts. The full catalog contains **282 scenarios**, including eight region-option/multilevel audits, two deletion-race regressions, sixteen performance scenarios, seventeen detection-boundary/transition additions, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and 41 workflows
 replacing the former 24 bundled reviews. A workflow records each assertion and
 screenshots; a failed or blocked prerequisite never counts as a pass.
 

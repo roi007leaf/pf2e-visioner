@@ -1,8 +1,41 @@
 # Automated live coverage inventory
 
-**270 automated scenarios; zero guided scenarios.** The former 24 manual reviews
+**282 automated scenarios; zero guided scenarios.** The former 24 manual reviews
 became 42 separate automated workflows. Counts describe executable definitions,
 not successful live verification or exhaustive line/branch coverage.
+
+Four `region-multilevel-*` workflows passed 86 assertions on Foundry 14.367 /
+PF2e 8.5.0, cleanup complete (run `f7f35817-8d9a-433d-a1a9-84ac2b779ba9`).
+Real native ground/upper levels share the same map footprint. Each behavior checks
+two target up/down cycles, both tokens upstairs, observer downstairs, behavior
+disable/re-enable and removal. Suppression additionally tests observer-only flags
+at identical coordinates on different floors. Visibility includes back-to-back
+floor changes that rebuild the selected observer's canvas while a region event
+is pending. Player snapshots and screenshots are recorded at each state check.
+These cases have open vertical sight lines; the separate native floor-occlusion
+and three upper-level border regressions cover blocking surfaces. They do not
+certify every combination of cover mode, sense, floor geometry and region behavior.
+
+Four `region-audit-*` workflows passed 191 assertions on Foundry 14.367 / PF2e
+8.5.0 with cleanup complete (run `cb455feb-13da-4f01-a98d-94ff108b05dd`). They cover:
+
+- Native checkbox saves, both values: behavior disabled, enabled where offered,
+  suppression observer/target flags, visibility inside-token and two-way flags.
+- Concealment enabled/disabled combinations and overlapping-region removal.
+- All three cover modes and grades, enabled/disabled combinations, directional
+  rays, crossing rays, strongest overlapping cover and removal fallback.
+- Concealment/cover elevation slabs, inclusive/exclusive upper bounds, holes,
+  concave polygons, rotation, separated shapes and ellipses using native geometry.
+- Suppression's 16 enabled/disabled/observer/target combinations, all 20 sense
+  selections individually, empty selection, outside and below-region controls.
+- Visibility's five states across both inside-token and two-way values, reverse
+  pairs, a second observer inside, and disabled behavior cleanup.
+
+Suppression selection and geometric checks call production calculators against
+real persisted Region documents; they do not certify rendered detection for every
+sense. Separate upper-level scent/lifesense/thoughtsense cases assert player border
+pixels through GM selection changes. This batch does not exhaust every visibility
+event-mask combination, combat timing, mixed-behavior overlap or third-party module.
 
 Two deletion regressions cover deleting a real token while flag persistence waits
 (with surviving writes verified) and rapid native token creation/deletion with two

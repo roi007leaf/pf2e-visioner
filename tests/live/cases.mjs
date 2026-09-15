@@ -1,4 +1,5 @@
 import { extendedCases } from './extended-cases.mjs';
+import { regionAuditCases } from './region-audit-workflows.mjs';
 import { itemRoleCases } from './item-role-cases.mjs';
 import { requiredCases } from './required-cases.mjs';
 import { automatedCases } from './automated-cases.mjs';
@@ -61,6 +62,7 @@ export const smokeCases = [
 ];
 
 export const fullCases = [
+  ...regionAuditCases,
   ...fpsCases,
   ...performanceLifecycleCases,
   ...scenePerformanceCases,

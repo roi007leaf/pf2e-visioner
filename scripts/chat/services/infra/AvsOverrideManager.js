@@ -193,7 +193,9 @@ export class AvsOverrideManager {
       // - One-way: sneak, hide, diversion, seek, point-out, manual edits from Token Manager
       //   Rationale: Token Manager already calls this with the correct logical direction
       //   (observer -> target). Making manual_action symmetric here caused double overrides.
-      // - Symmetric: region overrides and any other bulk/system-generated sources
+      // Regions enumerate their own directions using twoWayRegion and
+      // applyToInsideTokens. Mirroring here would override those checkboxes.
+      // - Symmetric: other bulk/system-generated sources
       const isOneWayBySource =
         isSneakAction ||
         src === 'hide_action' ||
@@ -202,6 +204,7 @@ export class AvsOverrideManager {
         src === 'seek_action_deferred' ||
         src === 'point_out_action' ||
         src === 'manual_action' ||
+        src === 'region_override' ||
         src === 'take_cover_action' ||
         src === 'encounter_stealth_initiative' ||
         src === 'system-condition' ||

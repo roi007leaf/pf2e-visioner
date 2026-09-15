@@ -1,4 +1,5 @@
 import { casePassed } from './coverage.mjs';
+import { regionAuditCases } from './region-audit-workflows.mjs';
 import { missingCases } from './missing-cases.mjs';
 import { auditCases } from './audit-cases.mjs';
 import { detectionGapCases } from './detection-gap-workflows.mjs';
@@ -9,6 +10,7 @@ import { deletionRaceCases } from './deletion-race-workflows.mjs';
 // Required functional contracts. Missing implementations are explicit blockers,
 // not omitted from the denominator or replaced with a passing placeholder.
 export const requirements = [
+  ['Region checkbox and mode matrix', regionAuditCases.map(c => c.name)],
   ['Deletion during AVS persistence waits', deletionRaceCases.map(c => c.name)],
   ['Dungeon walls, lights and lighting regions', scenePerformanceCases.map(c => c.name)],
   ['Client startup and retained memory', performanceLifecycleCases.map(c => c.name)],

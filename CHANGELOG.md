@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.7.5] - 2026-09-15
+
+### Fixed
+
+- Sense-suppression regions now also block presence markers for scent, lifesense, thoughtsense and echolocation. Upper-level targets can no longer retain a marker through a region that suppresses detection by the observer or of the target.
+- Concealment and Sense Suppression regions now honor their Enabled checkboxes as well as Foundry's Disabled checkbox.
+- Concealment and cover ray checks use native region geometry, including elevation bounds, holes, rotated and concave shapes, and separated shapes.
+- Region cover now retains observer and target elevations when calculating cover between tokens on different floors.
+- Visibility regions now honor the Two-Way checkbox instead of automatically mirroring one-way overrides.
+- Visibility region events wait for token objects to return after a native level change rebuilds the canvas. Queued events are discarded safely when the viewed scene changes or a draw fails.
+
+### Tests
+
+- Added automated region checkbox, mode and multilevel audits: 277 live assertions across eight scenarios passed with complete cleanup. Coverage includes native checkbox saves, all 20 suppression sense selections, cover grades and directions, visibility directions, geometry boundaries, and repeated floor transitions.
+- Added upper-level scent, lifesense and thoughtsense regressions, including actual GM select/release clicks in normal view, Observer View and GM Vision. Player border pixels remain independently verified; the reported GM-selection border loss was not reproduced.
+- Expanded local test instructions and coverage inventory to 282 automated scenarios. Test fixtures, settings and pause state are restored after runs; the local suite remains excluded from release ZIPs and CI execution.
+- All 4,913 unit tests and 51 live-harness checks passed. These focused live runs do not certify every combination or the entire 282-scenario catalog.
+
 ## [8.7.4] - 2026-09-15
 
 ### Fixed

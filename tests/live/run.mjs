@@ -353,7 +353,9 @@ async function run() {
               if (!journal.worldSettings?.settings.some(entry => entry.key === key)) throw Error(`Unjournaled QA setting: ${key}`);
               await rpc(gm.page, 'changeSetting', { key, value, runId: journal.runId, worldId: gm.state.world });
               for (const session of [gm, gm2, player].filter(Boolean)) await session.page.waitForFunction(
-                ({ key, value }) => game.settings.get('pf2e-visioner', key) === value, { key, value });
+                ({ key, value }) => (key === 'core.scrollingStatusText'
+                  ? game.settings.get('core', 'scrollingStatusText')
+                  : game.settings.get('pf2e-visioner', key)) === value, { key, value });
             },
             pause: paused => syncPause(journal, paused),
             mutate: async (operation, value, overrides = {}) => {

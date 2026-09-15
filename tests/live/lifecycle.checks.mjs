@@ -77,6 +77,28 @@ test('world settings writes require matching disposable world, allowed scope and
   } finally { Object.assign(globalThis, original); }
 });
 
+test('scrolling text uses the core namespace and restores its journaled value', async () => {
+  const original = { game: globalThis.game, canvas: globalThis.canvas };
+  let current = true;
+  const entry = { key: 'core.scrollingStatusText' };
+  try {
+    globalThis.game = { user: { isGM: true }, world: { id: 'qa-world' }, settings: {
+      settings: new Map([['core.scrollingStatusText', { scope: 'world' }]]),
+      storage: new Map([['world', [entry]]]),
+      get: (namespace, key) => { assert.equal(namespace, 'core'); assert.equal(key, 'scrollingStatusText'); return current; },
+      set: async (namespace, key, value) => { assert.equal(namespace, 'core'); assert.equal(key, 'scrollingStatusText'); current = value; },
+    } };
+    globalThis.canvas = { scene: { getFlag: () => RUN } };
+    const backup = captureSettings({ worldId: 'qa-world', keys: ['core.scrollingStatusText'] });
+    await changeSetting({ worldId: 'qa-world', runId: RUN, key: 'core.scrollingStatusText', value: false });
+    assert.equal(current, false);
+    await restoreSettings(backup);
+    await restoreSettings(backup);
+    assert.equal(current, true);
+    assert.throws(() => captureSettings({ worldId: 'qa-world', keys: ['core.otherSetting'] }), /not allowed/);
+  } finally { Object.assign(globalThis, original); }
+});
+
 test('client settings restore before leaving the fixture, and never write world settings', async () => {
   const original = { game: globalThis.game, canvas: globalThis.canvas };
   const calls = [];

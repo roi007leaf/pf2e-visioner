@@ -87,7 +87,7 @@ export class SenseSuppressionRegionBehavior extends RegionBehaviorBase {
 
             for (const behavior of behaviorsCollection) {
                 if (behavior.type !== BEHAVIOR_TYPE) continue;
-                const isEnabled = behavior.enabled !== false && behavior.disabled !== true;
+                const isEnabled = (behavior.system?.enabled ?? behavior.enabled) !== false && behavior.disabled !== true;
                 if (!isEnabled) continue;
 
                 const senses = behavior.system?.senses || behavior.senses;

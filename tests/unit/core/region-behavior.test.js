@@ -195,6 +195,47 @@ describe('VisibilityRegionBehavior', () => {
   });
 
   describe('Update Generation Logic', () => {
+    test.each(['ready', 'different-scene', 'timeout'])('queued events survive canvas rebuild with %s cleanup', async outcome => {
+      jest.useFakeTimers();
+      const saved = { ready: canvas.ready, loading: canvas.loading, scene: canvas.scene };
+      let resume;
+      const once = jest.spyOn(Hooks, 'once').mockImplementation((_name, callback) => { resume = callback; return 9123; });
+      const off = jest.spyOn(Hooks, 'off').mockImplementation(() => {});
+      canvas.scene = { id: 'qa-scene' };
+      canvas.ready = false; canvas.loading = true;
+      mockRegion.document.testPoint.mockImplementation(point => point.x === 100);
+      regionBehavior._applyVisibilityUpdates = jest.fn();
+      regionBehavior._pendingTokenEvents = new Map([['token1', { id: 'token1', isEntering: true, eventName: CONST.REGION_EVENTS.TOKEN_ENTER }]]);
+      try {
+        await regionBehavior._processPendingEvents();
+        await regionBehavior._processPendingEvents();
+        expect(once).toHaveBeenCalledTimes(1);
+        expect(regionBehavior._pendingTokenEvents.size).toBe(1);
+        expect(regionBehavior._applyVisibilityUpdates).not.toHaveBeenCalled();
+        if (outcome === 'timeout') jest.advanceTimersByTime(60000);
+        else {
+          // Native canvasReady fires while loading is still true.
+          canvas.ready = true; canvas.loading = true;
+          if (outcome === 'different-scene') canvas.scene = { id: 'other' };
+          await resume();
+        }
+        expect(regionBehavior._pendingTokenEvents.size).toBe(0);
+        expect(regionBehavior._applyVisibilityUpdates).toHaveBeenCalledTimes(outcome === 'ready' ? 1 : 0);
+        expect(off).toHaveBeenCalledWith('canvasReady', 9123);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        Object.assign(canvas, saved); once.mockRestore(); off.mockRestore(); jest.useRealTimers();
+      }
+    });
+    test('queues native token document events while canvas placeables are absent', async () => {
+      const original = canvas.tokens.placeables;
+      canvas.tokens.placeables = [];
+      regionBehavior._scheduleTokenEvent = jest.fn();
+      try {
+        await regionBehavior._handleRegionEvent({ name: CONST.REGION_EVENTS.TOKEN_ENTER, data: { token: mockToken1.document } });
+        expect(regionBehavior._scheduleTokenEvent).toHaveBeenCalledWith(mockToken1.document, true, CONST.REGION_EVENTS.TOKEN_ENTER);
+      } finally { canvas.tokens.placeables = original; }
+    });
     test.each(['manual_action', 'region_override'])('region removal respects override source %s', async source => {
       mockToken1.document.getFlag = () => ({ source, state: 'undetected' });
       const remove = jest.spyOn(AvsOverrideManager, 'removeOverride').mockResolvedValue(true);

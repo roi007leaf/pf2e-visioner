@@ -25,6 +25,54 @@ function makeToken(id) {
   };
 }
 
+test.each(['scent', 'lifesense', 'thoughtsense', 'echolocation'])(
+  '%s presence marker respects target region suppression and elevation', (sense) => {
+    const previousScene = canvas.scene;
+    const observer = { center: { x: 50, y: 50 }, document: { elevation: 0 },
+      distanceTo: () => 25,
+      actor: { system: { perception: { senses: [{ type: sense, range: 30 }] } } } };
+    const token = { visible: false, center: { x: 150, y: 50 }, document: { elevation: 20 } };
+    canvas.scene = { regions: [{
+      testPoint: (point, elevation) => point.x >= 100 && elevation >= 20,
+      behaviors: [{ type: 'pf2e-visioner.Pf2eVisionerSenseSuppression',
+        system: { enabled: true, senses: new Set([sense]), affectsTarget: true } }],
+    }] };
+    const decide = () => buildSystemHiddenIndicatorDecision({ observer, token,
+      getDetectionBetween: () => ({ sense, isPrecise: sense === 'echolocation' }),
+      canLifesenseDetect: () => true, canThoughtsenseDetect: () => true,
+      isSoundBlocked: () => false, isScentBlocked: () => false });
+    try {
+      expect(decide().shouldShowIndicator).toBe(false);
+      token.document.elevation = 0;
+      expect(decide().shouldShowIndicator).toBe(true);
+      token.document.elevation = 20;
+      canvas.scene.regions[0].behaviors[0].disabled = true;
+      expect(decide().shouldShowIndicator).toBe(true);
+    } finally { canvas.scene = previousScene; }
+  },
+);
+
+test('observer suppression uses movement override and leaves other senses available', () => {
+  const previousScene = canvas.scene;
+  const observer = { center: { x: 50, y: 50 }, document: { x: 0, y: 0, elevation: 20 },
+    distanceTo: () => 20,
+    actor: { system: { perception: { senses: [{ type: 'scent', range: 30 }] } } } };
+  const token = { visible: false, center: { x: 50, y: 50 }, document: { elevation: 0 } };
+  canvas.scene = { regions: [{ testPoint: (p, e) => p.x >= 100 && e >= 20,
+    behaviors: [{ type: 'pf2e-visioner.Pf2eVisionerSenseSuppression',
+      system: { senses: new Set(['scent']), affectsObserver: true, affectsTarget: false } }],
+  }] };
+  const decide = (positionOverride) => buildSystemHiddenIndicatorDecision({ observer, token,
+    positionOverride, grid: { size: 100 }, isScentBlocked: () => false });
+  try {
+    expect(decide(null).shouldShowScentIndicator).toBe(true);
+    expect(decide({ x: 100, y: 0 }).shouldShowScentIndicator).toBe(false);
+    expect(decide({ x: 100, y: 0, elevation: 0 }).shouldShowScentIndicator).toBe(true);
+    canvas.scene.regions[0].behaviors[0].system.senses = new Set(['lifesense']);
+    expect(decide({ x: 100, y: 0 }).shouldShowScentIndicator).toBe(true);
+  } finally { canvas.scene = previousScene; }
+});
+
 test.each([
   [{ type: 'SCENT' }],
   { contents: [{ slug: 'scent' }] },

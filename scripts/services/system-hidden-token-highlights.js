@@ -1,4 +1,5 @@
 import { isScentBlocked as defaultIsScentBlocked } from '../helpers/scent-wall-utils.js';
+import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
@@ -219,6 +220,30 @@ export function buildSystemHiddenIndicatorDecision({
   canThoughtsenseDetect = () => false,
   canScentDetect = () => true,
 } = {}) {
+  // Presence markers must obey the same observer/target region restrictions as AVS.
+  // A token being hidden by Core does not itself authorize detection through a region.
+  const regionPosition = (subject, override = null) => {
+    const doc = subject?.document ?? {};
+    const size = grid?.size ?? globalThis.canvas?.grid?.size ?? 1;
+    return {
+      x: override?.x != null ? override.x + (doc.width ?? 1) * size / 2
+        : subject?.center?.x ?? (doc.x ?? 0) + (doc.width ?? 1) * size / 2,
+      y: override?.y != null ? override.y + (doc.height ?? 1) * size / 2
+        : subject?.center?.y ?? (doc.y ?? 0) + (doc.height ?? 1) * size / 2,
+      elevation: override?.elevation ?? doc.elevation ?? 0,
+    };
+  };
+  const suppressed = new Set([
+    ...SenseSuppressionRegionBehavior.getSuppressedSensesForObserver(regionPosition(observer, positionOverride)),
+    ...SenseSuppressionRegionBehavior.getSuppressedSensesForTarget(regionPosition(token)),
+  ]);
+  senseContext = {
+    ...senseContext,
+    observerHasScent: senseContext?.observerHasScent && !suppressed.has('scent'),
+    observerHasLifesense: senseContext?.observerHasLifesense && !suppressed.has('lifesense'),
+    observerHasThoughtsense: senseContext?.observerHasThoughtsense && !suppressed.has('thoughtsense'),
+    observerHasEcholocation: senseContext?.observerHasEcholocation && !suppressed.has('echolocation'),
+  };
   const isSystemHidden = !token?.visible || token?.renderable === false;
   const mayShowSystemHiddenIndicator = token?.document?.hidden !== true;
   const targetTraits = token?.actor?.system?.traits?.value || [];

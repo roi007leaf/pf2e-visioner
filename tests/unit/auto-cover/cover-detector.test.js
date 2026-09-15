@@ -51,6 +51,26 @@ describe('CoverDetector', () => {
     jest.restoreAllMocks();
   });
 
+  test.each([null, 'lesser'])('region cover retains token elevation with wall override %s', async wallOverride => {
+    const { CoverRegionBehavior } = await import('../../../scripts/regions/CoverRegionBehavior.js');
+    const attacker = global.createMockToken({ id: 'region-attacker' });
+    const target = global.createMockToken({ id: 'region-target' });
+    attacker.document.elevation = 0;
+    target.document.elevation = 10;
+    const savedRegions = global.canvas.scene.regions;
+    global.canvas.scene.regions = [{
+      behaviors: [{ type: 'pf2e-visioner.Pf2eVisionerCover', disabled: false, system: { enabled: true, mode: 'override', coverLevel: 'standard' } }],
+      testPoint: point => point.elevation >= 10 && point.elevation < 20,
+    }];
+    expect(CoverRegionBehavior.getCoverBetween({ ...attacker.center, elevation: 0 }, { ...target.center, elevation: 10 })).toBe('standard');
+    jest.spyOn(coverDetector, '_checkWallCoverOverrides').mockReturnValue(wallOverride);
+    try {
+      expect(coverDetector.detectBetweenTokens(attacker, target)).toBe('standard');
+      target.document.elevation = 0;
+      expect(coverDetector.detectBetweenTokens(attacker, target)).toBe(wallOverride ?? 'none');
+    } finally { global.canvas.scene.regions = savedRegions; }
+  });
+
   describe('constructor', () => {
     test('should initialize correctly', () => {
       expect(coverDetector).toBeDefined();
