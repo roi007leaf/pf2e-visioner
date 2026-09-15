@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.7.4] - 2026-09-15
+
+### Fixed
+
+- Fixed overhead roofs briefly disappearing when moving a token outside a building. Movement soundwaves no longer force unseen loot or hazard tokens inside the building visible, which could incorrectly trigger Foundry's roof occlusion.
+
+### Tests
+
+- Added regressions for unseen loot and hazards during movement. Verified on an isolated copy of Oleg's Trading Post: 902 sampled frames across animated movement and mouse dragging with no roof flashes; entering a building still hides its roof normally.
+
 ## [8.7.3] - 2026-09-14
 
 ### Fixed

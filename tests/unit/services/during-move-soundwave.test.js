@@ -182,6 +182,7 @@ describe('setSoundwaveMeshVisible (live ring clear on LOS)', () => {
     return { detectionFilterMesh: { visible: true, renderable: true, alpha: 1 } };
   }
 
+
   test('hides the soundwave mesh when the observer gains sight (clears mid-move)', () => {
     const t = makeTarget();
     setSoundwaveMeshVisible(t, false);
@@ -609,6 +610,20 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
 
     expect(target.detectionFilter).toBe('PRE-EXISTING');
     expect(target.detectionFilterMesh.visible).toBe(false);
+  });
+
+  test.each(['loot', 'hazard'])('does not expose an unseen %s under an overhead roof during movement', async (type) => {
+    const target = { ...makeTarget(), actor: { type }, visible: false, interactive: true, detectionFilter: null };
+    globalThis.canvas = { tokens: { placeables: [target], preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true });
+    // Core's VISIBLE roof mode includes visible interactive tokens underneath roofs.
+    for (let frame = 0; frame < 3; frame++) {
+      mod.refreshSoundwavesForActiveMovement();
+      expect(target.visible && target.interactive).toBe(false);
+      expect(target.detectionFilter).toBeNull();
+      expect(target.detectionFilterMesh.visible).toBe(false);
+    }
+    mod.clearDuringMoveSoundwaveState();
   });
 
   test('updates soundwaves during a committed move (pending movement active)', async () => {

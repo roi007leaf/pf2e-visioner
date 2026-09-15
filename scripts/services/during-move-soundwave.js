@@ -186,6 +186,10 @@ function hasHiddenAvsOverride(observer, target) {
   }
 }
 
+function usesHiddenObjectRendering(target) {
+  return target?.actor?.type === 'loot' || target?.actor?.type === 'hazard';
+}
+
 export function targetShouldShowSoundwave(
   target,
   observers,
@@ -194,6 +198,7 @@ export function targetShouldShowSoundwave(
   impreciselySensed = impreciselySensedOutOfSight,
 ) {
   if (isSceneTokenVisionDisabled()) return false;
+  if (usesHiddenObjectRendering(target)) return false;
   for (const observer of observers) {
     if (observer === target) continue;
     if (getHiddenOverride(observer, target)) return true;
@@ -324,6 +329,7 @@ export function rememberSoundwaveDetectionBeforeCoreRefresh(target) {
 }
 
 export function installSoundwaveFilterOverride(target) {
+  if (usesHiddenObjectRendering(target)) return false;
   const id = target?.document?.id;
   const filter = getSoundwaveFilter();
   if (!id || !filter) return false;
@@ -469,6 +475,9 @@ export function refreshSoundwavesForActiveMovement() {
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
     if (suppressSoundwaveForControlledLevel(target)) continue;
     if (isPartyActorToken(target)) continue;
+    // Hidden objects do not use creature hearing markers. Forcing one visible also
+    // makes Core's VISIBLE occlusion mode remove any overhead roof covering it.
+    if (usesHiddenObjectRendering(target)) continue;
     if (target.controlled) {
       clearControlledTokenSoundwave(target);
       continue;
