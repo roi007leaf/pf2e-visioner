@@ -64,6 +64,7 @@ describe('initial scene hidden setup token tool', () => {
     game.user.isGM = true;
     game.settings.set(MODULE_ID, 'showVisionerSceneTools', true);
     game.settings.set(MODULE_ID, 'showQuickEditTool', false);
+    game.settings.set(MODULE_ID, 'playerPeekBlockMode', 'none');
     canvas.tokens.placeables = [];
     canvas.walls.placeables = [];
   });
@@ -107,6 +108,34 @@ describe('initial scene hidden setup token tool', () => {
       button: true,
     });
     expect(typeof tool.onChange).toBe('function');
+  });
+
+  test('adds one global player-peek mode toggle and cycles its active state', async () => {
+    game.settings.set(MODULE_ID, 'playerPeekBlockMode', 'corner');
+    const hook = getSceneControlsHook();
+    const controls = [{ name: 'tokens', tools: [] }];
+
+    hook(controls);
+
+    const tools = controls[0].tools.filter(
+      (candidate) => candidate.name === 'pf2e-visioner-block-player-peek',
+    );
+    expect(tools).toHaveLength(1);
+    expect(tools[0]).toMatchObject({
+      title: 'PF2E_VISIONER.PEEK.BLOCK_MODE_CORNER',
+      icon: 'fa-solid fa-turn-down',
+      active: true,
+      toggle: false,
+      button: true,
+    });
+
+    await tools[0].onChange();
+    expect(game.settings.set).toHaveBeenLastCalledWith(MODULE_ID, 'playerPeekBlockMode', 'door');
+    expect(tools[0]).toMatchObject({
+      title: 'PF2E_VISIONER.PEEK.BLOCK_MODE_DOOR',
+      icon: 'fa-solid fa-door-closed',
+      active: true,
+    });
   });
 
   test('reports saved prep defaults instead of warning when setting hidden without PCs', async () => {

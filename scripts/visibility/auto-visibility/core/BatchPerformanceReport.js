@@ -17,6 +17,15 @@ export const BATCH_PROCESSOR_TIMING_PHASES = Object.freeze([
   'updateCollection',
 ]);
 
+export const RESULT_APPLICATION_TIMING_PHASES = Object.freeze([
+  'preRenderLock',
+  'resultApplication',
+  'detectionFlush',
+  'postRenderLock',
+  'effectSync',
+  'perceptionRefresh',
+]);
+
 function roundMetric(value, digits = 2) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -49,6 +58,10 @@ export function buildBatchPerformanceReport(info = {}) {
     timings.detailedBatchTimings || {},
     BATCH_PROCESSOR_TIMING_PHASES,
   );
+  const resultApplicationBreakdown = timingValues(
+    timings.postResultTimings || {},
+    RESULT_APPLICATION_TIMING_PHASES,
+  );
 
   return {
     batchId: info.batchId ?? null,
@@ -64,6 +77,11 @@ export function buildBatchPerformanceReport(info = {}) {
     detailedBreakdown,
     timingPercentages: timingPercentages(timingBreakdown, totalMs),
     detailedPercentages: timingPercentages(detailedBreakdown, totalMs),
+    resultApplicationBreakdown,
+    resultApplicationPercentages: timingPercentages(
+      resultApplicationBreakdown,
+      timingBreakdown.resultApplication,
+    ),
     cacheBreakdown: {
       visGlobalHits: Number(info.breakdown?.visGlobalHits || 0),
       visGlobalMisses: Number(info.breakdown?.visGlobalMisses || 0),

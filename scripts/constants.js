@@ -1108,6 +1108,21 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: false,
   },
+  playerPeekBlockMode: {
+    name: 'PF2E_VISIONER.SETTINGS.PLAYER_PEEK_BLOCK_MODE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.PLAYER_PEEK_BLOCK_MODE.hint',
+    scope: 'world',
+    config: false,
+    restricted: true,
+    type: String,
+    choices: {
+      none: 'PF2E_VISIONER.PEEK.BLOCK_MODE_NONE',
+      corner: 'PF2E_VISIONER.PEEK.BLOCK_MODE_CORNER',
+      door: 'PF2E_VISIONER.PEEK.BLOCK_MODE_DOOR',
+      both: 'PF2E_VISIONER.PEEK.BLOCK_MODE_BOTH',
+    },
+    default: 'none',
+  },
   cornerPeekEnabled: {
     name: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.name',
     hint: 'PF2E_VISIONER.SETTINGS.CORNER_PEEK_ENABLED.hint',

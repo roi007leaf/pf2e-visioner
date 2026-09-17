@@ -2,6 +2,7 @@ import { MODULE_ID } from '../../constants.js';
 import { clampCornerPeek, clampDoorPeek, mergeSweptCone, pullBackOrigin } from './peek-geometry.js';
 import { readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
+import { inferPeekKind, isPeekKindBlocked } from './peek-block-mode.js';
 
 const PEEK_BAND = 25;
 const DOOR_NUDGE = 5;
@@ -54,6 +55,7 @@ export class PeekManager {
       this.endPeek(id, 'toggle');
       return false;
     }
+    if (this._playerPeekBlocked('door')) return false;
     if (!skipApproval && this._requiresDoorPeekApproval()) {
       return this._requestDoorPeekApproval(token, doorDoc, mouse);
     }
@@ -163,8 +165,28 @@ export class PeekManager {
       this.endPeek(id, 'toggle');
       return false;
     }
+    if (this._playerPeekBlocked('corner')) return false;
     this.startCornerPeek(token, mouse);
     return true;
+  }
+
+  _playerPeekBlocked(kind) {
+    try {
+      if (globalThis.game?.user?.isGM) return false;
+      const blocked = isPeekKindBlocked(
+        globalThis.game?.settings?.get?.(MODULE_ID, 'playerPeekBlockMode'),
+        kind,
+      );
+      if (blocked) {
+        globalThis.ui?.notifications?.warn?.(
+          globalThis.game?.i18n?.localize?.('PF2E_VISIONER.PEEK.BLOCKED_BY_GM') ??
+            'Peeking is temporarily blocked by the GM.',
+        );
+      }
+      return blocked;
+    } catch (_) {
+      return false;
+    }
   }
 
   _clampOriginToWalls(from, origin) {
@@ -298,6 +320,20 @@ export class PeekManager {
     this._pendingDoorApprovals.clear();
     this._clearPendingReaim();
     for (const id of this._registry.ids()) this.endPeek(id, reason);
+  }
+
+  endBlockedPeeks(mode) {
+    const blockCorner = isPeekKindBlocked(mode, 'corner');
+    const blockDoor = isPeekKindBlocked(mode, 'door');
+    if (!blockCorner && !blockDoor) return;
+    if (blockDoor) this._pendingDoorApprovals.clear();
+    this._clearPendingReaim();
+    for (const id of this._registry.ids()) {
+      const kind = this._active.get(id)?.kind ?? inferPeekKind(this._registry.get(id));
+      if ((kind === 'corner' && blockCorner) || (kind === 'door' && blockDoor)) {
+        this.endPeek(id, 'gm-blocked');
+      }
+    }
   }
 
   init() {

@@ -68,4 +68,23 @@ describe('GM Vision core-visibility policy', () => {
   test('AVS conflict warning stays inactive when AVS itself is off', () => {
     expect(isGmVisionModeActive()).toBe(false);
   });
+
+  test('reuses one GM Vision lookup per synchronous render burst and refreshes next microtask', async () => {
+    global.canvas.ready = true;
+    const get = jest.spyOn(global.game.settings, 'get');
+
+    expect(shouldBypassAvsForGmVision()).toBe(true);
+    expect(shouldBypassAvsForGmVision()).toBe(true);
+    expect(
+      get.mock.calls.filter(([namespace, key]) => namespace === 'pf2e' && key === 'gmVision'),
+    ).toHaveLength(1);
+
+    global.game.settings.set('pf2e', 'gmVision', false);
+    await Promise.resolve();
+
+    expect(shouldBypassAvsForGmVision()).toBe(false);
+    expect(
+      get.mock.calls.filter(([namespace, key]) => namespace === 'pf2e' && key === 'gmVision'),
+    ).toHaveLength(2);
+  });
 });

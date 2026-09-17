@@ -6,6 +6,7 @@ import { reinjectChatAutomationStyles } from './chat/chat-automation-styles.js';
 import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
 import { loadSharedUICSS } from './css-loader.js';
 import { setCachedSettingValue } from './utils/setting-value-cache.js';
+import { refreshPeekBlockSceneTool } from './services/Peek/peek-block-mode.js';
 
 // Grouped layout per redesign spec.
 // Each category contains an ordered list of group objects with a title & keys.
@@ -552,6 +553,13 @@ export function registerSettings() {
               './services/GmObserverView/gm-observer-view.js'
             );
             gmObserverView.refresh({ perception: key !== 'showGmObserverViewIndicator' });
+          } catch {}
+        };
+      } else if (key === 'playerPeekBlockMode') {
+        settingConfig.onChange = (mode) => {
+          try {
+            game.modules.get(MODULE_ID)?.api?.peekManager?.endBlockedPeeks?.(mode);
+            refreshPeekBlockSceneTool(mode);
           } catch {}
         };
       } else if (key === 'enableHoverTooltips') {

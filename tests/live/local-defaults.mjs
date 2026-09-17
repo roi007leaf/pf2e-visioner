@@ -4,6 +4,10 @@ import path from 'node:path';
 
 export const defaultsPath = path.join(homedir(), '.config', 'pf2e-visioner', 'live.json');
 
+export function needsSecondGmSession(cases = []) {
+  return cases.some(testCase => testCase?.secondGm === true);
+}
+
 export async function loadLocalDefaults(file = defaultsPath) {
   let text;
   try { text = await readFile(file, 'utf8'); }

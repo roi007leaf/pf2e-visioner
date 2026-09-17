@@ -70,19 +70,16 @@ function tokenIdOf(token) {
   return getTokenDocument(token)?.id ?? null;
 }
 
-function prunePendingPerceptionProfileWrites(now = Date.now()) {
-  for (const [tokenId, entry] of pendingPerceptionProfileWrites.entries()) {
-    if (!entry?.expiresAt || entry.expiresAt <= now) {
-      pendingPerceptionProfileWrites.delete(tokenId);
-    }
-  }
-}
-
 function getPendingPerceptionProfileWrite(token) {
-  prunePendingPerceptionProfileWrites();
   const tokenId = tokenIdOf(token);
   if (!tokenId) return null;
-  return pendingPerceptionProfileWrites.get(tokenId) ?? null;
+  const entry = pendingPerceptionProfileWrites.get(tokenId) ?? null;
+  if (!entry) return null;
+  if (!entry.expiresAt || entry.expiresAt <= Date.now()) {
+    pendingPerceptionProfileWrites.delete(tokenId);
+    return null;
+  }
+  return entry;
 }
 
 function readDocumentProfileMap(token) {

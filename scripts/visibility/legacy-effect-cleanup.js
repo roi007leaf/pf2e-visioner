@@ -2,11 +2,17 @@ import { MODULE_ID } from '../constants.js';
 import { deleteExistingEmbeddedItems } from './utils.js';
 
 export async function deleteLegacyVisibilityEffects(actor, hiddenActorSignature) {
-  if (!game.user?.isGM || !actor?.itemTypes?.effect || !hiddenActorSignature) return 0;
+  return deleteLegacyVisibilityEffectsForSignatures(actor, [hiddenActorSignature]);
+}
+
+export async function deleteLegacyVisibilityEffectsForSignatures(actor, hiddenActorSignatures) {
+  if (!game.user?.isGM || !actor?.itemTypes?.effect) return 0;
+  const signatures = new Set(Array.from(hiddenActorSignatures || []).filter(Boolean));
+  if (signatures.size === 0) return 0;
   const legacyEffects = actor.itemTypes.effect.filter(
     (effect) =>
       effect?.flags?.[MODULE_ID]?.isEphemeralOffGuard === true &&
-      effect?.flags?.[MODULE_ID]?.hiddenActorSignature === hiddenActorSignature,
+      signatures.has(effect?.flags?.[MODULE_ID]?.hiddenActorSignature),
   );
   const ids = legacyEffects
     .map((effect) => effect?.id)

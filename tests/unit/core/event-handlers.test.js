@@ -191,8 +191,8 @@ describe('Event Handler Tests', () => {
 
       updateHandler(mockActor);
 
-      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
     test('should translate actor visibility updates into invalidation reasons', () => {
@@ -243,7 +243,8 @@ describe('Event Handler Tests', () => {
       const actor = { id: 'actor1', system: { perception: { senses: [{ type: 'tremorsense', range: 30 }] } } };
       mockCanvas.tokens.placeables = [{ actor, document: { id: 'token1' } }];
       actorHandler.handleActorUpdate(actor, changes);
-      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
     test('ignores unrelated post-update fields and unchanged pre-update senses', () => {
@@ -281,8 +282,8 @@ describe('Event Handler Tests', () => {
 
       preUpdateHandler(mockActor, changes);
 
-      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
   });
 
@@ -330,8 +331,8 @@ describe('Event Handler Tests', () => {
 
       await createHandler(mockEffect);
 
-      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-      expect(mockVisibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+      expect(mockVisibilityState.markTokenChangedImmediate).toHaveBeenCalledWith('token1');
     });
 
     test('should record invisibility flags when effect create fires before actor condition helpers update', async () => {

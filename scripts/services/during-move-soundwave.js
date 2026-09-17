@@ -420,12 +420,12 @@ export function settleSoundwaveOverrides() {
     return;
   }
   if (filterOverrides.size === 0 && activeSoundwaveTargets.size === 0) return;
+  const currentViewObservers = currentViewVisionerObserversForTarget(null).filter(
+    (observer) => !isPartyActorToken(observer),
+  );
   for (const entry of [...filterOverrides.values()]) {
     const target = entry.target;
-    const observers = currentViewVisionerObserversForTarget(target).filter(
-      (observer) => !isPartyActorToken(observer),
-    );
-    const backInSight = observers.some(
+    const backInSight = currentViewObservers.some(
       (observer) => observer !== target && observerSightContainsTarget(observer, target),
     );
     // AVS can settle to Undetected instead of Hidden. Neither our fallback nor a stale Core
@@ -532,6 +532,11 @@ export function refreshSoundwavesForActiveMovement() {
   // repaint a soundwave during the throttle window and it must be removed immediately.
   if (!recomputeDue && !gmVisionBypass) return;
 
+  // Current-view observers depend on selection/drag state, not target identity. Resolve once per
+  // throttled recompute instead of rebuilding and filtering the same set for every scene token.
+  const currentViewObservers = currentViewVisionerObserversForTarget(null).filter(
+    (observer) => !isPartyActorToken(observer),
+  );
   const targetsWithObservers = [];
   for (const target of globalThis.canvas?.tokens?.placeables ?? []) {
     if (suppressSoundwaveForControlledLevel(target)) continue;
@@ -555,9 +560,7 @@ export function refreshSoundwavesForActiveMovement() {
       suppressCoreInvisibleHardHiddenTarget(target, { requireRemembered: false });
       continue;
     }
-    const observers = currentViewVisionerObserversForTarget(target).filter(
-      (observer) => !isPartyActorToken(observer),
-    );
+    const observers = currentViewObservers;
     if (gmVisionBypass && observers.length === 0) {
       try {
         removeSoundwaveFilterOverride(target);

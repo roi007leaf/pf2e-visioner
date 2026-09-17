@@ -5,6 +5,7 @@ import { showNotification } from '../utils.js';
 import { isPointInCone } from './Peek/peek-geometry.js';
 import { peekRegistry } from './Peek/PeekRegistry.js';
 import { peekGmOverlay } from './Peek/peek-gm-overlay.js';
+import { inferPeekKind, isPeekKindBlocked } from './Peek/peek-block-mode.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
 // No module-scoped socket reference required; use the service wrapper
@@ -493,6 +494,17 @@ async function seekTemplateHandler({
 export function peekUpdateHandler(payload) {
   if (!game.user?.isGM) return;
   if (!payload || payload.sceneId !== canvas?.scene?.id) return;
+  const sourceUser = game.users?.get?.(payload.userId);
+  const blockMode = game.settings.get(MODULE_ID, 'playerPeekBlockMode');
+  if (!sourceUser?.isGM && isPeekKindBlocked(blockMode, inferPeekKind(payload))) {
+    const hadActivePeek = peekRegistry.has(payload.tokenId);
+    peekRegistry.clear(payload.tokenId);
+    if (hadActivePeek) {
+      recalcPeekToken(payload.tokenId);
+      peekGmOverlay.render();
+    }
+    return;
+  }
   const now = Date.now();
   peekRegistry.set(
     payload.tokenId,
@@ -701,6 +713,21 @@ export async function doorPeekApprovalRequestHandler(
   try {
     if (!globalThis.game?.user?.isGM) return;
     if (!payload || payload.sceneId !== globalThis.canvas?.scene?.id) return;
+    if (
+      isPeekKindBlocked(
+        globalThis.game.settings.get(MODULE_ID, 'playerPeekBlockMode'),
+        'door',
+      )
+    ) {
+      sendDoorPeekApprovalResponse(payload.userId, {
+        requestId: payload.requestId,
+        sceneId: payload.sceneId,
+        tokenId: payload.tokenId,
+        wallId: payload.wallId,
+        approved: false,
+      });
+      return;
+    }
     const approved = await confirm(payload);
     sendDoorPeekApprovalResponse(payload.userId, {
       requestId: payload.requestId,

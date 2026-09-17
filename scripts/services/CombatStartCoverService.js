@@ -2,6 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import autoCoverSystem from '../cover/auto-cover/AutoCoverSystem.js';
 
 const COMPUTE_COVER_SETTING = 'computeCoverAtCombatStart';
+const OBSERVER_COVER_CONCURRENCY = 4;
 
 function collectionToArray(collection) {
   if (!collection) return [];
@@ -62,14 +63,15 @@ export class CombatStartCoverService {
     if (!combat) return;
 
     const combatants = collectionToArray(combat.combatants ?? combat.turns);
-    for (const observerCombatant of combatants) {
-      const observerToken = getTokenFromCombatant(observerCombatant);
-      if (!observerToken?.document?.id) continue;
-
-      for (const targetCombatant of combatants) {
+    const participants = combatants
+      .map((combatant) => ({ combatant, token: getTokenFromCombatant(combatant) }))
+      .filter(({ token }) => token?.document?.id);
+    let nextObserverIndex = 0;
+    const processObserver = async ({ combatant: observerCombatant, token: observerToken }) => {
+      // Cover flags are stored on the observer. Keep one observer's writes serial so each update
+      // sees the preceding map, while allowing independent observer documents to progress together.
+      for (const { combatant: targetCombatant, token: targetToken } of participants) {
         if (targetCombatant === observerCombatant) continue;
-        const targetToken = getTokenFromCombatant(targetCombatant);
-        if (!targetToken?.document?.id) continue;
         if (targetToken.document.id === observerToken.document.id) continue;
         if (!areEnemies(observerToken, targetToken)) continue;
 
@@ -81,7 +83,16 @@ export class CombatStartCoverService {
           autoCoverSystem.recordPair(observerToken.id, targetToken.id);
         }
       }
-    }
+    };
+    const workerCount = Math.min(OBSERVER_COVER_CONCURRENCY, participants.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (nextObserverIndex < participants.length) {
+          const participant = participants[nextObserverIndex++];
+          await processObserver(participant);
+        }
+      }),
+    );
   }
 
   _detectCover(observerToken, targetToken) {

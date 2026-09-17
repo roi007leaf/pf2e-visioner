@@ -161,4 +161,38 @@ describe('CombatStartCoverService', () => {
     expect(mockRecordPair).toHaveBeenCalledWith(enemy.id, party.id);
     expect(mockRecordPair).toHaveBeenCalledTimes(2);
   });
+
+  test('processes independent observers concurrently while serializing each observer cover map', async () => {
+    setCombatStartCoverSetting(true);
+    const { combatStartCoverService } = await importService();
+    const tokens = Array.from({ length: 8 }, (_, index) =>
+      makeToken(`token-${index}`, {
+        alliance: index % 2 === 0 ? 'party' : 'opposition',
+        disposition: index % 2 === 0 ? 1 : -1,
+      }),
+    );
+    tokensById = new Map(tokens.map((token) => [token.id, token]));
+    global.canvas.tokens.get = jest.fn((id) => tokensById.get(id));
+
+    let active = 0;
+    let maxActive = 0;
+    const activeByObserver = new Set();
+    mockSetCoverBetween.mockImplementation(async (observer) => {
+      expect(activeByObserver.has(observer.id)).toBe(false);
+      activeByObserver.add(observer.id);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      activeByObserver.delete(observer.id);
+    });
+
+    await combatStartCoverService.applyCombatStartAutoCover(
+      makeCombat(tokens.map((token, index) => makeCombatant(`c-${index}`, token))),
+    );
+
+    expect(mockSetCoverBetween).toHaveBeenCalledTimes(32);
+    expect(maxActive).toBeGreaterThan(1);
+    expect(maxActive).toBeLessThanOrEqual(4);
+  });
 });

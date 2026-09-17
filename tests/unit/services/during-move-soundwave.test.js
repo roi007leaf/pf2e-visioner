@@ -813,6 +813,23 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
     expect(getObservers).not.toHaveBeenCalled();
   });
 
+  test('discovers the current-view observer set once per recompute for every target', async () => {
+    const targets = Array.from({ length: 6 }, (_, index) => ({
+      ...makeTarget(),
+      document: { id: `target-${index}` },
+    }));
+    const getObservers = jest.fn(() => [
+      { document: { id: 'obs' }, vision: { los: { contains: () => false } } },
+    ]);
+    globalThis.canvas = { tokens: { placeables: targets, preview: { children: [] } } };
+    const mod = await loadWith({ pendingMovement: true, getObservers });
+
+    mod.refreshSoundwavesForActiveMovement();
+
+    expect(getObservers).toHaveBeenCalledTimes(1);
+    expect(targets.every((target) => target.detectionFilterMesh.visible)).toBe(true);
+  });
+
   test('does not scan all placeables for controlled-token cleanup inside the throttle window', async () => {
     const target = makeTarget();
     target.controlled = true;

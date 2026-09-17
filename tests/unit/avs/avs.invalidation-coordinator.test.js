@@ -525,7 +525,7 @@ describe('AvsInvalidationCoordinator completed movement reasons', () => {
     });
   });
 
-  test('token-movement-completed clears position-dependent caches and marks spatial recalculation', () => {
+  test('token-movement-completed clears position-dependent caches and queues movement recalculation', () => {
     const tokenDoc = { id: 'token1', x: 100, y: 200 };
     const movementChanges = { x: 150, y: 250 };
 
@@ -597,7 +597,7 @@ describe('AvsInvalidationCoordinator completed movement reasons', () => {
     jest.useRealTimers();
   });
 
-  test('token-position-updated clears position caches, notifies movement start, and marks spatial recalculation', () => {
+  test('token-position-updated clears position caches, notifies movement start, and queues movement recalculation', () => {
     const tokenDoc = { id: 'token1', x: 100, y: 200 };
     const movementChanges = { x: 150, y: 250 };
 
@@ -864,7 +864,7 @@ describe('AvsInvalidationCoordinator effect reasons', () => {
     });
   });
 
-  test('effect-visibility-updated clears position caches and recalculates all token pairs', () => {
+  test('effect-visibility-updated recalculates only relationships involving affected tokens', () => {
     const result = coordinator.invalidate({
       reason: 'effect-visibility-updated',
       document: { id: 'effect1' },
@@ -874,8 +874,14 @@ describe('AvsInvalidationCoordinator effect reasons', () => {
     expect(result).toBe(true);
     expect(cacheManager.clearVisibilityCache).toHaveBeenCalledTimes(1);
     expect(cacheManager.clearLosCache).toHaveBeenCalledTimes(1);
-    expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-    expect(visibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    expect(visibilityState.markTokenChangedImmediate.mock.calls).toEqual([
+      ['token1'],
+      ['token2'],
+    ]);
+
+    coordinator.invalidate({ reason: 'lighting-refresh' });
+    expect(visibilityState.markAllTokensChangedThrottled).not.toHaveBeenCalled();
   });
 
   test('effect-light-emitter-updated clears position caches and recalculates all tokens', () => {
@@ -981,7 +987,7 @@ describe('AvsInvalidationCoordinator actor reasons', () => {
     });
   });
 
-  test('actor-visibility-updated recalculates all token pairs', () => {
+  test('actor-visibility-updated recalculates only relationships involving actor tokens', () => {
     const result = coordinator.invalidate({
       reason: 'actor-visibility-updated',
       document: { id: 'actor1' },
@@ -989,8 +995,11 @@ describe('AvsInvalidationCoordinator actor reasons', () => {
     });
 
     expect(result).toBe(true);
-    expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
-    expect(visibilityState.markTokenChangedImmediate).not.toHaveBeenCalled();
+    expect(visibilityState.markAllTokensChangedImmediate).not.toHaveBeenCalled();
+    expect(visibilityState.markTokenChangedImmediate.mock.calls).toEqual([
+      ['token1'],
+      ['token2'],
+    ]);
   });
 });
 

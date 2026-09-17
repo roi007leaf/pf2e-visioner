@@ -55,7 +55,7 @@ export function getEligibleVisibilityTokenIds(tokens = [], exclusionManager = nu
  * - Tracking which tokens need visibility recalculation
  * - Managing batch processing of visibility updates
  * - Coordinating immediate vs throttled processing
- * - Spatial optimization for movement events
+ * - Mover-scoped invalidation for movement events
  *
  * Follows SOLID principles by providing a focused interface for visibility state management
  * without depending on the main EventDrivenVisibilitySystem implementation.
@@ -76,9 +76,6 @@ export class VisibilityStateManager {
   /** @type {Function} - Callback to process batch (injected dependency) */
   #batchProcessor = null;
 
-  /** @type {Function} - Callback to get spatial analysis (injected dependency) */
-  #spatialAnalyzer = null;
-
   /** @type {Function} - Callback to get exclusion manager (injected dependency) */
   #exclusionManager = null;
 
@@ -90,7 +87,6 @@ export class VisibilityStateManager {
 
   constructor(dependencies = {}) {
     this.#batchProcessor = dependencies.batchProcessor;
-    this.#spatialAnalyzer = dependencies.spatialAnalyzer;
     this.#exclusionManager = dependencies.exclusionManager;
     this.#systemStateProvider = dependencies.systemStateProvider;
     if (typeof dependencies.debugStackFactory === 'function') {
@@ -104,14 +100,6 @@ export class VisibilityStateManager {
    */
   setBatchProcessor(processor) {
     this.#batchProcessor = processor;
-  }
-
-  /**
-   * Set the spatial analyzer callback
-   * @param {Function} analyzer - Function to get affected tokens by movement
-   */
-  setSpatialAnalyzer(analyzer) {
-    this.#spatialAnalyzer = analyzer;
   }
 
   /**
@@ -139,7 +127,9 @@ export class VisibilityStateManager {
   }
 
   /**
-   * Mark a token as changed with spatial optimization for movement
+   * Mark the moved token as changed. BatchProcessor evaluates both directions
+   * between it and every eligible scene token, so adding nearby tokens here
+   * redundantly expands one move into an all-pairs recalculation.
    * @param {TokenDocument} [tokenDoc] - Token document (optional)
    * @param {Object} [changes] - Changes being made to the token (optional)
    */
@@ -157,36 +147,6 @@ export class VisibilityStateManager {
 
     const tokenId = tokenDoc.id;
     this.#changedTokens.add(tokenId);
-
-    // If spatial analyzer is available, get affected tokens
-    if (this.#spatialAnalyzer) {
-      try {
-        // Calculate old and new positions
-        const oldPos = {
-          x: tokenDoc.x + (tokenDoc.width * canvas.grid.size) / 2,
-          y: tokenDoc.y + (tokenDoc.height * canvas.grid.size) / 2,
-        };
-        const newPos = {
-          x:
-            (changes.x !== undefined ? changes.x : tokenDoc.x) +
-            (tokenDoc.width * canvas.grid.size) / 2,
-          // BUGFIX: use token height for Y center offset (was width)
-          y:
-            (changes.y !== undefined ? changes.y : tokenDoc.y) +
-            (tokenDoc.height * canvas.grid.size) / 2,
-        };
-
-        const affectedTokens = this.#spatialAnalyzer(oldPos, newPos, tokenId);
-
-        affectedTokens.forEach((token) => {
-          this.#changedTokens.add(token.document.id);
-        });
-      } catch (error) {
-        try {
-          this.#systemStateProvider?.debug?.('VSM:spatialOptimizationFailed', error);
-        } catch {}
-      }
-    }
 
     // Process SYNCHRONOUSLY to avoid browser throttling when window is minimized
     // Foundry hooks fire even when minimized, so we can process immediately

@@ -8,6 +8,7 @@ jest.mock('../../../scripts/services/Detection/select-all-token-visibility-bypas
   isSelectAllTokenVisibilityBypassActive: jest.fn(() => false),
 }));
 jest.mock('../../../scripts/services/Detection/detection-visibility-context.js', () => ({
+  detectionFrameCache: { getVisionSharingIndex: jest.fn(() => null) },
   getVisionerVisibilityBetweenTokens: () => 'observed',
   isAvsActiveGivenCombatGate: jest.fn(() => true),
 }));
@@ -34,7 +35,10 @@ import {
 import { shouldBypassAvsForGmVision } from '../../../scripts/services/gm-vision-bypass.js';
 import { isSelectAllTokenVisibilityBypassActive } from '../../../scripts/services/Detection/select-all-token-visibility-bypass.js';
 import { hasActivePendingTokenMovement } from '../../../scripts/services/movement-tracking.js';
-import { isAvsActiveGivenCombatGate } from '../../../scripts/services/Detection/detection-visibility-context.js';
+import {
+  detectionFrameCache,
+  isAvsActiveGivenCombatGate,
+} from '../../../scripts/services/Detection/detection-visibility-context.js';
 import { getDetectionSetting } from '../../../scripts/services/Detection/detection-setting-cache.js';
 import { releaseDetectionFilterPrimaryMesh } from '../../../scripts/services/Detection/detection-filter-mesh-suppression.js';
 
@@ -57,6 +61,7 @@ it('releases primary artwork when a filter clears after hard-hide handoff', () =
 
 beforeEach(() => {
   clearCurrentViewMovementRenderSettles();
+  detectionFrameCache.getVisionSharingIndex.mockReset().mockReturnValue(null);
   controlled.length = 0;
   draggedToken = null;
   const tokens = {};
@@ -223,6 +228,27 @@ describe('targetIsHardHiddenFromCurrentView', () => {
     expect(targetIsHardHiddenFromCurrentView(t)).toBe(false);
   });
 
+  it('reuses active vision-source discovery across one synchronous token refresh burst', () => {
+    controlled.length = 0;
+    draggedToken = null;
+    const sourceA = { document: { id: 'source-a' }, _isVisionSource: jest.fn(() => true) };
+    const sourceB = { document: { id: 'source-b' }, _isVisionSource: jest.fn(() => true) };
+    globalThis.canvas.tokens.placeables = [sourceA, sourceB];
+    __setStoredVisibilityForTest(
+      new Map([
+        ['source-a:t1', 'observed'],
+        ['source-b:t1', 'observed'],
+        ['source-a:t2', 'observed'],
+        ['source-b:t2', 'observed'],
+      ]),
+    );
+
+    expect(targetIsHardHiddenFromCurrentView(target('t1'))).toBe(false);
+    expect(targetIsHardHiddenFromCurrentView(target('t2'))).toBe(false);
+    expect(sourceA._isVisionSource).toHaveBeenCalledTimes(1);
+    expect(sourceB._isVisionSource).toHaveBeenCalledTimes(1);
+  });
+
   it('GM deselect (no observers) releases even a previously hard-hidden token', () => {
     globalThis.game = { user: { isGM: true } };
     controlled.length = 0;
@@ -332,6 +358,52 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
       expect(t.mesh.visible).toBe(true);
     },
   );
+
+  it('reuses indexed vision-sharing flags across targets in one render burst', () => {
+    const getFlag = jest.fn((_module, key) =>
+      ({ visionMasterTokenId: 'master', visionSharingMode: 'one-way' })[key],
+    );
+    const minion = { document: { id: 'minion', getFlag } };
+    const master = { document: { id: 'master' }, _isVisionSource: () => true };
+    const minionEntry = {
+      token: minion,
+      tokenId: 'minion',
+      masterId: 'master',
+      mode: 'one-way',
+    };
+    const masterEntry = {
+      token: master,
+      tokenId: 'master',
+      masterId: null,
+      mode: 'one-way',
+    };
+    detectionFrameCache.getVisionSharingIndex.mockReturnValue({
+      byToken: new Map([
+        ['minion', minionEntry],
+        ['master', masterEntry],
+      ]),
+      byMaster: new Map([['master', [minionEntry]]]),
+    });
+    controlled.splice(0, controlled.length, minion);
+    canvas.tokens.placeables = [minion, master];
+    __setStoredVisibilityForTest(
+      new Map([
+        ['minion:t-1', 'undetected'],
+        ['master:t-1', 'observed'],
+        ['minion:t-2', 'undetected'],
+        ['master:t-2', 'observed'],
+      ]),
+    );
+
+    expect(
+      targetIsHardHiddenFromCurrentView({ document: { id: 't-1' }, actor: { type: 'npc' } }),
+    ).toBe(false);
+    expect(
+      targetIsHardHiddenFromCurrentView({ document: { id: 't-2' }, actor: { type: 'npc' } }),
+    ).toBe(false);
+    expect(getFlag).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['one-way', 'minion', true, 'undetected', 'observed', false],
     ['one-way', 'master', true, 'observed', 'undetected', true],

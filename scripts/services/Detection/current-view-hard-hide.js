@@ -29,6 +29,8 @@ const MOVEMENT_REVEAL_SETTLE_TTL_MS = 3000;
 // from the live LOS result so the stale stored Undetected state cannot hide them for one frame (or
 // longer) between movement tracking ending and the AVS batch settling.
 let movementCoreVisibleReveals = new WeakMap();
+let fallbackVisionSourcesCache = null;
+let fallbackVisionSourcesClearScheduled = false;
 
 let storedVisibilityOverrideForTest = null;
 export function __setStoredVisibilityForTest(map) {
@@ -75,19 +77,30 @@ function getOwnStoredVisibilityState(observer, target) {
 
 function getStoredVisibilityState(observer, target) {
   const observerId = tokenIdOf(observer);
-  const masterId = observer?.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
-  const mode = observer?.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+  const sharingIndex = detectionFrameCache?.getVisionSharingIndex?.();
+  const observerEntry = sharingIndex?.byToken?.get(observerId);
+  const masterId = observerEntry
+    ? observerEntry.masterId
+    : observer?.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
+  const mode = observerEntry
+    ? observerEntry.mode
+    : observer?.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
   const sources = [observer];
   let replacesOwnVision = false;
-  const sharingIndex = detectionFrameCache?.getVisionSharingIndex?.();
   const candidates = sharingIndex
-    ? [sharingIndex.byToken.get(masterId)?.token, ...(sharingIndex.byMaster.get(observerId) ?? []).map((entry) => entry.token)].filter(Boolean)
-    : globalThis.canvas?.tokens?.placeables ?? [];
-  for (const token of candidates) {
+    ? [sharingIndex.byToken.get(masterId), ...(sharingIndex.byMaster.get(observerId) ?? [])].filter(Boolean)
+    : (globalThis.canvas?.tokens?.placeables ?? []).map((token) => ({ token }));
+  for (const candidate of candidates) {
+    const token = candidate.token;
     if (tokenIdOf(token) === observerId) continue;
-    const childMode = token.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    const childMode = sharingIndex
+      ? candidate.mode
+      : token.document?.getFlag?.(MODULE_ID, 'visionSharingMode') || 'one-way';
+    const childMasterId = sharingIndex
+      ? candidate.masterId
+      : token.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId');
     const sharesMaster = tokenIdOf(token) === masterId && mode !== 'reverse';
-    const sharesMinion = token.document?.getFlag?.(MODULE_ID, 'visionMasterTokenId') === observerId &&
+    const sharesMinion = childMasterId === observerId &&
       (childMode === 'two-way' || childMode === 'reverse');
     if (!sharesMaster && !sharesMinion) continue;
     // Core's source predicate includes sharing direction, blindness, and the current selection.
@@ -302,6 +315,27 @@ function shouldPreserveMovementCoreReveal(target) {
 
 export function clearCurrentViewMovementRenderSettles() {
   movementCoreVisibleReveals = new WeakMap();
+  fallbackVisionSourcesCache = null;
+  fallbackVisionSourcesClearScheduled = false;
+}
+
+function fallbackVisionSourcesForCurrentBurst() {
+  const placeables = globalThis.canvas?.tokens?.placeables ?? [];
+  if (fallbackVisionSourcesCache?.placeables === placeables) {
+    return fallbackVisionSourcesCache.sources;
+  }
+  const sources = placeables.filter((token) => token._isVisionSource?.());
+  fallbackVisionSourcesCache = { placeables, sources };
+  if (!fallbackVisionSourcesClearScheduled) {
+    fallbackVisionSourcesClearScheduled = true;
+    const clear = () => {
+      fallbackVisionSourcesCache = null;
+      fallbackVisionSourcesClearScheduled = false;
+    };
+    if (typeof queueMicrotask === 'function') queueMicrotask(clear);
+    else Promise.resolve().then(clear);
+  }
+  return sources;
 }
 
 export function applyCurrentViewHardHide(token, { allowMovementReveal = true } = {}) {
@@ -463,9 +497,7 @@ export function targetIsHardHiddenFromCurrentView(target) {
   if (observers.length === 0) {
     if (globalThis.game?.user?.isGM || !automaticVisibilityActive) return false;
     try {
-      const sources = (globalThis.canvas?.tokens?.placeables ?? []).filter((token) =>
-        token._isVisionSource?.(),
-      );
+      const sources = fallbackVisionSourcesForCurrentBurst();
       if (sources.length > 0) {
         return sources.every(
           (observer) =>

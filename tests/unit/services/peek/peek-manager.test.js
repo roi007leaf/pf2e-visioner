@@ -38,6 +38,82 @@ describe('PeekManager door peek', () => {
   });
 });
 
+describe('PeekManager GM peek block', () => {
+  let originalGet;
+  let originalIsGM;
+  let blockMode;
+
+  beforeEach(() => {
+    originalGet = global.game.settings.get;
+    originalIsGM = global.game.user.isGM;
+    blockMode = 'both';
+    global.game.user.isGM = false;
+    global.game.settings.get = jest.fn((moduleId, key) =>
+      moduleId === 'pf2e-visioner' && key === 'playerPeekBlockMode'
+        ? blockMode
+        : originalGet(moduleId, key),
+    );
+  });
+
+  afterEach(() => {
+    global.game.settings.get = originalGet;
+    global.game.user.isGM = originalIsGM;
+  });
+
+  test('blocks player corner and door peeks', async () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+
+    expect(mgr.toggleCornerPeek(token, { x: 100, y: 50 })).toBe(false);
+    expect(await mgr.tryStartDoorPeek(token, door, { x: 10, y: 20 })).toBe(false);
+    expect(d.registry.has('peeker')).toBe(false);
+    expect(global.ui.notifications.warn).toHaveBeenCalledWith('PF2E_VISIONER.PEEK.BLOCKED_BY_GM');
+  });
+
+  test('does not block GM peeks', () => {
+    global.game.user.isGM = true;
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: 0, y: 0, width: 1, height: 1 });
+
+    expect(mgr.toggleCornerPeek(token, { x: 100, y: 50 })).toBe(true);
+    expect(d.registry.has('peeker')).toBe(true);
+  });
+
+  test.each([
+    ['corner', false, true],
+    ['door', true, false],
+    ['none', true, true],
+  ])('%s mode independently gates corner=%s and door=%s', async (mode, cornerAllowed, doorAllowed) => {
+    blockMode = mode;
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const cornerToken = createMockToken({ id: 'corner', x: 0, y: 0, width: 1, height: 1 });
+    const doorToken = createMockToken({ id: 'door', x: -50, y: 50, width: 1, height: 1 });
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: () => undefined };
+
+    expect(mgr.toggleCornerPeek(cornerToken, { x: 100, y: 50 })).toBe(cornerAllowed);
+    expect(await mgr.tryStartDoorPeek(doorToken, door, { x: 10, y: 20 })).toBe(doorAllowed);
+  });
+
+  test('changing mode ends only active peeks of the blocked kind', () => {
+    blockMode = 'none';
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const cornerToken = createMockToken({ id: 'corner', x: 0, y: 0, width: 1, height: 1 });
+    const doorToken = createMockToken({ id: 'door', x: -50, y: 50, width: 1, height: 1 });
+    mgr.toggleCornerPeek(cornerToken, { x: 100, y: 50 });
+    mgr.startDoorPeek(doorToken, { id: 'door1', c: [0, 0, 0, 100] }, { x: 10, y: 20 });
+
+    mgr.endBlockedPeeks('corner');
+
+    expect(d.registry.has('corner')).toBe(false);
+    expect(d.registry.has('door')).toBe(true);
+  });
+});
+
 describe('PeekManager door re-aim and toggle', () => {
   test('updatePeek on a door peek keeps origin fixed but re-sends', () => {
     const restoreSettings = overridePeekSettings({ peekSweepAngle: 45 });

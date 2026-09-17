@@ -13,6 +13,12 @@ import {
 import { isDarknessSource } from '../utils/darkness-source.js';
 import { onRenderTileConfig } from '../ui/tile-cover-config.js';
 import { gmObserverView } from '../services/GmObserverView/gm-observer-view.js';
+import {
+  nextPeekBlockMode,
+  normalizePeekBlockMode,
+  peekBlockModePresentation,
+  syncPeekBlockSceneToolElement,
+} from '../services/Peek/peek-block-mode.js';
 
 export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
@@ -870,6 +876,9 @@ export function registerUIHooks() {
   // Refresh wall labels when active tool changes
   Hooks.on('renderSceneControls', () => {
     refreshWallIdentifierLabels().catch(() => {});
+    if (game.user?.isGM) {
+      syncPeekBlockSceneToolElement(game.settings.get(MODULE_ID, 'playerPeekBlockMode'));
+    }
   });
 
   // Handle configurable keybinding for wall cover labels (doesn't interfere with Alt-click)
@@ -1221,6 +1230,30 @@ export function registerUIHooks() {
       // === TOKEN TOOL ADDITIONS ===
       const tokens = groups.find((c) => c?.name === 'tokens' || c?.name === 'token');
       if (tokens) {
+        const playerPeekBlockMode = normalizePeekBlockMode(
+          game.settings.get(MODULE_ID, 'playerPeekBlockMode'),
+        );
+        const blockModePresentation = peekBlockModePresentation(playerPeekBlockMode);
+        const peekBlockTool = {
+          name: 'pf2e-visioner-block-player-peek',
+          title: game.i18n.localize(blockModePresentation.title),
+          icon: blockModePresentation.icon,
+          active: blockModePresentation.active,
+          toggle: false,
+          button: true,
+          onChange: async () => {
+            const current = game.settings.get(MODULE_ID, 'playerPeekBlockMode');
+            const next = nextPeekBlockMode(current);
+            await game.settings.set(MODULE_ID, 'playerPeekBlockMode', next);
+            const nextPresentation = peekBlockModePresentation(next);
+            peekBlockTool.title = game.i18n.localize(nextPresentation.title);
+            peekBlockTool.icon = nextPresentation.icon;
+            peekBlockTool.active = nextPresentation.active;
+            ui.controls?.render?.(true);
+          },
+        };
+        addTool(tokens.tools, peekBlockTool);
+
         // Quick Edit button (opens Visioner Quick Panel) - only show if setting is disabled
         if (game.settings.get(MODULE_ID, 'showQuickEditTool')) {
           addTool(tokens.tools, {

@@ -136,11 +136,21 @@ describe('BatchOrchestrator', () => {
   });
 
   test('processBatch starts/stop telemetry, applies deduped updates', async () => {
+    const performanceReport = {
+      batchId: 'batch-1',
+      totalMs: 25,
+      detailedBreakdown: { visibilityCalculations: 10 },
+    };
+    telemetryReporter.stop.mockReturnValue(performanceReport);
     const changed = new Set(['A']);
     await orchestrator.processBatch(changed);
     expect(telemetryReporter.start).toHaveBeenCalled();
     expect(telemetryReporter.stop).toHaveBeenCalled();
     expect(applied).toEqual([['A', 'B', 'hidden']]);
+    expect(global.Hooks.callAll).toHaveBeenCalledWith(
+      'pf2eVisionerAvsBatchComplete',
+      expect.objectContaining({ performance: performanceReport }),
+    );
   });
 
   test('does not apply an automatic result when AVS is disabled during calculation', async () => {
@@ -325,11 +335,16 @@ describe('BatchOrchestrator', () => {
     expect(orchestrator._lastLosMemo.map.has('stale')).toBe(false);
   });
 
-  test('processBatch clears global caches for movement batches', async () => {
+  test('movement uses full candidate scope without flushing unrelated pair caches', async () => {
     await orchestrator.processBatch(new Set(['A']), { movementSession: { sessionId: 'move-1' } });
 
-    expect(batchProcessor.globalVisibilityCache.clear).toHaveBeenCalledTimes(1);
-    expect(batchProcessor.globalLosCache.clear).toHaveBeenCalledTimes(1);
+    expect(batchProcessor.process).toHaveBeenCalledWith(
+      global.canvas.tokens.placeables,
+      new Set(['A']),
+      expect.objectContaining({ isMovementBatch: true, skipViewportFilter: true }),
+    );
+    expect(batchProcessor.globalVisibilityCache.clear).not.toHaveBeenCalled();
+    expect(batchProcessor.globalLosCache.clear).not.toHaveBeenCalled();
   });
 
   test('processBatch uses latest duplicate visibility update for same observer-target pair', async () => {

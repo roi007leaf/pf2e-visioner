@@ -126,6 +126,7 @@ export class BatchOrchestrator {
         clearSuppressLightingRefreshAfterBatch,
         schedulePostResultTask: scheduleTask,
         debug: (message) => this.systemState?.debug?.(message),
+        nowProvider: this.nowProvider,
         stopTelemetry: (payload) => this.telemetryReporter.stop(payload),
         getClientId: () => globalThis.game?.user?.id,
         getClientName: () => globalThis.game?.user?.name,
@@ -666,7 +667,7 @@ export class BatchOrchestrator {
 
     // A batch covering every candidate token is a reconciliation pass. It must not reuse
     // pair results from the state it is trying to repair. Partial batches keep the caches.
-    if (useFullTokenScope || isCompleteCandidateBatch) {
+    if (forceFullScope || isCompleteCandidateBatch) {
       try {
         this.batchProcessor?.globalVisibilityCache?.clear?.();
         this.batchProcessor?.globalLosCache?.clear?.();
@@ -760,15 +761,16 @@ export class BatchOrchestrator {
         return;
       }
 
-      const { uniqueUpdateCount } = await this.workflowFactory.runPostResults({
+      const { uniqueUpdateCount, timings: postResultTimings } = await this.workflowFactory.runPostResults({
         batchResult,
         postBatchPerceptionSuppression,
         flushDetectionBatch: () => detectionBatch.flush(),
         isMovementBatch,
       });
       timings.resultApplication = this.nowProvider() - stageStart;
+      timings.postResultTimings = postResultTimings;
 
-      this.workflowFactory.reportSuccessTelemetry({
+      const performance = this.workflowFactory.reportSuccessTelemetry({
         batchId,
         batchStartTime,
         batchEndTime: this.nowProvider(),
@@ -801,6 +803,7 @@ export class BatchOrchestrator {
         changedTokens: Array.from(visibleChangedTokens),
         allTokens,
         uniqueUpdateCount,
+        performance,
       });
     } catch (error) {
       detectionBatch.discardIfOpen();

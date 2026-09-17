@@ -17,6 +17,26 @@ painted full artwork or soundwaves. Source stayed unchanged and cleanup complete
 
 ## Rendered canvas FPS
 
+### Combat-gated AVS workload
+
+`fps-combat-30-lights-avs-activation` reproduces player-reported lag from GM
+activity when AVS is configured to run only in combat. It creates 30 encounter
+tokens, 24 walls and seven token lights, proves AVS is gated before combat, then
+measures four separate player render windows: pre-combat idle, native combat
+start, repeated GM token movement and six native PF2e save rolls. Each report
+also records completed AVS batch timestamps and changed-token counts, making a
+combat-start burst or redundant movement/roll batches visible beside FPS data.
+
+Combat start must complete at least one full-scene AVS batch within 150 ms of
+the state-manager queue completing. Its player frame gap remains recorded but
+does not use the generic absolute budget: native Foundry combat startup itself
+can exceed that budget with AVS disabled. Pre-combat idle must complete no AVS
+batches. Movement and rolls retain the rendered-frame budgets below, and every
+GM move must remain one-token scoped while showing intermediate positions.
+Final player artwork, AVS gate state and sampler cleanup are verified. This
+isolates module-owned AVS work from a real GM-to-player workflow; it does not
+model third-party combat or roll hooks.
+
 ### Dungeon scene workload
 
 `performance-dungeon-avs-off` and `performance-dungeon-avs-on` create an isolated

@@ -69,6 +69,12 @@ export const auditCases = [
     settings: ['requireGmApprovalForDoorPeek', 'peekSlitAngle', 'peekRange'],
     camera: { x: 900, y: 550, scale: 0.7 }, steps: [{ workflow: `audit-peek-${mode}` }],
   })),
+  ...['none', 'corner', 'door', 'both'].map(mode => ({
+    name: `audit-peek-block-${mode}`, area: 'player-peek-blocking', disposableWorld: true,
+    settings: ['playerPeekBlockMode', 'requireGmApprovalForDoorPeek', 'peekSlitAngle', 'peekRange'],
+    camera: { x: 900, y: 550, scale: 0.7 },
+    steps: [{ workflow: `audit-peek-block-${mode}` }],
+  })),
   ...['cancel-reload', 'turn-start', 'turn-end', 'realtime-pause', 'combat-end', 'dialog'].map(mode => ({
     name: `audit-timer-${mode}`, area: 'timed-overrides', disposableWorld: true,
     settings: ['avsOverrideValidationOnTurnChange'],

@@ -15,7 +15,7 @@ import { targetGesture, animateAndMeasure, reconnectPlayer, interactiveMutation 
 import { sourceFingerprint } from './evidence.mjs';
 import { prepareVisualSurface, verifySamplingArea } from './visual-surface.mjs';
 import { assertQaWorld, DEFAULT_QA_WORLD } from './world-guard.mjs';
-import { accountDefaults, loadLocalDefaults, promptAccount } from './local-defaults.mjs';
+import { accountDefaults, loadLocalDefaults, needsSecondGmSession, promptAccount } from './local-defaults.mjs';
 
 const directory = path.resolve('artifacts/live');
 const journalPath = path.join(directory, 'recovery.json');
@@ -265,7 +265,7 @@ async function run() {
   console.log('GM session ready');
   player = await login(await browser.newContext(options), url, playerAccount, false);
   console.log('Player session ready');
-  if (accountDefaults('gm2', localDefaults).username) {
+  if (needsSecondGmSession(cases) && accountDefaults('gm2', localDefaults).username) {
     gm2 = await login(await browser.newContext(options), url, await account('gm2'), true);
     if ([gm.state.user, player.state.user].includes(gm2.state.user) || gm2.state.world !== gm.state.world) throw Error('Second GM must be a distinct account in the same world');
   }

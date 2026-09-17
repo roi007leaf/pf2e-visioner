@@ -3,7 +3,7 @@ const ALLOWED = new Set([
   'sneakAllowHiddenUndetectedEndPosition',
   'enableHoverTooltips', 'autoVisibilityEnabled', 'avsOnlyInCombat', 'systemConditionOverrides',
   'enableCameraVisionAggregation', 'disableLineOfSightCalculation', 'cornerPeekEnabled',
-  'requireGmApprovalForDoorPeek', 'peekRange', 'peekSlitAngle', 'peekSweepAngle',
+  'requireGmApprovalForDoorPeek', 'playerPeekBlockMode', 'peekRange', 'peekSlitAngle', 'peekSweepAngle',
   'hiddenWallsEnabled', 'computeCoverAtCombatStart', 'autoCover', 'seekUseTemplate',
   'seekTemplateSkipDialog', 'seekTemplateMaxPlacementDistance', 'limitSeekRangeInCombat',
   'limitSeekRangeOutOfCombat', 'customSeekDistance', 'customSeekDistanceOutOfCombat',

@@ -71,6 +71,7 @@ export function createDefaultBatchWorkflowFactory({
   clearSuppressLightingRefreshAfterBatch = () => { },
   schedulePostResultTask = (task) => task(),
   debug = () => { },
+  nowProvider = () => globalThis.performance?.now?.() ?? Date.now(),
   stopTelemetry = () => { },
   getClientId = () => undefined,
   getClientName = () => undefined,
@@ -117,6 +118,7 @@ export function createDefaultBatchWorkflowFactory({
       clearSuppressLightingRefreshAfterBatch,
       scheduleTask: schedulePostResultTask,
       debug,
+      nowProvider,
     }),
     successTelemetryWorkflow: new BatchSuccessTelemetryWorkflow({
       stopTelemetry,

@@ -1016,6 +1016,10 @@
         "name": "Require GM Approval for Door Peek",
         "hint": "Players must ask the GM before a door peek starts. The GM receives an approval dialog; GMs can still peek directly."
       },
+      "PLAYER_PEEK_BLOCK_MODE": {
+        "name": "Player Peek Block Mode",
+        "hint": "Controls which player peek types are temporarily blocked from the Token Controls toolbar."
+      },
       "CORNER_PEEK_ENABLED": {
         "name": "Enable Corner Peeking",
         "hint": "Allow tokens to peek around corners with the Hold Peek keybind. Door peeking is controlled per-door in the wall configuration."
@@ -1539,6 +1543,11 @@
       "TOOLTIP": "Failure upgraded to Success due to Sneak Adept feat. It's almost impossible to spot this creature."
     },
     "PEEK": {
+      "BLOCK_MODE_NONE": "Player Peek Blocking: None (click to block corners)",
+      "BLOCK_MODE_CORNER": "Player Peek Blocking: Corners Only (click to block doors)",
+      "BLOCK_MODE_DOOR": "Player Peek Blocking: Doors Only (click to block both)",
+      "BLOCK_MODE_BOTH": "Player Peek Blocking: Both (click to allow all)",
+      "BLOCKED_BY_GM": "Peeking is temporarily blocked by the GM.",
       "CHECK_LABEL": "Peek Through Door",
       "DC_FIELD_LABEL": "Peek DC",
       "ALLOW_FIELD_LABEL": "Allow Peeking",

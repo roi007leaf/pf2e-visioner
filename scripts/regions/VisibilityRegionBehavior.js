@@ -259,11 +259,10 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           }
         }
         if (applyToInsideTokens) {
-          for (const insideA of inRegion) {
-            for (const insideB of inRegion) {
-              if (insideA.id === insideB.id) continue;
-              updates.push({ source: insideA.id, target: insideB.id, state: 'observed' });
-            }
+          for (const insideToken of inRegion) {
+            if (insideToken.id === token.id) continue;
+            updates.push({ source: token.id, target: insideToken.id, state: 'observed' });
+            updates.push({ source: insideToken.id, target: token.id, state: 'observed' });
           }
         }
       } else {
@@ -279,11 +278,10 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           }
         }
         if (applyToInsideTokens) {
-          for (const insideA of inRegion) {
-            for (const insideB of inRegion) {
-              if (insideA.id === insideB.id) continue;
-              updates.push({ source: insideA.id, target: insideB.id, state: visibilityState });
-            }
+          for (const insideToken of inRegion) {
+            if (insideToken.id === token.id) continue;
+            updates.push({ source: token.id, target: insideToken.id, state: visibilityState });
+            updates.push({ source: insideToken.id, target: token.id, state: visibilityState });
           }
         }
       }

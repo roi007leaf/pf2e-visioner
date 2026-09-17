@@ -37,6 +37,17 @@ export function isLightingRefreshSuppressed() {
   return !!getRuntimeFlag('suppressLightingRefresh');
 }
 
+export function setSuppressTokenVisibilityLightingRefresh(durationMs = 500) {
+  return setRuntimeFlag(
+    'suppressTokenVisibilityLightingRefreshUntil',
+    Date.now() + Math.max(0, Number(durationMs) || 0),
+  );
+}
+
+export function isTokenVisibilityLightingRefreshSuppressed() {
+  return Date.now() < Number(getRuntimeFlag('suppressTokenVisibilityLightingRefreshUntil') || 0);
+}
+
 export function setSuppressRefreshTokenProcessing(value = true) {
   return setRuntimeFlag('suppressRefreshTokenProcessing', value);
 }

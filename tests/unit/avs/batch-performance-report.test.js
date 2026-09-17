@@ -66,6 +66,31 @@ describe('BatchPerformanceReport', () => {
     expect(report.detailedPercentages.visibilityCalculationsPct).toBe(44);
   });
 
+  test('includes post-result application stage timings', () => {
+    const report = buildBatchPerformanceReport({
+      batchStartTime: 0,
+      batchEndTime: 20,
+      timings: {
+        resultApplication: 10,
+        postResultTimings: {
+          resultApplication: 2,
+          effectSync: 5,
+          perceptionRefresh: 3,
+        },
+      },
+    });
+
+    expect(report.resultApplicationBreakdown).toEqual({
+      preRenderLock: 0,
+      resultApplication: 2,
+      detectionFlush: 0,
+      postRenderLock: 0,
+      effectSync: 5,
+      perceptionRefresh: 3,
+    });
+    expect(report.resultApplicationPercentages.effectSyncPct).toBe(50);
+  });
+
   test('TelemetryReporter stores report and forwards it to sink', () => {
     const reportSink = jest.fn();
     const reporter = new TelemetryReporter({ reportSink });

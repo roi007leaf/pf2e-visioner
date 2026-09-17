@@ -34,10 +34,21 @@ describe('door state visibility refresh service', () => {
     expect(getDoorStateValidationTokens({ controlled, placeables })).toBe(controlled);
   });
 
-  test('falls back to all placeable tokens for post-door validation', () => {
-    const placeables = [{ document: { id: 'placeable' } }];
+  test('falls back to override-bearing targets for post-door validation', () => {
+    const unrelated = { document: { id: 'unrelated', flags: { 'pf2e-visioner': {} } } };
+    const target = {
+      document: {
+        id: 'target',
+        flags: { 'pf2e-visioner': { 'avs-override-from-observer': { state: 'hidden' } } },
+      },
+    };
+    const otherModule = {
+      document: { id: 'other-module', flags: { other: { 'avs-override-from-observer': {} } } },
+    };
 
-    expect(getDoorStateValidationTokens({ controlled: [], placeables })).toBe(placeables);
+    expect(
+      getDoorStateValidationTokens({ controlled: [], placeables: [unrelated, target, otherModule] }),
+    ).toEqual([target]);
   });
 
   test('handles immediate door-state AVS invalidation and registers post-batch work', async () => {

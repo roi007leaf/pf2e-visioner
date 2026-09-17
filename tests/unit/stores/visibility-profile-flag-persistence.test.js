@@ -29,6 +29,20 @@ describe('visibility profile flag persistence', () => {
     clearPendingPerceptionProfileWrites();
   });
 
+  test('reads one pending profile without scanning every pending observer', () => {
+    const observer = global.createMockToken({ id: 'observer-pending-direct-read' });
+    rememberPendingPerceptionProfileWrite(observer, { target: hiddenProfile() });
+    const pendingWrites = globalThis[
+      Symbol.for('pf2e-visioner.pendingPerceptionProfileWrites')
+    ];
+    const entries = jest.spyOn(pendingWrites, 'entries');
+
+    expect(getRawPerceptionProfileEntry(observer, 'target')).toEqual(
+      expect.objectContaining({ detectionState: 'hidden' }),
+    );
+    expect(entries).not.toHaveBeenCalled();
+  });
+
   test('builds v14 nested deletion patches for partial visibilityV2 removals', () => {
     const forcedDeletion = foundry.data.operators.ForcedDeletion;
     const observer = global.createMockToken({ id: 'observer-build' });

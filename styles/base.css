@@ -1139,3 +1139,26 @@
 .hidden {
   display: none !important;
 }
+/* GM warning state: at least one player peek method is globally blocked. */
+#scene-controls
+  [data-tool='pf2e-visioner-block-player-peek'].pf2e-visioner-peek-locked,
+#scene-controls
+  [data-action='pf2e-visioner-block-player-peek'].pf2e-visioner-peek-locked {
+  color: #fff !important;
+  background: #a61b1b !important;
+  border-color: #ff6b6b !important;
+  box-shadow:
+    0 0 0 1px #ff6b6b,
+    0 0 8px rgb(255 50 50 / 70%) !important;
+}
+
+#scene-controls
+  [data-tool='pf2e-visioner-block-player-peek'].pf2e-visioner-peek-locked:hover,
+#scene-controls
+  [data-action='pf2e-visioner-block-player-peek'].pf2e-visioner-peek-locked:hover {
+  background: #c62828 !important;
+}
+
+#scene-controls .pf2e-visioner-peek-locked i {
+  color: #fff !important;
+}

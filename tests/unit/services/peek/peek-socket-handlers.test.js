@@ -20,13 +20,16 @@ import { consumeFullVisibilityScopeRecalc } from '../../../../scripts/services/r
 
 describe('GM peek socket handlers', () => {
   let sceneId;
+  let originalSettingsGet;
   beforeEach(() => {
     sceneId = global.canvas?.scene?.id;
     global.game.user.isGM = true;
+    originalSettingsGet = global.game.settings.get;
   });
   afterEach(() => {
     peekRegistry.clearAll();
     global.game.user.isGM = true;
+    global.game.settings.get = originalSettingsGet;
     consumeFullVisibilityScopeRecalc();
   });
 
@@ -44,6 +47,46 @@ describe('GM peek socket handlers', () => {
   test('peekUpdateHandler stores on this scene as GM', () => {
     peekUpdateHandler({ tokenId: 't', sceneId, origin: { x: 1, y: 2 }, direction: 0, fov: 90, ignoredWallIds: ['w'] });
     expect(peekRegistry.get('t').ignoredWallIds).toEqual(['w']);
+  });
+
+  test('peekUpdateHandler rejects player updates while GM block is active', () => {
+    global.game.settings.get = jest.fn((moduleId, key) =>
+      moduleId === 'pf2e-visioner' && key === 'playerPeekBlockMode'
+        ? 'both'
+        : originalSettingsGet(moduleId, key),
+    );
+
+    peekUpdateHandler({
+      tokenId: 't',
+      sceneId,
+      userId: 'player1',
+      origin: { x: 1, y: 2 },
+      direction: 0,
+      fov: 90,
+      ignoredWallIds: [],
+    });
+
+    expect(peekRegistry.has('t')).toBe(false);
+  });
+
+  test('peekUpdateHandler allows door updates when only corner peeks are blocked', () => {
+    global.game.settings.get = jest.fn((moduleId, key) =>
+      moduleId === 'pf2e-visioner' && key === 'playerPeekBlockMode'
+        ? 'corner'
+        : originalSettingsGet(moduleId, key),
+    );
+
+    peekUpdateHandler({
+      tokenId: 't',
+      sceneId,
+      userId: 'player1',
+      origin: { x: 1, y: 2 },
+      direction: 0,
+      fov: 10,
+      ignoredWallIds: ['door1'],
+    });
+
+    expect(peekRegistry.has('t')).toBe(true);
   });
 
   test('peekUpdateHandler forces full-scope AVS recalc instead of GM viewport filtering', () => {
@@ -260,17 +303,20 @@ describe('door peek approval socket handlers', () => {
   let sceneId;
   let originalSocket;
   let originalModules;
+  let originalSettingsGet;
 
   beforeEach(() => {
     sceneId = global.canvas?.scene?.id;
     originalSocket = _socketService._socket;
     originalModules = global.game.modules;
+    originalSettingsGet = global.game.settings.get;
     global.game.user.isGM = true;
   });
 
   afterEach(() => {
     _socketService._socket = originalSocket;
     global.game.modules = originalModules;
+    global.game.settings.get = originalSettingsGet;
     global.game.user.isGM = true;
   });
 
@@ -300,6 +346,29 @@ describe('door peek approval socket handlers', () => {
       'DoorPeekApprovalResponse',
       ['player1'],
       expect.objectContaining({ requestId: 'r1', approved: true }),
+    );
+  });
+
+  test('GM block denies door requests without opening approval', async () => {
+    const executeForUsers = jest.fn();
+    const confirm = jest.fn(async () => true);
+    _socketService._socket = { executeForUsers };
+    global.game.settings.get = jest.fn((moduleId, key) =>
+      moduleId === 'pf2e-visioner' && key === 'playerPeekBlockMode'
+        ? 'door'
+        : originalSettingsGet(moduleId, key),
+    );
+
+    await doorPeekApprovalRequestHandler(
+      { requestId: 'r1', sceneId, tokenId: 't', wallId: 'w', userId: 'player1' },
+      { confirm },
+    );
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(executeForUsers).toHaveBeenCalledWith(
+      'DoorPeekApprovalResponse',
+      ['player1'],
+      expect.objectContaining({ requestId: 'r1', approved: false }),
     );
   });
 

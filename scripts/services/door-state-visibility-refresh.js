@@ -22,7 +22,11 @@ export function buildDoorStateSuppression(wallDocument, doorState, { now = Date.
 }
 
 export function getDoorStateValidationTokens({ controlled = [], placeables = [] } = {}) {
-  return controlled?.length > 0 ? controlled : (placeables ?? []);
+  if (controlled?.length > 0) return controlled;
+  return (placeables ?? []).filter((token) => {
+    const flags = token?.document?.flags?.[MODULE_ID];
+    return !!flags && Object.keys(flags).some((key) => key.startsWith('avs-override-from-'));
+  });
 }
 
 async function loadDefaultAutoVisibilitySystem() {

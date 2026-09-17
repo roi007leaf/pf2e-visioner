@@ -3,10 +3,16 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { accountDefaults, loadLocalDefaults, promptAccount } from './local-defaults.mjs';
+import { accountDefaults, loadLocalDefaults, needsSecondGmSession, promptAccount } from './local-defaults.mjs';
 
 const saved = { gm: { username: 'QA GM', password: 'saved-secret' },
   player: { username: 'QA Player', password: '', allowBlankPassword: true } };
+
+test('second GM login is required only by selected second-GM cases', () => {
+  assert.equal(needsSecondGmSession([{ name: 'performance' }]), false);
+  assert.equal(needsSecondGmSession([{ name: 'performance' }, { name: 'handover', secondGm: true }]), true);
+  assert.equal(needsSecondGmSession([]), false);
+});
 
 test('saved credentials still prompt and Enter accepts defaults without displaying secrets', async () => {
   const calls = [];

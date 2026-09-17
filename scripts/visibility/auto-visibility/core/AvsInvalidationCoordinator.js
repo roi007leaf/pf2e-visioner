@@ -4,9 +4,11 @@ import {
   isLightingRefreshSuppressed,
   isTokenLightMovementLightingRefreshSuppressed,
   isTokenMovementLightingRefreshSuppressed,
+  isTokenVisibilityLightingRefreshSuppressed,
   requestFullVisibilityScopeRecalc,
   setSuppressLightingRefresh,
   setSuppressTokenLightMovementLightingRefresh,
+  setSuppressTokenVisibilityLightingRefresh,
 } from '../../../services/runtime-state.js';
 import { LightingPrecomputer } from './LightingPrecomputer.js';
 import { VisionAnalyzer } from '../VisionAnalyzer.js';
@@ -216,6 +218,13 @@ export class AvsInvalidationCoordinator {
     if (isTokenLightMovementLightingRefreshSuppressed()) {
       this.systemState?.debug?.(
         'LightingEventHandler: suppressing lightingRefresh from token light movement',
+      );
+      return false;
+    }
+
+    if (isTokenVisibilityLightingRefreshSuppressed()) {
+      this.systemState?.debug?.(
+        'LightingEventHandler: suppressing lightingRefresh from token visibility change',
       );
       return false;
     }
@@ -572,6 +581,7 @@ export class AvsInvalidationCoordinator {
     this.#clearVisionAnalyzerCaches([tokenDoc.object].filter(Boolean));
     this.#clearVisibilityAndLosCaches();
     LightingPrecomputer.clearLightingCaches();
+    setSuppressTokenVisibilityLightingRefresh();
     this.visibilityState?.markTokenChangedImmediate?.(tokenDoc.id);
     return true;
   }
@@ -582,7 +592,8 @@ export class AvsInvalidationCoordinator {
 
     this.#clearVisibilityAndLosCaches();
     requestFullVisibilityScopeRecalc();
-    this.visibilityState?.markAllTokensChangedImmediate?.();
+    setSuppressTokenVisibilityLightingRefresh();
+    this.#markTokenIdsImmediate(tokenIds);
     return true;
   }
 
@@ -611,6 +622,7 @@ export class AvsInvalidationCoordinator {
     this.#clearVisionAnalyzerCaches(metadata.tokens);
     this.cacheManager?.clearVisibilityCache?.();
     requestFullVisibilityScopeRecalc();
+    setSuppressTokenVisibilityLightingRefresh();
     if (metadata.recalculateAllTokenPairs) {
       this.#clearVisibilityAndLosCaches();
       this.visibilityState?.markAllTokensChangedImmediate?.();
@@ -628,6 +640,7 @@ export class AvsInvalidationCoordinator {
 
     this.#clearVisionAnalyzerCaches(metadata.tokens);
     this.cacheManager?.clearVisibilityCache?.();
+    setSuppressTokenVisibilityLightingRefresh();
     this.#markTokenIdsImmediate(tokenIds);
     return true;
   }
@@ -648,7 +661,8 @@ export class AvsInvalidationCoordinator {
     tokenIds.forEach(id => this.visionAnalyzer?.invalidateVisionCache?.(id));
     this.cacheManager?.clearVisibilityCache?.();
     requestFullVisibilityScopeRecalc();
-    this.visibilityState?.markAllTokensChangedImmediate?.();
+    setSuppressTokenVisibilityLightingRefresh();
+    this.#markTokenIdsImmediate(tokenIds);
     return true;
   }
 

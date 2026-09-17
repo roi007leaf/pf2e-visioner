@@ -1,6 +1,19 @@
 import { BatchSuccessTelemetryWorkflow } from '../../../scripts/visibility/auto-visibility/core/BatchSuccessTelemetryWorkflow.js';
 
 describe('BatchSuccessTelemetryWorkflow', () => {
+  test('returns normalized performance report produced by telemetry sink', () => {
+    const report = {
+      batchId: 'batch-1',
+      totalMs: 12,
+      detailedBreakdown: { losCalculations: 4 },
+    };
+    const workflow = new BatchSuccessTelemetryWorkflow({
+      stopTelemetry: jest.fn(() => report),
+    });
+
+    expect(workflow.report({ batchId: 'batch-1' })).toBe(report);
+  });
+
   test('stops telemetry with a success payload built from runtime adapters and batch context', () => {
     const stopTelemetry = jest.fn();
     const timings = { batchProcessing: 10 };

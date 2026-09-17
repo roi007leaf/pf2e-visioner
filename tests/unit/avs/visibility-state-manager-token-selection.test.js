@@ -1,4 +1,7 @@
-import { getEligibleVisibilityTokenIds } from '../../../scripts/visibility/auto-visibility/core/VisibilityStateManager.js';
+import {
+  getEligibleVisibilityTokenIds,
+  VisibilityStateManager,
+} from '../../../scripts/visibility/auto-visibility/core/VisibilityStateManager.js';
 
 describe('getEligibleVisibilityTokenIds', () => {
   test('returns actor token ids in input order', () => {
@@ -31,5 +34,33 @@ describe('getEligibleVisibilityTokenIds', () => {
 
     expect(getEligibleVisibilityTokenIds(tokens, exclusionManager)).toEqual(['A']);
     expect(exclusionManager.isExcludedToken).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('VisibilityStateManager movement selection', () => {
+  test('queues only the mover even when spatial analysis finds every nearby token', () => {
+    const batchProcessor = jest.fn(async () => {});
+    const spatialAnalyzer = jest.fn(() => [
+      { document: { id: 'B' } },
+      { document: { id: 'C' } },
+    ]);
+    const manager = new VisibilityStateManager({
+      batchProcessor,
+      spatialAnalyzer,
+      systemStateProvider: {
+        debug: jest.fn(),
+        isDebugMode: jest.fn(() => false),
+        isEnabled: jest.fn(() => true),
+        shouldProcessEvents: jest.fn(() => true),
+      },
+    });
+
+    manager.markTokenChangedWithSpatialOptimization(
+      { id: 'A', name: 'Mover', x: 0, y: 0, width: 1, height: 1 },
+      { x: 100, y: 100 },
+    );
+
+    expect(batchProcessor).toHaveBeenCalledWith(new Set(['A']));
+    expect(spatialAnalyzer).not.toHaveBeenCalled();
   });
 });

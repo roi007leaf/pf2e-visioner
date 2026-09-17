@@ -33,7 +33,6 @@ export class BatchSuccessTelemetryWorkflow {
       hasDarknessSources: this.#hasDarknessSources(),
       debugMode: this.#getDebugMode(),
     });
-    this.#stopTelemetry(payload);
-    return payload;
+    return this.#stopTelemetry(payload) || payload;
   }
 }

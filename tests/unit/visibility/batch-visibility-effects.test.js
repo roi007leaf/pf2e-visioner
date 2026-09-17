@@ -126,6 +126,28 @@ describe('batchUpdateVisibilityEffects', () => {
     expect(second.createEmbeddedDocuments.mock.calls[0][1][0].flags['pf2e-visioner'].visibilityState).toBe('undetected');
   });
 
+  test('updates independent receiving actors with bounded concurrency', async () => {
+    const observer = makeToken('observer', 'Observer', makeActor('observer', 'observer-sig'));
+    let active = 0;
+    let maximumActive = 0;
+    const targets = Array.from({ length: 8 }, (_, index) => {
+      const actor = makeActor(`actor-${index}`, `target-${index}`);
+      actor.createEmbeddedDocuments.mockImplementation(async () => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        active -= 1;
+        return [];
+      });
+      return { target: makeToken(`target-${index}`, `Target ${index}`, actor), state: 'hidden' };
+    });
+
+    await batchUpdateVisibilityEffects(observer, targets);
+
+    expect(maximumActive).toBeGreaterThan(1);
+    expect(maximumActive).toBeLessThanOrEqual(4);
+  });
+
   test('removes legacy off-guard effects when pair becomes observed', async () => {
     const observerLegacy = {
       id: 'legacy-on-observer',
@@ -156,6 +178,36 @@ describe('batchUpdateVisibilityEffects', () => {
       'legacy-on-observer',
     ]);
     expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', ['legacy-on-target']);
+  });
+
+  test('coalesces legacy cleanup into one actor deletion for a relationship batch', async () => {
+    const observerA = makeToken('observer-a', 'Observer A', makeActor('observer-a-actor', 'sig-a'));
+    const observerB = makeToken('observer-b', 'Observer B', makeActor('observer-b-actor', 'sig-b'));
+    const legacyA = {
+      id: 'legacy-a',
+      flags: {
+        'pf2e-visioner': { isEphemeralOffGuard: true, hiddenActorSignature: 'sig-a' },
+      },
+    };
+    const legacyB = {
+      id: 'legacy-b',
+      flags: {
+        'pf2e-visioner': { isEphemeralOffGuard: true, hiddenActorSignature: 'sig-b' },
+      },
+    };
+    const targetActor = makeActor('target-actor', 'target-sig', [legacyA, legacyB]);
+    const target = makeToken('target', 'Target', targetActor);
+
+    await batchUpdateVisibilityEffectsForObservers([
+      { observer: observerA, targets: [{ target, state: 'observed' }] },
+      { observer: observerB, targets: [{ target, state: 'observed' }] },
+    ]);
+
+    expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledTimes(1);
+    expect(targetActor.deleteEmbeddedDocuments).toHaveBeenCalledWith('Item', [
+      'legacy-a',
+      'legacy-b',
+    ]);
   });
 
   test('removes legacy hidden off-guard effects when pair becomes undetected', async () => {

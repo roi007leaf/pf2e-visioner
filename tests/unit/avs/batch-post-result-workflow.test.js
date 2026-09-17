@@ -45,6 +45,24 @@ function createWorkflow(overrides = {}) {
 }
 
 describe('BatchPostResultWorkflow', () => {
+  test('reports post-result stage timings', async () => {
+    let now = 0;
+    const { workflow } = createWorkflow({ nowProvider: () => now++ });
+
+    const result = await workflow.run({
+      batchResult: { updates: [update('observed')] },
+    });
+
+    expect(result.timings).toEqual({
+      preRenderLock: 1,
+      resultApplication: 1,
+      detectionFlush: 1,
+      postRenderLock: 1,
+      effectSync: 1,
+      perceptionRefresh: 1,
+    });
+  });
+
   test('applies results, flushes detection, syncs effects, refreshes perception, then schedules suppression clear', async () => {
     const updates = [update('hidden'), update('observed')];
     const { workflow, order } = createWorkflow();

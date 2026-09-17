@@ -1,5 +1,23 @@
 # Changelog
 
+## [8.8.0] - 2026-09-17
+
+### Added
+
+- GMs can now globally control player peeking from one Token Controls button. The button cycles through None, Corners Only, Doors Only, and Both; blocked modes use distinct icons, tooltips, and a red locked-state highlight.
+- Peek blocking is enforced for player corner and door requests while preserving GM access. Changing modes immediately ends any active player peeks that are newly blocked.
+
+### Improved
+
+- AVS movement, actor, effect, door, and region invalidation now scopes work to affected tokens instead of repeatedly processing full-scene relationships. Hidden moving tokens still update every relevant observer relationship.
+- Reduced render-path overhead by reusing vision-sharing metadata, caching GM Vision decisions for each synchronous render burst, using direct pending-profile lookups, coalescing legacy effect cleanup, and skipping redundant lighting refreshes.
+- Bounded combat-start cover and effect-update concurrency, while expanded batch telemetry exposes candidate scope, cache behavior, write counts, and detailed timing for future profiling.
+
+### Tests
+
+- Added four real two-client live scenarios covering every block mode. A logged-in player attempts both corner and door peeks while a logged-in GM verifies the mirrored active state; all four scenarios passed with complete setting and fixture cleanup.
+- Added 100-token/25-light AVS-on/off canvas-pan scenarios plus CPU profiling support. All 523 automated suites (4,960 tests), 52 live-harness checks, lint, and diff-integrity checks passed; the final heavy AVS movement run completed with unchanged source and full cleanup.
+
 ## [8.7.6] - 2026-09-15
 
 ### Fixed

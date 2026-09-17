@@ -13,6 +13,7 @@ export class BatchPostResultWorkflow {
   #clearSuppressLightingRefreshAfterBatch;
   #scheduleTask;
   #debug;
+  #nowProvider;
 
   constructor({
     applyBatchResults = async () => 0,
@@ -24,6 +25,7 @@ export class BatchPostResultWorkflow {
     clearSuppressLightingRefreshAfterBatch = () => {},
     scheduleTask = (task) => task(),
     debug = () => {},
+    nowProvider = () => globalThis.performance?.now?.() ?? Date.now(),
   } = {}) {
     this.#applyBatchResults = applyBatchResults;
     this.#applyBatchResultRenderLock = applyBatchResultRenderLock;
@@ -34,6 +36,7 @@ export class BatchPostResultWorkflow {
     this.#clearSuppressLightingRefreshAfterBatch = clearSuppressLightingRefreshAfterBatch;
     this.#scheduleTask = scheduleTask;
     this.#debug = debug;
+    this.#nowProvider = nowProvider;
   }
 
   async run({
@@ -41,27 +44,48 @@ export class BatchPostResultWorkflow {
     postBatchPerceptionSuppression = null,
     flushDetectionBatch = this.#flushDetectionBatch,
   } = {}) {
+    const timings = {
+      preRenderLock: 0,
+      resultApplication: 0,
+      detectionFlush: 0,
+      postRenderLock: 0,
+      effectSync: 0,
+      perceptionRefresh: 0,
+    };
+    const measure = async (stage, operation) => {
+      const startedAt = this.#nowProvider();
+      const result = await operation();
+      timings[stage] += this.#nowProvider() - startedAt;
+      return result;
+    };
+
     if (batchResult.updates?.length > 0) {
-      await this.#applyBatchResultRenderLock(batchResult.updates, {
-        forceVisibility: true,
-        refreshTargets: false,
-      });
+      await measure('preRenderLock', () =>
+        this.#applyBatchResultRenderLock(batchResult.updates, {
+          forceVisibility: true,
+          refreshTargets: false,
+        }),
+      );
     }
 
-    const uniqueUpdateCount = await this.#applyBatchResults(batchResult, {
-      suppressVisibilityMapRender: shouldSuppressVisibilityMapRender(
-        postBatchPerceptionSuppression,
-      ),
-    });
+    const uniqueUpdateCount = await measure('resultApplication', () =>
+      this.#applyBatchResults(batchResult, {
+        suppressVisibilityMapRender: shouldSuppressVisibilityMapRender(
+          postBatchPerceptionSuppression,
+        ),
+      }),
+    );
     const appliedUpdates = batchResult.appliedUpdates ?? batchResult.updates;
 
-    await flushDetectionBatch();
+    await measure('detectionFlush', () => flushDetectionBatch());
 
     if (appliedUpdates?.length > 0) {
-      await this.#applyBatchResultRenderLock(appliedUpdates, {
-        forceVisibility: false,
-        refreshTargets: true,
-      });
+      await measure('postRenderLock', () =>
+        this.#applyBatchResultRenderLock(appliedUpdates, {
+          forceVisibility: false,
+          refreshTargets: true,
+        }),
+      );
     }
 
     const postProcessingPlan = buildBatchPostProcessingPlan({
@@ -72,14 +96,16 @@ export class BatchPostResultWorkflow {
 
     if (postProcessingPlan.hasVisibilityUpdates) {
       if (postProcessingPlan.shouldSyncEffects) {
-        await this.#syncEphemeralEffectsForUpdates(postProcessingPlan.effectUpdates);
+        await measure('effectSync', () =>
+          this.#syncEphemeralEffectsForUpdates(postProcessingPlan.effectUpdates),
+        );
       }
 
       if (postProcessingPlan.shouldRefreshPerception) {
         if (postProcessingPlan.shouldMarkPerceptionRefreshed) {
           postBatchPerceptionSuppression.perceptionRefreshed = true;
         }
-        await this.#refreshPerceptionAfterBatch();
+        await measure('perceptionRefresh', () => this.#refreshPerceptionAfterBatch());
       }
     } else {
       this.#debug('BatchOrchestrator: skipping perception refresh (no updates)');
@@ -90,6 +116,6 @@ export class BatchPostResultWorkflow {
       this.#clearSuppressLightingRefreshAfterBatch();
     });
 
-    return { uniqueUpdateCount, postProcessingPlan };
+    return { uniqueUpdateCount, postProcessingPlan, timings };
   }
 }

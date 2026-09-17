@@ -96,6 +96,8 @@ export const auditWorkflows = {
     [`audit-validation-${mode}`, c => validation(c, mode)])),
   'audit-peek-corner': peekCorner,
   'audit-peek-door': peekDoor,
+  ...Object.fromEntries(['none', 'corner', 'door', 'both'].map(mode =>
+    [`audit-peek-block-${mode}`, c => peekBlockMode(c, mode)])),
   'audit-timer-cancel-reload': timerCancel,
   'audit-timer-turn-start': c => timerRound(c, 'start'),
   'audit-timer-turn-end': c => timerRound(c, 'end'),
@@ -670,4 +672,58 @@ async function peekDoor(c) {
     await c.mutate('door', 1);
     await inspect(c, { peekActive: false, visible: true }, true, 'opening-door-clears-peek');
   } finally { await c.rpc(c.player, 'cleanupAuditTransients', c.runId); }
+}
+
+async function peekBlockMode(c, mode) {
+  await c.setting('playerPeekBlockMode', mode);
+  await c.setting('requireGmApprovalForDoorPeek', false);
+  await c.setting('peekSlitAngle', 10);
+  await c.setting('peekRange', 30);
+
+  const verify = async kind => {
+    const blocked = mode === 'both' || mode === kind;
+    await c.mutate('audit', { action: 'peek-wall', corner: kind === 'corner' });
+    await c.player.bringToFront();
+    if (kind === 'corner') {
+      const point = await c.player.evaluate(() => {
+        const p = canvas.stage.toGlobal(new PIXI.Point(475, 450));
+        return { x: p.x, y: p.y };
+      });
+      await c.player.mouse.move(point.x, point.y);
+    } else {
+      const { rect } = await c.rpc(c.player, 'snapshot', c.fixture);
+      await c.player.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+
+    await c.rpc(c.player, 'peekAudit', { fixture: c.fixture, action: kind });
+    if (blocked) await c.player.waitForTimeout(350);
+
+    const expected = {
+      peekActive: !blocked,
+      peekPending: 0,
+      ...(blocked ? { visible: false } : {}),
+    };
+    await c.check(expected, !blocked, `player-${mode}-${kind}-${blocked ? 'blocked' : 'allowed'}`, {
+      probe: 'audit', session: 'player',
+    });
+    await c.check({ peekActive: !blocked }, undefined,
+      `gm-observes-${mode}-${kind}-${blocked ? 'blocked' : 'allowed'}`, {
+        probe: 'audit', session: 'gm',
+      });
+
+    if (!blocked) await c.rpc(c.player, 'peekAudit', { fixture: c.fixture, action: 'end' });
+    await c.check({ peekActive: false }, undefined, `player-${mode}-${kind}-cleared`, {
+      probe: 'audit', session: 'player',
+    });
+    await c.check({ peekActive: false }, undefined, `gm-observes-${mode}-${kind}-cleared`, {
+      probe: 'audit', session: 'gm',
+    });
+  };
+
+  try {
+    await verify('corner');
+    await verify('door');
+  } finally {
+    await c.rpc(c.player, 'cleanupAuditTransients', c.runId);
+  }
 }

@@ -291,6 +291,28 @@ describe('VisibilityRegionBehavior', () => {
       expect(Array.isArray(updates)).toBe(true);
     });
 
+    test('entering token updates only relationships changed by that entry', () => {
+      regionBehavior.applyToInsideTokens = true;
+      regionBehavior.twoWayRegion = true;
+
+      const updates = regionBehavior._gatherUpdatesForToken(
+        'token1',
+        true,
+        [mockToken2, mockToken3],
+      );
+
+      expect(updates).toEqual(
+        expect.arrayContaining([
+          { source: 'token1', target: 'token2', state: 'hidden' },
+          { source: 'token2', target: 'token1', state: 'hidden' },
+          { source: 'token1', target: 'token3', state: 'hidden' },
+          { source: 'token3', target: 'token1', state: 'hidden' },
+        ]),
+      );
+      expect(updates).not.toContainEqual({ source: 'token2', target: 'token3', state: 'hidden' });
+      expect(updates).not.toContainEqual({ source: 'token3', target: 'token2', state: 'hidden' });
+    });
+
     test('should generate updates for exiting token', () => {
       mockRegion.document.testPoint.mockImplementation((center) => {
         return center.x <= 200;

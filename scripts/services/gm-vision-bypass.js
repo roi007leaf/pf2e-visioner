@@ -1,14 +1,20 @@
 import { MODULE_ID } from '../constants.js';
 import { getSystemId } from '../system-adapter.js';
 
-const GM_VISION_BYPASS_CACHE_MS = 50;
 let bypassCache = {
-  expiresAt: 0,
+  valid: false,
   value: false,
 };
+let bypassCacheGeneration = 0;
 
-function nowMs() {
-  return globalThis.performance?.now?.() ?? Date.now();
+function cacheGmVisionBypassForCurrentBurst(value) {
+  const generation = ++bypassCacheGeneration;
+  bypassCache = { valid: true, value };
+  const clear = () => {
+    if (bypassCacheGeneration === generation) bypassCache.valid = false;
+  };
+  if (typeof queueMicrotask === 'function') queueMicrotask(clear);
+  else Promise.resolve().then(clear);
 }
 
 function gmVisionSettingEnabled() {
@@ -113,15 +119,11 @@ export function shouldBypassAvsForGmVision() {
   if (globalThis.canvas?.ready !== true) {
     gmCoreVisionActive = isGmCoreVisionActive();
   } else {
-    const now = nowMs();
-    if (bypassCache.expiresAt > now) {
+    if (bypassCache.valid) {
       gmCoreVisionActive = bypassCache.value;
     } else {
       gmCoreVisionActive = isGmCoreVisionActive();
-      bypassCache = {
-        expiresAt: now + GM_VISION_BYPASS_CACHE_MS,
-        value: gmCoreVisionActive,
-      };
+      cacheGmVisionBypassForCurrentBurst(gmCoreVisionActive);
     }
   }
 
@@ -130,8 +132,9 @@ export function shouldBypassAvsForGmVision() {
 }
 
 export function clearGmVisionBypassCache() {
+  bypassCacheGeneration += 1;
   bypassCache = {
-    expiresAt: 0,
+    valid: false,
     value: false,
   };
 }

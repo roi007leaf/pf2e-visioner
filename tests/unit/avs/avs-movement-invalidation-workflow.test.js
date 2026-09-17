@@ -45,7 +45,7 @@ describe('AvsMovementInvalidationWorkflow', () => {
     clearSuppressTokenMovementLightingRefresh();
   });
 
-  test('completed movement clears position caches, marks spatial recalculation, then closes movement', () => {
+  test('completed movement queues movement recalculation, then closes movement', () => {
     const visibilityState = makeVisibilityState();
     const cacheManager = makeCacheManager();
     const batchOrchestrator = {

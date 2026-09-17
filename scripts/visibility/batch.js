@@ -7,10 +7,11 @@ import {
 import { OffGuardSuppression } from '../rule-elements/operations/OffGuardSuppression.js';
 import { hasActivePendingTokenMovement } from '../services/movement-tracking.js';
 import { EphemeralEffectIndex } from './ephemeral-effect-index.js';
-import { cleanupLegacyVisibilityPair } from './legacy-effect-cleanup.js';
+import { deleteLegacyVisibilityEffectsForSignatures } from './legacy-effect-cleanup.js';
 import { deleteExistingEmbeddedItems, runWithEffectLock } from './utils.js';
 
 const OBSERVED_EFFECT_MUTATION_SUPPRESSION_MS = 750;
+const RECEIVER_UPDATE_CONCURRENCY = 4;
 
 function tokenIdOf(token) {
   return token?.document?.id || token?.id || null;
@@ -52,6 +53,15 @@ export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, 
   const effectTarget =
     options.effectTarget || (options.direction === 'target_to_observer' ? 'observer' : 'subject');
   const updatesByReceiver = new Map();
+  const legacyCleanupByActor = new Map();
+  const addLegacyCleanup = (actor, signature) => {
+    if (!actor || !signature) return;
+    const actorKey = actor.uuid ?? actor;
+    if (!legacyCleanupByActor.has(actorKey)) {
+      legacyCleanupByActor.set(actorKey, { actor, signatures: new Set() });
+    }
+    legacyCleanupByActor.get(actorKey).signatures.add(signature);
+  };
   const now = () => globalThis.performance?.now?.() ?? Date.now();
   let sliceStartedAt = now();
   const yieldIfNeeded = async () => {
@@ -92,7 +102,8 @@ export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, 
         options.removeAllEffects ||
         suppressionActive
       ) {
-        await cleanupLegacyVisibilityPair(observerToken, update.target);
+        addLegacyCleanup(observerToken.actor, update.target.actor.signature);
+        addLegacyCleanup(update.target.actor, observerToken.actor.signature);
       }
       if (!updatesByReceiver.has(receiverId))
         updatesByReceiver.set(receiverId, { receiver, updates: [] });
@@ -104,10 +115,24 @@ export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, 
     }
     await yieldIfNeeded();
   }
-  for (const { receiver, updates } of updatesByReceiver.values()) {
+  const legacyCleanups = Array.from(legacyCleanupByActor.values());
+  let nextLegacyCleanupIndex = 0;
+  const legacyCleanupWorkerCount = Math.min(RECEIVER_UPDATE_CONCURRENCY, legacyCleanups.length);
+  await Promise.all(
+    Array.from({ length: legacyCleanupWorkerCount }, async () => {
+      while (nextLegacyCleanupIndex < legacyCleanups.length) {
+        const cleanup = legacyCleanups[nextLegacyCleanupIndex++];
+        await runWithEffectLock(cleanup.actor, () =>
+          deleteLegacyVisibilityEffectsForSignatures(cleanup.actor, cleanup.signatures),
+        );
+        await yieldIfNeeded();
+      }
+    }),
+  );
+  const processReceiver = async ({ receiver, updates }) => {
     try {
       const rType = receiver?.actor?.type;
-      if (rType && ['loot', 'vehicle', 'party'].includes(rType)) continue;
+      if (rType && ['loot', 'vehicle', 'party'].includes(rType)) return;
     } catch (_) {}
     await runWithEffectLock(receiver.actor, async () => {
       const effects = receiver.actor.itemTypes.effect;
@@ -166,6 +191,19 @@ export async function batchUpdateVisibilityEffectsForObservers(observerUpdates, 
       if (effectsToCreate.length > 0)
         await receiver.actor.createEmbeddedDocuments('Item', effectsToCreate);
     });
-    await yieldIfNeeded();
-  }
+  };
+
+  const receivers = Array.from(updatesByReceiver.values());
+  let nextReceiverIndex = 0;
+  const workerCount = Math.min(RECEIVER_UPDATE_CONCURRENCY, receivers.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextReceiverIndex < receivers.length) {
+        const receiverIndex = nextReceiverIndex;
+        nextReceiverIndex += 1;
+        await processReceiver(receivers[receiverIndex]);
+        await yieldIfNeeded();
+      }
+    }),
+  );
 }
