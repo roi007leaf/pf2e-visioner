@@ -61,6 +61,7 @@ let interfaceHatchFilterClass = null;
 let darknessColorState = null;
 let primaryVisionModeState = null;
 let detachedVisionSources = new Set();
+let restoringDetachedVisionSources = 0;
 let modeIndicatorCleanup = null;
 
 function observerDarknessStrength() {
@@ -519,6 +520,35 @@ function detachVisualVisionSources() {
   return changed;
 }
 
+export function wrapGmObserverVisionSourceAdd(wrapped, ...args) {
+  if (restoringDetachedVisionSources > 0 || !gmObserverView.isActive()) {
+    return wrapped(...args);
+  }
+
+  // Foundry rebuilds token sources when `hidden` changes. Keep source geometry
+  // current for AVS, but never activate it for an intermediate rendered frame.
+  if (this?.active && typeof this.remove === 'function') this.remove();
+  if (this) detachedVisionSources.add(this);
+  return undefined;
+}
+
+function registerVisionSourceAddWrapper() {
+  if (globalThis.__pf2eVisionerGmObserverVisionSourceAddWrapperRegistered) return;
+  if (typeof globalThis.libWrapper?.register !== 'function') return;
+
+  try {
+    globalThis.libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.sources.PointVisionSource.prototype.add',
+      wrapGmObserverVisionSourceAdd,
+      'MIXED',
+    );
+    globalThis.__pf2eVisionerGmObserverVisionSourceAddWrapperRegistered = true;
+  } catch (error) {
+    console.warn('PF2E Visioner | Failed to register GM Observer vision-source wrapper:', error);
+  }
+}
+
 function restoreDetachedVisionSources() {
   if (!detachedVisionSources.size) return false;
   let changed = false;
@@ -528,7 +558,12 @@ function restoreDetachedVisionSources() {
       if (source?.destroyed || object?.destroyed) continue;
       if (object && 'vision' in object && object.vision !== source) continue;
       if (typeof source?.add !== 'function') continue;
-      source.add();
+      restoringDetachedVisionSources += 1;
+      try {
+        source.add();
+      } finally {
+        restoringDetachedVisionSources -= 1;
+      }
       changed = true;
     } catch {
       /* the source may have been replaced while Observer View was active */
@@ -957,6 +992,7 @@ export const gmObserverView = {
   },
 
   registerHooks() {
+    registerVisionSourceAddWrapper();
     if (globalThis.__pf2eVisionerGmObserverViewHooksRegistered) return;
     globalThis.__pf2eVisionerGmObserverViewHooksRegistered = true;
 

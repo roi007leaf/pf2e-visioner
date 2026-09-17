@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.8.2] - 2026-09-17
+
+### Fixed
+
+- GM Observer View now prevents hidden and unhidden token updates from briefly reactivating detached Core vision sources, eliminating the multi-level canvas flash while preserving source restoration when Observer View is disabled.
+
+### Tests
+
+- Added regression coverage for suppressing intermediate vision-source registration and restoring the original source after Observer View exits.
+
 ## [8.8.1] - 2026-09-17
 
 ### Fixed

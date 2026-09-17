@@ -1,6 +1,9 @@
 import '../../setup.js';
 
-import { gmObserverView } from '../../../scripts/services/GmObserverView/gm-observer-view.js';
+import {
+  gmObserverView,
+  wrapGmObserverVisionSourceAdd,
+} from '../../../scripts/services/GmObserverView/gm-observer-view.js';
 import {
   clearScheduledCanvasPerceptionUpdate,
   flushScheduledCanvasPerceptionUpdate,
@@ -509,11 +512,14 @@ describe('GM Observer View token presentation', () => {
         visionSources.splice(visionSources.indexOf(visionSource), 1);
         visionSource.active = false;
       }),
-      add: jest.fn(() => {
-        visionSources.push(visionSource);
-        visionSource.active = true;
-      }),
     };
+    const coreAdd = jest.fn(() => {
+      visionSources.push(visionSource);
+      visionSource.active = true;
+    });
+    visionSource.add = jest.fn((...args) => {
+      return wrapGmObserverVisionSourceAdd.call(visionSource, coreAdd, ...args);
+    });
     observer.vision = visionSource;
     visionSources.push(visionSource);
     globalThis.canvas.scene = { tokenVision: true };
@@ -537,9 +543,37 @@ describe('GM Observer View token presentation', () => {
     expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
     expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x111111);
     expect(visionSource.add).toHaveBeenCalledTimes(1);
+    expect(coreAdd).toHaveBeenCalledTimes(1);
     expect(visionSources).toEqual([visionSource]);
     expect(observer.vision).toBe(visionSource);
     expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(2);
+  });
+
+  it('prevents hidden updates from briefly re-adding Observer View vision sources', () => {
+    const visionSources = [];
+    const visionSource = {
+      active: false,
+      remove: jest.fn(() => {
+        visionSource.active = false;
+      }),
+    };
+    const add = jest.fn(() => {
+      visionSource.active = true;
+      visionSources.push(visionSource);
+    });
+
+    wrapGmObserverVisionSourceAdd.call(visionSource, add);
+
+    expect(add).not.toHaveBeenCalled();
+    expect(visionSource.active).toBe(false);
+    expect(visionSources).toEqual([]);
+
+    globalThis.game.user.isGM = false;
+    wrapGmObserverVisionSourceAdd.call(visionSource, add);
+
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(visionSource.active).toBe(true);
+    expect(visionSources).toEqual([visionSource]);
   });
 
   it('refreshes multi-level lighting after changing Observer View darkness color', () => {
