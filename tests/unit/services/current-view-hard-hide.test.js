@@ -495,6 +495,8 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     );
 
     expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(false);
+    expect(observerViewStateForCurrentView(target)).toBeNull();
+    expect(observerViewStateForCurrentView(target, { includeObserved: true })).toBe('observed');
   });
 
   it('reports unseen when every selected observer has an undetected state', () => {

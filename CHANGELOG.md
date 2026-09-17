@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.8.3] - 2026-09-17
+
+### Fixed
+
+- GM Observer View now renders tokens from the selected observer's explicit AVS relationships even when multi-level rendering detaches Core vision sources, preserving Observed tokens while keeping wall- or floor-blocked tokens Undetected.
+- Token movement through an `F` waypoint now recalculates AVS at the committed destination. Foundry movement-chain history is no longer mistaken for an unfinished waypoint segment.
+
+### Tests
+
+- Added a real two-client combat regression that moves both tokens around a blocking wall with `F` waypoints across a turn transition, then verifies directional AVS state and GM Observer rendering.
+- All 523 automated suites (4,964 tests), 52 live-harness checks, focused lint, and the waypoint live scenario passed with complete fixture cleanup.
+
 ## [8.8.2] - 2026-09-17
 
 ### Fixed

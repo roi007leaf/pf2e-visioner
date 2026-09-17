@@ -584,6 +584,43 @@ describe('TokenEventHandler - animation detection on position change', () => {
     expect(queueOverrideValidation).not.toHaveBeenCalled();
   });
 
+  test('waypoint movement processes a destination even when Foundry reports prior movement ids in chain', async () => {
+    const invalidationCoordinator = { invalidate: jest.fn(() => true) };
+    handler = new TokenEventHandler(
+      systemState,
+      visibilityState,
+      spatialAnalyzer,
+      exclusionManager,
+      overrideValidationManager,
+      positionManager,
+      cacheManager,
+      batchOrchestrator,
+      invalidationCoordinator,
+    );
+    const tokenDoc = makeTokenDoc({
+      object: {
+        _animation: null,
+        _dragHandle: null,
+        actor: { id: 'actor-1', items: [] },
+      },
+    });
+
+    await handler.handleMoveToken(
+      tokenDoc,
+      { destination: { x: 800, y: 500 }, chain: ['prior-waypoint-movement'] },
+      { animate: true },
+      'user-1',
+    );
+
+    expect(invalidationCoordinator.invalidate).toHaveBeenCalledWith({
+      reason: 'token-movement-completed',
+      document: tokenDoc,
+      changeData: { x: 800, y: 500 },
+      options: { animate: true },
+      userId: 'user-1',
+    });
+  });
+
   test('final move skips only recently handled duplicate destination', async () => {
     const invalidationCoordinator = { invalidate: jest.fn(() => true) };
     handler = new TokenEventHandler(

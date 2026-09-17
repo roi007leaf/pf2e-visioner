@@ -1,4 +1,4 @@
-import { actionDialog, closeDialogs, managerSet, dragPreview, unfilter } from './ui-workflows.mjs';
+import { actionDialog, closeDialogs, managerSet, dragPreview, dragWithWaypoint, unfilter } from './ui-workflows.mjs';
 
 export async function levelsPillar(c) {
   await c.mutate('pillar');
@@ -51,6 +51,28 @@ export async function regionVisibility(c) {
   await c.mutate('state', 'undetected');
   await c.mutate('remove-regions'); await c.check({ state: 'undetected' }, false);
   await c.mutate('reset-override'); await c.check({ state: 'observed' }, true);
+}
+export async function combatWallTurnMovement(c) {
+  // Begin on the same side of a closed wall so both directions have a known,
+  // observed baseline before either combatant moves.
+  await c.mutate('target-token', { x: 500, y: 500 });
+  await c.mutate('wall-segment');
+  await c.mutate('gm-observer-view', true);
+  await c.mutate('combat');
+  await c.check({ state: 'observed', reverseState: 'observed', visible: true }, undefined, 'combat-start-mutual-visibility');
+
+  // The first combatant crosses the wall. The observer must retain the AVS
+  // relationship as Undetected rather than losing or revealing the target.
+  await dragWithWaypoint(c, { subject: 'target', waypoint: { x: 500, y: 1200 }, to: { x: 800, y: 500 } });
+  await c.check({ state: 'undetected', visible: false, meshVisible: false, meshRenderable: false }, undefined, 'first-token-behind-wall');
+
+  // Exercise the real turn hook before the other combatant moves through the
+  // wall. This is the stale-observer regression sequence from live play.
+  await c.mutate('next-turn');
+  await c.check({ state: 'undetected', visible: false, meshVisible: false, meshRenderable: false }, undefined, 'after-turn-transition');
+  await dragWithWaypoint(c, { subject: 'observer', waypoint: { x: 400, y: 1200 }, to: { x: 700, y: 500 } });
+  await c.check({ state: 'observed', reverseState: 'observed', visible: true }, undefined, 'second-mover-sees-first');
+  await c.check({ state: 'observed', visible: true, meshVisible: true, meshRenderable: true }, undefined, 'gm-observer-renders-first', { session: 'gm' });
 }
 export async function geometryCover(c, type) {
   await c.mutate('cover-geometry', { type });

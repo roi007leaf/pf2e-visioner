@@ -15,6 +15,10 @@ export function resolveGmObserverTokenPresentation({
 } = {}) {
   if (!active || controlled || preview || filteredOut || culled) return 'unchanged';
   if (!hasObservers) return 'normal';
+  // Observer View intentionally detaches Core vision sources to prevent the normal
+  // vision mask from flashing. Once AVS has explicitly resolved the pair as observed,
+  // that result must win over Core's expected `false` from the detached source.
+  if (visionerState === 'observed' || visionerState === 'concealed') return 'normal';
   if (visionerState === 'hidden') return 'hidden';
   if (visionerState === 'unnoticed') return 'unnoticed';
   if (!coreVisible || visionerState === 'undetected') return 'undetected';

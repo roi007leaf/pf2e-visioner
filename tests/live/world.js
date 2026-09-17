@@ -231,6 +231,10 @@ export async function mutate({ fixture, operation, value, runId }) {
       if (!canvas.scene.walls.size) await canvas.scene.createEmbeddedDocuments('Wall', [{ c: [650, 0, 650, 1400], door: 1, ds: value, sight: 20, move: 20, sound: 20 }]);
       else await canvas.scene.walls.contents[0].update({ ds: value }); break;
     }
+    case 'wall-segment': {
+      await canvas.scene.createEmbeddedDocuments('Wall', [{ c: [650, 300, 650, 700], sight: 20, move: 20, sound: 20, flags: flag(runId) }]);
+      break;
+    }
     case 'combat-start': {
       const combat = game.combats.find(c => c.scene?.id === fixture.scene && owned(c, runId));
       if (!combat) throw Error('Owned fixture encounter missing');

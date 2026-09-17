@@ -128,17 +128,9 @@ export class TokenEventHandler {
       return;
     }
 
-    // Check if this is the final move segment
-    // The updateData has a 'chain' array - if it's empty, this is the final move
-    const isFinalMove = !updateData.chain || updateData.chain.length === 0;
-
-    if (!isFinalMove) {
-      // This is an intermediate waypoint, skip processing
-      return;
-    }
-
-    // This is the final destination, process visibility
-    // Use destination from updateData - this is the final position after animation
+    // Foundry's chain contains prior movement IDs for a continued/waypoint
+    // movement; it does not identify an intermediate animation segment. The
+    // moveToken hook already supplies the committed destination for this move.
     const finalX = updateData.destination?.x ?? tokenDoc.x;
     const finalY = updateData.destination?.y ?? tokenDoc.y;
     const tokenId = tokenDoc.id;

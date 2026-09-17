@@ -233,6 +233,9 @@ describe('detection token refresh', () => {
 
     expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
     expect(releaseCurrentViewHardHideForLiveSight).toHaveBeenCalledWith(token);
+    expect(observerViewStateForCurrentView).toHaveBeenCalledWith(token, {
+      includeObserved: true,
+    });
     expect(gmObserverView.afterCoreTokenRefresh).toHaveBeenCalledWith(token, {
       coreVisible: false,
       visionerState: 'undetected',

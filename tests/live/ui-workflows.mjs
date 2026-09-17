@@ -83,6 +83,50 @@ export async function drag(c, { commit = false, to = { x: 400, y: 100 } } = {}) 
   } finally { await page.mouse.up(); }
   await c.check(commit ? { observerX: to.x, observerY: to.y, clones: 0 } : { observerX: 400, observerY: 500, clones: 0 }, undefined, 'drag-finished');
 }
+
+export async function dragWithWaypoint(c, { subject, waypoint, to }) {
+  const page = c.gm;
+  await page.bringToFront();
+  await c.mutate('select', { subject });
+  const tokenId = c.fixture[subject];
+  await page.evaluate(id => {
+    canvas.tokens.activate();
+    canvas.tokens.get(id).control({ releaseOthers: true });
+  }, tokenId);
+  await page.waitForFunction(id => canvas.activeLayer === canvas.tokens && canvas.tokens.get(id)?.controlled, tokenId);
+  const points = await page.evaluate(({ tokenId, waypoint, to }) => {
+    const token = canvas.tokens.get(tokenId);
+    if (!token?.controlled) throw Error('Waypoint drag requires the moving token to be controlled');
+    const screenCenter = position => canvas.stage.toGlobal(new PIXI.Point(position.x + token.w / 2, position.y + token.h / 2));
+    return {
+      from: screenCenter({ x: token.document.x, y: token.document.y }),
+      waypoint: screenCenter(waypoint),
+      to: screenCenter(to),
+    };
+  }, { tokenId, waypoint, to });
+
+  await page.mouse.move(points.from.x, points.from.y);
+  await page.mouse.down();
+  try {
+    await page.mouse.move(points.waypoint.x, points.waypoint.y, { steps: 18 });
+    await page.waitForFunction(id => canvas.tokens.get(id)?.mouseInteractionManager?.interactionData?.contexts, tokenId);
+    await page.keyboard.press('KeyF');
+    const explicitWaypoints = await page.evaluate(id => {
+      const token = canvas.tokens.get(id);
+      const contexts = Object.values(token?.mouseInteractionManager?.interactionData?.contexts ?? {});
+      return contexts.flatMap(context => context.waypoints ?? []).filter(point => point.explicit).length;
+    }, tokenId);
+    c.equal(explicitWaypoints, 1, `${subject}-f-waypoint-recorded`);
+    await page.mouse.move(points.to.x, points.to.y, { steps: 18 });
+  } finally {
+    await page.mouse.up();
+  }
+  await c.check({
+    [`${subject === 'observer' ? 'observer' : 'target'}X`]: to.x,
+    [`${subject === 'observer' ? 'observer' : 'target'}Y`]: to.y,
+    clones: 0,
+  }, undefined, `${subject}-waypoint-drag-finished`);
+}
 export async function dragPreview(c) {
   await c.mutate('pillar');
   await c.check({ visible: false }, false);

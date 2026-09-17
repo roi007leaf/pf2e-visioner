@@ -5,6 +5,7 @@ const scenario = (name, workflow, options = {}) => ({ name, area: options.area ?
 export const automatedCases = [
   scenario('manager-directions', 'manager-directions', { area: 'manager', secondObserver: true }),
   scenario('drag-preview', 'drag-preview', { area: 'movement' }),
+  scenario('combat-wall-turn-movement', 'combat-wall-turn-movement', { area: 'movement', camera: { x: 650, y: 750, scale: 0.6 } }),
   scenario('hearing-tremorsense-rendered-transitions', 'indicator-transitions', { area: 'senses', senses: [] }),
   scenario('scent-preserves-rendered-background-tile', 'tile-presence-pixels', { area: 'rendering', senses: ['scent'] }),
   scenario('levels-pillar', 'levels-pillar', { area: 'levels', environment: { core: 14 } }),

@@ -98,6 +98,7 @@ export const workflows = {
   'tile-cover': c => behavior.geometryCover(c, 'tile'),
   'hazard-loot': ui.hazardLoot,
   'region-visibility': behavior.regionVisibility,
+  'combat-wall-turn-movement': behavior.combatWallTurnMovement,
   'rule-elements': features.ruleLifecycle,
   'rule-strike': features.ruleStrike,
   'strike-off-guard': features.strikeOffGuard,

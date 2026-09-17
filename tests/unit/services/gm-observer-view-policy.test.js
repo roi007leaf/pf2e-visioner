@@ -46,6 +46,16 @@ describe('GM Observer View presentation policy', () => {
     );
   });
 
+  it('trusts an explicit AVS observed result after Observer View detaches Core vision sources', () => {
+    expect(
+      resolveGmObserverTokenPresentation({
+        ...base,
+        coreVisible: false,
+        visionerState: 'observed',
+      }),
+    ).toBe('normal');
+  });
+
   it('uses outline-only hidden treatment for a Visioner-hidden token', () => {
     expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'hidden' })).toBe(
       'hidden',

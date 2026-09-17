@@ -551,7 +551,7 @@ function observerViewPresentationState(state, target) {
 }
 
 /** Return the best PF2e unseen state shared by every selected observer. */
-export function observerViewStateForCurrentView(target) {
+export function observerViewStateForCurrentView(target, { includeObserved = false } = {}) {
   if (!target?.document?.id) return null;
   if (isSceneTokenVisionDisabled()) return null;
   if (isSelectAllTokenVisibilityBypassActive()) return null;
@@ -572,7 +572,10 @@ export function observerViewStateForCurrentView(target) {
     const state = getStoredVisibilityState(observer, target);
     const presentationState = observerViewPresentationState(state, target);
     const manualOverrideHides = hasObserverViewManualUnseenOverride(observer, target);
-    if (!presentationState || (!automaticVisibilityActive && !manualOverrideHides)) return null;
+    if (!presentationState || (!automaticVisibilityActive && !manualOverrideHides)) {
+      if (includeObserved && automaticVisibilityActive && !presentationState) return 'observed';
+      return null;
+    }
     const rank = presentationState === 'hidden' ? 0 : presentationState === 'undetected' ? 1 : 2;
     if (rank < bestUnseenRank) {
       bestUnseenState = presentationState;

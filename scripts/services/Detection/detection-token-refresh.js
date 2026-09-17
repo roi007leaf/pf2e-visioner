@@ -158,7 +158,9 @@ function afterCoreRefresh(token, before) {
   if (!detectionFilterOwnsRenderSurface(token)) releaseDetectionFilterPrimaryMesh(token);
   const coreVisible = token?.visible === true;
   const observerViewActive = gmObserverView.isActive();
-  const visionerState = observerViewActive ? observerViewStateForCurrentView(token) : null;
+  const visionerState = observerViewActive
+    ? observerViewStateForCurrentView(token, { includeObserved: true })
+    : null;
 
   if (!observerViewActive && !shouldBypassAvsForGmVision()) {
     suppressNewFoundryHiddenVisibilityDuringMove(token, before);
