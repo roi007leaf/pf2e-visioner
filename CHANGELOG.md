@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.8.1] - 2026-09-17
+
+### Fixed
+
+- GM Observer View now keeps multi-level scene backgrounds visible. Active Core vision sources are detached from visual rendering while their token LOS geometry remains available for AVS relationship calculations, then restored when Observer View is disabled.
+- Observer View now reinitializes vision modes, lighting, sound, and occlusion after visual-source changes so Foundry rebuilds the canvas with the correct GM presentation.
+
+### Tests
+
+- Compared Observer View with native PF2e GM Vision on a live multi-level scene and confirmed the background remains rendered while the observer token and Visioner markings remain visible.
+- All 523 automated suites (4,961 tests) and lint passed.
+
 ## [8.8.0] - 2026-09-17
 
 ### Added

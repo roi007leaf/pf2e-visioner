@@ -60,6 +60,7 @@ let hatchFilterClass = null;
 let interfaceHatchFilterClass = null;
 let darknessColorState = null;
 let primaryVisionModeState = null;
+let detachedVisionSources = new Set();
 let modeIndicatorCleanup = null;
 
 function observerDarknessStrength() {
@@ -505,6 +506,38 @@ function expectedCoreVisibilityGroupState() {
   return !!canvas.effects?.visionSources?.some?.((source) => source?.active);
 }
 
+function detachVisualVisionSources() {
+  const sources = Array.from(globalThis.canvas?.effects?.visionSources ?? []);
+  let changed = false;
+  for (const source of sources) {
+    if (!source?.active || typeof source.remove !== 'function') continue;
+    source.remove();
+    if (source.active) continue;
+    detachedVisionSources.add(source);
+    changed = true;
+  }
+  return changed;
+}
+
+function restoreDetachedVisionSources() {
+  if (!detachedVisionSources.size) return false;
+  let changed = false;
+  for (const source of detachedVisionSources) {
+    try {
+      const object = source?.object;
+      if (source?.destroyed || object?.destroyed) continue;
+      if (object && 'vision' in object && object.vision !== source) continue;
+      if (typeof source?.add !== 'function') continue;
+      source.add();
+      changed = true;
+    } catch {
+      /* the source may have been replaced while Observer View was active */
+    }
+  }
+  detachedVisionSources = new Set();
+  return changed;
+}
+
 function restorePrimaryVisionModePresentation() {
   if (!primaryVisionModeState) return;
   try {
@@ -538,6 +571,8 @@ function syncPrimaryVisionModePresentation() {
 }
 
 function restoreCanvasPresentation() {
+  let darknessChanged = false;
+  const visionSourcesChanged = restoreDetachedVisionSources();
   restorePrimaryVisionModePresentation();
   const visibility = globalThis.canvas?.visibility;
   if (visibility && 'visible' in visibility) {
@@ -552,17 +587,19 @@ function restoreCanvasPresentation() {
       ) {
         darknessColorState.config.darknessColor = darknessColorState.originalColor;
         globalThis.canvas?.environment?.initialize?.();
+        darknessChanged = true;
       }
     } catch {
       /* canvas may already be torn down */
     }
     darknessColorState = null;
   }
+  return darknessChanged || visionSourcesChanged;
 }
 
 function syncDarknessColor() {
   const config = globalThis.CONFIG?.Canvas;
-  if (!config || !('darknessColor' in config)) return;
+  if (!config || !('darknessColor' in config)) return false;
   const observerColor = globalThis.CONFIG?.PF2E?.Canvas?.darkness?.gmVision ?? 0xd1d1ff;
 
   if (darknessColorState?.config !== config) {
@@ -582,7 +619,7 @@ function syncDarknessColor() {
     observerDarknessStrength(),
   );
   darknessColorState.appliedColor = appliedColor;
-  if (config.darknessColor === appliedColor) return;
+  if (config.darknessColor === appliedColor) return false;
 
   config.darknessColor = appliedColor;
   try {
@@ -590,19 +627,20 @@ function syncDarknessColor() {
   } catch {
     /* environment may still be drawing */
   }
+  return true;
 }
 
 function syncCanvasPresentation() {
   if (!gmObserverView.isActive()) {
-    restoreCanvasPresentation();
-    return false;
+    return { active: false, darknessChanged: restoreCanvasPresentation() };
   }
 
+  const visionSourcesChanged = detachVisualVisionSources();
   const visibility = globalThis.canvas?.visibility;
   if (visibility && 'visible' in visibility) visibility.visible = false;
-  syncDarknessColor();
+  const darknessChanged = syncDarknessColor();
   syncPrimaryVisionModePresentation();
-  return true;
+  return { active: true, darknessChanged, visionSourcesChanged };
 }
 
 function refreshSceneControls() {
@@ -808,9 +846,12 @@ function syncModeIndicator(active) {
   modeIndicatorCleanup = makeModeIndicatorDraggable(indicator);
 }
 
-function schedulePerceptionRefresh() {
+function schedulePerceptionRefresh({ refreshLighting = false } = {}) {
   scheduleCanvasPerceptionUpdate({
+    initializeVisionModes: true,
     refreshVision: true,
+    ...(refreshLighting ? { refreshLighting: true } : {}),
+    refreshSounds: true,
     refreshOcclusion: true,
   });
 }
@@ -870,16 +911,19 @@ export const gmObserverView = {
   },
 
   syncCanvas() {
-    return syncCanvasPresentation();
+    const result = syncCanvasPresentation();
+    if (result.visionSourcesChanged) schedulePerceptionRefresh({ refreshLighting: true });
+    return result.active;
   },
 
   refresh({ perception = true } = {}) {
-    if (!this.isActive()) this.clear({ restoreCanvas: true });
+    let refreshLighting = false;
+    if (!this.isActive()) refreshLighting = this.clear({ restoreCanvas: true });
     else {
-      syncCanvasPresentation();
+      ({ darknessChanged: refreshLighting } = syncCanvasPresentation());
       syncModeIndicator(true);
     }
-    if (perception) schedulePerceptionRefresh();
+    if (perception) schedulePerceptionRefresh({ refreshLighting });
     refreshSceneControls();
   },
 
@@ -894,8 +938,10 @@ export const gmObserverView = {
     ownedTokenFilters = new WeakMap();
     ownedTokenOutlines = new WeakMap();
     syncModeIndicator(false);
-    if (restoreCanvas) restoreCanvasPresentation();
-    else primaryVisionModeState = null;
+    if (restoreCanvas) return restoreCanvasPresentation();
+    primaryVisionModeState = null;
+    detachedVisionSources = new Set();
+    return false;
   },
 
   async setEnabled(enabled) {

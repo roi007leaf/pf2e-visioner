@@ -1,6 +1,10 @@
 import '../../setup.js';
 
 import { gmObserverView } from '../../../scripts/services/GmObserverView/gm-observer-view.js';
+import {
+  clearScheduledCanvasPerceptionUpdate,
+  flushScheduledCanvasPerceptionUpdate,
+} from '../../../scripts/helpers/perception-refresh.js';
 import { setCachedSettingValue } from '../../../scripts/utils/setting-value-cache.js';
 
 const INDICATOR_POSITION_KEY = 'pf2e-visioner-gm-observer-indicator-pos';
@@ -133,6 +137,7 @@ describe('GM Observer View token presentation', () => {
   });
 
   afterEach(() => {
+    clearScheduledCanvasPerceptionUpdate();
     gmObserverView.clear();
     globalThis.localStorage?.removeItem(INDICATOR_POSITION_KEY);
     jest.restoreAllMocks();
@@ -494,13 +499,28 @@ describe('GM Observer View token presentation', () => {
     expect(gmObserverView.isActive()).toBe(false);
   });
 
-  it('reveals fog and lightens ambient darkness without changing active vision sources', () => {
-    const visionSource = { active: true };
+  it('detaches the visual vision source without destroying observer geometry', () => {
+    const observer = globalThis.canvas.tokens.controlled[0];
+    const visionSources = [];
+    const visionSource = {
+      active: true,
+      object: observer,
+      remove: jest.fn(() => {
+        visionSources.splice(visionSources.indexOf(visionSource), 1);
+        visionSource.active = false;
+      }),
+      add: jest.fn(() => {
+        visionSources.push(visionSource);
+        visionSource.active = true;
+      }),
+    };
+    observer.vision = visionSource;
+    visionSources.push(visionSource);
     globalThis.canvas.scene = { tokenVision: true };
     globalThis.canvas.visibility = { visible: true };
     globalThis.canvas.effects = {
       darkness: { alpha: 1 },
-      visionSources: [visionSource],
+      visionSources,
     };
 
     gmObserverView.syncCanvas();
@@ -508,13 +528,53 @@ describe('GM Observer View token presentation', () => {
     expect(globalThis.canvas.visibility.visible).toBe(false);
     expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
     expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x4b4b58);
-    expect(visionSource.active).toBe(true);
+    expect(visionSource.remove).toHaveBeenCalledTimes(1);
+    expect(visionSources).toEqual([]);
+    expect(observer.vision).toBe(visionSource);
 
     gmObserverView.clear();
     expect(globalThis.canvas.visibility.visible).toBe(true);
     expect(globalThis.canvas.effects.darkness.alpha).toBe(1);
     expect(globalThis.CONFIG.Canvas.darknessColor).toBe(0x111111);
+    expect(visionSource.add).toHaveBeenCalledTimes(1);
+    expect(visionSources).toEqual([visionSource]);
+    expect(observer.vision).toBe(visionSource);
     expect(globalThis.canvas.environment.initialize).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes multi-level lighting after changing Observer View darkness color', () => {
+    const update = jest.fn();
+    globalThis.canvas.scene = {
+      tokenVision: true,
+      levels: new Map([
+        ['ground', {}],
+        ['upper', {}],
+      ]),
+    };
+    globalThis.canvas.visibility = { visible: true };
+    globalThis.canvas.effects = {
+      darkness: { alpha: 1 },
+      visionSources: [{ active: true }],
+    };
+    globalThis.canvas.perception = {
+      update,
+      constructor: {
+        RENDER_FLAGS: {
+          refreshVision: {},
+          refreshLighting: {},
+          refreshOcclusion: {},
+        },
+      },
+    };
+
+    gmObserverView.refresh();
+    flushScheduledCanvasPerceptionUpdate();
+
+    expect(update).toHaveBeenCalledWith({
+      refreshVision: true,
+      refreshLighting: true,
+      refreshOcclusion: true,
+    });
   });
 
   it('updates ambient darkness strength live without reinitializing unchanged colors', () => {
