@@ -99,6 +99,7 @@ export const workflows = {
   'hazard-loot': ui.hazardLoot,
   'region-visibility': behavior.regionVisibility,
   'combat-wall-turn-movement': behavior.combatWallTurnMovement,
+  'gm-observer-hidden-concealed-rendering': behavior.gmObserverHiddenConcealedRendering,
   'rule-elements': features.ruleLifecycle,
   'rule-strike': features.ruleStrike,
   'strike-off-guard': features.strikeOffGuard,

@@ -4,7 +4,11 @@ import { validateCases, casePassed } from './coverage.mjs';
 import { fullCases } from './cases.mjs';
 import { workflows, executeWorkflow } from './workflows.mjs';
 import { verifySamplingArea } from './visual-surface.mjs';
-import { detectionPattern } from './artwork.mjs';
+import {
+  detectionPattern,
+  gmObserverHiddenCompositePattern,
+  stateOutlinePattern,
+} from './artwork.mjs';
 
 test('an obscured screenshot cannot pass as absent token artwork', async () => {
   await assert.rejects(verifySamplingArea({ evaluate: async () => ['DIALOG'] }, {}), /obstructed/);
@@ -24,6 +28,34 @@ test('missing soundwaves fail; hearing rejects colored linework', () => {
     assert.equal(result.visible, true);
     assert.equal(result.neutral, color[1] > 0);
   }
+});
+
+test('GM Observer state outline pixels require the requested visible color', () => {
+  const png = { width: 100, height: 100, data: Buffer.alloc(100 * 100 * 4) };
+  const rect = { x: 10, y: 10, width: 80, height: 80 };
+  assert.equal(stateOutlinePattern(png, rect, 'orange').visible, false);
+  for (const [expected, color] of [['orange', [255, 102, 0]], ['yellow', [255, 193, 7]]]) {
+    png.data.fill(0);
+    for (let x = 10; x <= 90; x++) png.data.set([...color, 255], (10 * 100 + x) * 4);
+    assert.equal(stateOutlinePattern(png, rect, expected).visible, true);
+  }
+});
+
+test('GM Observer Hidden pixels require recognizable art and soundwave variation', () => {
+  const png = { width: 100, height: 100, data: Buffer.alloc(100 * 100 * 4) };
+  const rect = { x: 10, y: 10, width: 80, height: 80 };
+  const colors = [[0, 180, 0], [180, 0, 0], [0, 0, 180]];
+  for (let y = 10; y < 90; y++) for (let x = 10; x < 90; x++) {
+    png.data.set([...colors[Math.min(2, Math.floor((x - 10) / (80 / 3)))], 255], (y * 100 + x) * 4);
+  }
+  assert.deepEqual(gmObserverHiddenCompositePattern(png, rect), {
+    visible: false, artwork: true, soundwaves: false, luminance: [129, 38, 13], ranges: [0, 0, 0],
+  });
+  for (let y = 26; y < 74; y += 6) for (let x = 20; x < 80; x++) {
+    const offset = (y * 100 + x) * 4;
+    for (let channel = 0; channel < 3; channel++) png.data[offset + channel] = Math.min(255, png.data[offset + channel] + 35);
+  }
+  assert.equal(gmObserverHiddenCompositePattern(png, rect).visible, true);
 });
 
 test('all full-suite cases are executable, with no manual steps or undefined workflows', () => {

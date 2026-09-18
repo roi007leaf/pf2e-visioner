@@ -97,6 +97,25 @@ describe('currentViewObservers', () => {
     expect(currentViewObservers().map((t) => t.document.id)).toEqual(['a']);
   });
 
+  it('excludes defeated controlled and dragged tokens from detecting', () => {
+    const deadControlled = {
+      document: { id: 'dead-controlled' },
+      actor: { type: 'character', isDead: true, hitPoints: { value: 10 } },
+    };
+    const deadDragged = {
+      document: { id: 'dead-dragged' },
+      actor: { type: 'npc', hitPoints: { value: 0 } },
+    };
+    const living = {
+      document: { id: 'living' },
+      actor: { type: 'character', hitPoints: { value: 10 } },
+    };
+    draggedToken = deadDragged;
+    controlled.push(deadControlled, living);
+
+    expect(currentViewObservers().map((t) => t.document.id)).toEqual(['living']);
+  });
+
   it('returns no Visioner observers when scene Token Vision is disabled', () => {
     const a = { document: { id: 'a' } };
     controlled.push(a);
@@ -497,6 +516,24 @@ describe('targetIsUnseenByEveryCurrentViewObserver', () => {
     expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(false);
     expect(observerViewStateForCurrentView(target)).toBeNull();
     expect(observerViewStateForCurrentView(target, { includeObserved: true })).toBe('observed');
+  });
+
+  it('preserves concealed for GM Observer presentation without treating it as unseen', () => {
+    const target = {
+      controlled: false,
+      document: { id: 'target', hidden: false },
+      actor: { type: 'npc', itemTypes: { condition: [] } },
+    };
+    __setStoredVisibilityForTest(
+      new Map([
+        ['observer-a:target', 'hidden'],
+        ['observer-b:target', 'concealed'],
+      ]),
+    );
+
+    expect(targetIsUnseenByEveryCurrentViewObserver(target)).toBe(false);
+    expect(observerViewStateForCurrentView(target)).toBeNull();
+    expect(observerViewStateForCurrentView(target, { includeObserved: true })).toBe('concealed');
   });
 
   it('reports unseen when every selected observer has an undetected state', () => {

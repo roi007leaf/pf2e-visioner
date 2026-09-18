@@ -20,6 +20,7 @@ import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js'
 import { isVisualSenseType } from '../visibility/StatelessVisibilityCalculator.js';
 import { isPartyActorToken } from '../utils/token-actor.js';
 import { releaseDetectionFilterMesh, suppressDetectionFilterMesh } from './Detection/detection-filter-mesh-suppression.js';
+import { hasGmObserverHiddenPresentation } from './GmObserverView/gm-observer-view.js';
 
 let running = false;
 let cachedSoundwaveFilter = null;
@@ -324,6 +325,9 @@ function showControlledTokenFullArt(target) {
 
 function suppressCoreInvisibleHardHiddenTarget(target, { requireRemembered = true } = {}) {
   if (!target || target.controlled) return false;
+  // GM Observer View deliberately detaches Core vision sources and owns this Hidden ripple.
+  // Reading Token#isVisible here would make Core clear that owned filter on every settle frame.
+  if (hasGmObserverHiddenPresentation(target)) return false;
   if (requireRemembered && !previouslySoundwaveDetectedTargets.has(target)) return false;
   let coreVisible = true;
   try {

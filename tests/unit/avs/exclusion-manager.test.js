@@ -25,11 +25,19 @@ describe('ExclusionManager observer/target role split', () => {
     expect(mgr.isExcludedAsTarget(living)).toBe(false);
   });
 
-  test('defeated PC is exempt: not defeated, not excluded in either role', () => {
+  test('defeated PC is excluded as observer but remains eligible as target', () => {
     const downedPc = npcToken({ id: 'pc', hp: 0, type: 'character' });
-    expect(mgr.isDefeatedToken(downedPc)).toBe(false);
-    expect(mgr.isExcludedToken(downedPc)).toBe(false);
+    expect(mgr.isDefeatedToken(downedPc)).toBe(true);
+    expect(mgr.isExcludedToken(downedPc)).toBe(true);
     expect(mgr.isExcludedAsTarget(downedPc)).toBe(false);
+  });
+
+  test('PF2e actor isDead excludes observer even when HP is positive', () => {
+    const corpse = npcToken({ id: 'dead-flag', hp: 12, type: 'character' });
+    corpse.actor.isDead = true;
+    expect(mgr.isDefeatedToken(corpse)).toBe(true);
+    expect(mgr.isExcludedToken(corpse)).toBe(true);
+    expect(mgr.isExcludedAsTarget(corpse)).toBe(false);
   });
 
   test('GM-hidden token stays excluded in both roles', () => {

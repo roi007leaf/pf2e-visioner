@@ -265,6 +265,15 @@ export async function snapshot(fixture) {
   const { HoverTooltips } = await import('../../scripts/services/HoverTooltips.js');
   const modes = CONFIG.Canvas.detectionModes;
   const filter = target.detectionFilter;
+  const observerOutline = target.children?.find?.(
+    child => child?.name === 'PF2E Visioner GM Observer State Outline',
+  );
+  const outlineColor = observerOutline?._pvStateOutlineFilter?.uniforms?.outlineColor;
+  const outlineColorNumber = Array.isArray(outlineColor) || ArrayBuffer.isView(outlineColor)
+    ? ((Math.round(Number(outlineColor[0]) * 255) << 16) |
+      (Math.round(Number(outlineColor[1]) * 255) << 8) |
+      Math.round(Number(outlineColor[2]) * 255))
+    : null;
   const point = target.getGlobalPosition();
   const scale = canvas.stage.scale.x;
   return {
@@ -276,6 +285,11 @@ export async function snapshot(fixture) {
     autoCover: game.settings.get(MODULE, 'autoCover') ? api.getAutoCoverState(observer, target) : null,
     observerSenses: Array.from(observer.actor.system.perception.senses).map(s => ({ type: s.type, acuity: s.acuity, range: s.range })),
     visible: target.visible, meshVisible: target.mesh?.visible, meshRenderable: target.mesh?.renderable,
+    gmObserverPresentation: target._pvGmObserverViewPresentation ?? null,
+    gmObserverOutlineColor: outlineColorNumber,
+    gmObserverOutlineVisible: !!(observerOutline?.visible && observerOutline?.renderable && observerOutline?.worldVisible),
+    detectionMeshVisible: target.detectionFilterMesh?.visible ?? null,
+    detectionMeshRenderable: target.detectionFilterMesh?.renderable ?? null,
     presenceMode: target._pvSystemHiddenIndicator?._pvIndicatorMode ?? null,
     presenceVisible: !!(target._pvSystemHiddenIndicator?.worldVisible && target._pvSystemHiddenIndicator?.renderable && target._pvSystemHiddenIndicator?.worldAlpha > 0),
     meshAlpha: target.mesh?.alpha, meshTint: target.mesh?.tint,

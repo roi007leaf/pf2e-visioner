@@ -56,6 +56,12 @@ describe('GM Observer View presentation policy', () => {
     ).toBe('normal');
   });
 
+  it('uses outline-only concealed treatment for a Visioner-concealed token', () => {
+    expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'concealed' })).toBe(
+      'concealed',
+    );
+  });
+
   it('uses outline-only hidden treatment for a Visioner-hidden token', () => {
     expect(resolveGmObserverTokenPresentation({ ...base, visionerState: 'hidden' })).toBe(
       'hidden',

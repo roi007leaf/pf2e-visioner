@@ -367,6 +367,28 @@ describe('settleSoundwaveOverrides (post-move handoff without an observed flash)
     expect(isOverridden(t)).toBe(true);
     expect(t.detectionFilter).toEqual(mockFilter);
   });
+
+  test('does not let settle visibility clear a GM Observer Hidden soundwave', () => {
+    const t = overriddenTarget('gm-observer-hidden');
+    removeSoundwaveFilterOverride(t);
+    t._pvGmObserverViewPresentation = 'hidden';
+    t.detectionFilter = mockFilter;
+    let visibilityReads = 0;
+    Object.defineProperty(t, 'isVisible', {
+      configurable: true,
+      get() {
+        visibilityReads += 1;
+        this.detectionFilter = null;
+        return false;
+      },
+    });
+    globalThis.canvas = { tokens: { controlled: [], preview: { children: [] } } };
+
+    settleSoundwaveOverrides();
+
+    expect(visibilityReads).toBe(0);
+    expect(t.detectionFilter).toBe(mockFilter);
+  });
 });
 
 describe('observerSightContainsTarget (live vision polygon contains the target center)', () => {

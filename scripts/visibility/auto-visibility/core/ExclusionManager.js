@@ -1,5 +1,8 @@
 
-import { isTokenInEncounter } from '../../../chat/services/infra/shared-utils.js';
+import {
+    isTokenDefeated,
+    isTokenInEncounter,
+} from '../../../chat/services/infra/shared-utils.js';
 import { MODULE_ID } from '../../../constants.js';
 import { isPartyActorToken } from '../../../utils/token-actor.js';
 
@@ -211,43 +214,7 @@ export class ExclusionManager {
      */
     _isDefeatedToken(token) {
         try {
-            const actor = token.actor;
-            if (!actor) return false;
-
-            // Only exclude player characters (PCs), not NPCs
-            if (actor.type === 'character') return false;
-
-            // HP based check (covers 0 or negative)
-            const hpValue = actor.hitPoints?.value ?? actor.system?.attributes?.hp?.value;
-            if (typeof hpValue === 'number' && hpValue <= 0) {
-                return true;
-            }
-
-            // Condition-based check (PF2e conditions use itemTypes.condition or conditions array)
-            const conditionSlugs = new Set();
-
-            if (Array.isArray(actor.itemTypes?.condition)) {
-                for (const c of actor.itemTypes.condition) {
-                    if (c?.slug) conditionSlugs.add(c.slug);
-                    else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
-                }
-            }
-
-            if (Array.isArray(actor.conditions)) {
-                for (const c of actor.conditions) {
-                    if (c?.slug) conditionSlugs.add(c.slug);
-                    else if (typeof c?.name === 'string') conditionSlugs.add(c.name.toLowerCase());
-                }
-            }
-
-            const defeatedSlugs = ['unconscious', 'dead', 'dying'];
-            for (const slug of defeatedSlugs) {
-                if (conditionSlugs.has(slug)) {
-                    return true;
-                }
-            }
-
-            return false;
+            return isTokenDefeated(token);
         } catch {
             return false;
         }

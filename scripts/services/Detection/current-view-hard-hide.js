@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { isTokenDefeated } from '../../chat/services/infra/shared-utils.js';
 import { hasActivePendingTokenMovement } from '../movement-tracking.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { gmObserverView } from '../GmObserverView/gm-observer-view.js';
@@ -46,7 +47,7 @@ export function currentViewObservers() {
   const seen = new Set();
   const add = (token) => {
     const id = tokenIdOf(token);
-    if (!id || seen.has(id)) return;
+    if (!id || seen.has(id) || isTokenDefeated(token)) return;
     seen.add(id);
     observers.push(token);
   };
@@ -543,6 +544,7 @@ function hasObserverViewManualUnseenOverride(observer, target) {
  * relevant observer's Visioner state hides it. The ordinary hard-hide policy remains unchanged.
  */
 function observerViewPresentationState(state, target) {
+  if (state === 'concealed') return 'concealed';
   if (state === 'hidden') {
     return hiddenStateShouldRenderHideTarget(target) ? 'undetected' : 'hidden';
   }
@@ -576,7 +578,14 @@ export function observerViewStateForCurrentView(target, { includeObserved = fals
       if (includeObserved && automaticVisibilityActive && !presentationState) return 'observed';
       return null;
     }
-    const rank = presentationState === 'hidden' ? 0 : presentationState === 'undetected' ? 1 : 2;
+    if (presentationState === 'concealed' && !includeObserved) return null;
+    const rank = presentationState === 'concealed'
+      ? -1
+      : presentationState === 'hidden'
+        ? 0
+        : presentationState === 'undetected'
+          ? 1
+          : 2;
     if (rank < bestUnseenRank) {
       bestUnseenState = presentationState;
       bestUnseenRank = rank;

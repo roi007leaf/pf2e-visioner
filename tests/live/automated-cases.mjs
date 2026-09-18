@@ -7,6 +7,9 @@ export const automatedCases = [
   scenario('drag-preview', 'drag-preview', { area: 'movement' }),
   scenario('combat-wall-turn-movement', 'combat-wall-turn-movement', { area: 'movement', camera: { x: 650, y: 750, scale: 0.6 } }),
   scenario('hearing-tremorsense-rendered-transitions', 'indicator-transitions', { area: 'senses', senses: [] }),
+  scenario('gm-observer-hidden-concealed-rendering', 'gm-observer-hidden-concealed-rendering', {
+    area: 'rendering', senses: [], darkness: true,
+  }),
   scenario('scent-preserves-rendered-background-tile', 'tile-presence-pixels', { area: 'rendering', senses: ['scent'] }),
   scenario('levels-pillar', 'levels-pillar', { area: 'levels', environment: { core: 14 } }),
   scenario('levels-surfaces-floor-occlusion', 'floor-occlusion', { area: 'levels', environment: { core: 14 } }),

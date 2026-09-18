@@ -74,6 +74,137 @@ export async function combatWallTurnMovement(c) {
   await c.check({ state: 'observed', reverseState: 'observed', visible: true }, undefined, 'second-mover-sees-first');
   await c.check({ state: 'observed', visible: true, meshVisible: true, meshRenderable: true }, undefined, 'gm-observer-renders-first', { session: 'gm' });
 }
+
+export async function gmObserverHiddenConcealedRendering(c) {
+  await c.mutate('gm-observer-view', true);
+  await c.check({
+    state: 'hidden',
+    sense: 'hearing',
+    gmObserverPresentation: 'hidden',
+    gmObserverOutlineColor: 0xff6600,
+    gmObserverOutlineVisible: true,
+    detectionMeshVisible: true,
+    detectionMeshRenderable: true,
+  }, undefined, 'hidden-keeps-soundwaves-under-orange-outline', { session: 'gm' });
+  await c.hiddenObserverComposite();
+  await c.stateOutline('orange');
+  const selectionFrames = await c.gm.evaluate(async f => {
+    const observer = canvas.tokens.get(f.observer);
+    const target = canvas.tokens.get(f.target);
+    const renderer = canvas.app.renderer;
+    if (!observer?.controlled || !target || !renderer?.on || !renderer?.off) {
+      throw Error('Selected GM Observer fixture and PIXI render events required');
+    }
+    const samples = [];
+    const stack = [];
+    let phase = 'selected';
+    const before = () => stack.push(renderer.renderingToScreen);
+    const after = () => {
+      const screen = stack.pop();
+      if (!screen || stack.length) return;
+      const outline = target.children?.find?.(
+        child => child?.name === 'PF2E Visioner GM Observer State Outline',
+      );
+      samples.push({
+        phase,
+        controlled: observer.controlled,
+        presentation: target._pvGmObserverViewPresentation ?? null,
+        token: target.visible === true && target.renderable === true,
+        art: target.mesh?.visible === true && target.mesh?.renderable === true,
+        wave: target.detectionFilterMesh?.visible === true &&
+          target.detectionFilterMesh?.renderable === true,
+        outline: outline?.visible === true && outline?.renderable === true &&
+          outline?.worldVisible === true,
+      });
+    };
+    const waitFrames = count => new Promise((resolve, reject) => {
+      const start = samples.length;
+      const timeout = setTimeout(() => reject(Error('Selection render sampling timed out')), 5000);
+      const poll = () => {
+        if (samples.length - start >= count) {
+          clearTimeout(timeout);
+          resolve();
+        } else requestAnimationFrame(poll);
+      };
+      requestAnimationFrame(poll);
+    });
+    renderer.on('prerender', before);
+    renderer.on('postrender', after);
+    try {
+      for (let cycle = 0; cycle < 5; cycle++) {
+        phase = `released-${cycle}`;
+        observer.release();
+        await waitFrames(2);
+        phase = `selected-${cycle}`;
+        observer.control({ releaseOthers: true });
+        await waitFrames(2);
+      }
+      await waitFrames(2);
+    } finally {
+      renderer.off('prerender', before);
+      renderer.off('postrender', after);
+      if (!observer.controlled) observer.control({ releaseOthers: true });
+    }
+    return samples;
+  }, c.fixture);
+  const blankFrames = selectionFrames.filter(frame => !frame.token || (!frame.art && !frame.wave));
+  const brokenHiddenFrames = selectionFrames.filter(frame => frame.presentation === 'hidden' &&
+    (!frame.art || !frame.wave || !frame.outline));
+  c.assert(selectionFrames.length >= 22,
+    `Selection sampler captured painted frames: ${selectionFrames.length}`);
+  c.equal(blankFrames, [], 'No blank target frames during GM Observer select/deselect');
+  c.equal(brokenHiddenFrames, [], 'Every painted Hidden frame keeps art, wave, and outline');
+  c.assert(selectionFrames.some(frame => frame.phase.startsWith('released-')) &&
+    selectionFrames.some(frame => frame.phase.startsWith('selected-')),
+  'Sampler covered both deselected and selected phases');
+  await c.check({
+    state: 'hidden',
+    gmObserverPresentation: 'hidden',
+    gmObserverOutlineVisible: true,
+    detectionMeshVisible: true,
+  }, undefined, 'selection-cycle-settles-hidden', { session: 'gm' });
+  const reselectRender = await c.gm.evaluate(async f => {
+    const target = canvas.tokens.get(f.target);
+    const mesh = target?.detectionFilterMesh;
+    let calls = 0;
+    const original = target?._renderDetectionFilter;
+    if (typeof original === 'function') {
+      target._renderDetectionFilter = function (...args) {
+        calls += 1;
+        return original.apply(this, args);
+      };
+    }
+    try {
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    } finally {
+      if (typeof original === 'function') target._renderDetectionFilter = original;
+    }
+    return {
+      calls,
+      filter: target?.detectionFilter?.constructor?.name ?? null,
+      filterEnabled: target?.detectionFilter?.enabled ?? null,
+      meshParent: mesh?.parent === target,
+      meshWorldVisible: mesh?.worldVisible ?? null,
+      meshVisible: mesh?.visible ?? null,
+      meshRenderable: mesh?.renderable ?? null,
+      meshAlpha: mesh?.alpha ?? null,
+    };
+  }, c.fixture);
+  c.assert(reselectRender.calls > 0,
+    `Reselected soundwave render probe: ${JSON.stringify(reselectRender)}`);
+  await c.hiddenObserverComposite();
+
+  await c.mutate('state', 'concealed');
+  await c.check({
+    state: 'concealed',
+    gmObserverPresentation: 'concealed',
+    gmObserverOutlineColor: 0xffc107,
+    gmObserverOutlineVisible: true,
+    detectionMeshVisible: false,
+    detectionMeshRenderable: false,
+  }, undefined, 'concealed-uses-yellow-outline-without-soundwaves', { session: 'gm' });
+  await c.stateOutline('yellow');
+}
 export async function geometryCover(c, type) {
   await c.mutate('cover-geometry', { type });
   const allowGreater = await c.gm.evaluate(() => game.settings.get('pf2e-visioner', 'wallCoverAllowGreater'));

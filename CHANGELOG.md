@@ -1,5 +1,18 @@
 # Changelog
 
+## [8.8.4] - 2026-09-18
+
+### Fixed
+
+- Defeated, dead, dying, unconscious, and zero-HP tokens no longer act as AVS observers or GM Observer View sources. Corpses remain valid visibility targets for living observers.
+- GM Observer View now keeps hearing and tremorsense soundwaves visible for Hidden tokens while layering the orange Hidden outline above them. Deselecting and reselecting an observer no longer makes the soundwaves flicker or disappear: the movement-settle loop now preserves the GM Observer-owned filter instead of asking Core to retest and clear it.
+- Concealed tokens now receive a yellow outline in GM Observer View without diagonal hatching or soundwaves.
+
+### Tests
+
+- Added regression coverage for defeated observer exclusion and corpse target eligibility, plus a real two-client GM Observer View scenario that verifies Hidden artwork, soundwave, and orange-outline pixels, checks every painted frame across five select/deselect cycles, confirms the soundwave filter renders after reselect, then transitions the same target to a yellow-outlined Concealed state without soundwaves.
+- All 523 automated suites (4,973 tests), 54 live-harness checks, lint, and the focused GM Observer View live scenario passed with complete fixture cleanup.
+
 ## [8.8.3] - 2026-09-17
 
 ### Fixed

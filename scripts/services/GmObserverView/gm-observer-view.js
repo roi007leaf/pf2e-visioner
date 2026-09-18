@@ -1,6 +1,8 @@
 import { MODULE_ID } from '../../constants.js';
+import { isTokenDefeated } from '../../chat/services/infra/shared-utils.js';
 import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh.js';
 import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
+import { getDetectionBetween } from '../../stores/detection-map.js';
 import { resolveGmObserverTokenPresentation } from './gm-observer-view-policy.js';
 
 const SETTING_KEY = 'gmObserverView';
@@ -15,6 +17,13 @@ const ACTIVE_BODY_CLASS = 'pf2e-visioner-gm-observer-view-active';
 const HIDDEN_FILTER_UNIFORMS = Object.freeze({
   stripeColor: [1, 0.4, 0],
   outlineColor: [1, 0.4, 0],
+  stripeOpacity: 0,
+  muteAmount: 0.25,
+  brightness: 0.82,
+});
+const CONCEALED_FILTER_UNIFORMS = Object.freeze({
+  stripeColor: [1, 0xc1 / 0xff, 0x07 / 0xff],
+  outlineColor: [1, 0xc1 / 0xff, 0x07 / 0xff],
   stripeOpacity: 0,
   muteAmount: 0.25,
   brightness: 0.82,
@@ -34,11 +43,13 @@ const UNNOTICED_FILTER_UNIFORMS = Object.freeze({
   brightness: 0.72,
 });
 const STATE_FILTER_UNIFORMS = Object.freeze({
+  concealed: CONCEALED_FILTER_UNIFORMS,
   hidden: HIDDEN_FILTER_UNIFORMS,
   undetected: UNDETECTED_FILTER_UNIFORMS,
   unnoticed: UNNOTICED_FILTER_UNIFORMS,
 });
 const STATE_INTERFACE_OUTLINE_COLORS = Object.freeze({
+  concealed: 0xffc107,
   hidden: 0xff6600,
   undetected: 0xf44336,
   unnoticed: 0x9c27b0,
@@ -63,6 +74,10 @@ let primaryVisionModeState = null;
 let detachedVisionSources = new Set();
 let restoringDetachedVisionSources = 0;
 let modeIndicatorCleanup = null;
+
+export function hasGmObserverHiddenPresentation(token) {
+  return token?.[TOKEN_PRESENTATION_KEY] === 'hidden';
+}
 
 function observerDarknessStrength() {
   const configured = Number(
@@ -93,7 +108,8 @@ function mixRgbColors(fromColor, toColor, amount) {
 
 function hasCurrentObservers() {
   const tokens = globalThis.canvas?.tokens;
-  return !!tokens?._draggedToken || (tokens?.controlled?.length ?? 0) > 0;
+  if (tokens?._draggedToken && !isTokenDefeated(tokens._draggedToken)) return true;
+  return (tokens?.controlled ?? []).some((token) => !isTokenDefeated(token));
 }
 
 function isPreviewToken(token) {
@@ -315,6 +331,7 @@ function colorNumberToRgb(color) {
 function attachOwnedOutline(token, presentation) {
   const color = STATE_INTERFACE_OUTLINE_COLORS[presentation];
   const Container = globalThis.PIXI?.Container;
+  const Sprite = globalThis.PIXI?.Sprite;
   const FilterClass =
     globalThis.foundry?.canvas?.rendering?.filters?.OutlineOverlayFilter;
   const HatchFilterClass = getInterfaceHatchFilterClass();
@@ -348,16 +365,28 @@ function attachOwnedOutline(token, presentation) {
 
     const container = new Container();
     container.name = 'PF2E Visioner GM Observer State Outline';
-    container.updateTransform = () => {};
-    container.render = (renderer) => {
-      if (Number(hatchFilter.uniforms.stripeOpacity) > 0) {
-        renderTokenMeshWithFilter(mesh, hatchFilter, renderer);
+    let outlineSprite = null;
+    if (typeof Sprite === 'function' && mesh.texture && typeof container.addChild === 'function') {
+      try {
+        outlineSprite = new Sprite({ texture: mesh.texture });
+      } catch {
+        outlineSprite = new Sprite(mesh.texture);
       }
-      renderTokenMeshWithFilter(mesh, outlineFilter, renderer);
-    };
+      outlineSprite.filters = [outlineFilter];
+      outlineSprite.eventMode = 'none';
+      container.addChild(outlineSprite);
+    } else {
+      container.updateTransform = () => {};
+      container.render = (renderer) => {
+        if (Number(hatchFilter.uniforms.stripeOpacity) > 0) {
+          renderTokenMeshWithFilter(mesh, hatchFilter, renderer);
+        }
+        renderTokenMeshWithFilter(mesh, outlineFilter, renderer);
+      };
+    }
     container._pvStateOutlineFilter = outlineFilter;
     container._pvStateHatchFilter = hatchFilter;
-    owned = { container, outlineFilter, hatchFilter, mesh };
+    owned = { container, outlineFilter, hatchFilter, outlineSprite, mesh };
     ownedTokenOutlines.set(token, owned);
   }
 
@@ -365,7 +394,7 @@ function attachOwnedOutline(token, presentation) {
     const showHatch = (STATE_FILTER_UNIFORMS[presentation]?.stripeOpacity ?? 0) > 0;
     Object.assign(owned.outlineFilter.uniforms, {
       outlineColor: colorNumberToRgba(color),
-      knockout: true,
+      knockout: presentation !== 'hidden',
       wave: false,
     });
     Object.assign(owned.hatchFilter.uniforms, {
@@ -377,14 +406,31 @@ function attachOwnedOutline(token, presentation) {
       keylineWidth: INTERFACE_HATCH_STYLE.keylineWidth,
       highlightMix: INTERFACE_HATCH_STYLE.highlightMix,
     });
+    if (owned.outlineSprite) {
+      const sprite = owned.outlineSprite;
+      sprite.texture = mesh.texture;
+      const localX = Number(mesh.position?.x ?? 0) - Number(token.position?.x ?? 0);
+      const localY = Number(mesh.position?.y ?? 0) - Number(token.position?.y ?? 0);
+      sprite.position?.set?.(localX, localY);
+      sprite.anchor?.copyFrom?.(mesh.anchor);
+      sprite.pivot?.copyFrom?.(mesh.pivot);
+      sprite.skew?.copyFrom?.(mesh.skew);
+      sprite.rotation = mesh.rotation ?? 0;
+      if (Number.isFinite(mesh.width)) sprite.width = mesh.width;
+      if (Number.isFinite(mesh.height)) sprite.height = mesh.height;
+      sprite.visible = true;
+      sprite.renderable = true;
+      sprite.alpha = presentation === 'hidden' ? 0.78 : 1;
+      sprite.tint = 0xffffff;
+    }
     if (owned.container.parent !== token) token.addChild(owned.container);
     owned.container.eventMode = 'none';
     owned.container.interactive = false;
     owned.container.alpha = 1;
     owned.container.visible = true;
     owned.container.renderable = true;
-    // Core soundwaves retain priority at zIndex 0; hover/selection borders remain above both.
-    owned.container.zIndex = -0.5;
+    // State color belongs above Core's soundwave mesh; Foundry interaction chrome remains higher.
+    owned.container.zIndex = 0.5;
     return owned.container;
   } catch {
     removeOwnedOutline(token, { destroy: true });
@@ -426,17 +472,8 @@ function captureOwnedChange(changes, surface, property, forced) {
   surface[property] = forced;
 }
 
-function hasActiveSoundwaveSurface(token) {
-  const filter = token?.detectionFilter;
-  const mesh = token?.detectionFilterMesh;
-  if (
-    !filter ||
-    mesh?.visible !== true ||
-    mesh?.renderable !== true ||
-    Number(mesh?.alpha ?? 1) <= 0
-  )
-    return false;
-
+function isSoundwaveFilter(filter) {
+  if (!filter) return false;
   const modes = globalThis.CONFIG?.Canvas?.detectionModes ?? {};
   for (const modeId of ['hearing', 'feelTremor']) {
     try {
@@ -446,6 +483,38 @@ function hasActiveSoundwaveSurface(token) {
     }
   }
   return false;
+}
+
+function hiddenSoundwaveFilterForCurrentObservers(target) {
+  const observers = [
+    globalThis.canvas?.tokens?._draggedToken,
+    ...(globalThis.canvas?.tokens?.controlled ?? []),
+  ].filter((observer, index, all) =>
+    observer && !isTokenDefeated(observer) && observer !== target &&
+    typeof observer?.document?.getFlag === 'function' && all.indexOf(observer) === index,
+  );
+  const senses = observers.map(observer => getDetectionBetween(observer, target)?.sense);
+  const modes = globalThis.CONFIG?.Canvas?.detectionModes ?? {};
+  const modeId = senses.includes('hearing')
+    ? 'hearing'
+    : senses.some(sense => sense === 'tremorsense' || sense === 'feelTremor')
+      ? 'feelTremor'
+      : null;
+  try {
+    return modeId ? modes[modeId]?.constructor?.getDetectionFilter?.() ?? null : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasActiveSoundwaveSurface(token) {
+  const mesh = token?.detectionFilterMesh;
+  return (
+    isSoundwaveFilter(token?.detectionFilter) &&
+    mesh?.visible === true &&
+    mesh?.renderable === true &&
+    Number(mesh?.alpha ?? 1) > 0
+  );
 }
 
 function restoreTokenPresentation(token) {
@@ -476,13 +545,32 @@ function restoreTokenPresentation(token) {
 
 function forceTokenArtVisible(token, { presentation }) {
   const changes = [];
-  const preserveSoundwave = hasActiveSoundwaveSurface(token);
+  const hiddenSoundwaveFilter = presentation === 'hidden' && !isSoundwaveFilter(token?.detectionFilter)
+    ? hiddenSoundwaveFilterForCurrentObservers(token)
+    : null;
+  if (hiddenSoundwaveFilter && token?.detectionFilter !== hiddenSoundwaveFilter) {
+    captureOwnedChange(changes, token, 'detectionFilter', hiddenSoundwaveFilter);
+  }
+  const preserveSoundwave =
+    presentation !== 'concealed' && hasActiveSoundwaveSurface(token);
+  const restoreHiddenSoundwave =
+    presentation === 'hidden' && isSoundwaveFilter(token?.detectionFilter);
   captureOwnedChange(changes, token, 'visible', true);
   captureOwnedChange(changes, token, 'renderable', true);
   captureOwnedChange(changes, token?.mesh, 'visible', true);
   captureOwnedChange(changes, token?.mesh, 'renderable', true);
   captureOwnedChange(changes, token?.mesh, 'alpha', token?.document?.hidden ? 0.5 : 1);
-  if (!preserveSoundwave) {
+  if (restoreHiddenSoundwave) {
+    captureOwnedChange(changes, token?.detectionFilterMesh, 'visible', true);
+    captureOwnedChange(changes, token?.detectionFilterMesh, 'renderable', true);
+    captureOwnedChange(changes, token?.detectionFilterMesh, 'alpha', 1);
+    captureOwnedChange(
+      changes,
+      token?.detectionFilterMesh,
+      'blendMode',
+      globalThis.PIXI?.BLEND_MODES?.ADD ?? 'add',
+    );
+  } else if (!preserveSoundwave) {
     captureOwnedChange(changes, token?.detectionFilterMesh, 'visible', false);
     captureOwnedChange(changes, token?.detectionFilterMesh, 'renderable', false);
   }

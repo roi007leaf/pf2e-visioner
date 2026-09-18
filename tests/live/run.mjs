@@ -10,7 +10,13 @@ import { executeWorkflow, workflows } from './workflows.mjs';
 import { assessRequirements } from './requirements.mjs';
 import { coverageFor, validateCases } from './coverage.mjs';
 import { finishCleanup, readJournal, validateCredentials, writeJournal } from './lifecycle.mjs';
-import { artworkPattern, matchesArtwork, detectionPattern } from './artwork.mjs';
+import {
+  artworkPattern,
+  matchesArtwork,
+  detectionPattern,
+  gmObserverHiddenCompositePattern,
+  stateOutlinePattern,
+} from './artwork.mjs';
 import { targetGesture, animateAndMeasure, reconnectPlayer, interactiveMutation } from './runner-actions.mjs';
 import { sourceFingerprint } from './evidence.mjs';
 import { prepareVisualSurface, verifySamplingArea } from './visual-surface.mjs';
@@ -407,6 +413,39 @@ async function run() {
                 await writeFile(path.join(evidenceDirectory, `${testCase.name}-${index}-${substep++}-indicator.png`), buffer);
                 if (stable < 2) item.renderSnapshot = await rpc(player.page, 'snapshot', fixture);
                 if (stable < 2) throw Error(`Detection pixels failed: ${JSON.stringify(item.actual)}`);
+                item.status = 'passed';
+              } catch (error) { item.status = 'failed'; item.error = safeError(error); throw error; }
+            },
+            stateOutline: async expected => {
+              const item = { label: `${expected}-state-outline-pixels`, status: 'running' }; stepResult.assertions.push(item);
+              try {
+                const deadline = Date.now() + 15000;
+                let buffer, stable = 0;
+                do {
+                  checkAbort(); await prepareVisualSurface(gm.page);
+                  const { rect } = await rpc(gm.page, 'snapshot', fixture);
+                  await verifySamplingArea(gm.page, rect);
+                  buffer = await gm.page.screenshot();
+                  item.actual = stateOutlinePattern(PNG.sync.read(buffer), rect, expected);
+                  stable = item.actual.visible ? stable + 1 : 0;
+                  if (stable >= 1) break;
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                } while (Date.now() < deadline);
+                await writeFile(path.join(evidenceDirectory, `${testCase.name}-${index}-${substep++}-${expected}-outline.png`), buffer);
+                if (stable < 1) throw Error(`${expected} outline pixels failed: ${JSON.stringify(item.actual)}`);
+                item.status = 'passed';
+              } catch (error) { item.status = 'failed'; item.error = safeError(error); throw error; }
+            },
+            hiddenObserverComposite: async () => {
+              const item = { label: 'hidden-art-soundwave-pixels', status: 'running' }; stepResult.assertions.push(item);
+              try {
+                await prepareVisualSurface(gm.page);
+                const { rect } = await rpc(gm.page, 'snapshot', fixture);
+                await verifySamplingArea(gm.page, rect);
+                const buffer = await gm.page.screenshot();
+                item.actual = gmObserverHiddenCompositePattern(PNG.sync.read(buffer), rect);
+                await writeFile(path.join(evidenceDirectory, `${testCase.name}-${index}-${substep++}-hidden-composite.png`), buffer);
+                if (!item.actual.visible) throw Error(`Hidden composite pixels failed: ${JSON.stringify(item.actual)}`);
                 item.status = 'passed';
               } catch (error) { item.status = 'failed'; item.error = safeError(error); throw error; }
             },

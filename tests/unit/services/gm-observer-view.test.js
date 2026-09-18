@@ -197,6 +197,65 @@ describe('GM Observer View token presentation', () => {
     expect(token._pvGmObserverViewPresentation).toBe('hidden');
   });
 
+  it('uses a yellow outline without hatch or soundwaves for concealed tokens', () => {
+    const token = makeToken();
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: true,
+        visionerState: 'concealed',
+      }),
+    ).toBe('concealed');
+
+    expect(token.mesh.filters[1]).toMatchObject({
+      uniforms: {
+        stripeColor: [1, 0xc1 / 0xff, 0x07 / 0xff],
+        outlineColor: [1, 0xc1 / 0xff, 0x07 / 0xff],
+        stripeOpacity: 0,
+      },
+    });
+    expect(token.detectionFilterMesh).toMatchObject({ visible: false, renderable: false });
+    expect(token._pvGmObserverViewPresentation).toBe('concealed');
+  });
+
+  it('restores a Core-suppressed Hidden soundwave beneath the orange outline', () => {
+    const token = makeToken();
+    token.detectionFilter = soundwaveFilter;
+    token.detectionFilterMesh = {
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      blendMode: 'normal',
+    };
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: false,
+        visionerState: 'hidden',
+      }),
+    ).toBe('hidden');
+
+    expect(token.detectionFilter).toBe(soundwaveFilter);
+    expect(token.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+      blendMode: 'add',
+    });
+    expect(token.addChild).toHaveBeenCalledTimes(1);
+    expect(token.addChild.mock.calls[0][0].zIndex).toBe(0.5);
+
+    gmObserverView.beforeCoreTokenRefresh(token);
+    expect(token.detectionFilterMesh).toEqual({
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      blendMode: 'normal',
+    });
+  });
+
   it('uses purple state styling for unnoticed tokens', () => {
     const token = makeToken();
     globalThis.canvas.tokens.placeables = [token];
@@ -218,6 +277,7 @@ describe('GM Observer View token presentation', () => {
   });
 
   it.each([
+    ['concealed', 0xffc107, 0],
     ['hidden', 0xff6600, 0],
     ['undetected', 0xf44336, 0.58],
     ['unnoticed', 0x9c27b0, 0.58],
@@ -238,7 +298,7 @@ describe('GM Observer View token presentation', () => {
       renderable: true,
       eventMode: 'none',
       parent: token,
-      zIndex: -0.5,
+      zIndex: 0.5,
     });
     expect(outline._pvStateOutlineFilter).toMatchObject({
       animated: false,
@@ -250,7 +310,7 @@ describe('GM Observer View token presentation', () => {
           (color & 0xff) / 255,
           1,
         ],
-        knockout: true,
+        knockout: state !== 'hidden',
         wave: false,
       },
     });
@@ -495,6 +555,26 @@ describe('GM Observer View token presentation', () => {
     expect(token.mesh.filters).toEqual([token.foreignMeshFilter]);
     expect(token.mesh.visible).toBe(true);
     expect(token.detectionFilterMesh.visible).toBe(false);
+  });
+
+  it('does not treat a defeated selected token as an observer', () => {
+    const token = makeToken();
+    globalThis.canvas.tokens.controlled = [
+      {
+        document: { id: 'dead-observer' },
+        actor: { type: 'character', isDead: true, hitPoints: { value: 10 } },
+      },
+    ];
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: false,
+        visionerState: null,
+      }),
+    ).toBe('normal');
+
+    expect(token.mesh.filters).toEqual([token.foreignMeshFilter]);
   });
 
   it('never activates for players', () => {
