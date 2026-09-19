@@ -2,6 +2,7 @@ import { MODULE_ID } from '../constants.js';
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { getCoverBetween } from '../stores/cover-map.js';
 import { getVisibilityBetween } from '../stores/visibility-map.js';
+import { actorHasFeature } from '../utils/actor-features.js';
 import {
   canAttemptHideOrRemainHidden,
   hidesEncounterTracker,
@@ -441,22 +442,36 @@ export class EncounterStealthInitiativeService {
     const observerInitiative = getNumericInitiative(observerCombatant);
     const beatsObserverInitiative =
       Number.isFinite(observerInitiative) && stealthInitiative > observerInitiative;
+    const prerequisiteProfile = this._getEncounterPrerequisiteProfile(
+      observerToken,
+      stealtherToken,
+    );
+    const canAvoidNotice =
+      actorHasFeature(stealtherToken, 'legendary-sneak') ||
+      canAttemptHideOrRemainHidden(prerequisiteProfile);
 
-    if (stealthInitiative >= perceptionDC) {
+    // Avoid Notice uses the normal Sneak requirements. Without concealment,
+    // standard/greater cover, or Legendary Sneak, the creature is observed
+    // regardless of its initiative result.
+    if (!canAvoidNotice) {
       return {
-        detectionState: 'undetected',
-        awarenessState: beatsObserverInitiative ? 'unnoticed' : 'noticed',
+        detectionState: 'observed',
+        awarenessState: 'noticed',
         hasConcealment: false,
         coverState: 'none',
         detectionSense: null,
       };
     }
 
-    const prerequisiteProfile = this._getEncounterPrerequisiteProfile(observerToken, stealtherToken);
-    if (
-      stealthInitiative >= perceptionDC - 10
-      && canAttemptHideOrRemainHidden(prerequisiteProfile)
-    ) {
+    if (stealthInitiative >= perceptionDC) {
+      return {
+        ...prerequisiteProfile,
+        detectionState: 'undetected',
+        awarenessState: beatsObserverInitiative ? 'unnoticed' : 'noticed',
+      };
+    }
+
+    if (stealthInitiative > perceptionDC - 10) {
       return {
         ...prerequisiteProfile,
         detectionState: 'hidden',

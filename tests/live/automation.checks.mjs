@@ -41,7 +41,7 @@ test('GM Observer state outline pixels require the requested visible color', () 
   }
 });
 
-test('GM Observer Hidden pixels require recognizable art and soundwave variation', () => {
+test('GM Observer Hidden pixels require recognizable art and animated soundwaves', () => {
   const png = { width: 100, height: 100, data: Buffer.alloc(100 * 100 * 4) };
   const rect = { x: 10, y: 10, width: 80, height: 80 };
   const colors = [[0, 180, 0], [180, 0, 0], [0, 0, 180]];
@@ -49,13 +49,15 @@ test('GM Observer Hidden pixels require recognizable art and soundwave variation
     png.data.set([...colors[Math.min(2, Math.floor((x - 10) / (80 / 3)))], 255], (y * 100 + x) * 4);
   }
   assert.deepEqual(gmObserverHiddenCompositePattern(png, rect), {
-    visible: false, artwork: true, soundwaves: false, luminance: [129, 38, 13], ranges: [0, 0, 0],
+    visible: false, artwork: true, soundwaves: false, animatedPixels: 0,
+    luminance: [129, 38, 13], ranges: [0, 0, 0],
   });
+  const later = { width: png.width, height: png.height, data: Buffer.from(png.data) };
   for (let y = 26; y < 74; y += 6) for (let x = 20; x < 80; x++) {
     const offset = (y * 100 + x) * 4;
-    for (let channel = 0; channel < 3; channel++) png.data[offset + channel] = Math.min(255, png.data[offset + channel] + 35);
+    for (let channel = 0; channel < 3; channel++) later.data[offset + channel] = Math.min(255, later.data[offset + channel] + 35);
   }
-  assert.equal(gmObserverHiddenCompositePattern(png, rect).visible, true);
+  assert.equal(gmObserverHiddenCompositePattern(png, rect, later).visible, true);
 });
 
 test('all full-suite cases are executable, with no manual steps or undefined workflows', () => {

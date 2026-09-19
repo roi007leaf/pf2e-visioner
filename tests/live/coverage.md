@@ -98,6 +98,13 @@ public mode in the native roll dialog because PF2e disallows manual blind rolls.
 This does not cover secret-roll privacy, natural 1 adjustments, player character
 weapon Strikes, Point Out, Take Cover or every action variant.
 
+The `stealth-initiative-eligibility` workflow uses a native encounter and native
+Stealth initiative roll, then fixes combatant totals around the observer's live
+Perception DC. It verifies that a successful roll in plain sight remains Observed,
+standard cover and concealment permit encounter stealth, an initiative-winning
+observer prevents Unnoticed, exactly DC-10 is Observed, and Legendary Sneak permits
+plain-sight stealth. Every branch also removes the encounter and confirms cleanup.
+
 Three `action-gap-degrees-*` workflows exercise Hide, Sneak and Seek at DC offsets
 -11, -10, -9, -1, 0, +9 and +10. Native PF2e DCs supply fixture thresholds;
 independent expected degrees and states check rendered labels, Apply, Undo and

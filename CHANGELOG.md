@@ -1,5 +1,18 @@
 # Changelog
 
+## [8.8.5] - 2026-09-19
+
+### Fixed
+
+- GM Observer View now renders the real animated hearing or tremorsense soundwave for Hidden tokens beneath the orange state outline instead of tinting the token artwork orange. Stored Hidden states also regain hearing waves when Foundry clears its transient detection filter.
+- Stealth initiative now follows Avoid Notice and Sneak positioning rules: a creature in plain sight becomes Observed unless it has concealment, standard or greater cover, or Legendary Sneak. A result exactly 10 below Perception DC is correctly treated as a critical failure.
+
+### Tests
+
+- Strengthened GM Observer pixel validation to require animation between frames, preventing a static orange hue from passing as soundwaves.
+- Expanded the real two-client Stealth initiative workflow across plain sight, cover, concealment, observer initiative, the DC-10 boundary, Legendary Sneak, and cleanup. All seven branches passed in the disposable QA world.
+- All 523 automated suites (4,977 tests), 54 live-harness checks, lint, build, and both focused live regressions passed with complete fixture cleanup.
+
 ## [8.8.4] - 2026-09-18
 
 ### Fixed

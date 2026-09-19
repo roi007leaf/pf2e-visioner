@@ -78,7 +78,7 @@ export function stateOutlinePattern(png, rect, expected) {
   return { visible: coloredPixels >= 3, coloredPixels };
 }
 
-export function gmObserverHiddenCompositePattern(png, rect) {
+export function gmObserverHiddenCompositePattern(png, rect, laterPng = null) {
   const art = artworkPattern(png, rect);
   const [green, red, blue] = art.luminance;
   const artwork = green > 70 && green > red + 15 && red > blue + 8;
@@ -96,7 +96,22 @@ export function gmObserverHiddenCompositePattern(png, rect) {
     }
     return Math.max(...values) - Math.min(...values);
   });
-  const soundwaves = ranges.filter(range => range >= 10).length >= 2 &&
-    ranges.reduce((sum, range) => sum + range, 0) >= 35;
-  return { visible: artwork && soundwaves, artwork, soundwaves, luminance: art.luminance, ranges };
+  let animatedPixels = 0;
+  if (laterPng) {
+    for (let y = Math.floor(rect.y + rect.height * 0.12); y < rect.y + rect.height * 0.88; y++) {
+      for (let x = Math.floor(rect.x + rect.width * 0.12); x < rect.x + rect.width * 0.88; x++) {
+        const offset = (y * png.width + x) * 4;
+        const delta = Math.max(
+          Math.abs(png.data[offset] - laterPng.data[offset]),
+          Math.abs(png.data[offset + 1] - laterPng.data[offset + 1]),
+          Math.abs(png.data[offset + 2] - laterPng.data[offset + 2]),
+        );
+        if (delta >= 14) animatedPixels++;
+      }
+    }
+  }
+  // Static orange art or linework is not a soundwave. Foundry's hearing filter
+  // must visibly animate between frames while the underlying artwork remains.
+  const soundwaves = !!laterPng && animatedPixels >= 8;
+  return { visible: artwork && soundwaves, artwork, soundwaves, animatedPixels, luminance: art.luminance, ranges };
 }

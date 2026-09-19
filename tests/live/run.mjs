@@ -443,8 +443,14 @@ async function run() {
                 const { rect } = await rpc(gm.page, 'snapshot', fixture);
                 await verifySamplingArea(gm.page, rect);
                 const buffer = await gm.page.screenshot();
-                item.actual = gmObserverHiddenCompositePattern(PNG.sync.read(buffer), rect);
-                await writeFile(path.join(evidenceDirectory, `${testCase.name}-${index}-${substep++}-hidden-composite.png`), buffer);
+                await new Promise(resolve => setTimeout(resolve, 350));
+                const laterBuffer = await gm.page.screenshot();
+                item.actual = gmObserverHiddenCompositePattern(
+                  PNG.sync.read(buffer), rect, PNG.sync.read(laterBuffer),
+                );
+                const evidenceName = `${testCase.name}-${index}-${substep++}-hidden-composite`;
+                await writeFile(path.join(evidenceDirectory, `${evidenceName}-before.png`), buffer);
+                await writeFile(path.join(evidenceDirectory, `${evidenceName}-after.png`), laterBuffer);
                 if (!item.actual.visible) throw Error(`Hidden composite pixels failed: ${JSON.stringify(item.actual)}`);
                 item.status = 'passed';
               } catch (error) { item.status = 'failed'; item.error = safeError(error); throw error; }

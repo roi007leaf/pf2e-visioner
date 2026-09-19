@@ -217,6 +217,9 @@ describe('EncounterStealthInitiativeService', () => {
     observerEqual.actor.system.perception.dc = 21;
     observerHigh.actor.system.perception.dc = 25;
     perceptionRoller.actor.system.perception.dc = 25;
+    mockGetCoverBetween.mockImplementation((observer) =>
+      observer === observerLow ? 'standard' : 'none',
+    );
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('low', observerLow, 10),
@@ -243,7 +246,7 @@ describe('EncounterStealthInitiativeService', () => {
       detectionState: 'undetected',
       awarenessState: 'unnoticed',
       hasConcealment: false,
-      coverState: 'none',
+      coverState: 'standard',
     });
     const equalChangesByTarget = mockSetPairOverrides.mock.calls.find(([observer]) => observer === observerEqual)[1];
     expect(equalChangesByTarget.get(stealther.id)).toMatchObject({
@@ -264,9 +267,69 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
+  test('successful Stealth initiative is observed in plain sight without a bypass feat', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 18;
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      state: 'observed',
+      detectionState: 'observed',
+      awarenessState: 'noticed',
+    });
+  });
+
+  test('Legendary Sneak permits successful Stealth initiative in plain sight', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 18;
+    stealther.actor.items = [{ type: 'feat', slug: 'legendary-sneak' }];
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      state: 'unnoticed',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+    });
+  });
+
+  test('Stealth initiative exactly 10 below Perception DC is observed despite valid cover', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 30;
+    mockGetCoverBetween.mockReturnValue('standard');
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 20, 'stealth'),
+    ]);
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      state: 'observed',
+      detectionState: 'observed',
+      awarenessState: 'noticed',
+    });
+  });
+
   test('writes unnoticed as encounter awareness metadata over undetected detection', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 18;
+    mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('low', observerLow, 10),
@@ -283,7 +346,7 @@ describe('EncounterStealthInitiativeService', () => {
       detectionState: 'undetected',
       awarenessState: 'unnoticed',
       hasConcealment: false,
-      coverState: 'none',
+      coverState: 'standard',
       detectionSense: null,
     });
   });
@@ -291,6 +354,7 @@ describe('EncounterStealthInitiativeService', () => {
   test('writes undetected without unnoticed awareness when observer initiative is equal or higher', async () => {
     setSetting(true);
     observerEqual.actor.system.perception.dc = 20;
+    mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('equal', observerEqual, 20),
@@ -307,7 +371,7 @@ describe('EncounterStealthInitiativeService', () => {
       detectionState: 'undetected',
       awarenessState: 'noticed',
       hasConcealment: false,
-      coverState: 'none',
+      coverState: 'standard',
       detectionSense: null,
     });
   });
@@ -432,6 +496,7 @@ describe('EncounterStealthInitiativeService', () => {
   test('combat start uses the latest edited initiative value to determine encounter stealth state', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 18;
+    mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
     const stealtherCombatant = makeCombatant('stealth', stealther, 10, 'stealth');
     const combat = makeCombat([
@@ -455,6 +520,7 @@ describe('EncounterStealthInitiativeService', () => {
   test('combat start unhides GM-hidden stealth combatants before applying encounter stealth overrides', async () => {
     setSetting(true);
     stealther.document.hidden = true;
+    mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('low', observerLow, 10),
@@ -696,6 +762,7 @@ describe('EncounterStealthInitiativeService', () => {
   test('meeting Perception DC with tied initiative makes the stealther undetected', async () => {
     setSetting(true);
     observerEqual.actor.system.perception.dc = 20;
+    mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
     const combat = makeCombat([
       makeCombatant('equal', observerEqual, 20),

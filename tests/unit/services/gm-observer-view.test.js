@@ -237,12 +237,13 @@ describe('GM Observer View token presentation', () => {
       }),
     ).toBe('hidden');
 
-    expect(token.detectionFilter).toBe(soundwaveFilter);
+    expect(token.detectionFilter).not.toBe(soundwaveFilter);
+    expect(token.detectionFilter.uniforms).toMatchObject({ knockout: false, wave: true });
     expect(token.detectionFilterMesh).toMatchObject({
       visible: true,
       renderable: true,
       alpha: 1,
-      blendMode: 'add',
+      blendMode: 'normal',
     });
     expect(token.addChild).toHaveBeenCalledTimes(1);
     expect(token.addChild.mock.calls[0][0].zIndex).toBe(0.5);
@@ -252,6 +253,34 @@ describe('GM Observer View token presentation', () => {
       visible: false,
       renderable: false,
       alpha: 0,
+      blendMode: 'normal',
+    });
+  });
+
+  it('adds hearing soundwaves when a stored Hidden state has no Core detection filter', () => {
+    const token = makeToken();
+    token.detectionFilter = null;
+    token.detectionFilterMesh = {
+      visible: false,
+      renderable: false,
+      alpha: 0,
+      blendMode: 'normal',
+    };
+    globalThis.canvas.tokens.placeables = [token];
+
+    expect(
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: false,
+        visionerState: 'hidden',
+      }),
+    ).toBe('hidden');
+
+    expect(token.detectionFilter).not.toBe(soundwaveFilter);
+    expect(token.detectionFilter.uniforms).toMatchObject({ knockout: false, wave: true });
+    expect(token.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
       blendMode: 'normal',
     });
   });
@@ -310,7 +339,7 @@ describe('GM Observer View token presentation', () => {
           (color & 0xff) / 255,
           1,
         ],
-        knockout: state !== 'hidden',
+        knockout: true,
         wave: false,
       },
     });
@@ -329,7 +358,6 @@ describe('GM Observer View token presentation', () => {
         highlightMix: 0.18,
       },
     });
-
     const renderedStates = [];
     token.mesh.render.mockImplementation(() => {
       renderedStates.push({

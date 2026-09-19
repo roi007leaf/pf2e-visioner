@@ -91,22 +91,38 @@ export async function ruleStrike(c) {
 export async function stealthInitiative(c) {
   const enabled = await c.gm.evaluate(() => game.settings.get('pf2e-visioner', 'enableStealthInitiativeVisibility'));
   if (!enabled) throw Error('Prerequisite: enableStealthInitiativeVisibility must be enabled');
+  const perceptionDC = await c.gm.evaluate(observerId => {
+    const dc = canvas.tokens.get(observerId)?.actor?.system?.perception?.dc;
+    return typeof dc === 'number' ? dc : dc?.value;
+  }, c.fixture.observer);
+  if (!Number.isFinite(perceptionDC)) throw Error('Prerequisite: observer Perception DC required');
   for (const spec of [
-    { target: 12, observer: 10, cover: 'none', expected: 'observed' },
-    { target: 12, observer: 10, cover: 'standard', expected: 'hidden' },
-    { target: 60, observer: 10, cover: 'standard', expected: 'unnoticed' },
-    { target: 60, observer: 80, cover: 'standard', expected: 'undetected' },
+    { label: 'plain-sight-success', target: perceptionDC + 5, observer: 10, cover: 'none', expected: 'observed' },
+    { label: 'standard-cover-failure', target: perceptionDC - 1, observer: 10, cover: 'standard', expected: 'hidden' },
+    { label: 'concealment-success', target: perceptionDC + 5, observer: 10, cover: 'none', state: 'concealed', expected: 'unnoticed' },
+    { label: 'standard-cover-success', target: perceptionDC + 5, observer: 10, cover: 'standard', expected: 'unnoticed' },
+    { label: 'observer-wins-initiative', target: perceptionDC + 5, observer: perceptionDC + 10, cover: 'standard', expected: 'undetected' },
+    { label: 'critical-failure-boundary', target: perceptionDC - 10, observer: 10, cover: 'standard', expected: 'observed' },
+    { label: 'legendary-sneak-plain-sight', target: perceptionDC + 5, observer: 10, cover: 'none', feat: 'legendary-sneak', expected: 'unnoticed' },
   ]) {
     await c.mutate('reset-override'); await c.mutate('cover', spec.cover);
+    if (spec.state) await c.mutate('state', spec.state);
+    if (spec.feat) await c.mutate('feat-add', { slug: spec.feat, subject: 'target' });
     await c.mutate('combat', { start: false });
+    const messagesBeforeRoll = await c.messages();
     await c.mutate('initiative');
-    c.assert((await c.messages()).some(m => m.roll), 'Native Stealth initiative produced a roll');
+    c.assert(
+      (await c.messages()).some(m => m.roll && !messagesBeforeRoll.some(previous => previous.id === m.id)),
+      'Native Stealth initiative produced a new roll',
+    );
     // Editing initiative is a native encounter operation; fixed totals exercise
-    // all four branches without altering PF2e random-number generation.
+    // the rule boundaries without replacing PF2e random-number generation.
     await c.mutate('initiative-values', spec);
-    await c.check({ state: spec.expected }, spec.expected === 'observed', `initiative-${spec.target}-${spec.observer}-${spec.cover}`);
+    await c.check({ state: spec.expected }, spec.expected === 'observed', `initiative-${spec.label}`);
     await c.mutate('combat-delete');
-    await c.mutate('reset-override'); await c.check({ state: 'observed' }, true);
+    await c.mutate('reset-override');
+    if (spec.feat) await c.mutate('feat-delete', { slug: spec.feat, subject: 'target' });
+    await c.check({ state: 'observed' }, true, `initiative-${spec.label}-cleanup`);
   }
 }
 

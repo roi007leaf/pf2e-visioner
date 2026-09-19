@@ -67,6 +67,8 @@ let presentedTokens = new Set();
 let tokenPresentationStates = new WeakMap();
 let ownedTokenFilters = new WeakMap();
 let ownedTokenOutlines = new WeakMap();
+const compositeSoundwaveFilters = new WeakMap();
+const ownedCompositeSoundwaveFilters = new WeakSet();
 let hatchFilterClass = null;
 let interfaceHatchFilterClass = null;
 let darknessColorState = null;
@@ -394,7 +396,10 @@ function attachOwnedOutline(token, presentation) {
     const showHatch = (STATE_FILTER_UNIFORMS[presentation]?.stripeOpacity ?? 0) > 0;
     Object.assign(owned.outlineFilter.uniforms, {
       outlineColor: colorNumberToRgba(color),
-      knockout: presentation !== 'hidden',
+      // This layer is only the Observer state contour. Rendering its source
+      // pixels for Hidden paints an orange copy of the token over Core's
+      // animated hearing mesh and makes a static hue look like soundwaves.
+      knockout: true,
       wave: false,
     });
     Object.assign(owned.hatchFilter.uniforms, {
@@ -420,7 +425,7 @@ function attachOwnedOutline(token, presentation) {
       if (Number.isFinite(mesh.height)) sprite.height = mesh.height;
       sprite.visible = true;
       sprite.renderable = true;
-      sprite.alpha = presentation === 'hidden' ? 0.78 : 1;
+      sprite.alpha = 1;
       sprite.tint = 0xffffff;
     }
     if (owned.container.parent !== token) token.addChild(owned.container);
@@ -474,6 +479,7 @@ function captureOwnedChange(changes, surface, property, forced) {
 
 function isSoundwaveFilter(filter) {
   if (!filter) return false;
+  if (ownedCompositeSoundwaveFilters.has(filter)) return true;
   const modes = globalThis.CONFIG?.Canvas?.detectionModes ?? {};
   for (const modeId of ['hearing', 'feelTremor']) {
     try {
@@ -483,6 +489,29 @@ function isSoundwaveFilter(filter) {
     }
   }
   return false;
+}
+
+function compositeSoundwaveFilter(source) {
+  if (!source || (typeof source !== 'object' && typeof source !== 'function')) return source;
+  const cached = compositeSoundwaveFilters.get(source);
+  if (cached) return cached;
+  const FilterClass = globalThis.foundry?.canvas?.rendering?.filters?.OutlineOverlayFilter;
+  if (!FilterClass?.create) return source;
+  try {
+    const filter = FilterClass.create({
+      outlineColor: source.uniforms?.outlineColor ?? [1, 1, 1, 1],
+      alphaThreshold: source.uniforms?.alphaThreshold ?? 0.6,
+      knockout: false,
+      wave: true,
+    });
+    filter.animated = source.animated ?? true;
+    filter.thickness = source.thickness ?? 1;
+    compositeSoundwaveFilters.set(source, filter);
+    ownedCompositeSoundwaveFilters.add(filter);
+    return filter;
+  } catch {
+    return source;
+  }
 }
 
 function hiddenSoundwaveFilterForCurrentObservers(target) {
@@ -499,9 +528,12 @@ function hiddenSoundwaveFilterForCurrentObservers(target) {
     ? 'hearing'
     : senses.some(sense => sense === 'tremorsense' || sense === 'feelTremor')
       ? 'feelTremor'
-      : null;
+      // Hidden is a known-location, imprecise presentation. Core may clear its
+      // transient detection filter before Observer View restores the token, so
+      // use PF2e's hearing waves as the stable fallback for that stored state.
+      : 'hearing';
   try {
-    return modeId ? modes[modeId]?.constructor?.getDetectionFilter?.() ?? null : null;
+    return modes[modeId]?.constructor?.getDetectionFilter?.() ?? null;
   } catch {
     return null;
   }
@@ -545,8 +577,12 @@ function restoreTokenPresentation(token) {
 
 function forceTokenArtVisible(token, { presentation }) {
   const changes = [];
-  const hiddenSoundwaveFilter = presentation === 'hidden' && !isSoundwaveFilter(token?.detectionFilter)
-    ? hiddenSoundwaveFilterForCurrentObservers(token)
+  const hiddenSoundwaveFilter = presentation === 'hidden'
+    ? compositeSoundwaveFilter(
+      isSoundwaveFilter(token?.detectionFilter)
+        ? token.detectionFilter
+        : hiddenSoundwaveFilterForCurrentObservers(token),
+    )
     : null;
   if (hiddenSoundwaveFilter && token?.detectionFilter !== hiddenSoundwaveFilter) {
     captureOwnedChange(changes, token, 'detectionFilter', hiddenSoundwaveFilter);
@@ -568,7 +604,7 @@ function forceTokenArtVisible(token, { presentation }) {
       changes,
       token?.detectionFilterMesh,
       'blendMode',
-      globalThis.PIXI?.BLEND_MODES?.ADD ?? 'add',
+      globalThis.PIXI?.BLEND_MODES?.NORMAL ?? 'normal',
     );
   } else if (!preserveSoundwave) {
     captureOwnedChange(changes, token?.detectionFilterMesh, 'visible', false);

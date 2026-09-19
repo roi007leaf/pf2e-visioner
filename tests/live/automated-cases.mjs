@@ -30,7 +30,9 @@ export const automatedCases = [
   scenario('search-exploration', 'search-exploration', { area: 'exploration', observerType: 'character' }),
   scenario('search-exploration-unnoticed', 'search-unnoticed', { area: 'exploration', observerType: 'character' }),
   scenario('settings-macros', 'settings-macros', { area: 'configuration' }),
-  scenario('stealth-initiative-eligibility', 'stealth-initiative', { area: 'initiative', secondObserver: true }),
+  scenario('stealth-initiative-eligibility', 'stealth-initiative', {
+    area: 'initiative', secondObserver: true, targetType: 'character', targetLevel: 15,
+  }),
   ...['terrain-stalker', 'camouflage', 'vanish-into-the-land', 'distracting-shadows', 'keen-eyes', 'thats-odd', 'very-sneaky', 'sneaky', 'deny-advantage'].map(slug =>
     scenario(`feat-context-${slug}`, `feat-${slug}`, { area: 'feats', secondObserver: true, observerType: 'character', observerLevel: 8 })),
   ...[14].map(core => scenario(`compatibility-foundry${core}-pf2e`, 'compatibility', { area: 'compatibility', environment: { core } })),
