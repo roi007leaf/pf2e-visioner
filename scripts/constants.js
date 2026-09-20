@@ -538,6 +538,26 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  extinguishLightWhenSwimming: {
+    name: 'PF2E_VISIONER.SETTINGS.EXTINGUISH_LIGHT_SWIMMING.name',
+    hint: 'PF2E_VISIONER.SETTINGS.EXTINGUISH_LIGHT_SWIMMING.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
+  relightHeldLightWhenLeavingSwimming: {
+    name: 'PF2E_VISIONER.SETTINGS.RELIGHT_LIGHT_LEAVING_SWIMMING.name',
+    hint: 'PF2E_VISIONER.SETTINGS.RELIGHT_LIGHT_LEAVING_SWIMMING.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   systemConditionOverrides: {
     name: 'PF2E_VISIONER.SETTINGS.SYSTEM_CONDITION_OVERRIDES.name',
     hint: 'PF2E_VISIONER.SETTINGS.SYSTEM_CONDITION_OVERRIDES.hint',

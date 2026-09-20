@@ -2,6 +2,8 @@ import { MODULE_ID } from '../../../constants.js';
 import { setLastMovedTokenId } from '../../../services/runtime-state.js';
 import { updateWallVisualsForEveryone } from '../../../services/socket.js';
 import { updateWallVisuals } from '../../../services/visual-effects.js';
+import { extinguishHeldLightSources, relightHeldLightSources } from '../../../utils/light-sources.js';
+import { getCachedSettingValue } from '../../../utils/setting-value-cache.js';
 import { AvsInvalidationCoordinator } from './AvsInvalidationCoordinator.js';
 import {
   tokenCreated,
@@ -469,6 +471,30 @@ export class TokenEventHandler {
       this.invalidation.invalidate(
         tokenMovementActionCacheInvalidated(tokenDoc, changes, { options, userId }),
       );
+
+      if (
+        changes.movementAction === 'swim' &&
+        getCachedSettingValue('extinguishLightWhenSwimming', false)
+      ) {
+        extinguishHeldLightSources(tokenDoc.actor).catch((error) => {
+          this.systemState.debug(() => ({
+            msg: 'extinguishHeldLightSources failed',
+            tokenId: tokenDoc?.id,
+            error,
+          }));
+        });
+      } else if (
+        changes.movementAction !== 'swim' &&
+        getCachedSettingValue('relightHeldLightWhenLeavingSwimming', false)
+      ) {
+        relightHeldLightSources(tokenDoc.actor).catch((error) => {
+          this.systemState.debug(() => ({
+            msg: 'relightHeldLightSources failed',
+            tokenId: tokenDoc?.id,
+            error,
+          }));
+        });
+      }
     }
 
     // Hidden flag toggle - recalculate everyone

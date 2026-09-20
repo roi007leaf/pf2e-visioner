@@ -21,6 +21,8 @@ const SETTINGS_GROUPS = {
         'showQuickEditTool',
         'hiddenWallIndicatorWidth',
         'dimLightingThreshold',
+        'extinguishLightWhenSwimming',
+        'relightHeldLightWhenLeavingSwimming',
       ],
     },
     {

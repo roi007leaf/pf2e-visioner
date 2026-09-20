@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.8.7] - 2026-09-20
+
+### Added
+
+- New setting: automatically extinguish a token's lit held or worn light source (e.g. a torch) when its movement type changes to swimming, using PF2e's native item light toggle so the item itself is unlit.
+- New setting: automatically relight any light source this module auto-extinguished for swimming once the token's movement type changes away from swimming. Both settings default to disabled.
+
+### Tests
+
+- Added unit coverage for extinguishing and relighting held light sources, including the no-op cases (no checked toggle, no TokenLight rule, item removed, no recorded flag).
+
 ## [8.8.6] - 2026-09-20
 
 ### Fixed
