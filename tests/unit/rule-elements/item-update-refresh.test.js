@@ -290,6 +290,44 @@ describe('rule-element item update refresh', () => {
     expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
   });
 
+  test('recalculates after a deafened condition change using settled prepared senses', async () => {
+    const token = makeToken('token-1');
+    const actor = { id: 'actor-1' };
+    const item = {
+      id: 'deafened',
+      type: 'condition',
+      slug: 'deafened',
+      parent: actor,
+      system: { slug: 'deafened' },
+    };
+    let scheduledCallback;
+    const scheduler = jest.fn((callback) => {
+      scheduledCallback = callback;
+      return 123;
+    });
+    const clearVisionCacheForTokenIds = jest.fn();
+    const clearActorConditionCache = jest.fn();
+    const recalculateTokenIds = jest.fn().mockResolvedValue(undefined);
+
+    expect(
+      itemUpdateRefresh.scheduleActorSenseChangeAvsRefresh(item, null, {
+        isGM: () => true,
+        getTokensForActor: () => [token],
+        scheduler,
+        clearVisionCacheForTokenIds,
+        clearActorConditionCache,
+        recalculateTokenIds,
+      }),
+    ).toBe(true);
+
+    expect(clearVisionCacheForTokenIds).not.toHaveBeenCalled();
+    await scheduledCallback();
+
+    expect(clearActorConditionCache).toHaveBeenCalledWith(actor);
+    expect(clearVisionCacheForTokenIds).toHaveBeenCalledWith(['token-1']);
+    expect(recalculateTokenIds).toHaveBeenCalledWith(['token-1']);
+  });
+
   test('schedules AVS recalculation when prepared actor Sense.value changes', async () => {
     const token = makeToken('token-1');
     const tremorsense = preparedSense('tremorsense', { acuity: 'precise', range: 60 });

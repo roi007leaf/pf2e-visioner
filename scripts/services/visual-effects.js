@@ -23,6 +23,7 @@
 import { MODULE_ID } from '../constants.js';
 import { getDetectionBetween } from '../stores/detection-map.js';
 import { getVisibilityBetween } from '../utils.js';
+import { scheduleAnimationFrame } from '../utils/scheduler.js';
 import { _internal as visibilityCalculatorInternal } from '../visibility/StatelessVisibilityCalculator.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 import { shouldBypassAvsForGmVision } from './gm-vision-bypass.js';
@@ -44,7 +45,10 @@ import {
   ensureSystemHiddenKeyHandlerInstalled,
   removeSystemHiddenIndicator,
 } from './system-hidden-indicator-rendering.js';
-import { isPresenceOnlyIndicatorMode } from './system-hidden-presence-only-suppression.js';
+import {
+  handoffPresenceOnlyTokenRenderToDetectionFilter,
+  isPresenceOnlyIndicatorMode,
+} from './system-hidden-presence-only-suppression.js';
 import { HoverTooltips } from './HoverTooltips.js';
 import {
   refreshTokenVisual,
@@ -68,6 +72,27 @@ export { removeSystemHiddenIndicator } from './system-hidden-indicator-rendering
  * This function mainly refreshes rendered token sprites after visibility state changes.
  */
 let updateTokenVisualsPending = false;
+
+function primeHearingDetectionFilter(token) {
+  if (!token) return false;
+  if (!token.detectionFilter) {
+    const points = token.document?.getVisibilityTestPoints?.() ??
+      (token.center ? [token.center] : []);
+    try {
+      if (points.length) canvas?.visibility?.testVisibility?.(points, { object: token });
+    } catch {
+      /* best-effort Core detection-filter refresh */
+    }
+  }
+  return handoffPresenceOnlyTokenRenderToDetectionFilter(token);
+}
+
+function scheduleHearingDetectionFilterHandoff(token, attemptsRemaining = 8) {
+  if (primeHearingDetectionFilter(token) || attemptsRemaining <= 0) return;
+  scheduleAnimationFrame(() => {
+    scheduleHearingDetectionFilterHandoff(token, attemptsRemaining - 1);
+  });
+}
 let pendingTokenVisualRefreshTargets = undefined;
 
 function queueTokenVisualRefresh(targets) {
@@ -358,6 +383,7 @@ export async function updateSystemHiddenTokenHighlights(
       const {
         shouldShowIndicator,
         indicatorMode,
+        detectionSense,
         shouldShowThoughtsenseIndicator,
         shouldShowEcholocationIndicator,
         shouldShowScentIndicator,
@@ -379,9 +405,17 @@ export async function updateSystemHiddenTokenHighlights(
 
       // If indicator exists but shouldn't, remove it
       if (existingIndicator && !shouldShowIndicator) {
+        // Hearing owns the next render surface. Keep primary art hidden while Core replaces the
+        // presence-only marker with its detection filter, avoiding a full-token transition frame.
+        const handingOffToHearing =
+          isPresenceOnlyIndicatorMode(existingIndicator._pvIndicatorMode) &&
+          detectionSense === 'hearing';
         removeSystemHiddenIndicator(token, {
-          forceTokenVisible: isPresenceOnlyIndicatorMode(existingIndicator._pvIndicatorMode),
+          forceTokenVisible:
+            isPresenceOnlyIndicatorMode(existingIndicator._pvIndicatorMode) &&
+            !handingOffToHearing,
         });
+        if (handingOffToHearing) scheduleHearingDetectionFilterHandoff(token);
         continue;
       }
 

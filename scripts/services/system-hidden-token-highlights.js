@@ -1,5 +1,6 @@
 import { isScentBlocked as defaultIsScentBlocked } from '../helpers/scent-wall-utils.js';
 import { SenseSuppressionRegionBehavior } from '../regions/SenseSuppressionRegionBehavior.js';
+import { hasActivePresenceOnlyTokenRenderSuppression } from './system-hidden-presence-only-suppression.js';
 
 function hasPositionChange(changes) {
   return !!changes && ('x' in changes || 'y' in changes);
@@ -244,7 +245,19 @@ export function buildSystemHiddenIndicatorDecision({
     observerHasThoughtsense: senseContext?.observerHasThoughtsense && !suppressed.has('thoughtsense'),
     observerHasEcholocation: senseContext?.observerHasEcholocation && !suppressed.has('echolocation'),
   };
-  const isSystemHidden = !token?.visible || token?.renderable === false;
+  const detection = getStoredDetection({ observer, token, getDetectionBetween });
+  // Presence-only indicators hide token art themselves. When AVS now reports a different sense,
+  // do not treat that module-owned suppression as fresh Core-hidden evidence or the old marker
+  // can keep itself alive (for example, deafened removal restores hearing after scent).
+  const isPresenceOnlySuppressed = hasActivePresenceOnlyTokenRenderSuppression(token);
+  const presenceOnlyMode = token?._pvPresenceOnlyRenderSuppression?.mode ?? null;
+  const activeDetectionReplacedPresenceSense =
+    isPresenceOnlySuppressed &&
+    !!detection?.sense &&
+    !!presenceOnlyMode &&
+    detection.sense !== presenceOnlyMode;
+  const isSystemHidden =
+    (!token?.visible || token?.renderable === false) && !activeDetectionReplacedPresenceSense;
   const mayShowSystemHiddenIndicator = token?.document?.hidden !== true;
   const targetTraits = token?.actor?.system?.traits?.value || [];
   const distanceInFeet = getSystemHiddenTokenDistance(observer, token, positionOverride, grid);
@@ -252,7 +265,6 @@ export function buildSystemHiddenIndicatorDecision({
   const thoughtsenseRange = senseContext?.thoughtsenseSense?.range ?? 0;
   const echolocationRange = senseContext?.echolocationSense?.range ?? 0;
   const scentRange = senseContext?.scentSense?.range ?? 0;
-  const detection = getStoredDetection({ observer, token, getDetectionBetween });
   const canBeDetectedByLifesense = canLifesenseDetect({ traits: targetTraits });
   const canBeDetectedByThoughtsense = canThoughtsenseDetect({ traits: targetTraits });
   const canBeDetectedByScent = canScentDetect({ traits: targetTraits });
@@ -320,6 +332,7 @@ export function buildSystemHiddenIndicatorDecision({
   return {
     shouldShowIndicator,
     indicatorMode,
+    detectionSense: detection?.sense ?? null,
     shouldShowLifesenseIndicator,
     shouldShowScentIndicator,
     shouldShowThoughtsenseIndicator,

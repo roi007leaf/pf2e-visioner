@@ -1,5 +1,6 @@
 import { isPrimaryGM } from '../services/gm-election.js';
 import { recalculateRuntimeAvsTokenIds } from '../services/avs-token-refresh.js';
+import { clearActorConditionSlugCache } from '../services/sense-distance.js';
 import { buildPreparedSensesSignature } from '../visibility/auto-visibility/core/TokenSenseSignatureCache.js';
 import { VisionAnalyzer } from '../visibility/auto-visibility/VisionAnalyzer.js';
 
@@ -8,6 +9,16 @@ const MODULE_ID = 'pf2e-visioner';
 const actorPreparedSenseSnapshots = new WeakMap();
 const actorPreparedSenseMutationTimers = new WeakMap();
 const watchedPreparedSenseObjects = new WeakMap();
+const VISIBILITY_CONDITION_SLUGS = new Set([
+  'blinded',
+  'concealed',
+  'dazzled',
+  'deafened',
+  'hidden',
+  'invisible',
+  'undetected',
+  'unnoticed',
+]);
 
 function defaultIsGM() {
   return !!globalThis.game?.user?.isGM;
@@ -127,6 +138,10 @@ function hasRuleChanges(changes) {
 
 function itemSenseChangeAffectsAvs(item, changes) {
   if (getVisionerRule(item)) return false;
+
+  const itemType = String(item?.type ?? '').toLowerCase();
+  const itemSlug = String(item?.slug ?? item?.system?.slug ?? item?.name ?? '').toLowerCase();
+  if (itemType === 'condition' && VISIBILITY_CONDITION_SLUGS.has(itemSlug)) return true;
 
   if (!changes || Object.keys(changes).length === 0) {
     return valueContainsSenseRule(item?.system?.rules);
@@ -758,6 +773,8 @@ export function scheduleActorSenseChangeAvsRefresh(
     scheduler = defaultScheduler,
     delayMs = 500,
     recalculateTokenIds = recalculateRuntimeAvsTokenIds,
+    clearVisionCacheForTokenIds = defaultClearVisionCacheForTokenIds,
+    clearActorConditionCache = clearActorConditionSlugCache,
     warn = console.warn,
   } = {},
 ) {
@@ -775,6 +792,8 @@ export function scheduleActorSenseChangeAvsRefresh(
 
     scheduler(async () => {
       try {
+        clearActorConditionCache?.(actor);
+        clearVisionCacheForTokenIds?.(tokenIds);
         watchActorPreparedSenses(actor, {
           isGM,
           getTokensForActor,

@@ -50,8 +50,11 @@ function makeToken() {
   const detectionFilter = { id: 'core-detection-filter' };
   const token = {
     controlled: false,
+    hover: false,
     visible: false,
     renderable: false,
+    border: { visible: false },
+    layer: { highlightObjects: false },
     detectionFilter,
     detectionFilterMesh: { visible: true, renderable: true },
     mesh: {
@@ -217,6 +220,38 @@ describe('GM Observer View token presentation', () => {
     });
     expect(token.detectionFilterMesh).toMatchObject({ visible: false, renderable: false });
     expect(token._pvGmObserverViewPresentation).toBe('concealed');
+  });
+
+  it.each(['observed', 'concealed'])(
+    'restores native selection borders for highlighted %s targets',
+    (visionerState) => {
+      const token = makeToken();
+      token.layer.highlightObjects = true;
+      globalThis.canvas.tokens.placeables = [token];
+
+      gmObserverView.afterCoreTokenRefresh(token, {
+        coreVisible: false,
+        visionerState,
+      });
+
+      expect(token.border.visible).toBe(true);
+
+      gmObserverView.beforeCoreTokenRefresh(token);
+      expect(token.border.visible).toBe(false);
+    },
+  );
+
+  it('does not add a native selection border to highlighted Hidden targets', () => {
+    const token = makeToken();
+    token.layer.highlightObjects = true;
+    globalThis.canvas.tokens.placeables = [token];
+
+    gmObserverView.afterCoreTokenRefresh(token, {
+      coreVisible: false,
+      visionerState: 'hidden',
+    });
+
+    expect(token.border.visible).toBe(false);
   });
 
   it('restores a Core-suppressed Hidden soundwave beneath the orange outline', () => {

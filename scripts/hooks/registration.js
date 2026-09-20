@@ -53,6 +53,7 @@ import {
   syncHiddenHazardIndicator,
 } from '../services/hidden-hazard-indicators.js';
 import { gmObserverView } from '../services/GmObserverView/gm-observer-view.js';
+import { registerPersistentSequencerEffectLayeringHooks } from '../services/sequencer-persistent-effect-layering.js';
 
 function clearActorFeatureCacheForItem(item) {
   const actor = item?.actor ?? item?.parent ?? null;
@@ -62,6 +63,7 @@ function clearActorFeatureCacheForItem(item) {
 
 export async function registerHooks() {
   gmObserverView.registerHooks();
+  registerPersistentSequencerEffectLayeringHooks();
   registerPf2eHudTakeCoverIntegration();
 
   Hooks.on('ready', onReady);

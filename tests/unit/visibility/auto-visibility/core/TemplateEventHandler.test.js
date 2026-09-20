@@ -58,6 +58,7 @@ describe('TemplateEventHandler', () => {
     mockEffectAreaRegion = {
       id: 'effect-area-1',
       name: 'Darkness',
+      visibility: 2,
       shapes: [{ type: 'circle', x: 200, y: 250, radius: 300 }],
       flags: {
         pf2e: {
@@ -67,7 +68,8 @@ describe('TemplateEventHandler', () => {
       },
       getFlag: jest.fn(),
       setFlag: jest.fn(),
-      unsetFlag: jest.fn()
+      unsetFlag: jest.fn(),
+      update: jest.fn()
     };
 
     global.canvas = {
@@ -133,6 +135,15 @@ describe('TemplateEventHandler', () => {
         })
       ]);
       expect(mockEffectAreaRegion.setFlag).toHaveBeenCalledWith(MODULE_ID, 'darknessLightId', 'light-1');
+      expect(mockEffectAreaRegion.update).toHaveBeenCalledWith({ visibility: 0 });
+    });
+
+    test('repairs existing Darkness regions to layer-only visibility on canvas ready', async () => {
+      mockScene.regions = new Map([[mockEffectAreaRegion.id, mockEffectAreaRegion]]);
+
+      await handler.handleCanvasReady();
+
+      expect(mockEffectAreaRegion.update).toHaveBeenCalledWith({ visibility: 0 });
     });
 
     test('syncs linked ambient darkness light when PF2e v14 effect-area region changes', async () => {
@@ -178,6 +189,7 @@ describe('TemplateEventHandler', () => {
       expect(mockScene.createEmbeddedDocuments).toHaveBeenCalledWith('Region', [
         expect.objectContaining({
           name: expect.stringContaining('Darkness Terrain'),
+          visibility: 0,
           shapes: expect.arrayContaining([
             expect.objectContaining({ radiusX: 400, radiusY: 400 })
           ]),

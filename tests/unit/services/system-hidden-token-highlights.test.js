@@ -106,6 +106,35 @@ test.each(['lifesense', 'thoughtsense'])('%s marker survives a visible-token ref
   expect(decision).toMatchObject({ shouldShowIndicator: true, indicatorMode: sense });
 });
 
+test('scent marker does not self-latch after detection changes to hearing', () => {
+  const observer = {
+    document: { x: 0, y: 0, width: 1, height: 1 },
+    actor: {
+      system: { perception: { senses: [{ type: 'scent', range: 30 }] } },
+      hasCondition: () => false,
+    },
+  };
+  const target = {
+    visible: false,
+    renderable: false,
+    document: { x: 100, y: 0, width: 1, height: 1, hidden: false },
+    actor: { system: { traits: { value: [] } } },
+    _pvPresenceOnlyRenderSuppression: { mode: 'scent', observerId: 'observer' },
+  };
+
+  const decision = buildSystemHiddenIndicatorDecision({
+    observer,
+    token: target,
+    grid: { size: 100, distance: 5, measurePath: () => ({ distance: 1 }) },
+    getVisibilityState: () => 'hidden',
+    getDetectionBetween: () => ({ sense: 'hearing', isPrecise: false }),
+    isScentBlocked: () => false,
+  });
+
+  expect(decision.shouldShowScentIndicator).toBe(false);
+  expect(decision.shouldShowIndicator).toBe(false);
+});
+
 function makePixiMock() {
   const makeDisplayObject = () => ({
     position: { set: jest.fn() },
@@ -919,6 +948,59 @@ describe('system-hidden indicator render lifecycle', () => {
     expect(existingIndicator._pvAnimationFrameId).not.toHaveBeenCalled();
     expect(global.canvas.interface.addChild).not.toHaveBeenCalled();
     expect(hiddenTarget._pvSystemHiddenIndicator).toBe(existingIndicator);
+  });
+
+  test('keeps token art hidden while a scent marker hands off to hearing', async () => {
+    const { updateSystemHiddenTokenHighlights } = await import(
+      '../../../scripts/services/visual-effects.js'
+    );
+
+    const existingIndicator = {
+      _pvObserverId: 'observer',
+      _pvIndicatorMode: 'scent',
+      destroy: jest.fn(),
+      parent: { removeChild: jest.fn() },
+    };
+    const observer = global.createMockToken({ id: 'observer' });
+    observer.actor.system.perception = { senses: [{ type: 'scent', range: 60 }] };
+    observer.actor.hasCondition = jest.fn(() => false);
+    observer.distanceTo = jest.fn(() => 30);
+    observer.document.getFlag.mockImplementation((_module, key) => {
+      if (key === 'visibilityV2') {
+        return { target: { detectionState: 'hidden', detectionSense: 'hearing' } };
+      }
+      if (key === 'detection') return { target: { sense: 'hearing', isPrecise: false } };
+      return null;
+    });
+    const hiddenTarget = global.createMockToken({ id: 'target' });
+    hiddenTarget.visible = false;
+    hiddenTarget.renderable = false;
+    hiddenTarget.mesh = { visible: false, renderable: false, alpha: 0 };
+    hiddenTarget.detectionFilter = { id: 'hearing-filter' };
+    hiddenTarget.detectionFilterMesh = { visible: false, renderable: false, alpha: 0 };
+    hiddenTarget._pvSystemHiddenIndicator = existingIndicator;
+    hiddenTarget._pvPresenceOnlyRenderSuppression = {
+      mode: 'scent',
+      observerId: 'observer',
+      expiresAt: Number.POSITIVE_INFINITY,
+    };
+
+    global.canvas.tokens.placeables = [observer, hiddenTarget];
+    global.canvas.tokens.get = jest.fn((id) => (id === 'observer' ? observer : hiddenTarget));
+
+    await updateSystemHiddenTokenHighlights('observer');
+
+    expect(existingIndicator.destroy).toHaveBeenCalledTimes(1);
+    expect(hiddenTarget._pvSystemHiddenIndicator).toBeNull();
+    expect(hiddenTarget.visible).toBe(true);
+    expect(hiddenTarget.renderable).toBe(true);
+    expect(hiddenTarget.mesh).toMatchObject({ visible: false, renderable: false, alpha: 1 });
+    expect(hiddenTarget.detectionFilter).toEqual({ id: 'hearing-filter' });
+    expect(hiddenTarget.detectionFilterMesh).toMatchObject({
+      visible: true,
+      renderable: true,
+      alpha: 1,
+    });
   });
 
   test('removes a stale special-sense indicator when a GM target becomes Foundry hidden', async () => {

@@ -36,6 +36,7 @@ export class TemplateEventHandler {
         Hooks.on('createRegion', this.handleRegionCreate.bind(this));
         Hooks.on('updateRegion', this.handleRegionUpdate.bind(this));
         Hooks.on('deleteRegion', this.handleRegionDelete.bind(this));
+        Hooks.on('canvasReady', this.handleCanvasReady.bind(this));
     }
 
     /**
@@ -127,6 +128,7 @@ export class TemplateEventHandler {
 
         try {
             if (this.#isDarknessRegion(region)) {
+                await this.#ensureDarknessRegionLayerVisibility(region);
                 await this.#ensureDarknessLightForRegion(region);
             }
         } catch {
@@ -152,6 +154,7 @@ export class TemplateEventHandler {
 
         try {
             if (this.#isDarknessRegion(region)) {
+                await this.#ensureDarknessRegionLayerVisibility(region);
                 const existingId = region.getFlag?.(MODULE_ID, 'darknessLightId');
                 if (existingId) await this.#syncDarknessLightForRegion(region);
                 else await this.#ensureDarknessLightForRegion(region);
@@ -174,6 +177,22 @@ export class TemplateEventHandler {
         } catch {
             /* best-effort */
         }
+    }
+
+    /**
+     * Repair persisted Darkness spell Regions created with PF2e's always-visible default.
+     */
+    async handleCanvasReady() {
+        if (!this.#systemState.shouldProcessEvents()) return;
+
+        const collection = canvas.scene?.regions;
+        const regions =
+            collection?.contents ??
+            (typeof collection?.values === 'function' ? Array.from(collection.values()) : []);
+        const updates = regions
+            .filter((region) => this.#isDarknessRegion(region))
+            .map((region) => this.#ensureDarknessRegionLayerVisibility(region));
+        await Promise.allSettled(updates);
     }
 
     /**
@@ -255,6 +274,16 @@ export class TemplateEventHandler {
         } catch {
             return false;
         }
+    }
+
+    /**
+     * Keep Darkness geometry editable on the Region layer without exposing its
+     * coverage highlight or measurements during ordinary token play.
+     */
+    async #ensureDarknessRegionLayerVisibility(region) {
+        const layerVisibility = globalThis.CONST?.REGION_VISIBILITY_MODES?.LAYER ?? 0;
+        if (region?.visibility === layerVisibility) return;
+        await region?.update?.({ visibility: layerVisibility });
     }
 
     /**
@@ -538,6 +567,7 @@ export class TemplateEventHandler {
             const regionData = {
                 name: `Darkness Terrain (${template.id})`,
                 color: '#000000',
+                visibility: globalThis.CONST?.REGION_VISIBILITY_MODES?.LAYER ?? 0,
                 shapes: [shape],
                 behaviors: [{
                     type: 'modifyMovementCost',

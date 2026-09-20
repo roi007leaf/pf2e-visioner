@@ -202,7 +202,7 @@ export class EventDrivenVisibilitySystem {
 
       // Initialize all event handlers using EventHandlerFactory
       // Handlers register themselves automatically and don't need to be stored
-      await EventHandlerFactory.createHandlers(
+      const handlers = await EventHandlerFactory.createHandlers(
         this.#systemStateProvider,
         this.#visibilityStateManager,
         {
@@ -228,6 +228,7 @@ export class EventDrivenVisibilitySystem {
 
       // Set system state
       this.#systemStateProvider.setEnabled(game.settings.get(MODULE_ID, 'autoVisibilityEnabled'));
+      await handlers.templateEventHandler?.handleCanvasReady?.();
     } catch (error) {
       console.error('PF2E Visioner | EventDrivenVisibilitySystem - Initialization failed:', error);
       throw error;

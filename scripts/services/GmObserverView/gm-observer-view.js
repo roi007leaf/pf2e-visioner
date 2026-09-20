@@ -596,6 +596,12 @@ function forceTokenArtVisible(token, { presentation }) {
   captureOwnedChange(changes, token?.mesh, 'visible', true);
   captureOwnedChange(changes, token?.mesh, 'renderable', true);
   captureOwnedChange(changes, token?.mesh, 'alpha', token?.document?.hidden ? 0.5 : 1);
+  const coreWouldShowBorder =
+    !token?.document?.isSecret &&
+    (token?.controlled === true || token?.hover === true || token?.layer?.highlightObjects === true);
+  if ((presentation === 'normal' || presentation === 'concealed') && coreWouldShowBorder) {
+    captureOwnedChange(changes, token?.border, 'visible', true);
+  }
   if (restoreHiddenSoundwave) {
     captureOwnedChange(changes, token?.detectionFilterMesh, 'visible', true);
     captureOwnedChange(changes, token?.detectionFilterMesh, 'renderable', true);

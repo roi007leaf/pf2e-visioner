@@ -1,3 +1,5 @@
+import { suppressDetectionFilterPrimaryMesh } from './Detection/detection-filter-mesh-suppression.js';
+
 export const PRESENCE_ONLY_RENDER_SUPPRESSION_KEY = '_pvPresenceOnlyRenderSuppression';
 
 const PRESENCE_ONLY_RENDER_SUPPRESSION_TTL_MS = 1500;
@@ -92,6 +94,25 @@ export function forcePresenceOnlySuppressedTokenVisible(token) {
     /* best-effort detection filter cleanup */
   }
   hideDisplayObject(token.detectionFilterMesh);
+}
+
+export function handoffPresenceOnlyTokenRenderToDetectionFilter(token) {
+  if (!token?.detectionFilter) return false;
+
+  clearPresenceOnlyTokenRenderSuppression(token);
+  try {
+    if ('visible' in token) token.visible = true;
+    if ('renderable' in token) token.renderable = true;
+    if (token.mesh && 'alpha' in token.mesh) token.mesh.alpha = 1;
+  } catch {
+    /* best-effort filtered token container restore */
+  }
+
+  // Keep unfiltered token art out of the primary pass. The detection-filter wrapper temporarily
+  // releases this mesh only while drawing the soundwave-filtered surface.
+  suppressDetectionFilterPrimaryMesh(token);
+  showDisplayObject(token.detectionFilterMesh);
+  return true;
 }
 
 export function suppressPresenceOnlyTokenRender(

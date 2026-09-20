@@ -1,5 +1,20 @@
 # Changelog
 
+## [8.8.6] - 2026-09-20
+
+### Fixed
+
+- Selected AVS observers now see Observed and Concealed token art above persistent primary-layer Sequencer effects such as Darkness, while Hidden and Undetected token bodies remain suppressed. Sequencer's interface eraser is also disabled during this presentation so token names, native hover or selection borders, and Visioner state contours remain visible.
+- Darkness spell regions now use Foundry's layer-only visibility mode, keeping their editable geometry on the Region layer without showing the region overlay during normal token play. Existing linked Darkness regions are repaired when the canvas loads.
+- GM Observer View now restores native hover and selection borders for Observed and Concealed tokens without adding those borders to Hidden targets.
+- Adding or removing perception conditions such as Deafened now clears prepared-condition and vision caches before AVS recalculates, so scent, lifesense, hearing, and other special-sense presentations update from settled PF2e actor data.
+- Removing Deafened no longer leaves stale scent markers or briefly reveals full token artwork. Presence-only markers now hand rendering directly to Core's hearing soundwave filter in the same frame.
+
+### Tests
+
+- Added regression coverage for persistent Sequencer ordering and cleanup, Darkness region visibility repair, Observer View borders, condition-driven sense cache invalidation, stale scent-marker cleanup, and scent-to-hearing render handoff.
+- Live Wolf validation confirmed five scent markers changed to hearing soundwaves with zero exposed-token frames. All 524 automated suites (4,993 tests), focused lint, and diff checks passed.
+
 ## [8.8.5] - 2026-09-19
 
 ### Fixed
