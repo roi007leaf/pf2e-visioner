@@ -52,7 +52,7 @@ describe('Detection Map Store', () => {
           target: { sense: 'hearing', isPrecise: false },
         },
       },
-      { render: false, animate: false },
+      { render: false },
     );
   });
 
@@ -72,7 +72,7 @@ describe('Detection Map Store', () => {
           target: { sense: 'darkvision', isPrecise: true },
         },
       },
-      { render: false, animate: false },
+      { render: false },
     );
   });
 
@@ -90,7 +90,7 @@ describe('Detection Map Store', () => {
           target: { sense: 'darkvision', isPrecise: true },
         },
       },
-      { render: false, animate: false },
+      { render: false },
     );
   });
 
@@ -124,7 +124,7 @@ describe('Detection Map Store', () => {
           'target-b': { sense: 'hearing', isPrecise: false },
         },
       },
-      { render: false, animate: false },
+      { render: false },
     );
   });
 
@@ -167,7 +167,7 @@ describe('Detection Map Store', () => {
           target: { sense: 'hearing', isPrecise: false },
         },
       },
-      { render: false, animate: false },
+      { render: false },
     );
   });
 });

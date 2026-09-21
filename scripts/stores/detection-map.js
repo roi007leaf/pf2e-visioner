@@ -24,7 +24,7 @@ import {
 
 let batchMode = false;
 const batchedUpdates = new Map();
-const DETECTION_FLAG_UPDATE_OPTIONS = { render: false, animate: false };
+const DETECTION_FLAG_UPDATE_OPTIONS = { render: false };
 
 export function startDetectionBatch() {
   batchMode = true;

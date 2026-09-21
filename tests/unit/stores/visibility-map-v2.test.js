@@ -210,7 +210,7 @@ describe('Visibility Map V2 profile storage', () => {
           },
         },
       ],
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
 
     global.canvas.scene.updateEmbeddedDocuments = originalUpdateEmbeddedDocuments;
@@ -280,7 +280,7 @@ describe('Visibility Map V2 profile storage', () => {
             },
           },
         ],
-        { diff: false, render: false, animate: false },
+        { diff: false, render: false },
       );
       expect(global.canvas.scene.updateEmbeddedDocuments.mock.calls[0][1][0])
         .not.toHaveProperty('flags.pf2e-visioner.-=visibilityV2');
@@ -326,7 +326,7 @@ describe('Visibility Map V2 profile storage', () => {
             'flags.pf2e-visioner.visibilityV2': foundry.data.operators.ForcedDeletion,
           },
         ],
-        { diff: false, render: false, animate: false },
+        { diff: false, render: false },
       );
       expect(observer.document.unsetFlag).not.toHaveBeenCalled();
       expect(getVisibilityBetween(observer, target)).toBe('observed');

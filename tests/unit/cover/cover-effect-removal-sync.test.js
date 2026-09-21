@@ -60,7 +60,7 @@ describe('cover effect removal sync', () => {
     expect(result.tokenIds).toEqual(expect.arrayContaining(['observer-token', 'target-token']));
     expect(observer.document.update).toHaveBeenCalledWith(
       { [`flags.${MODULE_ID}.cover`]: { 'other-token': 'greater' } },
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
   });
 

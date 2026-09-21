@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.8.10] - 2026-09-21
+
+### Fixed
+
+- Visioner flag writes (visibility, detection, cover maps, combat cleanup, migration) no longer pass `animate: false`, which made Foundry stop any running movement animation on the updated token. Flag-only updates are now plain no-op updates for the animation system, so a write that still lands during a move can no longer teleport the token. The pre-write movement guard from 8.8.9 remains in place.
+
+### Tests
+
+- Updated flag-write option expectations and added a guard test that the shared write options never carry `animate: false`.
+
 ## [8.8.9] - 2026-09-21
 
 ### Fixed

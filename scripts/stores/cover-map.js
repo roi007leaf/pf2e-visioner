@@ -37,7 +37,7 @@ export async function setCoverMap(token, coverMap, options = {}) {
     const path = `flags.${MODULE_ID}.cover`;
     result = await token.document.update(
       { [path]: normalizedCoverMap },
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
   }
 

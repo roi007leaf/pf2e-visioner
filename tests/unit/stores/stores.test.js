@@ -149,7 +149,7 @@ describe('Visibility Map Functions', () => {
         {
           'flags.pf2e-visioner.-=visibilityV2': null,
         },
-        { diff: false, render: false, animate: false },
+        { diff: false, render: false },
       );
 
       global.foundry.data.operators.ForcedDeletion = originalForcedDeletion;
@@ -261,7 +261,7 @@ describe('Visibility Map Functions', () => {
             '-=remove': null,
           },
         },
-        { diff: false, render: false, animate: false },
+        { diff: false, render: false },
       );
       expect(getVisibilityMap(mockObserver)).toEqual({ keep: 'undetected' });
 
@@ -356,7 +356,7 @@ describe('Visibility Map Functions', () => {
         {
           'flags.pf2e-visioner.-=visibilityV2': null,
         },
-        { diff: false, render: false, animate: false },
+        { diff: false, render: false },
       );
 
       global.foundry.data.operators.ForcedDeletion = originalForcedDeletion;
@@ -744,7 +744,7 @@ describe('Cover Map Functions with Ephemeral Effects', () => {
 
       expect(mockObserver.document.update).toHaveBeenCalledWith(
         { 'flags.pf2e-visioner.cover': coverMap },
-        { diff: false, render: false, animate: false }
+        { diff: false, render: false }
       );
     });
   });

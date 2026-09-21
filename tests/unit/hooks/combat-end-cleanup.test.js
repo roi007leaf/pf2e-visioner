@@ -93,7 +93,7 @@ describe('combat-only AVS end cleanup', () => {
           [`flags.${MODULE_ID}.-=detection`]: null,
         },
       ],
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
     expect(canvas.perception.update).toHaveBeenCalledTimes(1);
     expect(canvas.perception.update).toHaveBeenCalledWith({

@@ -122,7 +122,7 @@ async function setTokenProfileMap(tokenDocument, profileMap) {
 
   return tokenDocument?.update?.(
     { [`flags.${MODULE_ID}.${VISIBILITY_V2_FLAG}`]: profileMap },
-    { diff: false, render: false, animate: false },
+    { diff: false, render: false },
   );
 }
 
@@ -133,7 +133,7 @@ async function unsetLegacyVisibilityMap(tokenDocument) {
 
   return tokenDocument?.update?.(
     { [`flags.${MODULE_ID}.-=visibility`]: null },
-    { diff: false, render: false, animate: false },
+    { diff: false, render: false },
   );
 }
 

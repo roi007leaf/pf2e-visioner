@@ -28,7 +28,7 @@ export function getTokenId(tokenOrDocument) {
 }
 
 export function noRenderUpdateOptions() {
-  return { diff: false, render: false, animate: false };
+  return { diff: false, render: false };
 }
 
 export function areTokenFlagValuesEqual(left, right) {

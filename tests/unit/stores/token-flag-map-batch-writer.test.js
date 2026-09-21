@@ -111,7 +111,7 @@ describe('token flag map batch writer', () => {
     expect(scene.updateEmbeddedDocuments).toHaveBeenCalledWith(
       'Token',
       [{ _id: 'observer', 'flags.pf2e-visioner.detection': { target: { sense: 'vision' } } }],
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
     expect(document.update).not.toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe('token flag map batch writer', () => {
       1,
       'Token',
       [{ _id: 'observer', 'flags.pf2e-visioner.-=visibilityV2': null }],
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
     expect(scene.updateEmbeddedDocuments).toHaveBeenNthCalledWith(
       2,
@@ -191,7 +191,7 @@ describe('token flag map batch writer', () => {
           },
         },
       ],
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
   });
 
@@ -250,7 +250,7 @@ describe('token flag map batch writer', () => {
     });
     expect(document.update).toHaveBeenCalledWith(
       { 'flags.pf2e-visioner.detection': { target: { sense: 'hearing' } } },
-      { diff: false, render: false, animate: false },
+      { diff: false, render: false },
     );
   });
 

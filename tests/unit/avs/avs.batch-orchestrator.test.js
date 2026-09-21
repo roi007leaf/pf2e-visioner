@@ -955,7 +955,7 @@ describe('BatchOrchestrator', () => {
             target: { sense: 'hearing', isPrecise: false },
           },
         },
-        { render: false, animate: false },
+        { render: false },
       );
     } finally {
       discardDetectionBatch();

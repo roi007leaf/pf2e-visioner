@@ -201,7 +201,6 @@ export async function handleCombatEnd(combat = null) {
       await canvas.scene?.updateEmbeddedDocuments?.('Token', tokenUpdates, {
         diff: false,
         render: false,
-        animate: false,
       });
     }
 

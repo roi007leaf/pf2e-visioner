@@ -54,7 +54,7 @@ function removeMatchingTargetEntries(map, targetIds, expectedState) {
 async function persistManualCoverMap(token, coverMap) {
   const update = { [`flags.${MODULE_ID}.cover`]: coverMap };
   if (typeof token?.document?.update === 'function') {
-    await token.document.update(update, { diff: false, render: false, animate: false });
+    await token.document.update(update, { diff: false, render: false });
     return;
   }
   await token?.document?.setFlag?.(MODULE_ID, 'cover', coverMap);
@@ -71,7 +71,7 @@ async function persistAutoCoverMap(token, coverMap) {
   }
   await token?.document?.update?.(
     { [`flags.${MODULE_ID}.autoCoverMap`]: coverMap },
-    { diff: false, render: false, animate: false },
+    { diff: false, render: false },
   );
 }
 
