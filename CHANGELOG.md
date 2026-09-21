@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.8.8] - 2026-09-21
+
+### Added
+
+- Simplify Walls tool (Walls scene controls, GM only): replaces chains of connected walls that share an identical configuration with fewer segments using a distance tolerance, with a live before/after preview and one-click Undo (originals are stored on the scene and restored with their original ids). Doors and one-way walls are never changed. On a 1812-wall cavern a 10px tolerance yields 847 walls and raises movement FPS from ~70 to ~95.
+
+### Fixed
+
+- Large FPS drop while moving tokens on wall-heavy scenes: during a move every out-of-sight creature ran PF2e's hearing wall raycast for several test points on every frame. The hearing result is now cached per observer/target for 100ms during the move, tests only the center-most point and staggers rechecks across frames. Movement FPS on a 1812-wall scene went from ~22 to ~85 with no change to what is rendered.
+- The during-move soundwave scan now runs once per render frame instead of once per token refresh, and the duplicate post-refresh pass in `_applyRenderFlags` is skipped when only visibility was refreshed.
+- The PF2e GM Vision setting is read once per render frame instead of on every token mesh render.
+
+### Tests
+
+- Added coverage for the during-move hearing cache, once-per-frame soundwave refresh, `_applyRenderFlags` dedupe, GM Vision frame cache, wall simplification planning and apply/undo.
+
 ## [8.8.7] - 2026-09-20
 
 ### Added

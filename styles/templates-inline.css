@@ -458,3 +458,9 @@
 .pv-door-approval-pan-link { display:inline-flex; align-items:center; gap:5px; padding:2px 7px; border:1px solid rgba(140,180,255,0.55); border-radius:6px; background: rgba(140,180,255,0.14); color: var(--color-text-hyperlink, #8cb4ff); cursor:pointer; font:inherit; }
 .pv-door-approval-pan-link:hover,
 .pv-door-approval-pan-link:focus-visible { filter:brightness(1.12); outline:1px solid rgba(140,180,255,0.75); outline-offset:1px; }
+
+.pvv-wall-simplify-tolerance { display:flex; flex-direction:column; gap:4px; margin:10px 0; }
+.pvv-wall-simplify-tolerance input { width:120px; }
+.pvv-wall-simplify-hint, .pvv-wall-simplify-skipped { font-size:0.85em; opacity:0.75; }
+.pvv-wall-simplify-preview { font-weight:600; margin:8px 0 4px; }
+.pvv-wall-simplify-backup { font-size:0.9em; opacity:0.85; }

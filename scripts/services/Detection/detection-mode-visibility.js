@@ -5,6 +5,7 @@ import {
   NON_VISUAL_DETECTION_MODE_IDS,
 } from './detection-visibility-context.js';
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
+import { cachedHearingPointTestDuringMove } from './during-move-hearing-cache.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 
 function testDetectionPoints(detectionMode, visionSource, mode, config) {
@@ -43,6 +44,14 @@ export function testDetectionModeVisibility(visionSource, mode, config = {}) {
     if (visibility === 'hidden') {
       return true;
     }
+    return cachedHearingPointTestDuringMove(
+      observerToken,
+      targetToken,
+      modeId,
+      visibility,
+      config,
+      (pointConfig) => testDetectionPoints(this, visionSource, mode, pointConfig),
+    );
   }
 
   return testDetectionPoints(this, visionSource, mode, config);

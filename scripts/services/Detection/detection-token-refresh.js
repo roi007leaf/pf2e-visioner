@@ -27,6 +27,7 @@ import {
 } from './multi-level-control-view.js';
 
 const deferredCoreLevelHardHideTokens = new WeakSet();
+const afterCoreRefreshRuns = new WeakMap();
 const LEGACY_FILTERED_EFFECT_VISIBILITY_KEY = '_pvLegacyFilteredEffectVisibility';
 
 export function wrapPrimaryTokenMeshRender(wrapped, ...args) {
@@ -181,7 +182,7 @@ function afterCoreRefresh(token, before) {
   rememberSoundwaveDetectionBeforeCoreRefresh(token);
   // Token#_refreshVisibility forces a controlled token's primary mesh visible. Reassert the
   // remembered soundwave after Core has applied those flags so no full-art frame leaks through.
-  refreshSoundwavesForActiveMovement();
+  refreshSoundwavesForActiveMovement(token);
   if (observerViewActive) {
     gmObserverView.afterCoreTokenRefresh(token, { coreVisible, visionerState });
     enforceControlledLevelTokenRendering(token);
@@ -198,12 +199,29 @@ export function wrapTokenRefreshState(wrapped, ...args) {
   return result;
 }
 
+function onlyRefreshVisibilityFlag(flags) {
+  if (!flags || typeof flags !== 'object') return false;
+  let sawVisibility = false;
+  for (const [flag, active] of Object.entries(flags)) {
+    if (!active) continue;
+    if (flag !== 'refreshVisibility') return false;
+    sawVisibility = true;
+  }
+  return sawVisibility;
+}
+
+function countAfterCoreRefresh(token) {
+  afterCoreRefreshRuns.set(token, (afterCoreRefreshRuns.get(token) ?? 0) + 1);
+}
+
 export function wrapTokenApplyRenderFlags(wrapped, ...args) {
   if (isSceneTokenVisionDisabled()) return wrapped(...args);
   gmObserverView.beforeCoreTokenRefresh(this);
   const before = renderState(this);
+  const runsBefore = afterCoreRefreshRuns.get(this) ?? 0;
   const result = wrapped(...args);
-  afterCoreRefresh(this, before);
+  const innerRefreshRan = (afterCoreRefreshRuns.get(this) ?? 0) > runsBefore;
+  if (!(innerRefreshRan && onlyRefreshVisibilityFlag(args[0]))) afterCoreRefresh(this, before);
   reconcileLegacyFilteredEffectVisibility(this);
   hideFilteredTooltip(this);
   enforceControlledLevelTokenRendering(this);
@@ -220,6 +238,7 @@ export function wrapTokenRefreshVisibility(wrapped, ...args) {
     const before = renderState(this);
     const result = wrapped(...args);
     afterCoreRefresh(this, before);
+    countAfterCoreRefresh(this);
     return result;
   });
 }

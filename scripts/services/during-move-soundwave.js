@@ -30,6 +30,7 @@ let cachedSoundwaveFilter = null;
 // off the per-frame hot path. Between recomputes the installed filter overrides keep rendering.
 const WAVE_RECOMPUTE_INTERVAL_MS = 100;
 let lastWaveComputeAt = 0;
+let lastRefreshFrame = null;
 
 // Reuse pair queries within one throttled recompute only. Movement can cross a sound wall or
 // sense range boundary, so a result must not survive into the next position sample.
@@ -479,10 +480,51 @@ export function clearDuringMoveSoundwaveState() {
   activeSoundwaveTargets.clear();
   senseMemo.clear();
   lastWaveComputeAt = 0;
+  lastRefreshFrame = null;
   settleTicks = 0;
 }
 
-export function refreshSoundwavesForActiveMovement() {
+function currentRenderFrameStamp() {
+  const stamp = globalThis.canvas?.app?.ticker?.lastTime;
+  return typeof stamp === 'number' ? stamp : null;
+}
+
+function reassertSoundwaveOverride(target) {
+  if (suppressSoundwaveForControlledLevel(target)) return;
+  if (tokenIsOutsideControlledLevelCullingSurface(target)) {
+    removeSoundwaveFilterOverride(target);
+    reconcileRenderSurfaceAfterSoundwave(target);
+    return;
+  }
+  showSoundwaveRenderSurface(target);
+}
+
+function refreshControlledTokenSurface(target, movementOrDragActive) {
+  if (movementOrDragActive) clearControlledTokenSoundwave(target);
+  else showControlledTokenFullArt(target);
+}
+
+function reassertSoundwaveAfterCoreRefresh(token) {
+  if (!token || isSceneTokenVisionDisabled()) return;
+  const pendingMovementActive = hasActivePendingTokenMovement();
+  if (token.controlled) {
+    refreshControlledTokenSurface(token, pendingMovementActive || isMovementOrDragActive());
+    return;
+  }
+  if (token._original?.controlled) {
+    clearControlledTokenSoundwave(token);
+    return;
+  }
+  if (!pendingMovementActive) return;
+  if (filterOverrides.has(token)) reassertSoundwaveOverride(token);
+  if (activeSoundwaveTargets.has(token)) suppressCoreInvisibleHardHiddenTarget(token);
+}
+
+export function refreshSoundwavesForActiveMovement(refreshedToken = null) {
+  if (refreshedToken) reassertSoundwaveAfterCoreRefresh(refreshedToken);
+  const frame = currentRenderFrameStamp();
+  if (frame !== null && frame === lastRefreshFrame) return;
+  lastRefreshFrame = frame;
   if (isSceneTokenVisionDisabled()) {
     clearDuringMoveSoundwaveState();
     return;
@@ -496,8 +538,7 @@ export function refreshSoundwavesForActiveMovement() {
     ? tokenLayer.controlled
     : (tokenLayer?.placeables ?? []).filter((target) => target.controlled);
   for (const target of controlledTokens) {
-    if (movementOrDragActive) clearControlledTokenSoundwave(target);
-    else showControlledTokenFullArt(target);
+    refreshControlledTokenSurface(target, movementOrDragActive);
   }
   // Preview clones can have transient transforms. Never force them visible before Core is ready.
   for (const preview of globalThis.canvas?.tokens?.preview?.children ?? []) {
@@ -512,13 +553,7 @@ export function refreshSoundwavesForActiveMovement() {
   // Foundry can replace or hide the detection-filter mesh every frame. Reassert existing
   // soundwaves cheaply without rediscovering observers for every token.
   for (const { target } of filterOverrides.values()) {
-    if (suppressSoundwaveForControlledLevel(target)) continue;
-    if (tokenIsOutsideControlledLevelCullingSurface(target)) {
-      removeSoundwaveFilterOverride(target);
-      reconcileRenderSurfaceAfterSoundwave(target);
-      continue;
-    }
-    showSoundwaveRenderSurface(target);
+    reassertSoundwaveOverride(target);
   }
 
   // AVS state can become Undetected between 10 Hz sense decisions. Core immediately reports the

@@ -1,0 +1,27 @@
+<div class="visioner-confirm pvv-confirm-dialog pvv-confirm-info pvv-wall-simplify" tabindex="0">
+  <div class="pvv-confirm-hero">
+    <div class="pvv-confirm-hero-icon"><i class="fas fa-compress-alt"></i></div>
+    <div class="pvv-confirm-hero-copy">
+      <p>{{localize "PF2E_VISIONER.WALL_SIMPLIFY.DESCRIPTION"}}</p>
+      <label class="pvv-wall-simplify-tolerance">
+        <span>{{localize "PF2E_VISIONER.WALL_SIMPLIFY.TOLERANCE"}}</span>
+        <input type="number" name="tolerance" min="0" step="1" value="{{tolerance}}" />
+        <span class="pvv-wall-simplify-hint">{{localize "PF2E_VISIONER.WALL_SIMPLIFY.TOLERANCE_HINT"}}</span>
+      </label>
+      <p class="pvv-wall-simplify-preview" data-role="preview">
+        {{localize "PF2E_VISIONER.WALL_SIMPLIFY.PREVIEW" before=before after=after removed=removed}}
+      </p>
+      <p class="pvv-wall-simplify-skipped">{{localize "PF2E_VISIONER.WALL_SIMPLIFY.SKIPPED"}}</p>
+      {{#if hasBackup}}
+      <p class="pvv-wall-simplify-backup">{{localize "PF2E_VISIONER.WALL_SIMPLIFY.BACKUP_AVAILABLE" count=backupCount}}</p>
+      {{/if}}
+    </div>
+  </div>
+  <footer class="pvv-confirm-footer">
+    <button type="button" class="pvv-btn pvv-btn-secondary" data-action="no"><i class="fas fa-times"></i> {{localize "PF2E_VISIONER.WALL_SIMPLIFY.CANCEL"}}</button>
+    {{#if hasBackup}}
+    <button type="button" class="pvv-btn pvv-btn-secondary" data-action="undo"><i class="fas fa-undo"></i> {{localize "PF2E_VISIONER.WALL_SIMPLIFY.UNDO"}}</button>
+    {{/if}}
+    <button type="button" class="pvv-btn pvv-btn-primary" data-action="apply" {{#unless canApply}}disabled{{/unless}}><i class="fas fa-check"></i> {{localize "PF2E_VISIONER.WALL_SIMPLIFY.APPLY"}}</button>
+  </footer>
+</div>

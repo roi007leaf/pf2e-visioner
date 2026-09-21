@@ -87,4 +87,23 @@ describe('GM Vision core-visibility policy', () => {
       get.mock.calls.filter(([namespace, key]) => namespace === 'pf2e' && key === 'gmVision'),
     ).toHaveLength(2);
   });
+
+  test('reads the GM Vision setting once per render frame and again on the next frame', async () => {
+    global.canvas.ready = true;
+    global.canvas.app = { ticker: { lastTime: 1 } };
+    const get = jest.spyOn(global.game.settings, 'get');
+    const gmVisionReads = () =>
+      get.mock.calls.filter(([namespace, key]) => namespace === 'pf2e' && key === 'gmVision').length;
+
+    expect(shouldBypassAvsForGmVision()).toBe(true);
+    await Promise.resolve();
+    expect(shouldBypassAvsForGmVision()).toBe(true);
+    expect(gmVisionReads()).toBe(1);
+
+    global.game.settings.set('pf2e', 'gmVision', false);
+    global.canvas.app.ticker.lastTime = 2;
+    await Promise.resolve();
+    expect(shouldBypassAvsForGmVision()).toBe(false);
+    expect(gmVisionReads()).toBe(2);
+  });
 });

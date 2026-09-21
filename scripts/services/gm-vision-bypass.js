@@ -17,7 +17,15 @@ function cacheGmVisionBypassForCurrentBurst(value) {
   else Promise.resolve().then(clear);
 }
 
-function gmVisionSettingEnabled() {
+let gmVisionSettingFrame = null;
+let gmVisionSettingValue = null;
+
+function currentRenderFrameStamp() {
+  const stamp = globalThis.canvas?.app?.ticker?.lastTime;
+  return typeof stamp === 'number' ? stamp : null;
+}
+
+function readGmVisionSetting() {
   try {
     const setting = globalThis.game?.settings?.get?.(getSystemId(), 'gmVision');
     if (typeof setting === 'boolean') return setting;
@@ -26,6 +34,16 @@ function gmVisionSettingEnabled() {
   }
 
   return null;
+}
+
+function gmVisionSettingEnabled() {
+  const frame = currentRenderFrameStamp();
+  if (frame === null) return readGmVisionSetting();
+  if (frame !== gmVisionSettingFrame) {
+    gmVisionSettingFrame = frame;
+    gmVisionSettingValue = readGmVisionSetting();
+  }
+  return gmVisionSettingValue;
 }
 
 function gmVisionControlEnabled() {
@@ -137,4 +155,6 @@ export function clearGmVisionBypassCache() {
     valid: false,
     value: false,
   };
+  gmVisionSettingFrame = null;
+  gmVisionSettingValue = null;
 }

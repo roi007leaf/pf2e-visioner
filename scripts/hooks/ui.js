@@ -1070,6 +1070,17 @@ export function registerUIHooks() {
           },
         });
 
+        addTool(walls.tools, {
+          name: 'pf2e-visioner-simplify-walls',
+          title: game.i18n.localize('PF2E_VISIONER.WALL_SIMPLIFY.TITLE'),
+          icon: 'fas fa-compress-alt',
+          button: true,
+          onChange: async () => {
+            const { WallSimplifyDialog } = await import('../ui/dialogs/WallSimplifyDialog.js');
+            new WallSimplifyDialog().render(true);
+          },
+        });
+
         // Toggle Provide Auto-Cover (Selected Walls)
         const selectedWalls = canvas?.walls?.controlled ?? [];
 

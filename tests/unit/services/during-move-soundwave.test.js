@@ -1504,6 +1504,91 @@ describe('refreshSoundwavesForActiveMovement (only mutates during a committed mo
       globalThis.CONFIG = savedConfig;
     }
   });
+
+  describe('once per render frame (ticker stamp)', () => {
+    function controlledMover() {
+      return {
+        controlled: true,
+        detectionFilter: 'CORE-FILTER',
+        detectionFilterMesh: { visible: true, renderable: true, alpha: 1 },
+        document: { id: 'mover' },
+      };
+    }
+
+    function frameCanvas(placeables, controlled, lastTime) {
+      globalThis.canvas = {
+        app: { ticker: { lastTime } },
+        tokens: { placeables, controlled, preview: { children: [] } },
+      };
+    }
+
+    test('skips the full scan for repeat calls inside the same render frame, reruns on the next frame', async () => {
+      const mover = controlledMover();
+      frameCanvas([mover], [mover], 1);
+      const mod = await loadWith({ pendingMovement: true });
+
+      mod.refreshSoundwavesForActiveMovement();
+      expect(mover.detectionFilter).toBeNull();
+
+      mover.detectionFilter = 'CORE-FILTER';
+      mod.refreshSoundwavesForActiveMovement();
+      expect(mover.detectionFilter).toBe('CORE-FILTER');
+
+      globalThis.canvas.app.ticker.lastTime = 2;
+      mod.refreshSoundwavesForActiveMovement();
+      expect(mover.detectionFilter).toBeNull();
+    });
+
+    test('still reasserts the just-refreshed token inside a frame whose scan already ran', async () => {
+      const mover = controlledMover();
+      frameCanvas([mover], [mover], 1);
+      const mod = await loadWith({ pendingMovement: true });
+
+      mod.refreshSoundwavesForActiveMovement();
+      mover.detectionFilter = 'CORE-FILTER';
+      mod.refreshSoundwavesForActiveMovement(mover);
+      expect(mover.detectionFilter).toBeNull();
+    });
+
+    test('reasserts a refreshed soundwave override target render surface inside the same frame', async () => {
+      const savedConfig = globalThis.CONFIG;
+      const soundwaveFilter = { id: 'soundwave-filter' };
+      globalThis.CONFIG = {
+        Canvas: {
+          detectionModes: { hearing: { constructor: { getDetectionFilter: () => soundwaveFilter } } },
+        },
+      };
+      let mod;
+      try {
+        const target = { ...makeTarget(), detectionFilter: null, mesh: { visible: true, renderable: true } };
+        frameCanvas([target], [], 1);
+        mod = await loadWith({ pendingMovement: true });
+        mod.installSoundwaveFilterOverride(target);
+
+        mod.refreshSoundwavesForActiveMovement();
+        target.mesh.visible = false;
+        target.detectionFilterMesh.visible = false;
+
+        mod.refreshSoundwavesForActiveMovement(target);
+        expect(target.mesh.visible).toBe(true);
+        expect(target.detectionFilterMesh.visible).toBe(true);
+      } finally {
+        mod?.clearDuringMoveSoundwaveState();
+        globalThis.CONFIG = savedConfig;
+      }
+    });
+
+    test('never dedupes without a ticker frame stamp', async () => {
+      const mover = controlledMover();
+      globalThis.canvas = { tokens: { placeables: [mover], controlled: [mover], preview: { children: [] } } };
+      const mod = await loadWith({ pendingMovement: true });
+
+      mod.refreshSoundwavesForActiveMovement();
+      mover.detectionFilter = 'CORE-FILTER';
+      mod.refreshSoundwavesForActiveMovement();
+      expect(mover.detectionFilter).toBeNull();
+    });
+  });
 });
 
 describe('ensureDuringMoveSoundwaveRefresh (avsOnlyInCombat gate)', () => {

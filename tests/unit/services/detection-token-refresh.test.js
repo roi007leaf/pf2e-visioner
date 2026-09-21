@@ -38,6 +38,7 @@ jest.mock('../../../scripts/services/Detection/multi-level-control-view.js', () 
 
 import {
   wrapPrimaryTokenMeshRender,
+  wrapTokenApplyRenderFlags,
   wrapTokenControl,
   wrapTokenRefreshVisibility,
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
@@ -300,5 +301,39 @@ describe('detection token refresh', () => {
     expect(applyCurrentViewHardHide).not.toHaveBeenCalled();
     expect(rememberSoundwaveDetectionBeforeCoreRefresh).not.toHaveBeenCalled();
     expect(refreshSoundwavesForActiveMovement).not.toHaveBeenCalled();
+  });
+
+  it('runs the post-refresh pass once when _applyRenderFlags only refreshed visibility', () => {
+    globalThis.canvas = { scene: { tokenVision: true }, tokens: {} };
+    const token = foundryHiddenToken();
+    const wrapped = jest.fn(() => {
+      wrapTokenRefreshVisibility.call(token, () => {});
+    });
+
+    wrapTokenApplyRenderFlags.call(token, wrapped, { refreshVisibility: true });
+
+    expect(wrapped).toHaveBeenCalledTimes(1);
+    expect(refreshSoundwavesForActiveMovement).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the outer post-refresh pass when _applyRenderFlags applied other flags too', () => {
+    globalThis.canvas = { scene: { tokenVision: true }, tokens: {} };
+    const token = foundryHiddenToken();
+    const wrapped = jest.fn(() => {
+      wrapTokenRefreshVisibility.call(token, () => {});
+    });
+
+    wrapTokenApplyRenderFlags.call(token, wrapped, { refreshVisibility: true, refreshState: true });
+
+    expect(refreshSoundwavesForActiveMovement).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the outer post-refresh pass when Core skipped the inner visibility refresh', () => {
+    globalThis.canvas = { scene: { tokenVision: true }, tokens: {} };
+    const token = foundryHiddenToken();
+
+    wrapTokenApplyRenderFlags.call(token, jest.fn(), { refreshVisibility: true });
+
+    expect(refreshSoundwavesForActiveMovement).toHaveBeenCalledTimes(1);
   });
 });

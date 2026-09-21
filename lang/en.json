@@ -1568,6 +1568,21 @@
       "APPROVE": "Approve",
       "DENY": "Deny",
       "PAN_TO_DOOR": "Pan to door"
+    },
+    "WALL_SIMPLIFY": {
+      "TITLE": "Simplify Walls",
+      "DESCRIPTION": "Replaces chains of connected walls that share the same configuration with fewer segments. Every new segment stays within the tolerance of the original outline, so line of sight is preserved visually while Foundry has far fewer edges to process each frame.",
+      "TOLERANCE": "Tolerance (px)",
+      "TOLERANCE_HINT": "Max distance a simplified wall may deviate from the original. 0 merges only perfectly straight runs.",
+      "PREVIEW": "{before} walls → {after} walls ({removed} removed)",
+      "SKIPPED": "Doors and one-way walls are never changed.",
+      "BACKUP_AVAILABLE": "A previous simplification of this scene can be undone ({count} original walls stored).",
+      "APPLY": "Simplify",
+      "UNDO": "Undo last simplification",
+      "CANCEL": "Cancel",
+      "APPLIED": "Walls simplified: {before} → {after}.",
+      "UNDONE": "Wall simplification undone.",
+      "FAILED": "Wall simplification failed. See console."
     }
   }
 }
