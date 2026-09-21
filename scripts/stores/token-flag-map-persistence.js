@@ -124,11 +124,16 @@ export async function applyTokenFlagUpdatePasses({
   }
 
   const uniqueTokens = Array.from(new Set(tokensToWaitFor.filter(Boolean)));
-  await Promise.all(uniqueTokens.map((token) => waitForToken(token)));
+  const waitForTokens = () => Promise.all(uniqueTokens.map((token) => waitForToken(token)));
 
   const appliedPasses = [];
   if (typeof scene?.updateEmbeddedDocuments === 'function') {
+    let waited = false;
     for (const updates of passes) {
+      if (!waited) {
+        await waitForTokens();
+        waited = true;
+      }
       // Movement waits and prior writes yield to token deletion. Re-read scene
       // membership immediately before each pass instead of persisting stale IDs.
       const survivingUpdates = updates.filter(update => tokenStillExists(scene, update._id));
@@ -137,6 +142,7 @@ export async function applyTokenFlagUpdatePasses({
       appliedPasses.push(survivingUpdates);
     }
   } else {
+    await waitForTokens();
     await fallback();
     appliedPasses.push(...passes);
   }

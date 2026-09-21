@@ -1,11 +1,20 @@
 import { isTokenDocumentPendingDeletion } from './token-deletion-guard.js';
+import { hasPendingTokenMovementPosition } from '../services/movement-tracking.js';
 
 function getRenderableToken(token) {
   return token?.object ?? token ?? null;
 }
 
+function hasMovementAnimation(renderableToken) {
+  if (renderableToken?.movementAnimationPromise) return true;
+  if ((renderableToken?.animationContexts?.size ?? 0) > 0) return true;
+  const tokenId = renderableToken?.document?.id ?? renderableToken?.id;
+  return !!tokenId && hasPendingTokenMovementPosition(tokenId);
+}
+
 export function isTokenActivelyAnimating(token) {
   const renderableToken = getRenderableToken(token);
+  if (hasMovementAnimation(renderableToken)) return true;
   const animation = renderableToken?._animation;
   if (!animation) return false;
   if (animation.state === 'completed') return false;

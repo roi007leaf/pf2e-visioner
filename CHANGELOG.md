@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.8.9] - 2026-09-21
+
+### Fixed
+
+- Tokens sometimes teleported to their destination instead of finishing the movement animation. Foundry stops a token's movement animation whenever any update with `animate: false` reaches it, and an AVS batch that was already running when the move started could persist its visibility flags mid-animation. The pre-write guard now recognises Foundry v14 movement (`movementAnimationPromise`, animation contexts and Visioner's own pending-movement record) and waits immediately before writing, so flag persistence lands after the animation settles.
+
+### Tests
+
+- Added coverage for the v14 movement guard (promise, animation contexts, pending movement, settle wait).
+
 ## [8.8.8] - 2026-09-21
 
 ### Added
