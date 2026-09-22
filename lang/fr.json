@@ -522,6 +522,16 @@
         "name": "Activer les murs cachés",
         "hint": "Active les indicateurs Cachés et les indicateurs joueur par mur. Si un mur caché est une porte, il ne bloquera pas la vue."
       },
+      "FLANKING_SIZE_RULE": {
+        "name": "Règle de prise en tenaille des grandes créatures",
+        "hint": "Comment les lignes de prise en tenaille sont tracées pour les créatures de taille Grande ou plus. RAW : centre à centre (défaut PF2e). Chaque case occupée : trace depuis le centre de chaque case occupée ; en tenaille si une paire traverse des côtés/coins opposés. Chaque coin : trace entre les coins extérieurs de l'espace de chaque créature ; très généreux, même deux créatures de taille Moyenne sur des côtés perpendiculaires peuvent prendre en tenaille. Ligne à travers la cible : la ligne centre à centre doit seulement traverser l'espace de la cible.",
+        "CHOICES": {
+          "raw": "RAW (centre à centre)",
+          "anySquare": "Chaque case occupée",
+          "anyCorner": "Chaque coin (très généreux)",
+          "lineThrough": "Ligne à travers la cible"
+        }
+      },
       "AUTO_COVER": {
         "name": "Abri automatique",
         "hint": "S'il est activé, le module appliquera automatiquement l'abri aux jetons en fonction du chemin bloquant le jeton."

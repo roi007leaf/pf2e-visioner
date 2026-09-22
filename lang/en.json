@@ -922,6 +922,16 @@
         "name": "System conditions act as Visioner overrides",
         "hint": "When a token has the PF2E Hidden, Concealed, or Undetected condition, force that visibility toward the token for its enemies. Removing the condition reverts to automatic visibility. Manual overrides are never replaced."
       },
+      "FLANKING_SIZE_RULE": {
+        "name": "Large Creature Flanking Rule",
+        "hint": "How flanking lines are traced for Large and larger creatures. RAW: center-to-center (PF2e default). Any Occupied Square: trace from the center of every square each creature occupies; flanking if any pair crosses opposite sides/corners. Any Corner: trace between the outer corners of each creature's space; very generous, even two Medium creatures on perpendicular sides can flank. Line Through Target: center-to-center line only has to pass through the target's space.",
+        "CHOICES": {
+          "raw": "RAW (center to center)",
+          "anySquare": "Any occupied square",
+          "anyCorner": "Any corner (very generous)",
+          "lineThrough": "Line through target"
+        }
+      },
       "AUTO_COVER": {
         "name": "Enable Auto-Cover",
         "hint": "Allows cover to be automatically applied based on token coverage in relation to walls and other tokens"

@@ -1020,6 +1020,22 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  flankingSizeRule: {
+    name: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.name',
+    hint: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: String,
+    choices: {
+      raw: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.raw',
+      anySquare: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.anySquare',
+      anyCorner: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.anyCorner',
+      lineThrough: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.lineThrough',
+    },
+    default: 'raw',
+  },
+
   autoCover: {
     name: 'PF2E_VISIONER.SETTINGS.AUTO_COVER.name',
     hint: 'PF2E_VISIONER.SETTINGS.AUTO_COVER.hint',

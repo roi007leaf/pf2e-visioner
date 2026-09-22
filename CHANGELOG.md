@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.9.0] - 2026-09-22
+
+### Added
+
+- Large Creature Flanking Rule setting (Combat > Flanking, GM only, default RAW). Changes how PF2e traces the flanking line for Large and larger creatures without touching reach or ally checks: **Any Occupied Square** traces from the center of every square each creature occupies (the popular house rule where a Large ally diagonal to a target still flanks); **Any Corner** traces between the outer corners of each creature's space (very generous); **Line Through Target** only requires the center-to-center line to pass through the target's space. Applies to strikes, the flanking highlight and buddy detection alike. Gridless scenes and Tiny creatures always fall back to RAW.
+
+### Tests
+
+- Added unit coverage for the flanking geometry variants and the `onOppositeSides` wrapper (RAW passthrough, gridless/Tiny fallback, edge-collinear corner guard).
+
 ## [8.8.11] - 2026-09-22
 
 ### Fixed

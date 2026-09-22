@@ -91,6 +91,7 @@ const SETTINGS_GROUPS = {
       keys: ['wallCoverStandardThreshold', 'wallCoverAllowGreater', 'wallCoverGreaterThreshold'],
     },
   ],
+  Combat: [{ title: 'Flanking', keys: ['flankingSizeRule'] }],
   'A.V.S. Settings': [
     {
       title: 'A.V.S. Settings',

@@ -859,6 +859,16 @@
         "name": "Ukryte ściany",
         "hint": "Umożliwia konfigurację stanów widoczności ścian w menedżerze Visioner. Wizualny wskaźnik powodzenia Szukania."
       },
+      "FLANKING_SIZE_RULE": {
+        "name": "Zasada flankowania dużych stworzeń",
+        "hint": "Jak wyznaczane są linie flankowania dla stworzeń Dużych i większych. RAW: środek do środka (domyślne PF2e). Dowolne zajęte pole: linia od środka każdego zajętego pola; flankowanie, jeśli dowolna para przecina przeciwległe boki/rogi. Dowolny róg: linia między zewnętrznymi rogami przestrzeni każdego stworzenia; bardzo hojne, nawet dwa Średnie stworzenia po prostopadłych bokach mogą flankować. Linia przez cel: linia środek–środek musi jedynie przechodzić przez przestrzeń celu.",
+        "CHOICES": {
+          "raw": "RAW (środek do środka)",
+          "anySquare": "Dowolne zajęte pole",
+          "anyCorner": "Dowolny róg (bardzo hojne)",
+          "lineThrough": "Linia przez cel"
+        }
+      },
       "AUTO_COVER": {
         "name": "Włącz automatyczną osłonę",
         "hint": "Umożliwia automatyczne stosowanie osłony w oparciu o zasięg tokenu w stosunku do ścian i innych tokenów."
