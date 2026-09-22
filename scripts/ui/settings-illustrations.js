@@ -1,3 +1,9 @@
+import {
+  lineThroughTarget,
+  pointsOnOppositeSides,
+  segmentLiesOnEdge,
+} from '../services/flanking/flanking-size-rule.js';
+
 const CHOICE_KEY = 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES';
 const DIAGRAM_KEY = 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.DIAGRAM';
 
@@ -11,11 +17,11 @@ const SCENE = {
   flanker: { x: 200, y: 300, w: 100, h: 100 },
 };
 
-const RULE_LINES = {
-  raw: { from: { x: 100, y: 100 }, to: { x: 250, y: 350 }, flanked: false, dots: 'center' },
-  anySquare: { from: { x: 50, y: 150 }, to: { x: 250, y: 350 }, flanked: true, dots: 'squares' },
-  anyCorner: { from: { x: 0, y: 200 }, to: { x: 300, y: 300 }, flanked: true, dots: 'corners' },
-  lineThrough: { from: { x: 100, y: 100 }, to: { x: 250, y: 350 }, flanked: true, dots: 'center' },
+const RULE_POINTS = {
+  raw: 'center',
+  anySquare: 'squares',
+  anyCorner: 'corners',
+  lineThrough: 'center',
 };
 
 function localize(key) {
@@ -68,15 +74,48 @@ function candidatePoints(rect, mode) {
   return [centerOf(rect)];
 }
 
-function candidateDots(mode) {
-  return [...candidatePoints(SCENE.ally, mode), ...candidatePoints(SCENE.flanker, mode)]
-    .map((p) => dot(p, 'pv-dg-candidate'))
-    .join('');
+function boundsOf(rect) {
+  return {
+    x: rect.x,
+    y: rect.y,
+    width: rect.w,
+    height: rect.h,
+    left: rect.x,
+    top: rect.y,
+    right: rect.x + rect.w,
+    bottom: rect.y + rect.h,
+  };
 }
 
-function flankLine({ from, to, flanked }) {
-  const cls = flanked ? 'pv-dg-line pv-dg-pass' : 'pv-dg-line pv-dg-fail';
-  return `<line class="${cls}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"/>${dot(from)}${dot(to)}`;
+function pairPasses(rule, from, to) {
+  const target = boundsOf(SCENE.target);
+  if (rule === 'lineThrough') return lineThroughTarget(boundsOf(SCENE.flanker), boundsOf(SCENE.ally), target);
+  if (rule === 'anyCorner' && segmentLiesOnEdge(from, to, target)) return false;
+  return pointsOnOppositeSides(from, to, target);
+}
+
+function candidateLines(rule) {
+  const mode = RULE_POINTS[rule];
+  const lines = [];
+  for (const from of candidatePoints(SCENE.flanker, mode)) {
+    for (const to of candidatePoints(SCENE.ally, mode)) {
+      lines.push({ from, to, pass: pairPasses(rule, from, to) });
+    }
+  }
+  return lines;
+}
+
+function lineSvg({ from, to, pass }) {
+  const cls = pass ? 'pv-dg-line pv-dg-pass' : 'pv-dg-line pv-dg-fail';
+  return `<line class="${cls}" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"/>`;
+}
+
+function linesSvg(lines) {
+  const failing = lines.filter((l) => !l.pass).map(lineSvg);
+  const passing = lines.filter((l) => l.pass).map(lineSvg);
+  const dots = new Set();
+  for (const { from, to } of lines) dots.add(dot(from)).add(dot(to));
+  return [...failing, ...passing, ...dots].join('');
 }
 
 function badge(flanked) {
@@ -85,28 +124,29 @@ function badge(flanked) {
   return `<text class="${cls}" x="${COLS * CELL - 10}" y="${ROWS * CELL - 14}" text-anchor="end">${text}</text>`;
 }
 
-function sceneSvg(rule) {
-  const spec = RULE_LINES[rule];
+function sceneSvg(rule, lines) {
   return [
     `<svg class="pv-dg" viewBox="0 0 ${COLS * CELL} ${ROWS * CELL}" xmlns="http://www.w3.org/2000/svg" role="img">`,
     gridLines(),
     box(SCENE.ally, 'pv-dg-ally'),
     box(SCENE.flanker, 'pv-dg-ally'),
     box(SCENE.target, 'pv-dg-target'),
-    candidateDots(spec.dots),
-    flankLine(spec),
-    badge(spec.flanked),
+    linesSvg(lines),
+    badge(lines.some((l) => l.pass)),
     '</svg>',
   ].join('');
 }
 
 export function buildFlankingIllustrations() {
-  return Object.keys(RULE_LINES).map((value) => ({
-    value,
-    label: `${CHOICE_KEY}.${value}`,
-    flanked: RULE_LINES[value].flanked,
-    svg: sceneSvg(value),
-  }));
+  return Object.keys(RULE_POINTS).map((value) => {
+    const lines = candidateLines(value);
+    return {
+      value,
+      label: `${CHOICE_KEY}.${value}`,
+      flanked: lines.some((l) => l.pass),
+      svg: sceneSvg(value, lines),
+    };
+  });
 }
 
 const BUILDERS = {

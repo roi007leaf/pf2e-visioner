@@ -4,7 +4,7 @@
 
 ### Added
 
-- Large Creature Flanking Rule now shows a diagram card per option in Visioner Settings (Combat > Flanking). Each card renders the same scene (Large ally, Medium flanker, target) and shows which line the rule traces and whether it flanks; clicking a card selects that option.
+- Large Creature Flanking Rule is now picked from diagram cards in Visioner Settings (Combat > Flanking) instead of a dropdown. Each card renders the same scene (Large ally, Medium flanker, target) with every candidate line the rule would trace, passing lines in green, failing ones faint, plus a Flanked / Not flanked badge; clicking a card selects that option.
 - The PF2e flanking highlight line (hold Alt with a target) now originates from the square or corner that actually produced the flank when a house rule is active, instead of always drawing center-to-center.
 
 ### Tests

@@ -90,7 +90,7 @@ export function boundsCorners(bounds) {
   ];
 }
 
-function segmentLiesOnEdge(a, b, bounds) {
+export function segmentLiesOnEdge(a, b, bounds) {
   const horizontal = a.y === b.y && (a.y === bounds.top || a.y === bounds.bottom);
   const vertical = a.x === b.x && (a.x === bounds.left || a.x === bounds.right);
   return horizontal || vertical;

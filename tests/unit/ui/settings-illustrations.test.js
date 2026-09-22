@@ -27,25 +27,31 @@ describe('buildFlankingIllustrations', () => {
   test('raw card shows the failed center line', () => {
     const { svg, flanked } = byValue().raw;
     expect(flanked).toBe(false);
-    expect(svg).toContain('x1="100" y1="100" x2="250" y2="350"');
+    expect(svg).toContain('class="pv-dg-line pv-dg-fail" x1="250" y1="350" x2="100" y2="100"');
   });
 
-  test('anySquare card draws the passing square-center line', () => {
+  const count = (svg, cls) => (svg.match(new RegExp(`class="pv-dg-line ${cls}"`, 'g')) ?? []).length;
+
+  test('anySquare card draws every square-center line, passing one highlighted', () => {
     const { svg, flanked } = byValue().anySquare;
     expect(flanked).toBe(true);
-    expect(svg).toContain('x1="50" y1="150" x2="250" y2="350"');
+    expect(svg).toContain('class="pv-dg-line pv-dg-pass" x1="250" y1="350" x2="50" y2="150"');
+    expect(count(svg, 'pv-dg-pass') + count(svg, 'pv-dg-fail')).toBe(4);
+    expect(count(svg, 'pv-dg-pass')).toBe(1);
   });
 
-  test('anyCorner card draws a corner-to-corner line', () => {
+  test('anyCorner card draws every corner pair, passing ones highlighted', () => {
     const { svg, flanked } = byValue().anyCorner;
     expect(flanked).toBe(true);
-    expect(svg).toContain('x1="0" y1="200" x2="300" y2="300"');
+    expect(svg).toContain('class="pv-dg-line pv-dg-pass" x1="300" y1="300" x2="0" y2="200"');
+    expect(count(svg, 'pv-dg-pass') + count(svg, 'pv-dg-fail')).toBe(16);
+    expect(count(svg, 'pv-dg-pass')).toBeGreaterThan(0);
   });
 
   test('lineThrough card draws the center line as passing', () => {
     const { svg, flanked } = byValue().lineThrough;
     expect(flanked).toBe(true);
-    expect(svg).toContain('x1="100" y1="100" x2="250" y2="350"');
+    expect(svg).toContain('class="pv-dg-line pv-dg-pass" x1="250" y1="350" x2="100" y2="100"');
   });
 });
 

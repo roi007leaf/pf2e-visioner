@@ -42,22 +42,22 @@
                 </div>
               {{else if (eq item.inputType "number")}}
                 <input type="number" name="settings.{{item.key}}" value="{{item.value}}" min="{{item.min}}" max="{{item.max}}" step="{{item.step}}">
+              {{else if item.illustrations}}
+                <input type="hidden" name="settings.{{item.key}}" value="{{item.value}}">
+                <div class="pv-choice-cards">
+                  {{#each item.illustrations as |card|}}
+                    <button type="button" class="pv-choice-card {{#if card.selected}}active{{/if}}" data-action="pickIllustration" data-key="{{item.key}}" data-value="{{card.value}}">
+                      {{{card.svg}}}
+                      <span class="pv-choice-card-label">{{localize card.label}}</span>
+                    </button>
+                  {{/each}}
+                </div>
               {{else if (eq item.inputType "select")}}
                 <select name="settings.{{item.key}}">
                   {{#each item.choices as |opt|}}
                     <option value="{{opt.value}}" {{#if opt.selected}}selected{{/if}}>{{localize opt.label}}</option>
                   {{/each}}
                 </select>
-                {{#if item.illustrations}}
-                  <div class="pv-choice-cards">
-                    {{#each item.illustrations as |card|}}
-                      <button type="button" class="pv-choice-card {{#if card.selected}}active{{/if}}" data-action="pickIllustration" data-key="{{item.key}}" data-value="{{card.value}}">
-                        {{{card.svg}}}
-                        <span class="pv-choice-card-label">{{localize card.label}}</span>
-                      </button>
-                    {{/each}}
-                  </div>
-                {{/if}}
               {{else}}
                 <input type="text" name="settings.{{item.key}}" value="{{item.value}}">
               {{/if}}
