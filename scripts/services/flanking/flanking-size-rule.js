@@ -59,12 +59,25 @@ export function splitBoundsIntoSquareCenters(bounds, gridSize) {
   return centers;
 }
 
-export function anySquarePairOnOppositeSides(flankerBounds, allyBounds, targetBounds, gridSize) {
-  const flankerCenters = splitBoundsIntoSquareCenters(flankerBounds, gridSize);
-  const allyCenters = splitBoundsIntoSquareCenters(allyBounds, gridSize);
-  return flankerCenters.some((f) =>
-    allyCenters.some((a) => pointsOnOppositeSides(f, a, targetBounds)),
+function findPointPair(fromPoints, toPoints, accept) {
+  for (const from of fromPoints) {
+    for (const to of toPoints) {
+      if (accept(from, to)) return { from, to };
+    }
+  }
+  return null;
+}
+
+function findSquarePair(flankerBounds, allyBounds, targetBounds, gridSize) {
+  return findPointPair(
+    splitBoundsIntoSquareCenters(flankerBounds, gridSize),
+    splitBoundsIntoSquareCenters(allyBounds, gridSize),
+    (f, a) => pointsOnOppositeSides(f, a, targetBounds),
   );
+}
+
+export function anySquarePairOnOppositeSides(flankerBounds, allyBounds, targetBounds, gridSize) {
+  return findSquarePair(flankerBounds, allyBounds, targetBounds, gridSize) !== null;
 }
 
 export function boundsCorners(bounds) {
@@ -83,14 +96,16 @@ function segmentLiesOnEdge(a, b, bounds) {
   return horizontal || vertical;
 }
 
-export function anyCornerPairOnOppositeSides(flankerBounds, allyBounds, targetBounds) {
-  const flankerCorners = boundsCorners(flankerBounds);
-  const allyCorners = boundsCorners(allyBounds);
-  return flankerCorners.some((f) =>
-    allyCorners.some(
-      (a) => !segmentLiesOnEdge(f, a, targetBounds) && pointsOnOppositeSides(f, a, targetBounds),
-    ),
+function findCornerPair(flankerBounds, allyBounds, targetBounds) {
+  return findPointPair(
+    boundsCorners(flankerBounds),
+    boundsCorners(allyBounds),
+    (f, a) => !segmentLiesOnEdge(f, a, targetBounds) && pointsOnOppositeSides(f, a, targetBounds),
   );
+}
+
+export function anyCornerPairOnOppositeSides(flankerBounds, allyBounds, targetBounds) {
+  return findCornerPair(flankerBounds, allyBounds, targetBounds) !== null;
 }
 
 export function lineThroughTarget(flankerBounds, allyBounds, targetBounds) {
@@ -100,6 +115,23 @@ export function lineThroughTarget(flankerBounds, allyBounds, targetBounds) {
   return Object.values(rectEdges(targetBounds)).some((edge) =>
     segmentsIntersect(a, b, edge[0], edge[1]),
   );
+}
+
+export function findFlankingPair(flankerBounds, allyBounds, targetBounds, gridSize, rule) {
+  if (rule === FLANKING_SIZE_RULES.anySquare) {
+    return findSquarePair(flankerBounds, allyBounds, targetBounds, gridSize);
+  }
+  if (rule === FLANKING_SIZE_RULES.anyCorner) {
+    return findCornerPair(flankerBounds, allyBounds, targetBounds);
+  }
+  if (rule === FLANKING_SIZE_RULES.lineThrough && lineThroughTarget(flankerBounds, allyBounds, targetBounds)) {
+    return { from: centerOf(flankerBounds), to: centerOf(allyBounds) };
+  }
+  return null;
+}
+
+export function readFlankingSizeRule() {
+  return readRule();
 }
 
 function readRule() {

@@ -60,6 +60,23 @@
 .pv-form-row .pv-col-grow { flex:1 1 auto; }
 .pv-form-row .pv-col-static { flex:0 0 auto; display:flex; align-items:center; }
 .pv-note { opacity:.8; }
+.pv-choice-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; margin-top:8px; }
+.pv-choice-card { display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px; border:1px solid var(--color-border-light-primary, #7a7971); border-radius:8px; background:rgba(0,0,0,.15); cursor:pointer; line-height:1.1; }
+.pv-choice-card:hover { border-color:var(--color-border-highlight, #ff6400); }
+.pv-choice-card.active { border-color:var(--color-border-highlight, #ff6400); box-shadow:0 0 6px var(--color-shadow-highlight, #ff6400); }
+.pv-choice-card-label { font-size:.8em; text-align:center; }
+.pv-dg { width:100%; height:auto; }
+.pv-dg-grid { stroke:rgba(255,255,255,.18); stroke-width:2; }
+.pv-dg-ally { fill:rgba(74,144,226,.35); stroke:#4a90e2; stroke-width:4; }
+.pv-dg-target { fill:rgba(217,83,79,.35); stroke:#d9534f; stroke-width:4; }
+.pv-dg-candidate { fill:rgba(255,255,255,.35); }
+.pv-dg-dot { fill:#fff; }
+.pv-dg-line { stroke-width:6; stroke-linecap:round; }
+.pv-dg-line.pv-dg-pass { stroke:#3cb371; }
+.pv-dg-line.pv-dg-fail { stroke:#d9534f; stroke-dasharray:14 12; }
+.pv-dg-badge { font-size:34px; font-weight:700; paint-order:stroke; stroke:#000; stroke-width:6; }
+.pv-dg-badge.pv-dg-pass { fill:#3cb371; }
+.pv-dg-badge.pv-dg-fail { fill:#d9534f; }
 .pv-range-control { display:grid; grid-template-columns:minmax(0, 1fr) 3.5rem; gap:10px; align-items:center; }
 .pv-range-control input[type="range"] { width:100%; margin:0; }
 .pv-range-value { text-align:center; font-variant-numeric:tabular-nums; }

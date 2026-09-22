@@ -48,6 +48,16 @@
                     <option value="{{opt.value}}" {{#if opt.selected}}selected{{/if}}>{{localize opt.label}}</option>
                   {{/each}}
                 </select>
+                {{#if item.illustrations}}
+                  <div class="pv-choice-cards">
+                    {{#each item.illustrations as |card|}}
+                      <button type="button" class="pv-choice-card {{#if card.selected}}active{{/if}}" data-action="pickIllustration" data-key="{{item.key}}" data-value="{{card.value}}">
+                        {{{card.svg}}}
+                        <span class="pv-choice-card-label">{{localize card.label}}</span>
+                      </button>
+                    {{/each}}
+                  </div>
+                {{/if}}
               {{else}}
                 <input type="text" name="settings.{{item.key}}" value="{{item.value}}">
               {{/if}}

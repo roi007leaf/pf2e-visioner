@@ -5,6 +5,7 @@ import {
   anyCornerPairOnOppositeSides,
   anySquarePairOnOppositeSides,
   boundsCorners,
+  findFlankingPair,
   lineThroughTarget,
   pointsOnOppositeSides,
   splitBoundsIntoSquareCenters,
@@ -106,6 +107,36 @@ describe('lineThroughTarget', () => {
 
   test('center line missing target does not count', () => {
     expect(lineThroughTarget(mediumFlankerNE, largeAllyNW, target)).toBe(false);
+  });
+});
+
+describe('findFlankingPair', () => {
+  test('anySquare returns the square centers that produced the flank', () => {
+    const pair = findFlankingPair(mediumFlankerSE, largeAllyNW, target, GRID, 'anySquare');
+    expect(pair.from).toEqual({ x: 250, y: 350 });
+    expect([{ x: 50, y: 150 }, { x: 150, y: 150 }, { x: 50, y: 50 }]).toContainEqual(pair.to);
+    expect(pointsOnOppositeSides(pair.from, pair.to, target)).toBe(true);
+  });
+
+  test('anyCorner returns corner points', () => {
+    const pair = findFlankingPair(mediumFlankerE, mediumAllyN, target, GRID, 'anyCorner');
+    expect(boundsCorners(mediumFlankerE)).toContainEqual(pair.from);
+    expect(boundsCorners(mediumAllyN)).toContainEqual(pair.to);
+  });
+
+  test('lineThrough returns centers', () => {
+    expect(findFlankingPair(mediumFlankerSE, largeAllyNW, target, GRID, 'lineThrough')).toEqual({
+      from: { x: 250, y: 350 },
+      to: { x: 100, y: 100 },
+    });
+  });
+
+  test('returns null when no pair flanks', () => {
+    expect(findFlankingPair(mediumFlankerNE, largeAllyNW, target, GRID, 'anySquare')).toBeNull();
+  });
+
+  test('raw returns null', () => {
+    expect(findFlankingPair(mediumFlankerE, mediumAllyW, target, GRID, 'raw')).toBeNull();
   });
 });
 

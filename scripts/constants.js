@@ -1034,6 +1034,7 @@ export const DEFAULT_SETTINGS = {
       lineThrough: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.lineThrough',
     },
     default: 'raw',
+    illustration: 'flankingSizeRule',
   },
 
   autoCover: {

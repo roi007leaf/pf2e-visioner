@@ -21,6 +21,7 @@ import { exposeVisionerGlobalsAsync } from './services/visioner-globals.js';
 import { createPeekManager } from './services/Peek/peek-bootstrap.js';
 import { showPerceptiveConflictBanner } from './integrations/module-compatibility-warnings.js';
 import { registerSenseSuppressionVisionIntegration } from './regions/sense-suppression-vision-integration.js';
+import { registerFlankingHighlightOriginHooks } from './services/flanking/flanking-highlight-origin.js';
 
 let initializedAutoVisibilitySystem = null;
 
@@ -140,6 +141,8 @@ Hooks.once('init', async () => {
 
     // Initialize detection wrapper
     initializeDetectionWrapper();
+
+    registerFlankingHighlightOriginHooks();
 
     // Initialize dialog scroll fix
     initializeDialogScrollFix();

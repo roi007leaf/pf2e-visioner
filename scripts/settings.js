@@ -4,6 +4,7 @@
 
 import { reinjectChatAutomationStyles } from './chat/chat-automation-styles.js';
 import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
+import { buildSettingIllustrations } from './ui/settings-illustrations.js';
 import { loadSharedUICSS } from './css-loader.js';
 import { setCachedSettingValue } from './utils/setting-value-cache.js';
 import { refreshPeekBlockSceneTool } from './services/Peek/peek-block-mode.js';
@@ -122,6 +123,23 @@ function isGroupedKey(key) {
 }
 
 let currentVisionerSettingsApp = null;
+
+function wireIllustrationCards(content) {
+  content.querySelectorAll('[data-action="pickIllustration"]').forEach((card) => {
+    card.addEventListener('click', () => selectIllustration(content, card));
+  });
+}
+
+function selectIllustration(content, card) {
+  const { key, value } = card.dataset;
+  const select = content.querySelector(`[name="settings.${key}"]`);
+  if (!select) return;
+  select.value = value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  card.closest('.pv-choice-cards')
+    ?.querySelectorAll('.pv-choice-card')
+    .forEach((el) => el.classList.toggle('active', el === card));
+}
 
 export function settingInputPresentation(config = {}) {
   let inputType = 'text';
@@ -305,6 +323,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           value: current,
           inputType,
           choices: choicesList,
+          illustrations: buildSettingIllustrations(cfg, current),
           min: presentation.min,
           max: presentation.max,
           step: presentation.step,
@@ -338,6 +357,8 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           } catch { }
         });
       });
+
+      wireIllustrationCards(content);
 
       // Keep range values readable while dragging; settings still apply via Save.
       content.querySelectorAll('[data-pv-range]').forEach((input) => {

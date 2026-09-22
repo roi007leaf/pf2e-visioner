@@ -395,7 +395,11 @@
                     "anySquare": "任意占据格",
                     "anyCorner": "任意角点（非常宽松）",
                     "lineThrough": "穿过目标的连线"
-                }
+                },
+              "DIAGRAM": {
+                "flanked": "夹击",
+                "notFlanked": "未夹击"
+              }
             },
             "AUTO_COVER": {
                 "name": "启用自动掩蔽",

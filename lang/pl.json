@@ -867,6 +867,10 @@
           "anySquare": "Dowolne zajęte pole",
           "anyCorner": "Dowolny róg (bardzo hojne)",
           "lineThrough": "Linia przez cel"
+        },
+        "DIAGRAM": {
+          "flanked": "Flankowany",
+          "notFlanked": "Nieflankowany"
         }
       },
       "AUTO_COVER": {

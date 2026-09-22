@@ -530,6 +530,10 @@
           "anySquare": "Chaque case occupée",
           "anyCorner": "Chaque coin (très généreux)",
           "lineThrough": "Ligne à travers la cible"
+        },
+        "DIAGRAM": {
+          "flanked": "En tenaille",
+          "notFlanked": "Pas en tenaille"
         }
       },
       "AUTO_COVER": {

@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.9.1] - 2026-09-22
+
+### Added
+
+- Large Creature Flanking Rule now shows a diagram card per option in Visioner Settings (Combat > Flanking). Each card renders the same scene (Large ally, Medium flanker, target) and shows which line the rule traces and whether it flanks; clicking a card selects that option.
+- The PF2e flanking highlight line (hold Alt with a target) now originates from the square or corner that actually produced the flank when a house rule is active, instead of always drawing center-to-center.
+
+### Tests
+
+- Added unit coverage for the flanking pair finder, the highlight-origin renderer patch (RAW passthrough, rule-driven line origin, center fallback) and the settings diagram builder.
+
 ## [8.9.0] - 2026-09-22
 
 ### Added

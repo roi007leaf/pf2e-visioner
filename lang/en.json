@@ -930,6 +930,10 @@
           "anySquare": "Any occupied square",
           "anyCorner": "Any corner (very generous)",
           "lineThrough": "Line through target"
+        },
+        "DIAGRAM": {
+          "flanked": "Flanked",
+          "notFlanked": "Not flanked"
         }
       },
       "AUTO_COVER": {
