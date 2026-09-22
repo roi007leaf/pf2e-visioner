@@ -56,19 +56,6 @@ export async function onTokenCreated(scene, tokenDoc) {
   } catch (error) {
     console.error('PF2E Visioner: Error in onTokenCreated:', error);
   }
-  // Ensure Vision is enabled on newly created token documents
-  try {
-    const desired = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
-    if (tokenDoc?.actor?.type === 'npc') {
-      const currentEnabled = tokenDoc?.sight?.enabled ?? tokenDoc?.vision ?? undefined;
-      if (currentEnabled !== desired) {
-        await tokenDoc.update?.(
-          { vision: desired, sight: { enabled: desired } },
-          { diff: false, render: false, animate: false },
-        );
-      }
-    }
-  } catch (_) { }
   setTimeout(async () => {
     await updateTokenVisuals();
     // Add hover tooltip listeners to the new token
@@ -85,6 +72,16 @@ export async function onTokenCreated(scene, tokenDoc) {
  * Check and restore party token state if applicable
  * @param {TokenDocument} tokenDoc - The token to check
  */
+export function applyNpcVisionOnPreCreate(tokenDoc) {
+  try {
+    if (tokenDoc?.actor?.type !== 'npc') return;
+    const desired = !!game.settings.get(MODULE_ID, 'enableAllTokensVision');
+    const current = tokenDoc?.sight?.enabled ?? tokenDoc?.vision ?? undefined;
+    if (current === desired) return;
+    tokenDoc.updateSource?.({ sight: { enabled: desired } });
+  } catch (_) {}
+}
+
 async function checkAndRestorePartyTokenState(tokenDoc) {
   try {
     // First try to restore from deleted token cache (for undo operations)
@@ -193,6 +190,7 @@ export function registerTokenHooks() {
   globalThis.libWrapper?.register(MODULE_ID, 'CONFIG.Token.documentClass.deleteDocuments', trackTokenDeletion, 'WRAPPER');
   // Hook into token creation (use preCreateToken for better timing)
   Hooks.on('preCreateToken', onTokenCreated);
+  Hooks.on('preCreateToken', applyNpcVisionOnPreCreate);
 
   // Hook into token deletion
   Hooks.on('deleteToken', onTokenDeleted);

@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.8.11] - 2026-09-22
+
+### Fixed
+
+- "Vision for NPCs" setting works again for newly placed tokens. The pre-create hook received the raw creation data instead of the token document, so the NPC vision toggle never applied to compendium drops or actors imported after world load. Vision is now set on the token document via `updateSource` before creation.
+
+### Tests
+
+- Added unit coverage for the NPC vision pre-create handler (NPC on/off, non-NPC skip, already-matching skip).
+
 ## [8.8.10] - 2026-09-21
 
 ### Fixed
