@@ -924,11 +924,11 @@
       },
       "FLANKING_SIZE_RULE": {
         "name": "Large Creature Flanking Rule",
-        "hint": "How flanking lines are traced for Large and larger creatures. RAW: center-to-center (PF2e default). Any Occupied Square: trace from the center of every square each creature occupies; flanking if any pair crosses opposite sides/corners. Any Corner: trace between the outer corners of each creature's space; very generous, even two Medium creatures on perpendicular sides can flank. Line Through Target: center-to-center line only has to pass through the target's space.",
+        "hint": "How the flanking line is traced for Large and larger creatures. Pick an option below; each diagram shows the lines that rule would trace on the same scene.",
         "CHOICES": {
           "raw": "RAW (center to center)",
           "anySquare": "Any occupied square",
-          "anyCorner": "Any corner (very generous)",
+          "anyCorner": "Any corner",
           "lineThrough": "Line through target"
         },
         "DIAGRAM": {

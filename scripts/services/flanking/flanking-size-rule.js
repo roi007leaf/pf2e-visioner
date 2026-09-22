@@ -59,25 +59,52 @@ export function splitBoundsIntoSquareCenters(bounds, gridSize) {
   return centers;
 }
 
+function squaredDistance(a, b) {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+}
+
 function findPointPair(fromPoints, toPoints, accept) {
+  let best = null;
+  let bestDistance = Infinity;
   for (const from of fromPoints) {
     for (const to of toPoints) {
-      if (accept(from, to)) return { from, to };
+      if (!accept(from, to)) continue;
+      const distance = squaredDistance(from, to);
+      if (distance >= bestDistance) continue;
+      best = { from, to };
+      bestDistance = distance;
     }
   }
-  return null;
+  return best;
+}
+
+function anyPointPair(fromPoints, toPoints, accept) {
+  return fromPoints.some((from) => toPoints.some((to) => accept(from, to)));
+}
+
+function squarePairAccept(targetBounds) {
+  return (from, to) => pointsOnOppositeSides(from, to, targetBounds);
+}
+
+function cornerPairAccept(targetBounds) {
+  return (from, to) =>
+    !segmentLiesOnEdge(from, to, targetBounds) && pointsOnOppositeSides(from, to, targetBounds);
 }
 
 function findSquarePair(flankerBounds, allyBounds, targetBounds, gridSize) {
   return findPointPair(
     splitBoundsIntoSquareCenters(flankerBounds, gridSize),
     splitBoundsIntoSquareCenters(allyBounds, gridSize),
-    (f, a) => pointsOnOppositeSides(f, a, targetBounds),
+    squarePairAccept(targetBounds),
   );
 }
 
 export function anySquarePairOnOppositeSides(flankerBounds, allyBounds, targetBounds, gridSize) {
-  return findSquarePair(flankerBounds, allyBounds, targetBounds, gridSize) !== null;
+  return anyPointPair(
+    splitBoundsIntoSquareCenters(flankerBounds, gridSize),
+    splitBoundsIntoSquareCenters(allyBounds, gridSize),
+    squarePairAccept(targetBounds),
+  );
 }
 
 export function boundsCorners(bounds) {
@@ -100,12 +127,16 @@ function findCornerPair(flankerBounds, allyBounds, targetBounds) {
   return findPointPair(
     boundsCorners(flankerBounds),
     boundsCorners(allyBounds),
-    (f, a) => !segmentLiesOnEdge(f, a, targetBounds) && pointsOnOppositeSides(f, a, targetBounds),
+    cornerPairAccept(targetBounds),
   );
 }
 
 export function anyCornerPairOnOppositeSides(flankerBounds, allyBounds, targetBounds) {
-  return findCornerPair(flankerBounds, allyBounds, targetBounds) !== null;
+  return anyPointPair(
+    boundsCorners(flankerBounds),
+    boundsCorners(allyBounds),
+    cornerPairAccept(targetBounds),
+  );
 }
 
 export function lineThroughTarget(flankerBounds, allyBounds, targetBounds) {

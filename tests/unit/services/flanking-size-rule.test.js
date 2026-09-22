@@ -8,6 +8,7 @@ import {
   findFlankingPair,
   lineThroughTarget,
   pointsOnOppositeSides,
+  segmentLiesOnEdge,
   splitBoundsIntoSquareCenters,
   wrapOnOppositeSides,
 } from '../../../scripts/services/flanking/flanking-size-rule.js';
@@ -111,17 +112,51 @@ describe('lineThroughTarget', () => {
 });
 
 describe('findFlankingPair', () => {
-  test('anySquare returns the square centers that produced the flank', () => {
+  const dist = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+
+  const shortestPassing = (fromPoints, toPoints, accept = () => true) => {
+    const passing = [];
+    for (const from of fromPoints) {
+      for (const to of toPoints) {
+        if (accept(from, to) && pointsOnOppositeSides(from, to, target)) passing.push(dist(from, to));
+      }
+    }
+    return Math.min(...passing);
+  };
+
+  test('anySquare returns the closest square centers that flank', () => {
     const pair = findFlankingPair(mediumFlankerSE, largeAllyNW, target, GRID, 'anySquare');
-    expect(pair.from).toEqual({ x: 250, y: 350 });
-    expect([{ x: 50, y: 150 }, { x: 150, y: 150 }, { x: 50, y: 50 }]).toContainEqual(pair.to);
     expect(pointsOnOppositeSides(pair.from, pair.to, target)).toBe(true);
+    expect(dist(pair.from, pair.to)).toBe(
+      shortestPassing(
+        splitBoundsIntoSquareCenters(mediumFlankerSE, GRID),
+        splitBoundsIntoSquareCenters(largeAllyNW, GRID),
+      ),
+    );
   });
 
-  test('anyCorner returns corner points', () => {
+  test('anyCorner returns the closest flanking corner pair', () => {
     const pair = findFlankingPair(mediumFlankerE, mediumAllyN, target, GRID, 'anyCorner');
     expect(boundsCorners(mediumFlankerE)).toContainEqual(pair.from);
     expect(boundsCorners(mediumAllyN)).toContainEqual(pair.to);
+    expect(dist(pair.from, pair.to)).toBe(
+      shortestPassing(
+        boundsCorners(mediumFlankerE),
+        boundsCorners(mediumAllyN),
+        (from, to) => !segmentLiesOnEdge(from, to, target),
+      ),
+    );
+  });
+
+  test('anySquare on a Huge ally still picks the nearest flanking square', () => {
+    const hugeAlly = rect(0, 0, 300, 300);
+    const pair = findFlankingPair(mediumFlankerSE, hugeAlly, target, GRID, 'anySquare');
+    expect(dist(pair.from, pair.to)).toBe(
+      shortestPassing(
+        splitBoundsIntoSquareCenters(mediumFlankerSE, GRID),
+        splitBoundsIntoSquareCenters(hugeAlly, GRID),
+      ),
+    );
   });
 
   test('lineThrough returns centers', () => {

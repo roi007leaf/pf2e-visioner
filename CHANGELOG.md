@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.9.2] - 2026-09-22
+
+### Changed
+
+- The flanking highlight line now uses the closest pair of points that produces the flank instead of the first one found, so the drawn angle matches what players expect.
+- Reworded the Large Creature Flanking Rule options: the diagrams carry the explanation, and Any Corner is no longer singled out as the generous option since Line Through Target is looser than RAW in cases Any Corner is not.
+
+### Tests
+
+- Flanking pair tests now assert the returned pair is the shortest passing one for each rule.
+
 ## [8.9.1] - 2026-09-22
 
 ### Added
