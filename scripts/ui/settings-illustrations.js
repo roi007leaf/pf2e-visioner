@@ -1,5 +1,7 @@
 import {
+  angularSpanFrom,
   lineThroughTarget,
+  oppositeArcsFlank,
   pointsOnOppositeSides,
   segmentLiesOnEdge,
 } from '../services/flanking/flanking-size-rule.js';
@@ -21,6 +23,7 @@ const RULE_POINTS = {
   raw: 'center',
   anySquare: 'squares',
   anyCorner: 'corners',
+  oppositeArcs: 'center',
   lineThrough: 'center',
 };
 
@@ -89,6 +92,7 @@ function boundsOf(rect) {
 
 function pairPasses(rule, from, to) {
   const target = boundsOf(SCENE.target);
+  if (rule === 'oppositeArcs') return oppositeArcsFlank(boundsOf(SCENE.flanker), boundsOf(SCENE.ally), target);
   if (rule === 'lineThrough') return lineThroughTarget(boundsOf(SCENE.flanker), boundsOf(SCENE.ally), target);
   if (rule === 'anyCorner' && segmentLiesOnEdge(from, to, target)) return false;
   return pointsOnOppositeSides(from, to, target);
@@ -118,6 +122,26 @@ function linesSvg(lines) {
   return [...failing, ...passing, ...dots].join('');
 }
 
+function arcPath(span, radius) {
+  const origin = centerOf(SCENE.target);
+  const point = (angle) => ({
+    x: (origin.x + Math.cos(angle) * radius).toFixed(1),
+    y: (origin.y + Math.sin(angle) * radius).toFixed(1),
+  });
+  const from = point(span.start);
+  const to = point(span.end);
+  const large = span.end - span.start > Math.PI ? 1 : 0;
+  return `<path class="pv-dg-arc" d="M ${from.x} ${from.y} A ${radius} ${radius} 0 ${large} 1 ${to.x} ${to.y}"/>`;
+}
+
+function arcsSvg(rule) {
+  if (rule !== 'oppositeArcs') return '';
+  const origin = centerOf(SCENE.target);
+  const flankerSpan = angularSpanFrom(origin, boundsOf(SCENE.flanker));
+  const allySpan = angularSpanFrom(origin, boundsOf(SCENE.ally));
+  return arcPath(flankerSpan, 70) + arcPath(allySpan, 60);
+}
+
 function badge(flanked) {
   const text = localize(`${DIAGRAM_KEY}.${flanked ? 'flanked' : 'notFlanked'}`);
   const cls = flanked ? 'pv-dg-badge pv-dg-pass' : 'pv-dg-badge pv-dg-fail';
@@ -131,6 +155,7 @@ function sceneSvg(rule, lines) {
     box(SCENE.ally, 'pv-dg-ally'),
     box(SCENE.flanker, 'pv-dg-ally'),
     box(SCENE.target, 'pv-dg-target'),
+    arcsSvg(rule),
     linesSvg(lines),
     badge(lines.some((l) => l.pass)),
     '</svg>',

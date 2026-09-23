@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.9.3] - 2026-09-23
+
+### Added
+
+- New flanking option, Opposite arcs (defender's view): from the target's centre, each creature covers an arc, and the target is flanked when the two arcs face each other head on. It is the only option judged from the defender's side rather than from a traced line, so it also works on gridless scenes and for Tiny creatures, where the other house rules fall back to RAW.
+
+### Changed
+
+- The rule hint no longer says Large creatures only, since Opposite arcs changes results at every size.
+
+### Tests
+
+- Added coverage for the angular span helper, the arc comparison (opposite, perpendicular, same side, Tiny), its highlight line and its diagram card.
+
 ## [8.9.2] - 2026-09-22
 
 ### Changed

@@ -924,11 +924,12 @@
       },
       "FLANKING_SIZE_RULE": {
         "name": "Large Creature Flanking Rule",
-        "hint": "How the flanking line is traced for Large and larger creatures. Pick an option below; each diagram shows the lines that rule would trace on the same scene.",
+        "hint": "How the flanking line is traced. Pick an option below; each diagram shows the lines that rule would trace on the same scene.",
         "CHOICES": {
           "raw": "RAW (center to center)",
           "anySquare": "Any occupied square",
           "anyCorner": "Any corner",
+          "oppositeArcs": "Opposite arcs (defender's view)",
           "lineThrough": "Line through target"
         },
         "DIAGRAM": {

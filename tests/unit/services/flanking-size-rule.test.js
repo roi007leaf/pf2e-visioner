@@ -5,8 +5,10 @@ import {
   anyCornerPairOnOppositeSides,
   anySquarePairOnOppositeSides,
   boundsCorners,
+  angularSpanFrom,
   findFlankingPair,
   lineThroughTarget,
+  oppositeArcsFlank,
   pointsOnOppositeSides,
   segmentLiesOnEdge,
   splitBoundsIntoSquareCenters,
@@ -111,6 +113,41 @@ describe('lineThroughTarget', () => {
   });
 });
 
+describe('angularSpanFrom', () => {
+  test('span of a square directly east spans its corners', () => {
+    const span = angularSpanFrom({ x: 150, y: 250 }, mediumFlankerE);
+    expect(span.start).toBeCloseTo(-Math.PI / 4, 5);
+    expect(span.end).toBeCloseTo(Math.PI / 4, 5);
+  });
+
+  test('span of a square directly north is centred on -90 degrees', () => {
+    const span = angularSpanFrom({ x: 150, y: 250 }, mediumAllyN);
+    expect((span.start + span.end) / 2).toBeCloseTo(-Math.PI / 2, 5);
+  });
+});
+
+describe('oppositeArcsFlank', () => {
+  test('opposite sides flank', () => {
+    expect(oppositeArcsFlank(mediumFlankerE, mediumAllyW, target)).toBe(true);
+  });
+
+  test('perpendicular mediums flank because their arcs touch head on', () => {
+    expect(oppositeArcsFlank(mediumFlankerE, mediumAllyN, target)).toBe(true);
+  });
+
+  test('large ally diagonal to the target flanks', () => {
+    expect(oppositeArcsFlank(mediumFlankerSE, largeAllyNW, target)).toBe(true);
+  });
+
+  test('two allies on the same side do not flank', () => {
+    expect(oppositeArcsFlank(mediumFlankerNE, largeAllyNW, target)).toBe(false);
+  });
+
+  test('tiny flanker still works', () => {
+    expect(oppositeArcsFlank(rect(200, 200, 50, 50), mediumAllyW, target)).toBe(true);
+  });
+});
+
 describe('findFlankingPair', () => {
   const dist = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
@@ -170,6 +207,15 @@ describe('findFlankingPair', () => {
     expect(findFlankingPair(mediumFlankerNE, largeAllyNW, target, GRID, 'anySquare')).toBeNull();
   });
 
+  test('oppositeArcs returns both space centres', () => {
+    const pair = findFlankingPair(mediumFlankerE, mediumAllyW, target, GRID, 'oppositeArcs');
+    expect(pair).toEqual({ from: { x: 250, y: 250 }, to: { x: 50, y: 250 } });
+  });
+
+  test('oppositeArcs returns null when the arcs do not oppose', () => {
+    expect(findFlankingPair(mediumFlankerNE, largeAllyNW, target, GRID, 'oppositeArcs')).toBeNull();
+  });
+
   test('raw returns null', () => {
     expect(findFlankingPair(mediumFlankerE, mediumAllyW, target, GRID, 'raw')).toBeNull();
   });
@@ -209,6 +255,20 @@ describe('wrapOnOppositeSides', () => {
   test('anyCorner setting flanks with perpendicular mediums', () => {
     global.game.settings.set(MODULE_ID, 'flankingSizeRule', 'anyCorner');
     expect(wrapOnOppositeSides(wrapped, token(mediumFlankerE), token(mediumAllyN), token(target))).toBe(true);
+    expect(wrapped).not.toHaveBeenCalled();
+  });
+
+  test('oppositeArcs setting applies on a gridless scene', () => {
+    global.canvas.grid.isGridless = true;
+    global.game.settings.set(MODULE_ID, 'flankingSizeRule', 'oppositeArcs');
+    expect(wrapOnOppositeSides(wrapped, token(mediumFlankerSE), token(largeAllyNW), token(target))).toBe(true);
+    expect(wrapped).not.toHaveBeenCalled();
+  });
+
+  test('oppositeArcs setting applies to a Tiny flanker', () => {
+    global.game.settings.set(MODULE_ID, 'flankingSizeRule', 'oppositeArcs');
+    const tiny = token(rect(200, 200, 50, 50));
+    expect(wrapOnOppositeSides(wrapped, tiny, token(mediumAllyW), token(target))).toBe(true);
     expect(wrapped).not.toHaveBeenCalled();
   });
 

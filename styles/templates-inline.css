@@ -71,6 +71,7 @@
 .pv-dg-target { fill:rgba(217,83,79,.35); stroke:#d9534f; stroke-width:4; }
 .pv-dg-candidate { fill:rgba(255,255,255,.35); }
 .pv-dg-dot { fill:#fff; }
+.pv-dg-arc { fill:none; stroke:#f0ad4e; stroke-width:5; stroke-linecap:round; }
 .pv-dg-line { stroke-width:6; stroke-linecap:round; }
 .pv-dg-line.pv-dg-pass { stroke:#3cb371; }
 .pv-dg-line.pv-dg-fail { stroke:#d9534f; stroke-opacity:.45; stroke-width:4; stroke-dasharray:14 12; }

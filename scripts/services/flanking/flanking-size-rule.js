@@ -4,6 +4,7 @@ export const FLANKING_SIZE_RULES = Object.freeze({
   raw: 'raw',
   anySquare: 'anySquare',
   anyCorner: 'anyCorner',
+  oppositeArcs: 'oppositeArcs',
   lineThrough: 'lineThrough',
 });
 
@@ -139,6 +140,41 @@ export function anyCornerPairOnOppositeSides(flankerBounds, allyBounds, targetBo
   );
 }
 
+const TWO_PI = Math.PI * 2;
+
+function normalizeAngle(angle) {
+  const wrapped = angle % TWO_PI;
+  return wrapped < 0 ? wrapped + TWO_PI : wrapped;
+}
+
+export function angularSpanFrom(origin, bounds) {
+  const base = Math.atan2(centerOf(bounds).y - origin.y, centerOf(bounds).x - origin.x);
+  let min = 0;
+  let max = 0;
+  for (const corner of boundsCorners(bounds)) {
+    const offset = normalizeAngle(Math.atan2(corner.y - origin.y, corner.x - origin.x) - base + Math.PI) - Math.PI;
+    if (offset < min) min = offset;
+    if (offset > max) max = offset;
+  }
+  return { start: base + min, end: base + max };
+}
+
+function spansOverlap(a, b) {
+  const widthA = a.end - a.start;
+  const widthB = b.end - b.start;
+  return normalizeAngle(b.start - a.start) <= widthA || normalizeAngle(a.start - b.start) <= widthB;
+}
+
+export function oppositeArcsFlank(flankerBounds, allyBounds, targetBounds) {
+  const origin = centerOf(targetBounds);
+  const flankerSpan = angularSpanFrom(origin, flankerBounds);
+  const allySpan = angularSpanFrom(origin, allyBounds);
+  return spansOverlap(flankerSpan, {
+    start: allySpan.start + Math.PI,
+    end: allySpan.end + Math.PI,
+  });
+}
+
 export function lineThroughTarget(flankerBounds, allyBounds, targetBounds) {
   const a = centerOf(flankerBounds);
   const b = centerOf(allyBounds);
@@ -154,6 +190,11 @@ export function findFlankingPair(flankerBounds, allyBounds, targetBounds, gridSi
   }
   if (rule === FLANKING_SIZE_RULES.anyCorner) {
     return findCornerPair(flankerBounds, allyBounds, targetBounds);
+  }
+  if (rule === FLANKING_SIZE_RULES.oppositeArcs) {
+    return oppositeArcsFlank(flankerBounds, allyBounds, targetBounds)
+      ? { from: centerOf(flankerBounds), to: centerOf(allyBounds) }
+      : null;
   }
   if (rule === FLANKING_SIZE_RULES.lineThrough && lineThroughTarget(flankerBounds, allyBounds, targetBounds)) {
     return { from: centerOf(flankerBounds), to: centerOf(allyBounds) };
@@ -177,8 +218,9 @@ function boundsSmallerThanSquare(bounds, gridSize) {
   return bounds.width < gridSize || bounds.height < gridSize;
 }
 
-function canApplyRule(flankerBounds, allyBounds, targetBounds, gridSize) {
+function canApplyRule(rule, flankerBounds, allyBounds, targetBounds, gridSize) {
   if (!flankerBounds || !allyBounds || !targetBounds) return false;
+  if (rule === FLANKING_SIZE_RULES.oppositeArcs) return true;
   if (!gridSize || canvas?.grid?.isGridless) return false;
   return !boundsSmallerThanSquare(flankerBounds, gridSize) && !boundsSmallerThanSquare(allyBounds, gridSize);
 }
@@ -190,8 +232,11 @@ export function wrapOnOppositeSides(wrapped, flanker, ally, target) {
   const flankerBounds = flanker?.mechanicalBounds;
   const allyBounds = ally?.mechanicalBounds;
   const targetBounds = target?.mechanicalBounds;
-  if (!canApplyRule(flankerBounds, allyBounds, targetBounds, gridSize)) {
+  if (!canApplyRule(rule, flankerBounds, allyBounds, targetBounds, gridSize)) {
     return wrapped(flanker, ally, target);
+  }
+  if (rule === FLANKING_SIZE_RULES.oppositeArcs) {
+    return oppositeArcsFlank(flankerBounds, allyBounds, targetBounds);
   }
   if (rule === FLANKING_SIZE_RULES.lineThrough) {
     return lineThroughTarget(flankerBounds, allyBounds, targetBounds);

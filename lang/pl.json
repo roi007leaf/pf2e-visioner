@@ -861,11 +861,12 @@
       },
       "FLANKING_SIZE_RULE": {
         "name": "Zasada flankowania dużych stworzeń",
-        "hint": "Jak wyznaczana jest linia flankowania dla stworzeń Dużych i większych. Wybierz opcję poniżej; każdy diagram pokazuje linie, które dana zasada wyznaczyłaby w tej samej scenie.",
+        "hint": "Jak wyznaczana jest linia flankowania. Wybierz opcję poniżej; każdy diagram pokazuje linie, które dana zasada wyznaczyłaby w tej samej scenie.",
         "CHOICES": {
           "raw": "RAW (środek do środka)",
           "anySquare": "Dowolne zajęte pole",
           "anyCorner": "Dowolny róg",
+          "oppositeArcs": "Przeciwne łuki (z perspektywy broniącego)",
           "lineThrough": "Linia przez cel"
         },
         "DIAGRAM": {

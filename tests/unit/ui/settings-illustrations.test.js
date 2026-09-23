@@ -13,6 +13,7 @@ describe('buildFlankingIllustrations', () => {
       'raw',
       'anySquare',
       'anyCorner',
+      'oppositeArcs',
       'lineThrough',
     ]);
   });
@@ -46,6 +47,13 @@ describe('buildFlankingIllustrations', () => {
     expect(svg).toContain('class="pv-dg-line pv-dg-pass" x1="300" y1="300" x2="0" y2="200"');
     expect(count(svg, 'pv-dg-pass') + count(svg, 'pv-dg-fail')).toBe(16);
     expect(count(svg, 'pv-dg-pass')).toBeGreaterThan(0);
+  });
+
+  test('oppositeArcs card draws the centre line and both arcs', () => {
+    const { svg, flanked } = byValue().oppositeArcs;
+    expect(flanked).toBe(true);
+    expect(svg).toContain('class="pv-dg-line pv-dg-pass" x1="250" y1="350" x2="100" y2="100"');
+    expect((svg.match(/class="pv-dg-arc"/g) ?? []).length).toBe(2);
   });
 
   test('lineThrough card draws the center line as passing', () => {

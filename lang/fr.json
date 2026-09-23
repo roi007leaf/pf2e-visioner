@@ -524,11 +524,12 @@
       },
       "FLANKING_SIZE_RULE": {
         "name": "Règle de prise en tenaille des grandes créatures",
-        "hint": "Comment la ligne de prise en tenaille est tracée pour les créatures de taille Grande ou plus. Choisissez une option ci-dessous ; chaque diagramme montre les lignes que cette règle tracerait sur la même scène.",
+        "hint": "Comment la ligne de prise en tenaille est tracée. Choisissez une option ci-dessous ; chaque diagramme montre les lignes que cette règle tracerait sur la même scène.",
         "CHOICES": {
           "raw": "RAW (centre à centre)",
           "anySquare": "Chaque case occupée",
           "anyCorner": "Chaque coin",
+          "oppositeArcs": "Arcs opposés (point de vue du défenseur)",
           "lineThrough": "Ligne à travers la cible"
         },
         "DIAGRAM": {
