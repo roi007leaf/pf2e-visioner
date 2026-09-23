@@ -1,9 +1,9 @@
 // Additional live fixtures and read-only probes. Every mutation is confined to
 // marked scene documents; this file never changes users or world settings.
 const MODULE = 'pf2e-visioner';
-export async function fixtureCharacterItems(runId) {
+export async function fixtureCharacterItems(runId, classSlug = 'fighter') {
   const items = [];
-  for (const [packId, slug] of [['pf2e.ancestries', 'human'], ['pf2e.classes', 'fighter']]) {
+  for (const [packId, slug] of [['pf2e.ancestries', 'human'], ['pf2e.classes', classSlug]]) {
     const pack = game.packs.get(packId);
     if (!pack) throw Error(`Prerequisite: ${packId} compendium required for character fixture`);
     const index = await pack.getIndex({ fields: ['system.slug'] });
@@ -60,7 +60,9 @@ export async function mutateExtra({ fixture, operation, value }) {
       if (value.selection) for (const rule of data.system.rules ?? []) if (rule.key === 'ChoiceSet') rule.selection = value.selection;
       data.flags = { ...data.flags, [MODULE]: { liveTestRun: run, liveFeat: value.slug } };
       const created = await actor.createEmbeddedDocuments('Item', [data]);
-      if (created.length !== 1 || !actor.items.has(created[0].id)) throw Error(`Fixture setup failed: actor did not accept feat ${value.slug}`);
+      if (!created.some((item) => item.slug === value.slug && actor.items.has(item.id))) {
+        throw Error(`Fixture setup failed: actor did not accept feat ${value.slug}`);
+      }
       break;
     }
     case 'feat-delete': {
@@ -68,6 +70,40 @@ export async function mutateExtra({ fixture, operation, value }) {
       const ids = actor.items.filter(i => i.getFlag(MODULE, 'liveTestRun') === run && i.getFlag(MODULE, 'liveFeat') === value.slug).map(i => i.id);
       if (!ids.length) throw Error('Test feat missing');
       await actor.deleteEmbeddedDocuments('Item', ids); break;
+    }
+    case 'combat-start-character-kit': {
+      const actor = target.actor;
+      const source = value === 'defend'
+        ? [['pf2e.actionspf2e', 'defend'], ['pf2e.equipment-srd', 'steel-shield']]
+        : [['pf2e.actionspf2e', 'rage']];
+      const documents = [];
+      for (const [packId, slug] of source) {
+        const pack = game.packs.get(packId);
+        if (!pack) throw Error(`Prerequisite: ${packId} compendium required`);
+        const index = await pack.getIndex({ fields: ['system.slug'] });
+        const entry = index.find((item) => item.system?.slug === slug);
+        if (!entry) throw Error(`Prerequisite: ${slug} item required`);
+        const data = (await pack.getDocument(entry._id)).toObject();
+        delete data._id;
+        data.flags = { ...data.flags, [MODULE]: { liveTestRun: run, liveCombatStartItem: slug } };
+        if (slug === 'steel-shield') data.system.equipped = { ...data.system.equipped, carryType: 'held', handsHeld: 1 };
+        documents.push(data);
+      }
+      if (value === 'rage' && !documents[0].system.selfEffect?.uuid) {
+        const pack = game.packs.get('pf2e.feat-effects');
+        const index = await pack?.getIndex({ fields: ['system.slug'] });
+        const entry = index?.find((item) => item.system?.slug === 'effect-rage');
+        if (!entry) throw Error('Prerequisite: native Rage self effect required');
+        documents[0].system.selfEffect = { uuid: `Compendium.pf2e.feat-effects.Item.${entry._id}` };
+      }
+      const created = await actor.createEmbeddedDocuments('Item', documents);
+      if (created.length !== documents.length) throw Error('Fixture combat-start kit creation failed');
+      if (value === 'defend') {
+        const defend = created.find((item) => item.slug === 'defend');
+        if (!defend) throw Error('Fixture Defend activity missing');
+        await actor.update({ 'system.exploration': [defend.id] });
+      }
+      break;
     }
     case 'purge-seed': {
       if (!second) throw Error('Second fixture token required');

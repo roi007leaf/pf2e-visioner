@@ -5,6 +5,7 @@ import {
   sendStealthInitiativeCoverResponse,
 } from '../../services/socket.js';
 import { higherStealthCoverState } from './usecases/stealth-observer-analysis.js';
+import { saveStealthInitiativeCoverChoice } from './stealth-initiative-cover-choice.js';
 
 const GM_RESPONSE_TIMEOUT_MS = 30000;
 
@@ -19,13 +20,16 @@ class StealthInitiativeCoverCoordinator {
     }
 
     if (game.user?.isGM) {
-      return this._openCoverDialog(hider?.name ?? '', suggestedState);
+      return this._openCoverDialog(hider?.name ?? '', suggestedState, {
+        tokenId: hider?.document?.id ?? hider?.id,
+        combatId: game.combat?.id,
+      });
     }
 
     return this._requestFromGM(hider, suggestedState);
   }
 
-  async _openCoverDialog(hiderName, suggestedState) {
+  async _openCoverDialog(hiderName, suggestedState, { tokenId, combatId } = {}) {
     try {
       const title =
         game.i18n
@@ -43,6 +47,9 @@ class StealthInitiativeCoverCoordinator {
         app.render(true);
       });
 
+      if (chosen !== null && chosen !== undefined) {
+        await saveStealthInitiativeCoverChoice({ combatId, tokenId, state: chosen });
+      }
       return chosen ?? suggestedState;
     } catch (e) {
       console.warn('PF2E Visioner | Failed to open stealth-initiative cover dialog:', e);
@@ -73,6 +80,7 @@ class StealthInitiativeCoverCoordinator {
         requestId,
         hiderTokenId: hider?.document?.id ?? hider?.id ?? null,
         hiderName: hider?.name ?? '',
+        combatId: game.combat?.id,
         suggestedState,
         userId: game.userId,
       });
@@ -91,12 +99,13 @@ class StealthInitiativeCoverCoordinator {
     });
   }
 
-  async handleIncomingGMRequest({ requestId, hiderTokenId, hiderName, suggestedState, userId } = {}) {
+  async handleIncomingGMRequest({ requestId, hiderTokenId, hiderName, suggestedState, userId, combatId } = {}) {
     if (!game.user?.isGM || !requestId) return;
 
     const chosenState = await this._openCoverDialog(
       hiderName || canvas?.tokens?.get?.(hiderTokenId)?.name || '',
       suggestedState,
+      { tokenId: hiderTokenId, combatId },
     );
 
     sendStealthInitiativeCoverResponse(userId, { requestId, chosenState });

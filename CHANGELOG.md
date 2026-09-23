@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.10.0] - 2026-09-23
+
+### Added
+
+- Combat settings can raise a PC's usable held shield when Defending and apply a configured Rage self effect for a PC with Quick-Tempered at combat start. Both are off by default; duplicate Avoid Notice automation takes precedence when enabled.
+
+### Fixed
+
+- Encounter Stealth initiative now honors pre-existing Concealed overrides, manually set cover, and the GM's initiative cover-dialog choice when evaluating a Stealth roll against each observer's Perception DC. A successful roll becomes Unnoticed regardless of observer initiative, and encounter cleanup releases visibility to AVS.
+- NPC Stealth initiative cover checks now use hostile observers relative to the NPC, including PCs.
+
+### Tests
+
+- Added encounter-start regressions for a Concealed override, initiative cover-dialog choices, and tied initiative, plus a live NPC workflow for manual Concealed, standard cover, greater cover, and cover-dialog choices.
+- Added unit and live PF2e encounter tests for Defend shields and Quick-Tempered Rage, including setting isolation and cleanup.
+
 ## [8.9.3] - 2026-09-23
 
 ### Added

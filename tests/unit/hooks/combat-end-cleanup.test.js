@@ -8,6 +8,7 @@ jest.mock('../../../scripts/services/EncounterStealthInitiativeService.js', () =
   encounterStealthInitiativeService: {
     applyEncounterStartVisibility: jest.fn(),
     clearCombat: jest.fn(),
+    cleanupCombat: jest.fn().mockResolvedValue(undefined),
     handleCombatantInitiativeUpdate: jest.fn(),
     isEnabled: jest.fn(() => false),
     isInitiativeRelevantUpdate: jest.fn(() => false),

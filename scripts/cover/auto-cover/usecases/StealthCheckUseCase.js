@@ -468,7 +468,7 @@ class StealthCheckUseCase extends BaseAutoCoverUseCase {
             try {
               const analysis = analyzeStealthObserverCover({
                 hider,
-                observerMode: 'non-party',
+                observerMode: 'hostile-relative',
                 detectCover: (observer, subject) => this._detectCover(observer, subject),
               });
               observers = analysis.observers;

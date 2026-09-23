@@ -105,6 +105,51 @@ describe('StealthInitiativeCoverCoordinator', () => {
     expect(requestGMStealthInitiativeCover).not.toHaveBeenCalled();
   });
 
+  test('stores a confirmed GM initiative cover choice on its combatant', async () => {
+    const combatant = { tokenId: 'hider', setFlag: jest.fn().mockResolvedValue(undefined) };
+    const combat = { id: 'combat-1', combatants: [combatant] };
+    const previousCombat = game.combat;
+    const previousCombats = game.combats;
+    game.combat = combat;
+    game.combats = { get: jest.fn(() => combat) };
+    try {
+      const hider = global.createMockToken({ id: 'hider', name: 'Aria' });
+      const promise = coordinator.resolveCoverState({ hider, suggestedState: 'none' });
+      mockDialogInstances[0]._resolver('standard');
+
+      expect(await promise).toBe('standard');
+      expect(combatant.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'stealthInitiativeCoverChoice', 'standard');
+    } finally {
+      game.combat = previousCombat;
+      game.combats = previousCombats;
+    }
+  });
+
+  test('stores a player-requested GM cover choice on the correct combatant', async () => {
+    const combatant = { tokenId: 'hider-9', setFlag: jest.fn().mockResolvedValue(undefined) };
+    const combat = { id: 'combat-9', combatants: [combatant] };
+    const previousCombat = game.combat;
+    const previousCombats = game.combats;
+    game.combat = { id: 'different-combat' };
+    game.combats = { get: jest.fn((id) => id === 'combat-9' ? combat : null) };
+    try {
+      const handled = coordinator.handleIncomingGMRequest({
+        requestId: 'req-9', hiderTokenId: 'hider-9', hiderName: 'Bram',
+        suggestedState: 'none', userId: 'player-9', combatId: 'combat-9',
+      });
+      mockDialogInstances[0]._resolver('greater');
+      await handled;
+
+      expect(combatant.setFlag).toHaveBeenCalledWith('pf2e-visioner', 'stealthInitiativeCoverChoice', 'greater');
+      expect(sendStealthInitiativeCoverResponse).toHaveBeenCalledWith('player-9', {
+        requestId: 'req-9', chosenState: 'greater',
+      });
+    } finally {
+      game.combat = previousCombat;
+      game.combats = previousCombats;
+    }
+  });
+
   test('falls back to the suggestion when the GM dialog is dismissed without a choice', async () => {
     global.game.user.isGM = true;
     const hider = global.createMockToken({ id: 'hider', name: 'Aria' });

@@ -5,6 +5,7 @@ const mockSetVisibilityBetween = jest.fn();
 const mockGetVisibilityBetween = jest.fn();
 const mockGetCoverBetween = jest.fn();
 const mockSetPairOverrides = jest.fn();
+const mockRemoveOverride = jest.fn();
 
 jest.mock('../../../scripts/stores/cover-map.js', () => ({
   __esModule: true,
@@ -21,6 +22,7 @@ jest.mock('../../../scripts/chat/services/infra/AvsOverrideManager.js', () => ({
   __esModule: true,
   default: {
     setPairOverrides: (...args) => mockSetPairOverrides(...args),
+    removeOverride: (...args) => mockRemoveOverride(...args),
   },
 }));
 
@@ -147,6 +149,7 @@ describe('EncounterStealthInitiativeService', () => {
 
     mockSetVisibilityBetween.mockResolvedValue(true);
     mockSetPairOverrides.mockResolvedValue(true);
+    mockRemoveOverride.mockResolvedValue(true);
     mockGetVisibilityBetween.mockReturnValue('undetected');
     mockGetCoverBetween.mockReturnValue('none');
   });
@@ -211,7 +214,7 @@ describe('EncounterStealthInitiativeService', () => {
     expect(mockSetPairOverrides).not.toHaveBeenCalled();
   });
 
-  test('stealth initiative state uses Perception DC and observer initiative', async () => {
+  test('stealth initiative state uses Perception DC and stealth prerequisites', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 18;
     observerEqual.actor.system.perception.dc = 21;
@@ -286,6 +289,75 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
+  test('uses a pre-existing Concealed override when the visibility map reports Observed', async () => {
+    setSetting(true);
+    observerLow.actor.system.perception.dc = 18;
+    mockGetVisibilityBetween.mockReturnValue('observed');
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'concealed',
+      source: 'manual_action',
+      hasConcealment: true,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 120, 'stealth'),
+    ], { id: 'concealed-prior-override-combat' });
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
+    expect(changesByTarget.get(stealther.id)).toMatchObject({
+      state: 'unnoticed',
+      detectionState: 'undetected',
+      awarenessState: 'unnoticed',
+      hasConcealment: true,
+    });
+    expect(stealther.document.setFlag).toHaveBeenCalledWith(
+      'pf2e-visioner',
+      `encounter-stealth-previous-from-${observerLow.id}`,
+      expect.objectContaining({ detectionState: 'observed', hasConcealment: true }),
+    );
+  });
+
+  test.each(['standard', 'greater'])('uses a %s choice from the initiative cover dialog', async (coverState) => {
+    setSetting(true);
+    mockGetVisibilityBetween.mockReturnValue('observed');
+    mockGetCoverBetween.mockReturnValue('none');
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth', {
+        getFlag: jest.fn((moduleId, key) => moduleId === 'pf2e-visioner' && key === 'stealthInitiativeCoverChoice'
+          ? coverState : undefined),
+      }),
+    ], { id: `initiative-dialog-${coverState}` });
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides.mock.calls[0][1].get(stealther.id)).toMatchObject({
+      state: 'unnoticed', coverState,
+    });
+  });
+
+  test('a None choice in the initiative cover dialog rejects stale mapped cover', async () => {
+    setSetting(true);
+    mockGetVisibilityBetween.mockReturnValue('observed');
+    mockGetCoverBetween.mockReturnValue('standard');
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth', {
+        getFlag: jest.fn((moduleId, key) => moduleId === 'pf2e-visioner' && key === 'stealthInitiativeCoverChoice'
+          ? 'none' : undefined),
+      }),
+    ], { id: 'initiative-dialog-none' });
+
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+
+    expect(mockSetPairOverrides.mock.calls[0][1].get(stealther.id).state).toBe('observed');
+  });
+
   test('Legendary Sneak permits successful Stealth initiative in plain sight', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 18;
@@ -351,7 +423,7 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
-  test('writes undetected without unnoticed awareness when observer initiative is equal or higher', async () => {
+  test('Stealth success remains unnoticed when observer initiative is equal or higher', async () => {
     setSetting(true);
     observerEqual.actor.system.perception.dc = 20;
     mockGetCoverBetween.mockReturnValue('standard');
@@ -367,9 +439,9 @@ describe('EncounterStealthInitiativeService', () => {
     const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'undetected',
+      state: 'unnoticed',
       detectionState: 'undetected',
-      awarenessState: 'noticed',
+      awarenessState: 'unnoticed',
       hasConcealment: false,
       coverState: 'standard',
       detectionSense: null,
@@ -444,7 +516,7 @@ describe('EncounterStealthInitiativeService', () => {
     });
   });
 
-  test('failed Perception DC by more than 10 creates observed when observer initiative is not beaten', async () => {
+  test('failed Perception DC by more than 10 creates observed', async () => {
     setSetting(true);
     observerLow.actor.system.perception.dc = 31;
     const { encounterStealthInitiativeService } = await importService();
@@ -467,13 +539,11 @@ describe('EncounterStealthInitiativeService', () => {
     setSetting(true);
     mockGetCoverBetween.mockReturnValue('standard');
     const { encounterStealthInitiativeService } = await importService();
-    const observerCombatant = makeCombatant('low', observerLow, 10);
     const stealthCombatant = makeCombatant('stealth', stealther, null, 'stealth');
 
     expect(
       encounterStealthInitiativeService._getStealthInitiativeState(
         stealthCombatant,
-        observerCombatant,
         observerLow,
         stealther,
       ),
@@ -486,7 +556,6 @@ describe('EncounterStealthInitiativeService', () => {
     expect(
       encounterStealthInitiativeService._getStealthInitiativeState(
         makeCombatant('stealth', stealther, 20, 'stealth'),
-        observerCombatant,
         observerLow,
         stealther,
       ),
@@ -759,7 +828,52 @@ describe('EncounterStealthInitiativeService', () => {
     )).toBeUndefined();
   });
 
-  test('meeting Perception DC with tied initiative makes the stealther undetected', async () => {
+  test('ending combat releases a pre-existing Concealed override to AVS', async () => {
+    setSetting(true);
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'concealed', source: 'manual_action', hasConcealment: true,
+    };
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth'),
+    ], { id: 'release-concealed-on-combat-end' });
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'unnoticed', source: 'encounter_stealth_initiative',
+      observerId: observerLow.id, targetId: stealther.id,
+      detectionState: 'undetected', awarenessState: 'unnoticed',
+    };
+    mockSetPairOverrides.mockClear();
+
+    await encounterStealthInitiativeService.cleanupCombat(combat);
+
+    expect(mockSetPairOverrides).not.toHaveBeenCalled();
+    expect(mockRemoveOverride).toHaveBeenCalledWith(observerLow.id, stealther.id);
+    expect(stealther.document.getFlag('pf2e-visioner', `encounter-stealth-previous-from-${observerLow.id}`)).toBeUndefined();
+  });
+
+  test('ending combat removes an encounter-only visibility override', async () => {
+    setSetting(true);
+    mockGetCoverBetween.mockReturnValue('standard');
+    const { encounterStealthInitiativeService } = await importService();
+    const combat = makeCombat([
+      makeCombatant('low', observerLow, 10),
+      makeCombatant('stealth', stealther, 30, 'stealth'),
+    ], { id: 'remove-encounter-only-on-combat-end' });
+    await encounterStealthInitiativeService.applyEncounterStartVisibility(combat);
+    stealther.document.flags['pf2e-visioner'][`avs-override-from-${observerLow.id}`] = {
+      state: 'unnoticed', source: 'encounter_stealth_initiative',
+      observerId: observerLow.id, targetId: stealther.id,
+      detectionState: 'undetected', awarenessState: 'unnoticed',
+    };
+
+    await encounterStealthInitiativeService.cleanupCombat(combat);
+
+    expect(mockRemoveOverride).toHaveBeenCalledWith(observerLow.id, stealther.id);
+  });
+
+  test('meeting Perception DC with tied initiative makes the stealther unnoticed', async () => {
     setSetting(true);
     observerEqual.actor.system.perception.dc = 20;
     mockGetCoverBetween.mockReturnValue('standard');
@@ -781,9 +895,9 @@ describe('EncounterStealthInitiativeService', () => {
     const changesByTarget = mockSetPairOverrides.mock.calls[0][1];
     expect(changesByTarget.get(stealther.id)).toMatchObject({
       target: stealther,
-      state: 'undetected',
+      state: 'unnoticed',
       detectionState: 'undetected',
-      awarenessState: 'noticed',
+      awarenessState: 'unnoticed',
     });
   });
 

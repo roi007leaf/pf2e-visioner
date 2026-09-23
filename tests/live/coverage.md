@@ -102,8 +102,19 @@ The `stealth-initiative-eligibility` workflow uses a native encounter and native
 Stealth initiative roll, then fixes combatant totals around the observer's live
 Perception DC. It verifies that a successful roll in plain sight remains Observed,
 standard cover and concealment permit encounter stealth, an initiative-winning
-observer prevents Unnoticed, exactly DC-10 is Observed, and Legendary Sneak permits
-plain-sight stealth. Every branch also removes the encounter and confirms cleanup.
+observer does not prevent Unnoticed, exactly DC-10 is Observed, and Legendary Sneak
+permits plain-sight stealth. The `stealth-initiative-manual-states` workflow uses
+an NPC with native Stealth initiative and verifies manually stored Concealed,
+standard cover, and greater cover, plus GM-selected standard and greater cover
+in the initiative bonus dialog, before combat. It checks Unnoticed after a successful roll
+and release to AVS after combat while retaining manually set cover. Every branch removes the
+encounter and confirms cleanup.
+
+The `combat-start-defend-shield` and `combat-start-quick-tempered-rage` workflows
+use native PF2e character items in a disposable encounter. They verify that
+Visioner's enabled settings apply the raised-shield effect through PF2e's action
+and the Rage self effect from the configured action. The shield effect expires
+at the start of the character's first turn. QA settings and fixtures are restored.
 
 Three `action-gap-degrees-*` workflows exercise Hide, Sneak and Seek at DC offsets
 -11, -10, -9, -1, 0, +9 and +10. Native PF2e DCs supply fixture thresholds;

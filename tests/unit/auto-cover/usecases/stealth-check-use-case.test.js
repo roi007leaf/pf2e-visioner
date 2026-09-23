@@ -550,6 +550,31 @@ describe('StealthCheckUseCase', () => {
         expect.objectContaining({ manualCoverState: 'lesser' }),
       );
     });
+
+    test('uses party enemies as observers when an NPC rolls Stealth initiative', async () => {
+      const { default: stealthInitiativeCoverCoordinator } = await import(
+        '../../../../scripts/cover/auto-cover/StealthInitiativeCoverCoordinator.js'
+      );
+      const hiderToken = mockToken({ id: 'npc', isOwner: true, x: 0, y: 0, alliance: 'opposition' });
+      const allyToken = mockToken({ id: 'ally', x: 5, y: 5, alliance: 'opposition' });
+      const observerToken = mockToken({ id: 'pc', x: 10, y: 10, alliance: 'party' });
+      const mockCheck = { modifiers: [], push: jest.fn() };
+      const mockContext = {
+        type: 'initiative', actor: { getActiveTokens: () => [hiderToken] },
+        options: ['stealth-check', 'check:statistic:base:stealth'],
+      };
+      global.canvas.tokens.placeables = [hiderToken, allyToken, observerToken];
+      const { getCoverBetween } = await import('../../../../scripts/utils.js');
+      getCoverBetween.mockImplementation(observer => observer.id === 'pc' ? 'standard' : 'none');
+      stealthCheckUseCase._detectCover = jest.fn().mockReturnValue('none');
+
+      await stealthCheckUseCase.handleCheckRoll(mockCheck, mockContext);
+
+      expect(stealthInitiativeCoverCoordinator.resolveCoverState).toHaveBeenCalledWith(
+        expect.objectContaining({ manualCoverState: 'standard' }),
+      );
+      expect(stealthCheckUseCase._detectCover).not.toHaveBeenCalledWith(allyToken, hiderToken);
+    });
   });
 
   describe('handleCheckRoll - preserves existing roll options', () => {

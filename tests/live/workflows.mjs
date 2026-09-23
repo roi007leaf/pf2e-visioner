@@ -117,6 +117,9 @@ export const workflows = {
   'search-unnoticed': c => behavior.searchExploration(c, 'unnoticed'),
   'settings-macros': ui.settingsMacros,
   'stealth-initiative': features.stealthInitiative,
+  'stealth-initiative-manual-states': features.stealthInitiativeManualStates,
+  'combat-start-defend-shield': c => features.combatStartCharacterAction(c, 'defend'),
+  'combat-start-quick-tempered-rage': c => features.combatStartCharacterAction(c, 'rage'),
   ...Object.fromEntries(['terrain-stalker', 'camouflage', 'vanish-into-the-land', 'distracting-shadows', 'keen-eyes', 'thats-odd', 'very-sneaky', 'sneaky', 'deny-advantage']
     .map(slug => [`feat-${slug}`, c => features.featContext(c, slug)])),
   compatibility: behavior.compatibility,

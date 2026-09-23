@@ -69,7 +69,7 @@ export function installMessageTagger(runId) {
   return hook;
 }
 
-export async function setup({ runId, playerId, senses = ['darkvision'], darkness = false, secondObserver = false, requireSettings = {}, environment = {}, camera, observerType = 'npc', targetType = 'npc', observerLevel = 1, targetLevel = 1 }) {
+export async function setup({ runId, playerId, senses = ['darkvision'], darkness = false, secondObserver = false, requireSettings = {}, environment = {}, camera, observerType = 'npc', targetType = 'npc', targetClass = 'fighter', observerLevel = 1, targetLevel = 1 }) {
   validateRunId(runId);
   installMessageTagger(runId);
   if (!game.user.isGM) throw Error('GM required');
@@ -87,7 +87,7 @@ export async function setup({ runId, playerId, senses = ['darkvision'], darkness
   for (const [index, name] of ['Observer', 'Target', ...(secondObserver ? ['Second Observer'] : [])].entries()) {
     const type = index === 0 ? observerType : index === 1 ? targetType : 'npc';
     const character = type === 'character';
-    const items = character ? await (await import('./scenario-support.js')).fixtureCharacterItems(runId) : [];
+    const items = character ? await (await import('./scenario-support.js')).fixtureCharacterItems(runId, index === 1 ? targetClass : 'fighter') : [];
     actors.push(await Actor.create({ name: `Visioner QA ${name}`, type, items,
       img: 'icons/svg/mystery-man.svg', flags: flag(runId),
       ownership: { default: 0, ...(index !== 1 ? { [playerId]: 3 } : {}) },

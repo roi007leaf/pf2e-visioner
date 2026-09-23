@@ -751,6 +751,14 @@
         "name": "Encounter Stealth Initiative Visibility",
         "hint": "When enabled, PF2E Visioner handles Stealth-initiative encounter setup: combatants who rolled Stealth are initially undetected and hidden from tracker rows for creatures they beat their perception DC. Leave disabled if PF2e Avoid Notice or another module manages this."
       },
+      "RAISE_PC_SHIELDS_WHEN_DEFENDING": {
+        "name": "Raise PC Shields when Defending",
+        "hint": "At combat start, raise a held, usable shield for each PC using the Defend exploration activity. The benefit lasts until that PC's first turn begins."
+      },
+      "ENRAGE_BARBARIANS_AT_COMBAT_START": {
+        "name": "Enrage Barbarians at Combat Start",
+        "hint": "At combat start, apply Rage for PCs with Quick-Tempered and a Rage action configured with a self-applied effect."
+      },
       "DISABLE_LINE_OF_SIGHT": {
         "name": "Disable Line of Sight Raycasting",
         "hint": "Disable line-of-sight raycasting for visibility. When enabled, visibility will only be calculated for selected tokens using their vision shapes. Visibility results within the visibility shape will be more accurate, but darkvision and unselected token results will only use distance and senses, ignoring walls and obstacles."

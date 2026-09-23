@@ -91,6 +91,7 @@ export async function ruleStrike(c) {
 export async function stealthInitiative(c) {
   const enabled = await c.gm.evaluate(() => game.settings.get('pf2e-visioner', 'enableStealthInitiativeVisibility'));
   if (!enabled) throw Error('Prerequisite: enableStealthInitiativeVisibility must be enabled');
+  await requireAvoidNoticeBridgeDisabled(c);
   const perceptionDC = await c.gm.evaluate(observerId => {
     const dc = canvas.tokens.get(observerId)?.actor?.system?.perception?.dc;
     return typeof dc === 'number' ? dc : dc?.value;
@@ -101,7 +102,7 @@ export async function stealthInitiative(c) {
     { label: 'standard-cover-failure', target: perceptionDC - 1, observer: 10, cover: 'standard', expected: 'hidden' },
     { label: 'concealment-success', target: perceptionDC + 5, observer: 10, cover: 'none', state: 'concealed', expected: 'unnoticed' },
     { label: 'standard-cover-success', target: perceptionDC + 5, observer: 10, cover: 'standard', expected: 'unnoticed' },
-    { label: 'observer-wins-initiative', target: perceptionDC + 5, observer: perceptionDC + 10, cover: 'standard', expected: 'undetected' },
+    { label: 'observer-wins-initiative', target: perceptionDC + 5, observer: perceptionDC + 10, cover: 'standard', expected: 'unnoticed' },
     { label: 'critical-failure-boundary', target: perceptionDC - 10, observer: 10, cover: 'standard', expected: 'observed' },
     { label: 'legendary-sneak-plain-sight', target: perceptionDC + 5, observer: 10, cover: 'none', feat: 'legendary-sneak', expected: 'unnoticed' },
   ]) {
@@ -123,6 +124,125 @@ export async function stealthInitiative(c) {
     await c.mutate('reset-override');
     if (spec.feat) await c.mutate('feat-delete', { slug: spec.feat, subject: 'target' });
     await c.check({ state: 'observed' }, true, `initiative-${spec.label}-cleanup`);
+  }
+}
+
+export async function stealthInitiativeManualStates(c) {
+  const enabled = await c.gm.evaluate(() => game.settings.get('pf2e-visioner', 'enableStealthInitiativeVisibility'));
+  if (!enabled) throw Error('Prerequisite: enableStealthInitiativeVisibility must be enabled');
+  await requireAvoidNoticeBridgeDisabled(c);
+  const targetType = await c.gm.evaluate(targetId => canvas.tokens.get(targetId)?.actor?.type, c.fixture.target);
+  c.equal(targetType, 'npc', 'Stealth initiative fixture is an NPC');
+  const perceptionDC = await c.gm.evaluate(observerId => {
+    const dc = canvas.tokens.get(observerId)?.actor?.system?.perception?.dc;
+    return typeof dc === 'number' ? dc : dc?.value;
+  }, c.fixture.observer);
+  if (!Number.isFinite(perceptionDC)) throw Error('Prerequisite: observer Perception DC required');
+
+  for (const spec of [
+    { label: 'manual-concealed', state: 'concealed', cover: 'none' },
+    { label: 'manual-standard-cover', cover: 'standard' },
+    { label: 'manual-greater-cover', cover: 'greater' },
+    { label: 'dialog-standard-cover', cover: 'none', dialogCover: 'standard' },
+    { label: 'dialog-greater-cover', cover: 'none', dialogCover: 'greater' },
+  ]) {
+    await c.mutate('reset-override');
+    await c.mutate('cover', spec.cover);
+    if (spec.state) await c.mutate('state', spec.state);
+    const prior = await c.gm.evaluate(({ observer, target }) => {
+      const observerToken = canvas.tokens.get(observer);
+      const targetToken = canvas.tokens.get(target);
+      return {
+        cover: observerToken.document.getFlag('pf2e-visioner', 'cover')?.[target],
+        override: targetToken.document.getFlag('pf2e-visioner', `avs-override-from-${observer}`),
+      };
+    }, c.fixture);
+    c.equal(prior.cover ?? 'none', spec.cover, `${spec.label}: manual cover persisted before combat`);
+    if (spec.state) c.equal(prior.override?.state, spec.state, `${spec.label}: manual visibility override persisted before combat`);
+    await c.mutate('combat', { start: false });
+    const messagesBeforeRoll = await c.messages();
+    await c.mutate('initiative', spec.dialogCover ? { cover: spec.dialogCover } : undefined);
+    c.assert((await c.messages()).some(m => m.roll && !messagesBeforeRoll.some(previous => previous.id === m.id)),
+      `${spec.label}: NPC made a native Stealth initiative roll`);
+    if (spec.dialogCover) {
+      const savedCover = await c.gm.evaluate(({ scene, target }) => {
+        const combat = game.combats.find(entry => entry.scene?.id === scene && entry.combatants.some(cbt => cbt.tokenId === target));
+        return combat?.combatants.find(cbt => cbt.tokenId === target)?.getFlag('pf2e-visioner', 'stealthInitiativeCoverChoice');
+      }, c.fixture);
+      c.equal(savedCover, spec.dialogCover, `${spec.label}: GM dialog choice stored on combatant`);
+    }
+    await c.mutate('initiative-values', { target: perceptionDC + 5, observer: perceptionDC + 10 });
+    await c.check({ state: 'unnoticed', cover: spec.cover }, false, `${spec.label}-unnoticed`);
+    await c.mutate('combat-delete');
+    await c.check({ state: 'observed', cover: spec.cover }, true, `${spec.label}-avs-restored`);
+    const remaining = await c.gm.evaluate(({ observer, target }) => {
+      const flags = canvas.tokens.get(target).document;
+      return {
+        override: flags.getFlag('pf2e-visioner', `avs-override-from-${observer}`),
+        previous: flags.getFlag('pf2e-visioner', `encounter-stealth-previous-from-${observer}`),
+      };
+    }, c.fixture);
+    c.equal(remaining.override, undefined, `${spec.label}: visibility override released`);
+    c.equal(remaining.previous, undefined, `${spec.label}: saved override discarded`);
+    await c.mutate('cover', 'none');
+    await c.check({ state: 'observed', cover: 'none' }, true, `${spec.label}-cleanup`);
+  }
+}
+
+export async function combatStartCharacterAction(c, kind) {
+  const setting = kind === 'defend' ? 'raisePcShieldsWhenDefending' : 'enrageBarbariansAtCombatStart';
+  const competing = await c.gm.evaluate((key) => {
+    if (!game.modules.get('pf2e-avoid-notice')?.active) return false;
+    return game.settings.get('pf2e-avoid-notice', key);
+  }, kind === 'defend' ? 'raiseShields' : 'rage');
+  if (competing) throw Error(`Prerequisite: disable Avoid Notice ${kind} automation in the QA world`);
+  await c.setting(setting, true);
+  if (kind === 'rage') await c.mutate('feat-add', { slug: 'quick-tempered', subject: 'target' });
+  await c.mutate('combat-start-character-kit', kind);
+  const ready = await c.gm.evaluate(({ target }) => {
+    const actor = canvas.tokens.get(target)?.actor;
+    return {
+      type: actor?.type,
+      activity: Array.from(actor?.system?.exploration ?? []).some((id) => actor.items.get(id)?.slug === 'defend'),
+      shield: !!actor?.heldShield,
+      action: !!actor?.itemTypes?.action?.find((item) => item.slug === 'rage' && item.system.selfEffect?.uuid),
+      feat: !!actor?.itemTypes?.feat?.find((item) => item.slug === 'quick-tempered'),
+    };
+  }, c.fixture);
+  c.equal(ready.type, 'character', `${kind}: fixture is a PC`);
+  if (kind === 'defend') {
+    c.assert(ready.activity && ready.shield, 'Defend activity and held shield are prepared');
+  } else {
+    c.assert(ready.feat && ready.action, 'Quick-Tempered and configured Rage action are prepared');
+  }
+
+  await c.mutate('combat', { start: false });
+  await c.mutate('combat-start');
+  const effectSlug = kind === 'defend' ? 'raise-a-shield' : 'effect-rage';
+  await c.gm.waitForFunction(({ target, effectSlug }) =>
+    canvas.tokens.get(target)?.actor?.itemTypes?.effect?.some((effect) =>
+      (effect.slug === effectSlug || (effectSlug === 'raise-a-shield' && effect.slug === 'effect-raise-a-shield')) &&
+      (effectSlug !== 'raise-a-shield' || effect.system.duration?.value === 0)),
+  { target: c.fixture.target, effectSlug }, { timeout: 20000 });
+  const effects = await c.gm.evaluate(({ target }) => canvas.tokens.get(target).actor.itemTypes.effect.map((effect) => ({
+    slug: effect.slug, duration: effect.system.duration?.value,
+  })), c.fixture);
+  c.assert(effects.some((effect) => effect.slug === effectSlug ||
+    (effectSlug === 'raise-a-shield' && effect.slug === 'effect-raise-a-shield')),
+  `${kind}: native PF2e effect applied at combat start`);
+  if (kind === 'defend') c.assert(effects.some((effect) =>
+    ['raise-a-shield', 'effect-raise-a-shield'].includes(effect.slug) && effect.duration === 0),
+  'Raised shield expires at first turn');
+  await c.mutate('combat-delete');
+}
+
+async function requireAvoidNoticeBridgeDisabled(c) {
+  const handler = await c.gm.evaluate(() => {
+    if (!game.modules.get('pf2e-avoid-notice')?.active) return 'disabled';
+    return game.settings.get('pf2e-avoid-notice', 'visibilityHandler');
+  });
+  if (handler !== 'disabled') {
+    throw Error(`Prerequisite: pf2e-avoid-notice visibilityHandler must be disabled; found ${handler}`);
   }
 }
 

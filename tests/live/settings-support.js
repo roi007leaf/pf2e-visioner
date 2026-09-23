@@ -12,6 +12,7 @@ const ALLOWED = new Set([
   'autoCoverIgnoreSmallerTokens', 'autoCoverIgnoreSameSizeTokens', 'autoCoverIgnoreLargerTokens',
   'autoCoverAllowProneBlockers', 'autoCoverTokenIntersectionMode', 'wallCoverAllowGreater',
   'wallCoverStandardThreshold', 'wallCoverGreaterThreshold', 'enableStealthInitiativeVisibility',
+  'raisePcShieldsWhenDefending', 'enrageBarbariansAtCombatStart',
 ]);
 function namespace(key) { return key === 'core.scrollingStatusText' ? 'core' : MODULE; }
 function settingKey(key) { return key === 'core.scrollingStatusText' ? 'scrollingStatusText' : key; }

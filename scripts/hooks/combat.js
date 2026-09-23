@@ -5,6 +5,7 @@
 import { MODULE_ID } from '../constants.js';
 import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { combatStartCoverService } from '../services/CombatStartCoverService.js';
+import { applyCombatStartCharacterActions } from '../services/CombatStartCharacterActions.js';
 import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
 
 export function registerCombatHooks() {
@@ -22,16 +23,16 @@ async function onCombatStart(combat) {
   await handleCombatStart(combat);
 }
 
-function onCombatEnd(combat) {
+async function onCombatEnd(combat) {
   resetEncounterFiltersInDialogs();
-  encounterStealthInitiativeService.clearCombat(combat);
-  handleCombatEnd(combat);
+  await encounterStealthInitiativeService.cleanupCombat(combat);
+  await handleCombatEnd(combat);
 }
 
-function onUpdateCombat(combat, updateData) {
+async function onUpdateCombat(combat, updateData) {
   if (Object.prototype.hasOwnProperty.call(updateData, 'started') && updateData.started === false) {
-    encounterStealthInitiativeService.clearCombat(combat);
-    handleCombatEnd(combat);
+    await encounterStealthInitiativeService.cleanupCombat(combat);
+    await handleCombatEnd(combat);
     resetEncounterFiltersInDialogs();
   }
 
@@ -58,10 +59,10 @@ async function onUpdateCombatant(combatant, updateData) {
   await encounterStealthInitiativeService.handleCombatantInitiativeUpdate(combatant, updateData, combat);
 }
 
-function onDeleteCombat(combat) {
+async function onDeleteCombat(combat) {
   resetEncounterFiltersInDialogs();
-  encounterStealthInitiativeService.clearCombat(combat);
-  handleCombatEnd(combat);
+  await encounterStealthInitiativeService.cleanupCombat(combat, { deleted: true });
+  await handleCombatEnd(combat);
 }
 
 function onRenderCombatTracker(tracker) {
@@ -107,6 +108,7 @@ async function handleCombatStart(combat) {
   await encounterStealthInitiativeService.applyEncounterStartVisibility(combatTracker, {
     requireStarted: false,
   });
+  await applyCombatStartCharacterActions(combatTracker);
   await checkAvsOverrides();
 }
 

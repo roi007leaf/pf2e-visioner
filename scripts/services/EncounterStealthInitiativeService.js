@@ -1,6 +1,10 @@
 import { MODULE_ID } from '../constants.js';
 import AvsOverrideManager from '../chat/services/infra/AvsOverrideManager.js';
 import { getCoverBetween } from '../stores/cover-map.js';
+import {
+  STEALTH_INITIATIVE_COVER_CHOICE_FLAG,
+  STEALTH_INITIATIVE_COVER_STATES,
+} from '../cover/auto-cover/stealth-initiative-cover-choice.js';
 import { getVisibilityBetween } from '../stores/visibility-map.js';
 import { actorHasFeature } from '../utils/actor-features.js';
 import {
@@ -185,7 +189,6 @@ export class EncounterStealthInitiativeService {
         if (records.has(recordKey)) continue;
         const profile = this._getStealthInitiativeProfile(
           stealther,
-          observer,
           observerToken,
           stealtherToken,
         );
@@ -251,6 +254,40 @@ export class EncounterStealthInitiativeService {
     this._initialHideRecordsByCombat.delete(combatId);
     this._expiredInitialHideRecordsByCombat.delete(combatId);
     this.applyTrackerVisibility(combat);
+  }
+
+  async cleanupCombat(combat = game.combat, { deleted = false } = {}) {
+    if (game.user?.isGM && combat) {
+      const combatId = getCombatId(combat);
+      const encounterPairs = new Set([
+        ...(this._initialHideRecordsByCombat.get(combatId) ?? []),
+        ...(this._expiredInitialHideRecordsByCombat.get(combatId) ?? []),
+      ]);
+      const combatants = collectionToArray(combat.combatants ?? combat.turns);
+      for (const stealther of combatants.filter((entry) => this.isStealthInitiativeCombatant(entry))) {
+        const stealtherToken = getTokenFromCombatant(stealther);
+        if (!stealtherToken?.document?.id) continue;
+        for (const observer of combatants) {
+          if (observer === stealther) continue;
+          const observerToken = getTokenFromCombatant(observer);
+          if (!observerToken?.document?.id || !areEnemies(observerToken, stealtherToken)) continue;
+          const override = this._getInitialOverride(observerToken, stealtherToken);
+          const previousFlagKey = this._getPreviousOverrideFlagKey(observerToken);
+          const hasPreviousOverride = !!stealtherToken.document.getFlag(MODULE_ID, previousFlagKey);
+          const wasEncounterPair = encounterPairs.has(makeRecordKey(observerToken.document.id, stealtherToken.document.id));
+          if (!wasEncounterPair && !hasPreviousOverride &&
+              !this._isActiveInitialOverride(override, observerToken, stealtherToken)) continue;
+          if (override) {
+            await AvsOverrideManager.removeOverride(observerToken.document.id, stealtherToken.document.id);
+          }
+          if (hasPreviousOverride) await stealtherToken.document.unsetFlag(MODULE_ID, previousFlagKey);
+        }
+        if (!deleted && stealther.getFlag?.(MODULE_ID, STEALTH_INITIATIVE_COVER_CHOICE_FLAG) !== undefined) {
+          await stealther.unsetFlag?.(MODULE_ID, STEALTH_INITIATIVE_COVER_CHOICE_FLAG);
+        }
+      }
+    }
+    this.clearCombat(combat);
   }
 
   applyTrackerVisibility(combat = game.combat) {
@@ -425,26 +462,26 @@ export class EncounterStealthInitiativeService {
     return stealtherToken.document?.getFlag?.(MODULE_ID, flagKey);
   }
 
-  _getStealthInitiativeState(stealthCombatant, observerCombatant, observerToken, stealtherToken) {
+  _getStealthInitiativeState(stealthCombatant, observerToken, stealtherToken) {
     return profileToLegacyVisibility(
-      this._getStealthInitiativeProfile(stealthCombatant, observerCombatant, observerToken, stealtherToken),
+      this._getStealthInitiativeProfile(stealthCombatant, observerToken, stealtherToken),
       { preserveEncounterUnnoticed: true },
     );
   }
 
-  _getStealthInitiativeProfile(stealthCombatant, observerCombatant, observerToken, stealtherToken) {
+  _getStealthInitiativeProfile(stealthCombatant, observerToken, stealtherToken) {
     const stealthInitiative = getNumericInitiative(stealthCombatant);
     if (!Number.isFinite(stealthInitiative)) return legacyVisibilityToProfile('observed');
 
     const perceptionDC = getPerceptionDC(observerToken);
     if (!Number.isFinite(perceptionDC)) return legacyVisibilityToProfile('observed');
 
-    const observerInitiative = getNumericInitiative(observerCombatant);
-    const beatsObserverInitiative =
-      Number.isFinite(observerInitiative) && stealthInitiative > observerInitiative;
+    const chosenCoverState = stealthCombatant?.getFlag?.(MODULE_ID, STEALTH_INITIATIVE_COVER_CHOICE_FLAG)
+      ?? stealthCombatant?.flags?.[MODULE_ID]?.[STEALTH_INITIATIVE_COVER_CHOICE_FLAG];
     const prerequisiteProfile = this._getEncounterPrerequisiteProfile(
       observerToken,
       stealtherToken,
+      chosenCoverState,
     );
     const canAvoidNotice =
       actorHasFeature(stealtherToken, 'legendary-sneak') ||
@@ -467,7 +504,7 @@ export class EncounterStealthInitiativeService {
       return {
         ...prerequisiteProfile,
         detectionState: 'undetected',
-        awarenessState: beatsObserverInitiative ? 'unnoticed' : 'noticed',
+        awarenessState: 'unnoticed',
       };
     }
 
@@ -488,7 +525,11 @@ export class EncounterStealthInitiativeService {
     };
   }
 
-  _getEncounterPrerequisiteProfile(observerToken, stealtherToken) {
+  _getEncounterPrerequisiteProfile(observerToken, stealtherToken, chosenCoverState = null) {
+    const existingOverride = this._getInitialOverride(observerToken, stealtherToken);
+    const overrideProfile = existingOverride
+      ? overrideToPerceptionProfile(existingOverride)
+      : null;
     let coverState = 'none';
     if (observerToken && stealtherToken) {
       try {
@@ -498,6 +539,10 @@ export class EncounterStealthInitiativeService {
         coverState = 'none';
       }
     }
+    if (coverState === 'none' && STANDARD_OR_GREATER_COVER.has(overrideProfile?.coverState)) {
+      coverState = overrideProfile.coverState;
+    }
+    if (STEALTH_INITIATIVE_COVER_STATES.has(chosenCoverState)) coverState = chosenCoverState;
 
     let hasConcealment = false;
     if (observerToken && stealtherToken) {
@@ -511,7 +556,8 @@ export class EncounterStealthInitiativeService {
     return {
       detectionState: 'observed',
       awarenessState: 'noticed',
-      hasConcealment: hasConcealment || hasConcealedCondition(stealtherToken),
+      hasConcealment:
+        hasConcealment || !!overrideProfile?.hasConcealment || hasConcealedCondition(stealtherToken),
       coverState,
       detectionSense: null,
     };
@@ -558,7 +604,7 @@ export class EncounterStealthInitiativeService {
     const state = profileToLegacyVisibility(previousOverride, { preserveEncounterUnnoticed: true });
 
     stealtherToken.document?.unsetFlag?.(MODULE_ID, flagKey);
-    AvsOverrideManager.setPairOverrides(
+    return AvsOverrideManager.setPairOverrides(
       observerToken,
       new Map([
         [

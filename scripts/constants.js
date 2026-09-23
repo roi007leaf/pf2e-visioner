@@ -700,6 +700,26 @@ export const DEFAULT_SETTINGS = {
     default: false,
   },
 
+  raisePcShieldsWhenDefending: {
+    name: 'PF2E_VISIONER.SETTINGS.RAISE_PC_SHIELDS_WHEN_DEFENDING.name',
+    hint: 'PF2E_VISIONER.SETTINGS.RAISE_PC_SHIELDS_WHEN_DEFENDING.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
+  enrageBarbariansAtCombatStart: {
+    name: 'PF2E_VISIONER.SETTINGS.ENRAGE_BARBARIANS_AT_COMBAT_START.name',
+    hint: 'PF2E_VISIONER.SETTINGS.ENRAGE_BARBARIANS_AT_COMBAT_START.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: false,
+  },
+
   disableLineOfSightCalculation: {
     name: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.name',
     hint: 'PF2E_VISIONER.SETTINGS.DISABLE_LINE_OF_SIGHT.hint',
