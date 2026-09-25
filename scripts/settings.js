@@ -4,7 +4,6 @@
 
 import { reinjectChatAutomationStyles } from './chat/chat-automation-styles.js';
 import { DEFAULT_SETTINGS, KEYBINDINGS, MODULE_ID } from './constants.js';
-import { buildSettingIllustrations } from './ui/settings-illustrations.js';
 import { loadSharedUICSS } from './css-loader.js';
 import { setCachedSettingValue } from './utils/setting-value-cache.js';
 import { refreshPeekBlockSceneTool } from './services/Peek/peek-block-mode.js';
@@ -91,10 +90,6 @@ const SETTINGS_GROUPS = {
       title: 'Wall Auto Cover Settings',
       keys: ['wallCoverStandardThreshold', 'wallCoverAllowGreater', 'wallCoverGreaterThreshold'],
     },
-  ],
-  Combat: [
-    { title: 'Combat Start', keys: ['raisePcShieldsWhenDefending', 'enrageBarbariansAtCombatStart'] },
-    { title: 'Flanking', keys: ['flankingSizeRule'] },
   ],
   'A.V.S. Settings': [
     {
@@ -326,7 +321,6 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
           value: current,
           inputType,
           choices: choicesList,
-          illustrations: buildSettingIllustrations(cfg, current),
           min: presentation.min,
           max: presentation.max,
           step: presentation.step,

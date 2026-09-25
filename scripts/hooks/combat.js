@@ -5,7 +5,6 @@
 import { MODULE_ID } from '../constants.js';
 import { updateCanvasPerception } from '../helpers/perception-refresh.js';
 import { combatStartCoverService } from '../services/CombatStartCoverService.js';
-import { applyCombatStartCharacterActions } from '../services/CombatStartCharacterActions.js';
 import { encounterStealthInitiativeService } from '../services/EncounterStealthInitiativeService.js';
 
 export function registerCombatHooks() {
@@ -108,7 +107,6 @@ async function handleCombatStart(combat) {
   await encounterStealthInitiativeService.applyEncounterStartVisibility(combatTracker, {
     requireStarted: false,
   });
-  await applyCombatStartCharacterActions(combatTracker);
   await checkAvsOverrides();
 }
 

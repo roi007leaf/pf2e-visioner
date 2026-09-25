@@ -36,12 +36,6 @@ export const automatedCases = [
   scenario('stealth-initiative-manual-states', 'stealth-initiative-manual-states', {
     area: 'initiative', targetType: 'npc',
   }),
-  scenario('combat-start-defend-shield', 'combat-start-defend-shield', {
-    area: 'initiative', targetType: 'character', settings: ['raisePcShieldsWhenDefending'],
-  }),
-  scenario('combat-start-quick-tempered-rage', 'combat-start-quick-tempered-rage', {
-    area: 'initiative', targetType: 'character', targetClass: 'barbarian', settings: ['enrageBarbariansAtCombatStart'],
-  }),
   ...['terrain-stalker', 'camouflage', 'vanish-into-the-land', 'distracting-shadows', 'keen-eyes', 'thats-odd', 'very-sneaky', 'sneaky', 'deny-advantage'].map(slug =>
     scenario(`feat-context-${slug}`, `feat-${slug}`, { area: 'feats', secondObserver: true, observerType: 'character', observerLevel: 8 })),
   ...[14].map(core => scenario(`compatibility-foundry${core}-pf2e`, 'compatibility', { area: 'compatibility', environment: { core } })),

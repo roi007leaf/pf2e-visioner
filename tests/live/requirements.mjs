@@ -41,7 +41,7 @@ export const requirements = [
   ['Sneak', ['combat-sneak-action', 'sneak-apply-revert']],
   ['Seek', ['combat-seek-action', 'seek-apply-revert']],
   ['Other encounter actions', ['attack-consequences', 'attack-consequences-hidden', 'attack-consequences-undetected', 'diversion-apply-revert', 'point-out-apply-revert', 'take-cover-expiry']],
-  ['Initiative and exploration', ['search-exploration', 'search-exploration-unnoticed', 'stealth-initiative-eligibility', 'stealth-initiative-manual-states', 'combat-start-defend-shield', 'combat-start-quick-tempered-rage']],
+  ['Initiative and exploration', ['search-exploration', 'search-exploration-unnoticed', 'stealth-initiative-eligibility', 'stealth-initiative-manual-states']],
   ['Managers', ['manager-directions', 'hazard-manager-privacy', 'loot-manager-privacy']],
   ['Rule visibility and cover', ['rule-visibility-hidden-delete', 'rule-cover-lesser-delete', 'rule-cover-standard-delete', 'rule-cover-greater-delete', 'rule-visibility-source-stacking', 'rule-visibility-unmatched-predicate', 'rule-visibility-direction']],
   ['Remaining rule operations', ['rule-aura-visibility', 'rule-action-qualification', 'rule-cover-adjustment', 'rule-detection-mode', 'rule-distance-bands', 'rule-lighting-modification', 'rule-off-guard-suppression', 'rule-roll-context', 'rule-sense-modification', 'rule-shared-vision', 'rule-item-edit-refresh', 'rule-strike-consumption', 'rule-native-strike-off-guard']],

@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.10.1] - 2026-09-25
+
+### Changed
+
+- Moved large-creature flanking, Defend shield raising, and Quick-Tempered Rage automation to PF2e Combater. Legacy world settings remain hidden for one-time migration; Visioner no longer runs these combat options.
+
 ## [8.10.0] - 2026-09-23
 
 ### Added

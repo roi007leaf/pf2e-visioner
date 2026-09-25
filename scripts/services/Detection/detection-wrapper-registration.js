@@ -19,7 +19,6 @@ import { startDuringMoveSoundwaveOnDrag } from '../during-move-soundwave.js';
 import { wrapMultiLevelDragPreviewInitializeSources } from './multi-level-control-view.js';
 import { VISIBILITY_DETECTION_THRESHOLDS } from './detection-visibility-context.js';
 import { wrapTokenCanHover, wrapTokenHoverIn } from './current-view-hard-hide.js';
-import { registerFlankingSizeRuleWrapper } from '../flanking/flanking-size-rule.js';
 
 export function registerDetectionWrappers({
   libWrapperAdapter = libWrapper,
@@ -152,7 +151,6 @@ function registerTokenDetectionWrappers(libWrapperAdapter, warn, foundryGenerati
       wrapTokenDocumentPrepareBaseData,
       'WRAPPER',
     );
-    registerFlankingSizeRuleWrapper(libWrapperAdapter);
   } catch (error) {
     warn('[PF2E-Visioner] Failed to register Token wrapper:', error);
   }

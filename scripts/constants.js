@@ -704,7 +704,7 @@ export const DEFAULT_SETTINGS = {
     name: 'PF2E_VISIONER.SETTINGS.RAISE_PC_SHIELDS_WHEN_DEFENDING.name',
     hint: 'PF2E_VISIONER.SETTINGS.RAISE_PC_SHIELDS_WHEN_DEFENDING.hint',
     scope: 'world',
-    config: true,
+    config: false,
     restricted: true,
     type: Boolean,
     default: false,
@@ -714,7 +714,7 @@ export const DEFAULT_SETTINGS = {
     name: 'PF2E_VISIONER.SETTINGS.ENRAGE_BARBARIANS_AT_COMBAT_START.name',
     hint: 'PF2E_VISIONER.SETTINGS.ENRAGE_BARBARIANS_AT_COMBAT_START.hint',
     scope: 'world',
-    config: true,
+    config: false,
     restricted: true,
     type: Boolean,
     default: false,
@@ -1044,7 +1044,7 @@ export const DEFAULT_SETTINGS = {
     name: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.name',
     hint: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.hint',
     scope: 'world',
-    config: true,
+    config: false,
     restricted: true,
     type: String,
     choices: {
@@ -1055,7 +1055,6 @@ export const DEFAULT_SETTINGS = {
       lineThrough: 'PF2E_VISIONER.SETTINGS.FLANKING_SIZE_RULE.CHOICES.lineThrough',
     },
     default: 'raw',
-    illustration: 'flankingSizeRule',
   },
 
   autoCover: {

@@ -189,53 +189,6 @@ export async function stealthInitiativeManualStates(c) {
   }
 }
 
-export async function combatStartCharacterAction(c, kind) {
-  const setting = kind === 'defend' ? 'raisePcShieldsWhenDefending' : 'enrageBarbariansAtCombatStart';
-  const competing = await c.gm.evaluate((key) => {
-    if (!game.modules.get('pf2e-avoid-notice')?.active) return false;
-    return game.settings.get('pf2e-avoid-notice', key);
-  }, kind === 'defend' ? 'raiseShields' : 'rage');
-  if (competing) throw Error(`Prerequisite: disable Avoid Notice ${kind} automation in the QA world`);
-  await c.setting(setting, true);
-  if (kind === 'rage') await c.mutate('feat-add', { slug: 'quick-tempered', subject: 'target' });
-  await c.mutate('combat-start-character-kit', kind);
-  const ready = await c.gm.evaluate(({ target }) => {
-    const actor = canvas.tokens.get(target)?.actor;
-    return {
-      type: actor?.type,
-      activity: Array.from(actor?.system?.exploration ?? []).some((id) => actor.items.get(id)?.slug === 'defend'),
-      shield: !!actor?.heldShield,
-      action: !!actor?.itemTypes?.action?.find((item) => item.slug === 'rage' && item.system.selfEffect?.uuid),
-      feat: !!actor?.itemTypes?.feat?.find((item) => item.slug === 'quick-tempered'),
-    };
-  }, c.fixture);
-  c.equal(ready.type, 'character', `${kind}: fixture is a PC`);
-  if (kind === 'defend') {
-    c.assert(ready.activity && ready.shield, 'Defend activity and held shield are prepared');
-  } else {
-    c.assert(ready.feat && ready.action, 'Quick-Tempered and configured Rage action are prepared');
-  }
-
-  await c.mutate('combat', { start: false });
-  await c.mutate('combat-start');
-  const effectSlug = kind === 'defend' ? 'raise-a-shield' : 'effect-rage';
-  await c.gm.waitForFunction(({ target, effectSlug }) =>
-    canvas.tokens.get(target)?.actor?.itemTypes?.effect?.some((effect) =>
-      (effect.slug === effectSlug || (effectSlug === 'raise-a-shield' && effect.slug === 'effect-raise-a-shield')) &&
-      (effectSlug !== 'raise-a-shield' || effect.system.duration?.value === 0)),
-  { target: c.fixture.target, effectSlug }, { timeout: 20000 });
-  const effects = await c.gm.evaluate(({ target }) => canvas.tokens.get(target).actor.itemTypes.effect.map((effect) => ({
-    slug: effect.slug, duration: effect.system.duration?.value,
-  })), c.fixture);
-  c.assert(effects.some((effect) => effect.slug === effectSlug ||
-    (effectSlug === 'raise-a-shield' && effect.slug === 'effect-raise-a-shield')),
-  `${kind}: native PF2e effect applied at combat start`);
-  if (kind === 'defend') c.assert(effects.some((effect) =>
-    ['raise-a-shield', 'effect-raise-a-shield'].includes(effect.slug) && effect.duration === 0),
-  'Raised shield expires at first turn');
-  await c.mutate('combat-delete');
-}
-
 async function requireAvoidNoticeBridgeDisabled(c) {
   const handler = await c.gm.evaluate(() => {
     if (!game.modules.get('pf2e-avoid-notice')?.active) return 'disabled';
