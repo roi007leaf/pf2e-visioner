@@ -4,9 +4,14 @@ import { scheduleCanvasPerceptionUpdate } from '../../helpers/perception-refresh
 import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { getDetectionBetween } from '../../stores/detection-map.js';
 import { resolveGmObserverTokenPresentation } from './gm-observer-view-policy.js';
+import {
+  clearGmObserverWallHighlights,
+  syncGmObserverWallHighlights,
+} from './gm-observer-wall-highlights.js';
 
 const SETTING_KEY = 'gmObserverView';
 const SHOW_MODE_INDICATOR_SETTING_KEY = 'showGmObserverViewIndicator';
+const SHOW_WALL_HIGHLIGHTS_SETTING_KEY = 'showGmObserverWallHighlights';
 const DARKNESS_STRENGTH_SETTING_KEY = 'gmObserverViewDarknessOpacity';
 const DEFAULT_DARKNESS_STRENGTH = 0.7;
 const TOKEN_PRESENTATION_KEY = '_pvGmObserverViewPresentation';
@@ -1088,6 +1093,7 @@ export const gmObserverView = {
       ({ darknessChanged: refreshLighting } = syncCanvasPresentation());
       syncModeIndicator(true);
     }
+    this.refreshWallHighlights();
     if (perception) schedulePerceptionRefresh({ refreshLighting });
     refreshSceneControls();
   },
@@ -1103,6 +1109,7 @@ export const gmObserverView = {
     ownedTokenFilters = new WeakMap();
     ownedTokenOutlines = new WeakMap();
     syncModeIndicator(false);
+    clearGmObserverWallHighlights();
     if (restoreCanvas) return restoreCanvasPresentation();
     primaryVisionModeState = null;
     detachedVisionSources = new Set();
@@ -1121,6 +1128,14 @@ export const gmObserverView = {
     return this.setEnabled(!this.isActive());
   },
 
+  refreshWallHighlights({ redraw = false } = {}) {
+    return syncGmObserverWallHighlights({
+      active: this.isActive(),
+      enabled: getCachedSettingValue(SHOW_WALL_HIGHLIGHTS_SETTING_KEY, false) === true,
+      redraw,
+    });
+  },
+
   registerHooks() {
     registerVisionSourceAddWrapper();
     if (globalThis.__pf2eVisionerGmObserverViewHooksRegistered) return;
@@ -1135,6 +1150,27 @@ export const gmObserverView = {
     globalThis.Hooks?.on?.('controlToken', () => {
       if (this.isActive()) this.refresh();
     });
+    globalThis.Hooks?.on?.('updateUser', (user, changes) => {
+      if (user?.id === globalThis.game?.user?.id && Object.hasOwn(changes ?? {}, 'role')) {
+        this.refresh();
+      }
+    });
+    let wallRedrawQueued = false;
+    for (const event of ['createWall', 'updateWall', 'deleteWall']) {
+      globalThis.Hooks?.on?.(event, () => {
+        if (
+          wallRedrawQueued ||
+          !this.isActive() ||
+          getCachedSettingValue(SHOW_WALL_HIGHLIGHTS_SETTING_KEY, false) !== true
+        ) return;
+        wallRedrawQueued = true;
+        const schedule = globalThis.requestAnimationFrame ?? ((callback) => setTimeout(callback, 0));
+        schedule(() => {
+          wallRedrawQueued = false;
+          this.refreshWallHighlights({ redraw: true });
+        });
+      });
+    }
     globalThis.Hooks?.on?.('canvasTearDown', () => this.clear({ restoreCanvas: false }));
   },
 };

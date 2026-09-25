@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.10.2] - 2026-09-25
+
+### Added
+
+- GM Observer View can show static wall highlights using Foundry's wall and door colors. The GM client setting is on by default and can be disabled in Vision settings. Highlights update when walls change and add no animation ticker.
+
+### Tests
+
+- Added coverage for wall colors, scene and setting cleanup, and GM-only setting visibility. Verified the highlight and toggle in Foundry.
+
 ## [8.10.1] - 2026-09-25
 
 ### Changed

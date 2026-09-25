@@ -83,4 +83,15 @@ describe('GM Observer View keybinding', () => {
       default: true,
     });
   });
+
+  it('offers optional client wall highlights for GM Observer View', async () => {
+    const { DEFAULT_SETTINGS } = await import('../../../scripts/constants.js');
+
+    expect(DEFAULT_SETTINGS.showGmObserverWallHighlights).toMatchObject({
+      scope: 'client',
+      restricted: true,
+      type: Boolean,
+      default: true,
+    });
+  });
 });

@@ -806,6 +806,10 @@
         "name": "Show GM Observer View Indicator",
         "hint": "Shows the persistent GM Observer View active-mode indicator. Disable this to keep Observer View active without displaying the indicator."
       },
+      "SHOW_GM_OBSERVER_WALL_HIGHLIGHTS": {
+        "name": "Show Wall Highlights in GM Observer View",
+        "hint": "Draws static wall lines using Foundry's wall and door colors while GM Observer View is active."
+      },
       "GM_OBSERVER_VIEW_DARKNESS_OPACITY": {
         "name": "GM Observer View Darkness Strength",
         "hint": "Controls how dark unlit areas remain while GM Observer View is active. Higher values preserve more darkness contrast; lower values brighten the scene more."

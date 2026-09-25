@@ -839,6 +839,16 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  showGmObserverWallHighlights: {
+    name: 'PF2E_VISIONER.SETTINGS.SHOW_GM_OBSERVER_WALL_HIGHLIGHTS.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SHOW_GM_OBSERVER_WALL_HIGHLIGHTS.hint',
+    scope: 'client',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
+
   gmObserverViewDarknessOpacity: {
     name: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.name',
     hint: 'PF2E_VISIONER.SETTINGS.GM_OBSERVER_VIEW_DARKNESS_OPACITY.hint',

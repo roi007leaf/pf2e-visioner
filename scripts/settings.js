@@ -43,6 +43,7 @@ const SETTINGS_GROUPS = {
         'enableAllTokensVision',
         'gmObserverView',
         'showGmObserverViewIndicator',
+        'showGmObserverWallHighlights',
         'gmObserverViewDarknessOpacity',
         'enableCameraVisionAggregation',
       ],
@@ -221,7 +222,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
     const flatDependencyMap = new Map();
     // We'll extend this with the runtime dependency map defined later; replicate keys here for depth calc
     const dependencyPairs = [
-      ['gmObserverView', ['showGmObserverViewIndicator']],
+      ['gmObserverView', ['showGmObserverViewIndicator', 'showGmObserverWallHighlights']],
       ['includeLootActors', ['lootStealthDC']],
       ['hiddenWallsEnabled', ['wallStealthDC']],
       ['limitSeekRangeInCombat', ['customSeekDistance']],
@@ -387,7 +388,7 @@ class VisionerSettingsForm extends foundry.applications.api.ApplicationV2 {
 
       // Generic dependency system per redesign
       const dependencyMap = {
-        gmObserverView: ['showGmObserverViewIndicator'],
+        gmObserverView: ['showGmObserverViewIndicator', 'showGmObserverWallHighlights'],
         autoCover: [
           'autoCoverVisualizationOnlyInEncounter',
           'autoCoverVisualizationRespectFogForGM',
@@ -566,14 +567,18 @@ export function registerSettings() {
       if (
         key === 'gmObserverView' ||
         key === 'showGmObserverViewIndicator' ||
+        key === 'showGmObserverWallHighlights' ||
         key === 'gmObserverViewDarknessOpacity'
       ) {
-        settingConfig.onChange = async () => {
+        settingConfig.onChange = async (value) => {
+          setCachedSettingValue(key, value);
           try {
             const { gmObserverView } = await import(
               './services/GmObserverView/gm-observer-view.js'
             );
-            gmObserverView.refresh({ perception: key !== 'showGmObserverViewIndicator' });
+            gmObserverView.refresh({
+              perception: key !== 'showGmObserverViewIndicator' && key !== 'showGmObserverWallHighlights',
+            });
           } catch {}
         };
       } else if (key === 'playerPeekBlockMode') {
