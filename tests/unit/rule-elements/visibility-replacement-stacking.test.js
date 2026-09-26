@@ -1,3 +1,4 @@
+import { getVisibilityOverrideFactor } from '../../../scripts/rule-elements/visibility-override-factor.js';
 import { VisibilityOverride } from '../../../scripts/rule-elements/operations/VisibilityOverride.js';
 import { RuleElementChecker } from '../../../scripts/rule-elements/RuleElementChecker.js';
 
@@ -139,4 +140,76 @@ test('queued removal preserves concurrent independent additions', async () => {
   expect(
     subject.document.getFlag('pf2e-visioner', 'visibilityReplacements').map((s) => s.ownerId),
   ).toEqual(['second']);
+});
+
+test('factor labels follow winning applicable sources without changing identity', async () => {
+  const subject = token('subject'),
+    other = token('other');
+  canvas.tokens.placeables = [subject, other];
+  await VisibilityOverride.applyVisibilityOverride(
+    { ...leaves('from'), label: ' Leaves ' },
+    subject,
+  );
+  await VisibilityOverride.applyVisibilityOverride(
+    {
+      ...leaves('from'),
+      source: 'mist',
+      label: 'Mist',
+      priority: 200,
+    },
+    subject,
+  );
+  const profile = { visibilityReplacementOriginalState: 'observed' };
+  expect(getVisibilityOverrideFactor(other, subject, 'concealed', profile)).toEqual({
+    source: 'mist',
+    label: 'Mist',
+  });
+  expect(getVisibilityOverrideFactor(subject, other, 'concealed', profile)).toBeNull();
+  await VisibilityOverride.applyVisibilityOverride(
+    {
+      ...leaves('from'),
+      source: 'mist',
+      label: 'Updated mist',
+      priority: 200,
+    },
+    subject,
+  );
+  expect(getVisibilityOverrideFactor(other, subject, 'concealed', profile)?.label).toBe(
+    'Updated mist',
+  );
+  await VisibilityOverride.removeVisibilityOverride({ ...leaves('from'), source: 'mist' }, subject);
+  expect(getVisibilityOverrideFactor(other, subject, 'concealed', profile)?.label).toBe('Leaves');
+  expect(
+    getVisibilityOverrideFactor(other, subject, 'hidden', {
+      visibilityReplacementOriginalState: 'hidden',
+    }),
+  ).toBeNull();
+  await other.document.setFlag('pf2e-visioner', 'ignoredVisibilitySources', {
+    caster: { sourceTags: ['leaves'], fromStates: ['concealed'] },
+  });
+  expect(getVisibilityOverrideFactor(other, subject, 'concealed', profile)).toBeNull();
+});
+
+test('unlabeled direct overrides retain generic fallback and custom labels survive persistence', () => {
+  const subject = token('subject'),
+    other = token('other');
+  subject.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
+    active: true,
+    direction: 'from',
+    state: 'hidden',
+    source: 'direct',
+    label: '  ',
+  });
+  expect(getVisibilityOverrideFactor(other, subject, 'hidden')).toEqual({
+    source: 'direct',
+    label: null,
+  });
+  subject.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
+    active: true,
+    direction: 'from',
+    state: 'hidden',
+    source: 'direct',
+    label: 'Blur',
+  });
+  expect(getVisibilityOverrideFactor(other, subject, 'hidden')?.label).toBe('Blur');
 });

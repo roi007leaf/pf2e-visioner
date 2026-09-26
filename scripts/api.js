@@ -1,3 +1,4 @@
+import { getVisibilityOverrideFactor } from './rule-elements/visibility-override-factor.js';
 /**
  * Public API for PF2E Per-Token Visibility
  */
@@ -904,15 +905,16 @@ export class Pf2eVisionerApi {
       }
 
       // 2.5 RULE ELEMENT OVERRIDES (can override automatic visibility calculations)
-      const hasRuleElementOverride =
-        observerToken.document.getFlag('pf2e-visioner', 'ruleElementOverride') ||
-        targetToken.document.getFlag('pf2e-visioner', 'ruleElementOverride') ||
-        observerToken.document.getFlag('pf2e-visioner', 'visibilityReplacement') ||
-        targetToken.document.getFlag('pf2e-visioner', 'visibilityReplacement');
-
-      if (hasRuleElementOverride) {
+      const overrideFactor = getVisibilityOverrideFactor(
+        observerToken,
+        targetToken,
+        resolvedVisibility,
+        () => getPerceptionProfileBetweenStore(observerToken, targetToken),
+      );
+      if (overrideFactor) {
         reasons.push(
-          game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RULE_ELEMENT_OVERRIDE'),
+          overrideFactor.label ||
+            game.i18n.localize('PF2E_VISIONER.VISIBILITY_FACTORS.REASONS.RULE_ELEMENT_OVERRIDE'),
         );
         slugs.push('rule-element-override');
       }

@@ -264,6 +264,7 @@ export class RuleElementChecker {
           return {
             state: observerState,
             source: observerConfig.source,
+            label: observerConfig.label,
             priority: observerConfig.priority || 100,
             type: 'ruleElementOverride',
           };
@@ -279,6 +280,7 @@ export class RuleElementChecker {
           return {
             state: targetState,
             source: targetConfig.source,
+            label: targetConfig.label,
             priority: targetConfig.priority || 100,
             type: 'ruleElementOverride',
           };
@@ -324,6 +326,7 @@ export class RuleElementChecker {
               return {
                 state: sourceState,
                 source: source.id,
+                label: source.label,
                 priority: source.priority ?? 100,
                 type: 'ruleElementOverride',
               };
@@ -379,6 +382,7 @@ export class RuleElementChecker {
               return {
                 state: sourceState || storedState,
                 source: source.id,
+                label: source.label,
                 priority: source.priority || 100,
                 type: 'ruleElementOverride',
               };
@@ -421,6 +425,7 @@ export class RuleElementChecker {
               return {
                 state: sourceState || storedState,
                 source: source.id,
+                label: source.label,
                 priority: source.priority || 100,
                 type: 'ruleElementOverride',
               };
@@ -547,6 +552,7 @@ export class RuleElementChecker {
           return {
             state: observerConfig.toState,
             source: observerConfig.source,
+            label: observerConfig.label,
             priority: observerConfig.priority || 100,
             type: 'visibilityReplacement',
             fromState: currentVisibility,
@@ -613,6 +619,7 @@ export class RuleElementChecker {
           return {
             state: targetConfig.toState,
             source: targetConfig.source,
+            label: targetConfig.label,
             priority: targetConfig.priority || 100,
             type: 'visibilityReplacement',
             fromState: currentVisibility,

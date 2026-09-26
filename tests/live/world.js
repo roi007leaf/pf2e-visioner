@@ -163,7 +163,7 @@ export async function mutate({ fixture, operation, value, runId }) {
       await actor.createEmbeddedDocuments('Item', [{ name: `Visioner QA ${value.id}`, type: 'effect',
         flags: { [MODULE]: { [MARKER]: runId, liveEffectId: value.id } },
         system: { duration: { value: -1, unit: 'unlimited', expiry: null },
-          rules: [{ key: 'PF2eVisionerEffect', operations: value.operations.map(op => op.masterActorUuid === '$secondObserver' ? { ...op, masterActorUuid: canvas.tokens.get(fixture.secondObserver).actor.uuid } : op), priority: value.priority ?? 100 }] },
+          rules: [{ key: 'PF2eVisionerEffect', ...(value.label ? { label: value.label } : {}), operations: value.operations.map(op => op.masterActorUuid === '$secondObserver' ? { ...op, masterActorUuid: canvas.tokens.get(fixture.secondObserver).actor.uuid } : op), priority: value.priority ?? 100 }] },
       }]); break;
     }
     case 'effect-delete': {
@@ -177,7 +177,7 @@ export async function mutate({ fixture, operation, value, runId }) {
       const actor = value.subject === 'observer' ? observer.actor : target.actor;
       const item = actor.items.find(item => owned(item, runId) && item.getFlag(MODULE, 'liveEffectId') === value.id);
       if (!item) throw Error('Fixture effect missing for edit');
-      await item.update({ 'system.rules': [{ key: 'PF2eVisionerEffect', operations: value.operations, priority: 100 }] }); break;
+      await item.update({ 'system.rules': [{ key: 'PF2eVisionerEffect', ...(value.label ? { label: value.label } : {}), operations: value.operations, priority: 100 }] }); break;
     }
     case 'condition': await observer.actor.toggleCondition(value); break;
     case 'target-condition': await target.actor.toggleCondition(value); break;

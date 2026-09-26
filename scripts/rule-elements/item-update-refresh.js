@@ -551,7 +551,11 @@ async function applyOperation(
     }
     case 'overrideVisibility': {
       const OperationClass = await getOperationClass('VisibilityOverride');
-      await OperationClass?.applyVisibilityOverride?.(operation, token, { ruleElementId });
+      await OperationClass?.applyVisibilityOverride?.(
+        { ...operation, label: operation.label?.trim() || ruleElementContext?.label },
+        token,
+        { ruleElementId },
+      );
       break;
     }
     case 'conditionalState': {
@@ -644,6 +648,7 @@ async function refreshTokenRuleElementState({
   ruleElementId,
   ruleSlug = 'effect',
   rulePriority,
+  ruleLabel,
   getOperationClass,
   warn,
 }) {
@@ -651,6 +656,7 @@ async function refreshTokenRuleElementState({
     item,
     slug: ruleSlug,
     priority: rulePriority,
+    label: ruleLabel,
     ruleElementId,
     ruleElementRegistryKey: registryKey,
   };
@@ -721,6 +727,7 @@ export async function refreshVisionerRuleElementItem(
       ruleElementId,
       ruleSlug: visionerRule.slug || 'effect',
       rulePriority: visionerRule.priority,
+      ruleLabel: visionerRule.label,
       getOperationClass,
       warn,
     });

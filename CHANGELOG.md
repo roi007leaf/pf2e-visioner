@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.10.9] - 2026-09-26
+
+### Added
+
+- Visibility overrides support optional rule-element labels and operation labels. Factor text uses the applicable winning override's label, with the localized generic fallback when omitted.
+- PF2e Utility Buttons cards display custom override labels in their visible source descriptions and tooltips. Labels are saved with rolls so historical cards retain their original source after effects are edited or removed.
+
+### Fixed
+
+- Visibility factors exclude overrides that do not apply to the observer/target pair, including opposite directions, losing sources, and ignored concealment sources.
+- Removing a custom label clears its persisted flag rather than retaining stale text through Foundry's flag merging.
+
+### Tests
+
+- Added label regressions for stacking, directions, priority, immunity, edits, removal, generic fallback, safe text rendering, and historical card labels.
+- Live Foundry regression passed with PF2e Utility Buttons enabled, including actual chat card creation and visible rendering. Disposable test data and QA module configuration were restored.
+
 ## [8.10.8] - 2026-09-26
 
 ### Fixed

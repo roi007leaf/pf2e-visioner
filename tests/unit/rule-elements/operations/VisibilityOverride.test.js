@@ -83,6 +83,22 @@ describe('VisibilityOverride', () => {
   });
 
   describe('applyVisibilityOverride', () => {
+    it('explicitly clears a removed label under Foundry object flag merging', async () => {
+      let stored = { label: 'Old label' };
+      mockSubjectToken.document.setFlag.mockImplementation(async (_scope, key, value) => {
+        if (key === 'ruleElementOverride') {
+          stored = { ...stored, ...Object.fromEntries(
+            Object.entries(value).filter(([, entry]) => entry !== undefined),
+          ) };
+        }
+      });
+      const operation = { observers: 'all', direction: 'from', state: 'hidden', source: 'direct' };
+      await VisibilityOverride.applyVisibilityOverride({ ...operation, label: 'New label' }, mockSubjectToken);
+      expect(stored.label).toBe('New label');
+      await VisibilityOverride.applyVisibilityOverride(operation, mockSubjectToken);
+      expect(stored.label).toBeNull();
+    });
+
     it('retains the surviving visibility source when a stronger source is removed', async () => {
       SourceTracker.getVisibilityStateSources.mockReturnValue([{ id: 'low-effect', state: 'concealed', priority: 100 }]);
       SourceTracker.getEffectiveState.mockImplementation(

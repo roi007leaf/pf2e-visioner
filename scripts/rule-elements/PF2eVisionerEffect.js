@@ -129,6 +129,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           tokenIds: new fields.ArrayField(new fields.StringField(), { required: false }),
 
           source: new fields.StringField({ required: false }),
+          label: new fields.StringField({ required: false }),
           sourceTags: new fields.ArrayField(new fields.StringField(), { required: false }),
 
           fromStates: new fields.ArrayField(
@@ -805,6 +806,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
             {
               ...operation,
               source: operation.source || this.ruleElementId,
+              label: operation.label?.trim() || this._source?.label,
               triggerRecalculation,
             },
             token,

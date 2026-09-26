@@ -3,8 +3,10 @@
  */
 
 import { ChatAutomationService } from '../chat/automation-service.js';
+import { registerUtilityButtonsVisibilityLabels } from '../integrations/utility-buttons-visibility-labels.js';
 
 export function registerChatHooks() {
+  Hooks.once('ready', registerUtilityButtonsVisibilityLabels);
   // Foundry v13+: use renderChatMessageHTML (HTMLElement instead of jQuery)
   Hooks.on('renderChatMessageHTML', (message, element, ...rest) => {
     try {

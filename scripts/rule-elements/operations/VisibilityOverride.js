@@ -120,6 +120,7 @@ export class VisibilityOverride {
       const sourceData = {
         id: source || `visibility-replacement-${Date.now()}`,
         type: source,
+        label: operation.label?.trim() || null,
         priority,
         fromStates,
         toState,
@@ -169,6 +170,7 @@ export class VisibilityOverride {
     const sourceData = {
       id: source || `visibility-${Date.now()}`,
       type: source,
+      label: operation.label?.trim() || null,
       priority,
       state,
       qualifications: operation.qualifications || {},
@@ -239,6 +241,7 @@ export class VisibilityOverride {
       await subjectToken.document.setFlag('pf2e-visioner', 'ruleElementOverride', {
         active: true,
         source: sourceData.id,
+        label: sourceData.label,
         state,
         direction,
         sourceTags: operation.sourceTags,
