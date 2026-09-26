@@ -457,6 +457,7 @@ describe('rule-element item update refresh', () => {
     expect(operationClasses.VisibilityOverride.applyVisibilityOverride).toHaveBeenCalledWith(
       { type: 'overrideVisibility', source: 'item-1-effect' },
       token,
+      { ruleElementId: 'item-1-effect' },
     );
     expect(operationClasses.SenseModifier.applySenseModifications).toHaveBeenCalledWith(
       token,

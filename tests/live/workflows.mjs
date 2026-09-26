@@ -1,3 +1,4 @@
+import { autumnLeavesWorkflows } from './autumn-leaves-workflows.mjs';
 import assert from 'node:assert/strict';
 import { regionAuditWorkflows } from './region-audit-workflows.mjs';
 import * as ui from './ui-workflows.mjs';
@@ -16,6 +17,7 @@ import { deletionRaceWorkflows } from './deletion-race-workflows.mjs';
 import { visibilityRegressionWorkflows } from './visibility-regression-workflows.mjs';
 
 export const workflows = {
+  ...autumnLeavesWorkflows,
   ...visibilityRegressionWorkflows,
   ...regionAuditWorkflows,
   ...fpsWorkflows,

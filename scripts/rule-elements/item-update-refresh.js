@@ -25,7 +25,9 @@ function defaultIsGM() {
 }
 
 function defaultGetTokensForActor(actor) {
-  return globalThis.canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || [];
+  return (
+    globalThis.canvas?.tokens?.placeables?.filter((token) => token.actor?.id === actor.id) || []
+  );
 }
 
 function defaultScheduler(callback, delayMs) {
@@ -80,7 +82,9 @@ function hasRuleElementChanges(changes) {
   const systemChanges = changes?.system || {};
   return (
     Object.keys(systemChanges).some((key) => key === 'rules' || key.startsWith('rules.')) ||
-    Object.keys(changes || {}).some((key) => key === 'system.rules' || key.startsWith('system.rules.'))
+    Object.keys(changes || {}).some(
+      (key) => key === 'system.rules' || key.startsWith('system.rules.'),
+    )
   );
 }
 
@@ -133,7 +137,9 @@ function hasRuleChanges(changes) {
   if (Object.keys(systemChanges).some((key) => key === 'rules' || key.startsWith('rules.'))) {
     return true;
   }
-  return Object.keys(changes).some((key) => key === 'system.rules' || key.startsWith('system.rules.'));
+  return Object.keys(changes).some(
+    (key) => key === 'system.rules' || key.startsWith('system.rules.'),
+  );
 }
 
 function itemSenseChangeAffectsAvs(item, changes) {
@@ -296,11 +302,7 @@ function watchPreparedSenseProperty(sense, property, onChange) {
 
 export function watchActorPreparedSenses(
   actor,
-  {
-    isGM = defaultIsGM,
-    warn = console.warn,
-    ...scheduleOptions
-  } = {},
+  { isGM = defaultIsGM, warn = console.warn, ...scheduleOptions } = {},
 ) {
   try {
     if (!isGM()) return false;
@@ -549,7 +551,7 @@ async function applyOperation(
     }
     case 'overrideVisibility': {
       const OperationClass = await getOperationClass('VisibilityOverride');
-      await OperationClass?.applyVisibilityOverride?.(operation, token);
+      await OperationClass?.applyVisibilityOverride?.(operation, token, { ruleElementId });
       break;
     }
     case 'conditionalState': {
@@ -858,7 +860,8 @@ export function handleVisionerRuleElementItemUpdate(
   options,
   userId,
   {
-    scheduleVisionerRuleElementItemRefresh: scheduleItemRefresh = scheduleVisionerRuleElementItemRefresh,
+    scheduleVisionerRuleElementItemRefresh:
+      scheduleItemRefresh = scheduleVisionerRuleElementItemRefresh,
     warn = console.warn,
     ...scheduleOptions
   } = {},

@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.10.5] - 2026-09-26
+
+### Fixed
+
+- Visibility replacements stack by source and direction instead of overwriting one another. Item edits and removal preserve independent replacements; eligible sources honor priority and source immunity.
+- Ranged visibility overrides use native token distance on current Foundry versions.
+
+### Added
+
+- Corrected Autumn's Leaves example effects and Aura UUID setup instructions. Observed-to-Concealed replacements preserve invisibility.
+
+### Tests
+
+- Native Aura and generic replacement live regressions passed on GM and player clients, including rendering, invisibility, priority, both directions, direction edits, range exclusions, exit/reentry, and selective removal.
+- All 5,087 unit/integration tests and 54 live-harness checks passed.
+
 ## [8.10.4] - 2026-09-26
 
 ### Added

@@ -303,33 +303,33 @@ for (const failAt of [null, 'cleanup', 'restore', 'verify']) {
 }
 
 test('world cleanup deletes only tagged documents and their action messages, even after one deletion fails', async () => {
-  const original = Object.fromEntries(['game', 'Actor', 'Scene', 'Combat', 'ChatMessage'].map(k => [k, globalThis[k]]));
+  const original = Object.fromEntries(['game', 'Actor', 'Scene', 'Combat', 'ChatMessage', 'Item'].map(k => [k, globalThis[k]]));
   const document = (id, runId, speaker) => ({ id, speaker, getFlag: () => runId });
   const calls = [];
-  globalThis.game = { user: { isGM: true },
+  globalThis.game = { user: { isGM: true }, items: [document('test-item', RUN), document('real-item', null)],
     scenes: [document('test-scene', RUN), document('real-scene', null)],
     actors: [document('test-actor', RUN), document('other-run-actor', 'another-run')],
     combats: [document('test-combat', RUN), document('real-combat', null)],
     messages: [document('action-message', null, { scene: 'test-scene' }), document('normal-message', null, { scene: 'real-scene' })],
   };
-  for (const name of ['ChatMessage', 'Combat', 'Scene', 'Actor']) globalThis[name] = { deleteDocuments: async ids => {
+  for (const name of ['ChatMessage', 'Combat', 'Scene', 'Actor', 'Item']) globalThis[name] = { deleteDocuments: async ids => {
     calls.push([name, ids]); if (name === 'Combat') throw Error('Simulated combat deletion failure');
   } };
   try {
     await assert.rejects(cleanup(RUN), /Simulated combat deletion failure/);
-    assert.deepEqual(calls, [['ChatMessage', ['action-message']], ['Combat', ['test-combat']], ['Scene', ['test-scene']], ['Actor', ['test-actor']]]);
+    assert.deepEqual(calls, [['ChatMessage', ['action-message']], ['Combat', ['test-combat']], ['Scene', ['test-scene']], ['Actor', ['test-actor']], ['Item', ['test-item']]]);
   } finally { for (const [key, value] of Object.entries(original)) globalThis[key] = value; }
 });
 
 test('failed message deletion retains reference documents for the next recovery attempt', async () => {
-  const original = Object.fromEntries(['game', 'Actor', 'Scene', 'Combat', 'ChatMessage'].map(k => [k, globalThis[k]]));
+  const original = Object.fromEntries(['game', 'Actor', 'Scene', 'Combat', 'ChatMessage', 'Item'].map(k => [k, globalThis[k]]));
   const calls = [];
-  globalThis.game = { user: { isGM: true },
+  globalThis.game = { user: { isGM: true }, items: [],
     scenes: [{ id: 'scene', getFlag: () => RUN }],
     actors: [{ id: 'actor', getFlag: () => RUN }], combats: [],
     messages: [{ id: 'message', getFlag: () => null, speaker: { scene: 'scene' } }],
   };
-  for (const name of ['ChatMessage', 'Combat', 'Scene', 'Actor']) globalThis[name] = { deleteDocuments: async () => {
+  for (const name of ['ChatMessage', 'Combat', 'Scene', 'Actor', 'Item']) globalThis[name] = { deleteDocuments: async () => {
     calls.push(name); if (name === 'ChatMessage') throw Error('Message locked');
   } };
   try {

@@ -1,0 +1,80 @@
+{
+  "name": "Effect: Autumn's Leaves (In Area)",
+  "type": "effect",
+  "img": "icons/magic/nature/leaf-glow-maple-orange.webp",
+  "system": {
+    "slug": "autumn-leaves-within",
+    "description": {
+      "value": "<p>You call forth a storm of leaves from autumn's embrace. These leaves swirl in a 20-foot emanation for 1 minute. Creatures within the area are concealed, and creatures outside the area are concealed to creatures within the leaves. However, you can see through this concealment. You can Dismiss the activation.</p>",
+      "gm": ""
+    },
+    "duration": {
+      "value": 1,
+      "unit": "minutes",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "direction": "to",
+            "observers": "all",
+            "fromStates": ["observed"],
+            "toState": "concealed",
+            "source": "autumn-leaves-within",
+            "sourceTags": ["autumns-embrace"]
+          }
+        ],
+        "priority": 100
+      },
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "direction": "from",
+            "observers": "all",
+            "source": "autumn-leaves-within-concealed",
+            "sourceTags": ["autumns-embrace"],
+            "fromStates": ["observed"],
+            "toState": "concealed"
+          }
+        ],
+        "priority": 100
+      }
+    ],
+    "publication": {
+      "title": "",
+      "authors": "",
+      "license": "OGL",
+      "remaster": false
+    },
+    "traits": {
+      "otherTags": [],
+      "value": []
+    },
+    "_migration": {
+      "version": null,
+      "previous": null
+    },
+    "level": {
+      "value": 1
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "badge": null,
+    "fromSpell": false,
+    "context": null
+  },
+  "effects": [],
+  "flags": {}
+}

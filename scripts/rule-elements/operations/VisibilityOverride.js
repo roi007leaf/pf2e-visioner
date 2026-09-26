@@ -3,20 +3,59 @@ import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
+  static getReplacementSources(token) {
+    const sources = token.document.getFlag('pf2e-visioner', 'visibilityReplacements');
+    if (Array.isArray(sources)) return sources;
+    const legacy = token.document.getFlag('pf2e-visioner', 'visibilityReplacement');
+    return legacy?.active ? [legacy] : [];
+  }
+
+  static async removeReplacementSources(token, operation, ruleElementId) {
+    const sources = this.getReplacementSources(token);
+    const remaining = sources.filter((s) =>
+      s.ownerId && ruleElementId
+        ? s.ownerId !== ruleElementId
+        : !this._matchesAnyCleanupId(s.id, [operation?.source, ruleElementId].filter(Boolean)),
+    );
+    if (remaining.length) {
+      await token.document.setFlag('pf2e-visioner', 'visibilityReplacements', remaining);
+      await token.document.setFlag('pf2e-visioner', 'visibilityReplacement', remaining.at(-1));
+    } else {
+      await token.document.unsetFlag('pf2e-visioner', 'visibilityReplacements');
+      await token.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
+    }
+  }
   static async _clearVisibilityAfterSourceRemoval(observer, target, cleanupIds) {
-    const override = target.document?.getFlag?.('pf2e-visioner', `avs-override-from-${observer.id}`);
-    if (override && override.coverOnly !== true && !this._matchesAnyCleanupId(override.source, cleanupIds)) {
+    const override = target.document?.getFlag?.(
+      'pf2e-visioner',
+      `avs-override-from-${observer.id}`,
+    );
+    if (
+      override &&
+      override.coverOnly !== true &&
+      !this._matchesAnyCleanupId(override.source, cleanupIds)
+    ) {
       return;
     }
-    const { setVisibilityBetween, getVisibilityBetween } = await import('../../stores/visibility-map.js');
+    const { setVisibilityBetween, getVisibilityBetween } = await import(
+      '../../stores/visibility-map.js'
+    );
     const sources = SourceTracker.getVisibilityStateSources(target, observer.id) || [];
     const remainingState = SourceTracker.getEffectiveState(sources, 'visibility');
     const nextState = remainingState || 'observed';
     const currentState = getVisibilityBetween(observer, target);
-    await setVisibilityBetween(observer, target,
-      currentState === 'undetected' && ['observed', 'concealed'].includes(nextState) ? currentState : nextState, {
-      skipEphemeralUpdate: true, isAutomatic: false, direction: 'observer_to_target',
-    });
+    await setVisibilityBetween(
+      observer,
+      target,
+      currentState === 'undetected' && ['observed', 'concealed'].includes(nextState)
+        ? currentState
+        : nextState,
+      {
+        skipEphemeralUpdate: true,
+        isAutomatic: false,
+        direction: 'observer_to_target',
+      },
+    );
   }
   static _matchesAnyCleanupId(sourceId, cleanupIds) {
     if (!sourceId || !Array.isArray(cleanupIds) || cleanupIds.length === 0) return false;
@@ -70,8 +109,22 @@ export class VisibilityOverride {
         range: operation.range,
         levelComparison: operation.levelComparison,
         sourceTags: operation.sourceTags,
+        ownerId: options.ruleElementId,
+        source,
       };
 
+      const sources = this.getReplacementSources(subjectToken).filter(
+        (s) =>
+          !(
+            s.id === sourceData.id &&
+            s.direction === direction &&
+            s.ownerId === sourceData.ownerId
+          ),
+      );
+      await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacements', [
+        ...sources,
+        { active: true, ...sourceData },
+      ]);
       await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
         active: true,
         ...sourceData,
@@ -155,7 +208,6 @@ export class VisibilityOverride {
       appliedToAnyToken = true;
     }
 
-
     // Only set the ruleElementOverride flag if:
     // 1. We actually applied the state to at least one token, AND
     // 2. There are no predicates (predicates require per-pair state, not global override)
@@ -215,11 +267,15 @@ export class VisibilityOverride {
 
       // Update the visibility map for this specific observer->target pair
       // This is unidirectional: only sets visibility from observer's perspective of target
-      const { setVisibilityBetween, getVisibilityBetween } = await import('../../stores/visibility-map.js');
+      const { setVisibilityBetween, getVisibilityBetween } = await import(
+        '../../stores/visibility-map.js'
+      );
       // Keep an unseen pair unseen until AVS evaluates the rule against LOS.
       const currentState = getVisibilityBetween(observerToken, targetToken);
-      const initialState = currentState === 'undetected' && ['observed', 'concealed'].includes(state)
-        ? currentState : state;
+      const initialState =
+        currentState === 'undetected' && ['observed', 'concealed'].includes(state)
+          ? currentState
+          : state;
       await setVisibilityBetween(observerToken, targetToken, initialState, {
         skipEphemeralUpdate: !applyOffGuard,
         isAutomatic: false,
@@ -231,6 +287,10 @@ export class VisibilityOverride {
   }
 
   static async removeVisibilityOverride(operation, subjectToken, ruleElementId = null) {
+    if (operation?.fromStates?.length && operation.toState) {
+      await this.removeReplacementSources(subjectToken, operation, ruleElementId);
+      return;
+    }
 
     if (!subjectToken) return;
 
@@ -263,21 +323,20 @@ export class VisibilityOverride {
             idToMatch = existingReplacement.id;
           }
         }
-      } catch (_) { }
+      } catch (_) {}
     }
-
 
     const cleanupIds = Array.from(
       new Set(
-        [ruleElementId, sourceId, idToMatch].filter((id) => typeof id === 'string' && id.length > 0),
+        [ruleElementId, sourceId, idToMatch].filter(
+          (id) => typeof id === 'string' && id.length > 0,
+        ),
       ),
     );
 
     if (cleanupIds.length > 0) {
       const allTokens = canvas.tokens?.placeables.filter((t) => t.actor) || [];
-      const { getVisibilityBetween } = await import(
-        '../../stores/visibility-map.js'
-      );
+      const { getVisibilityBetween } = await import('../../stores/visibility-map.js');
 
       // Remove all sources with IDs that match ruleElementId (exact or prefix match)
       // Sources can have IDs like ruleElementId, or ruleElementId + suffixes
@@ -309,13 +368,11 @@ export class VisibilityOverride {
               if (data.sources.length !== originalLength) {
                 sourcesRemovedFromToken += originalLength - data.sources.length;
                 modified = true;
-
               }
 
               // Clean up empty entries
               if (data.sources.length === 0) {
                 delete stateSource.visibilityByObserver[observerId];
-
               }
             }
           }
@@ -324,7 +381,6 @@ export class VisibilityOverride {
           if (Object.keys(stateSource.visibilityByObserver).length === 0) {
             delete stateSource.visibilityByObserver;
             modified = true;
-
           }
         }
 
@@ -354,13 +410,11 @@ export class VisibilityOverride {
           if (Object.keys(stateSource).length === 0) {
             // Empty stateSource - use unsetFlag to remove it, then wait for it to complete
             await token.document.unsetFlag('pf2e-visioner', 'stateSource');
-
           } else {
             // Use update() with explicit key path to ensure replacement, not merge
             await token.document.update({
               [`flags.pf2e-visioner.stateSource`]: stateSource,
             });
-
           }
 
           // Wait a moment for the update to propagate
@@ -388,7 +442,6 @@ export class VisibilityOverride {
               }
             }
           }
-
         }
       }
 
@@ -438,8 +491,6 @@ export class VisibilityOverride {
           visibilityMapCleared++;
         }
       }
-
-
 
       await subjectToken.document.unsetFlag('pf2e-visioner', 'ruleElementOverride');
       await subjectToken.document.unsetFlag('pf2e-visioner', 'visibilityReplacement');
@@ -501,7 +552,7 @@ export class VisibilityOverride {
       if (!direction && existingReplacement?.direction) {
         direction = existingReplacement.direction;
       }
-    } catch (_) { }
+    } catch (_) {}
 
     // Remove sources from ALL tokens, regardless of direction
     // This ensures we clean up sources stored with either 'to' or 'from' direction
@@ -574,7 +625,9 @@ export class VisibilityOverride {
 
     if (range) {
       filteredTokens = filteredTokens.filter((token) => {
-        const distance = canvas.grid.measureDistance(subjectToken, token);
+        const distance = subjectToken.distanceTo?.(token)
+          ?? canvas.grid.measurePath?.([subjectToken.center, token.center]).distance
+          ?? canvas.grid.measureDistance?.(subjectToken, token);
         return distance <= range;
       });
     }

@@ -335,7 +335,7 @@ export async function snapshot(fixture) {
 
 export async function leftovers(runId) {
   validateRunId(runId);
-  return Object.fromEntries(['messages', 'combats', 'scenes', 'actors'].map(key => [key, game[key].filter(d => owned(d, runId)).map(d => d.id)]));
+  return Object.fromEntries(['messages', 'combats', 'scenes', 'actors', 'items'].map(key => [key, game[key].filter(d => owned(d, runId)).map(d => d.id)]));
 }
 
 export async function cleanup(runId) {
@@ -346,7 +346,7 @@ export async function cleanup(runId) {
   const sceneIds = new Set(game.scenes.filter(d => owned(d, runId)).map(d => d.id));
   const actorIds = new Set(game.actors.filter(d => owned(d, runId)).map(d => d.id));
   let retainMessageReferences = false;
-  for (const [collection, type] of [[game.messages, ChatMessage], [game.combats, Combat], [game.scenes, Scene], [game.actors, Actor]]) {
+  for (const [collection, type] of [[game.messages, ChatMessage], [game.combats, Combat], [game.scenes, Scene], [game.actors, Actor], [game.items, Item]]) {
     if (retainMessageReferences && (collection === game.scenes || collection === game.actors)) continue;
     const ids = collection.filter(d => owned(d, runId) || (collection === game.messages &&
       (sceneIds.has(d.speaker?.scene) || actorIds.has(d.speaker?.actor)))).map(d => d.id);

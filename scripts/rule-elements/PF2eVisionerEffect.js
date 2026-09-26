@@ -483,6 +483,13 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           if (registeredFlags.includes('visibilityReplacement')) {
             updates['flags.pf2e-visioner.visibilityReplacement'] = null;
           }
+          {
+            const path = 'flags.pf2e-visioner.visibilityReplacements';
+            const sources =
+              updates[path] ?? token.document.getFlag('pf2e-visioner', 'visibilityReplacements');
+            if (Array.isArray(sources))
+              updates[path] = sources.filter((s) => s.ownerId !== this.ruleElementId);
+          }
           if (registeredFlags.includes('conditionalState')) {
             updates['flags.pf2e-visioner.conditionalState'] = null;
           }
@@ -809,6 +816,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
               triggerRecalculation,
             },
             token,
+            { ruleElementId: this.ruleElementId },
           );
           await this.registerFlag(token, 'ruleElementOverride');
           await this.registerFlag(token, 'visibilityReplacement');
@@ -817,7 +825,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'ignoreVisibilitySources': {
           const { setIgnoredVisibilitySources } = await import('./visibility-source-tags.js');
           await setIgnoredVisibilitySources(token, this.ruleElementId, operation);
-            if (triggerRecalculation) await window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll?.();
+          if (triggerRecalculation)
+            await window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll?.();
           break;
         }
 
@@ -846,7 +855,10 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
           break;
 
         case 'conditionalState':
-          await VisibilityOverride.applyConditionalState({ ...operation, triggerRecalculation }, token);
+          await VisibilityOverride.applyConditionalState(
+            { ...operation, triggerRecalculation },
+            token,
+          );
           await this.registerFlag(token, 'conditionalState');
           break;
 
@@ -899,7 +911,6 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
       const registryKey = this.ruleElementRegistryKey;
 
       for (const token of tokens) {
-
         // Track visibility override cleanup to avoid duplicate cleanup
         // Visibility override cleanup is direction-agnostic and removes all sources for the rule element ID
         // Both 'overrideVisibility' and 'conditionalState' use the same cleanup function
@@ -1044,7 +1055,7 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         case 'ignoreVisibilitySources': {
           const { removeIgnoredVisibilitySources } = await import('./visibility-source-tags.js');
           await removeIgnoredVisibilitySources(token, ruleElementId);
-            await window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll?.();
+          await window.pf2eVisioner?.services?.autoVisibilitySystem?.recalculateAll?.();
           break;
         }
 

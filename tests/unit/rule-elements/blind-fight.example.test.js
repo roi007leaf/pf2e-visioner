@@ -5,6 +5,7 @@ describe('Blind-Fight example sanity', () => {
     const token = {
       id: 's1',
       document: {
+        getFlag: jest.fn(),
         setFlag: jest.fn(() => Promise.resolve()),
       },
     };
@@ -25,7 +26,7 @@ describe('Blind-Fight example sanity', () => {
     expect(token.document.setFlag).toHaveBeenCalledWith(
       'pf2e-visioner',
       'visibilityReplacement',
-      expect.objectContaining({ predicate: ['self:trait:human'] })
+      expect.objectContaining({ predicate: ['self:trait:human'] }),
     );
   });
 });

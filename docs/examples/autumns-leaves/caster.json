@@ -1,0 +1,84 @@
+{
+  "name": "Effect: Autumn's Leaves (Caster)",
+  "type": "effect",
+  "img": "icons/magic/nature/leaf-arrowheads-glow-green.webp",
+  "system": {
+    "slug": "autumn-leaves-caster",
+    "description": {
+      "value": "<p>You call forth a storm of leaves from autumn's embrace. These leaves swirl in a 20-foot emanation for 1 minute. Creatures within the area are concealed, and creatures outside the area are concealed to creatures within the leaves. However, you can see through this concealment. You can Dismiss the activation.</p>",
+      "gm": ""
+    },
+    "duration": {
+      "value": 1,
+      "unit": "minutes",
+      "expiry": "turn-start",
+      "sustained": false
+    },
+    "rules": [
+      {
+        "key": "PF2eVisionerEffect",
+        "operations": [
+          {
+            "type": "overrideVisibility",
+            "direction": "from",
+            "observers": "all",
+            "fromStates": ["observed"],
+            "toState": "concealed",
+            "source": "autumn-leaves-caster",
+            "sourceTags": ["autumns-embrace"]
+          },
+          {
+            "type": "ignoreVisibilitySources",
+            "sourceTags": ["autumns-embrace"],
+            "fromStates": ["concealed"]
+          }
+        ],
+        "priority": 100
+      },
+      {
+        "key": "Aura",
+        "slug": "autumns-leaves",
+        "radius": 20,
+        "effects": [
+          {
+            "uuid": "Item.REPLACE_WITH_IN_AREA_EFFECT_ID",
+            "affects": "all",
+            "events": ["enter"],
+            "includesSelf": false,
+            "removeOnExit": true
+          }
+        ]
+      }
+    ],
+    "publication": {
+      "title": "",
+      "authors": "",
+      "license": "OGL",
+      "remaster": false
+    },
+    "traits": {
+      "otherTags": [],
+      "value": []
+    },
+    "_migration": {
+      "version": null,
+      "previous": null
+    },
+    "level": {
+      "value": 1
+    },
+    "tokenIcon": {
+      "show": true
+    },
+    "unidentified": false,
+    "start": {
+      "value": 0,
+      "initiative": null
+    },
+    "badge": null,
+    "fromSpell": false,
+    "context": null
+  },
+  "effects": [],
+  "flags": {}
+}
