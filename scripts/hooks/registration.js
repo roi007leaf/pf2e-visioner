@@ -22,6 +22,7 @@ import {
   watchCurrentScenePreparedSenses,
 } from '../rule-elements/item-update-refresh.js';
 import { cleanupDeletedEffectItem } from '../services/deleted-effect-cleanup.js';
+import { applyPlayerCreatedVisionerRules } from '../rule-elements/created-item-refresh.js';
 import { createVisionMasterTokenRefresh } from '../services/vision-master-token-refresh.js';
 import { handleSceneDisableAvsRefresh } from '../services/scene-disable-avs-refresh.js';
 import { handlePreCreateChatMessage } from '../chat/services/pre-create-message.js';
@@ -159,6 +160,7 @@ export async function registerHooks() {
     clearActorFeatureCacheForItem(item);
     handleActorSenseChangeItemEvent(item, null, options, userId);
     handleConditionItemChange(item);
+    await applyPlayerCreatedVisionerRules(item, userId);
   });
 
   // Wall lifecycle: refresh indicators and see-through state when walls change

@@ -7,6 +7,22 @@ const caster = JSON.parse(
 );
 export const autumnLeavesCases = [
   {
+    name: 'regression-player-mid-turn-visibility-effect',
+    area: 'rule-elements',
+    disposableWorld: true,
+    senses: [],
+    steps: [{ workflow: 'regression-player-mid-turn-visibility-effect' }],
+  },
+  {
+    name: 'regression-autumn-leaves-mid-turn',
+    area: 'rule-elements',
+    disposableWorld: true,
+    secondObserver: true,
+    senses: [],
+    settings: ['core.scrollingStatusText'],
+    steps: [{ workflow: 'regression-autumn-leaves-mid-turn' }],
+  },
+  {
     name: 'regression-generic-visibility-replacements',
     area: 'rule-elements',
     disposableWorld: true,
@@ -24,6 +40,53 @@ export const autumnLeavesCases = [
   },
 ];
 export const autumnLeavesWorkflows = {
+  'regression-player-mid-turn-visibility-effect': async (c) => {
+    await c.mutate('combat');
+    const playerId = await c.player.evaluate(() => game.user.id);
+    await c.gm.evaluate(
+      async ({ f, playerId }) =>
+        canvas.tokens.get(f.target).actor.update({ [`ownership.${playerId}`]: 3 }),
+      { f: c.fixture, playerId },
+    );
+    await c.player.waitForFunction((f) => canvas.tokens.get(f.target).actor.isOwner, c.fixture);
+    const turn = await c.gm.evaluate(() => ({ round: game.combat.round, turn: game.combat.turn }));
+    const id = await c.player.evaluate(
+      async ({ f, area, runId }) => {
+        if (canvas.scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId)
+          throw Error('Owned QA scene required');
+        const [item] = await canvas.tokens
+          .get(f.target)
+          .actor.createEmbeddedDocuments('Item', [
+            { ...area, flags: { 'pf2e-visioner': { liveTestRun: runId } } },
+          ]);
+        return item.id;
+      },
+      { f: c.fixture, area, runId: c.runId },
+    );
+    await c.check(
+      { state: 'concealed', reverseState: 'concealed' },
+      true,
+      'player-applied-effect-refreshes-both-directions-mid-turn',
+    );
+    c.equal(
+      await c.gm.evaluate(() => ({ round: game.combat.round, turn: game.combat.turn })),
+      turn,
+      'player-effect-does-not-need-turn-advance',
+    );
+    await c.player.evaluate(
+      async ({ f, id }) => canvas.tokens.get(f.target).actor.items.get(id).delete(),
+      { f: c.fixture, id },
+    );
+    await c.check(
+      { state: 'observed', reverseState: 'observed' },
+      true,
+      'player-effect-removal-refreshes-mid-turn',
+    );
+  },
+  'regression-autumn-leaves-mid-turn': async (c) => {
+    c.autumnMidTurn = true;
+    await autumnLeavesWorkflows['regression-autumn-leaves-aura'](c);
+  },
   'regression-generic-visibility-replacements': async (c) => {
     const operation = (source, direction, toState, priority, extra = {}) => ({
       type: 'overrideVisibility',
@@ -75,13 +138,28 @@ export const autumnLeavesWorkflows = {
     await c.check({ state: 'hidden' }, false, 'generic-concealment-preserves-invisibility');
     await c.mutate('target-condition', 'invisible');
     await c.check({ state: 'concealed' }, true, 'generic-concealment-restored');
-    await c.gm.evaluate(async f => canvas.tokens.get(f.target).document.unsetFlag('pf2e-visioner', 'visibilityReplacement'), c.fixture);
+    await c.gm.evaluate(
+      async (f) =>
+        canvas.tokens.get(f.target).document.unsetFlag('pf2e-visioner', 'visibilityReplacement'),
+      c.fixture,
+    );
     await c.mutate('target-token', { x: 1000 });
     await c.check({ state: 'concealed' }, true, 'stacked-source-works-without-legacy-mirror');
     await c.mutate('effect-delete', { id: 'low' });
     await c.check({ state: 'observed' }, true, 'last-independent-effect-removal-restores-art');
-    await c.mutate('effect-add', { id: 'both-directions', operations: [low, { ...low, source: 'generic-outgoing', direction: 'to' }] });
-    const nativeCount = await c.gm.evaluate(f => canvas.tokens.get(f.target).actor.itemTypes.effect.find(i => i.rules.some(r => r.key === 'PF2eVisionerEffect')).rules.find(r => r.key === 'PF2eVisionerEffect').smartMergeOperations().length, c.fixture);
+    await c.mutate('effect-add', {
+      id: 'both-directions',
+      operations: [low, { ...low, source: 'generic-outgoing', direction: 'to' }],
+    });
+    const nativeCount = await c.gm.evaluate(
+      (f) =>
+        canvas.tokens
+          .get(f.target)
+          .actor.itemTypes.effect.find((i) => i.rules.some((r) => r.key === 'PF2eVisionerEffect'))
+          .rules.find((r) => r.key === 'PF2eVisionerEffect')
+          .smartMergeOperations().length,
+      c.fixture,
+    );
     c.equal(nativeCount, 2, 'native-application-keeps-both-directions-in-one-rule');
     await pair(true, 'concealed', 'single-rule-outgoing-replacement');
     await c.check({ state: 'concealed' }, true, 'single-rule-incoming-replacement');
@@ -100,8 +178,20 @@ export const autumnLeavesWorkflows = {
         { f: c.fixture, runId: c.runId },
       );
       await c.setting('core.scrollingStatusText', false);
+      if (c.autumnMidTurn) {
+        const playerId = await c.player.evaluate(() => game.user.id);
+        await c.gm.evaluate(
+          async ({ f, playerId }) =>
+            canvas.tokens.get(f.target).actor.update({ [`ownership.${playerId}`]: 3 }),
+          { f: c.fixture, playerId },
+        );
+      }
+      if (c.autumnMidTurn) await c.mutate('combat');
+      const combatState = c.autumnMidTurn
+        ? await c.gm.evaluate(() => ({ round: game.combat.round, turn: game.combat.turn }))
+        : null;
       const item = await c.gm.evaluate(
-        async ({ f, runId, area, caster }) => {
+        async ({ f, runId, area, caster, midTurn }) => {
           if (!game.user.isGM || canvas.scene.getFlag('pf2e-visioner', 'liveTestRun') !== runId)
             throw Error('Owned QA scene required');
           await canvas.scene.updateEmbeddedDocuments(
@@ -120,11 +210,12 @@ export const autumnLeavesWorkflows = {
           const [effect] = await canvas.tokens
             .get(f.observer)
             .actor.createEmbeddedDocuments('Item', [caster]);
-          for (const aura of canvas.tokens.get(f.observer).document.auras.values())
-            await aura.notifyActors();
+          if (!midTurn)
+            for (const aura of canvas.tokens.get(f.observer).document.auras.values())
+              await aura.notifyActors();
           return effect.id;
         },
-        { f: c.fixture, runId: c.runId, area, caster },
+        { f: c.fixture, runId: c.runId, area, caster, midTurn: c.autumnMidTurn === true },
       );
       const pair = async (observer, target, state, label) => {
         for (const page of [c.gm, c.player])
@@ -156,10 +247,19 @@ export const autumnLeavesWorkflows = {
       await pair(outside, inside, 'concealed', 'outsider-sees-leaves-concealment');
       await pair(inside, outside, 'concealed', 'inside-sees-outside-concealed');
       await pair(outside, owner, 'concealed', 'outsider-sees-caster-concealed');
-      await c.gm.evaluate(async f => {
+      if (combatState)
+        c.equal(
+          await c.gm.evaluate(() => ({ round: game.combat.round, turn: game.combat.turn })),
+          combatState,
+          'aura-entry-applies-without-turn-advance',
+        );
+      await c.gm.evaluate(async (f) => {
         const token = canvas.tokens.get(f.target);
-        const effect = token.actor.itemTypes.effect.find(i => i.slug === 'autumn-leaves-within');
-        await effect.update({ name: effect.name + ' edited', 'system.rules': effect.toObject().system.rules.slice().reverse() });
+        const effect = token.actor.itemTypes.effect.find((i) => i.slug === 'autumn-leaves-within');
+        await effect.update({
+          name: effect.name + ' edited',
+          'system.rules': effect.toObject().system.rules.slice().reverse(),
+        });
       }, c.fixture);
       await pair(inside, outside, 'concealed', 'native-rule-reapplication-preserves-to');
       await pair(outside, inside, 'concealed', 'native-rule-reapplication-preserves-from');

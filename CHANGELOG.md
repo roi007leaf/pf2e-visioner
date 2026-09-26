@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.10.7] - 2026-09-26
+
+### Fixed
+
+- Player-created Visioner effects apply immediately through the active GM, including every rule element and both visibility directions. Effects gained during a turn no longer wait for turn advancement. GM-created effects retain native application without duplicate handling.
+
+### Tests
+
+- Added live combat regressions for player-created In Area effects and native Aura application to stationary recipients during a turn. Application and removal update both directions without advancing turns.
+- All four related live scenarios, 5,091 unit/integration tests, and 54 live-harness checks passed.
+
 ## [8.10.6] - 2026-09-26
 
 ### Fixed
