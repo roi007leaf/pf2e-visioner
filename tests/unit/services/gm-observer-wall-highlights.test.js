@@ -86,6 +86,37 @@ describe('GM Observer wall highlights', () => {
     expect(graphic.destroyed).toBe(true);
   });
 
+  it('preserves Foundry Color objects returned for wall categories', () => {
+    canvas.walls.placeables = [
+      wall([1, 2, 3, 4], new Number(0x81b90c)),
+      wall([5, 6, 7, 8], new Number(0x77e7e8)),
+      wall([9, 10, 11, 12], new Number(0xca81ff)),
+    ];
+
+    const graphic = syncGmObserverWallHighlights({ active: true, enabled: true });
+    expect(graphic.calls.filter((call) => call[0] === 'lineStyle' && call[1] === 3)).toEqual([
+      ['lineStyle', 3, 0x81b90c, 0.95],
+      ['lineStyle', 3, 0x77e7e8, 0.95],
+      ['lineStyle', 3, 0xca81ff, 0.95],
+    ]);
+  });
+
+  it('omits normal and secret door segments regardless of door state', () => {
+    canvas.walls.placeables = [wall([1, 2, 3, 4], 0x81b90c)];
+    for (const door of [1, 2]) {
+      for (const ds of [0, 1, 2]) {
+        const doorWall = wall([5, 6, 7, 8], 0x6666ee);
+        Object.assign(doorWall.document, { door, ds });
+        canvas.walls.placeables.push(doorWall);
+      }
+    }
+
+    const graphic = syncGmObserverWallHighlights({ active: true, enabled: true });
+    expect(graphic.calls.filter((call) => call[0] === 'lineStyle' && call[1] === 3)).toEqual([
+      ['lineStyle', 3, 0x81b90c, 0.95],
+    ]);
+  });
+
   it('uses Core category and door-state colors before a wall display initializes', () => {
     const previousConst = globalThis.CONST;
     globalThis.CONST = { WALL_DOOR_STATES: { CLOSED: 0, OPEN: 1, LOCKED: 2 } };

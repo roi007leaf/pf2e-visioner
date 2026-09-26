@@ -4,6 +4,7 @@
  */
 
 import { MODULE_ID } from '../../constants.js';
+import { combatStartCoverService } from '../../services/CombatStartCoverService.js';
 import { withRollContextVisibilityOverride } from '../../services/roll-context-visibility-override.js';
 import autoCoverSystem from './AutoCoverSystem.js';
 import coverUIManager from './CoverUIManager.js';
@@ -227,6 +228,7 @@ export class AutoCoverHooks {
 
       const tokenId = tokenDoc?.id;
       if (!tokenId) return;
+      combatStartCoverService.invalidateTokenCover(tokenId);
 
       const token = canvas?.tokens?.get?.(tokenId);
       if (token?.actor) {

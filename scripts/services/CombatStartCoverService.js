@@ -49,6 +49,13 @@ function areEnemies(tokenA, tokenB) {
 }
 
 export class CombatStartCoverService {
+  _activeCoverRuns = new Set();
+
+  invalidateTokenCover(tokenId) {
+    if (!tokenId) return;
+    for (const movedTokenIds of this._activeCoverRuns) movedTokenIds.add(tokenId);
+  }
+
   isEnabled() {
     try {
       return !!game.settings.get(MODULE_ID, COMPUTE_COVER_SETTING);
@@ -66,6 +73,8 @@ export class CombatStartCoverService {
     const participants = combatants
       .map((combatant) => ({ combatant, token: getTokenFromCombatant(combatant) }))
       .filter(({ token }) => token?.document?.id);
+    const movedTokenIds = new Set();
+    this._activeCoverRuns.add(movedTokenIds);
     let nextObserverIndex = 0;
     const processObserver = async ({ combatant: observerCombatant, token: observerToken }) => {
       // Cover flags are stored on the observer. Keep one observer's writes serial so each update
@@ -74,25 +83,34 @@ export class CombatStartCoverService {
         if (targetCombatant === observerCombatant) continue;
         if (targetToken.document.id === observerToken.document.id) continue;
         if (!areEnemies(observerToken, targetToken)) continue;
+        if (movedTokenIds.has(observerToken.id) || movedTokenIds.has(targetToken.id)) continue;
 
         const coverState = this._detectCover(observerToken, targetToken);
         await autoCoverSystem.setCoverBetween(observerToken, targetToken, coverState, {
           skipEphemeralUpdate: false,
         });
+        if (movedTokenIds.has(observerToken.id) || movedTokenIds.has(targetToken.id)) {
+          await autoCoverSystem.cleanupCover(observerToken, targetToken);
+          continue;
+        }
         if (coverState !== 'none') {
           autoCoverSystem.recordPair(observerToken.id, targetToken.id);
         }
       }
     };
     const workerCount = Math.min(OBSERVER_COVER_CONCURRENCY, participants.length);
-    await Promise.all(
-      Array.from({ length: workerCount }, async () => {
-        while (nextObserverIndex < participants.length) {
-          const participant = participants[nextObserverIndex++];
-          await processObserver(participant);
-        }
-      }),
-    );
+    try {
+      await Promise.all(
+        Array.from({ length: workerCount }, async () => {
+          while (nextObserverIndex < participants.length) {
+            const participant = participants[nextObserverIndex++];
+            await processObserver(participant);
+          }
+        }),
+      );
+    } finally {
+      this._activeCoverRuns.delete(movedTokenIds);
+    }
   }
 
   _detectCover(observerToken, targetToken) {

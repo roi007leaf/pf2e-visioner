@@ -75,6 +75,42 @@ describe('combat-start cover effect lifecycle', () => {
     expect(attacker.actor.itemTypes.effect).toHaveLength(0);
   });
 
+  test('first-turn movement while combat-start cover is still applying leaves no cover', async () => {
+    attacker.actor.itemTypes.effect.length = 0;
+    target.actor.itemTypes.effect.length = 0;
+    await attacker.document.unsetFlag('pf2e-visioner', 'autoCoverMap');
+    await target.document.unsetFlag('pf2e-visioner', 'autoCoverMap');
+    autoCoverSystem._activePairsByAttacker.clear();
+
+    const originalSetCoverBetween = autoCoverSystem.setCoverBetween.bind(autoCoverSystem);
+    let resumeCoverWrite;
+    const coverWriteHeld = new Promise((resolve) => { resumeCoverWrite = resolve; });
+    let coverWriteStarted;
+    const coverWriteReached = new Promise((resolve) => { coverWriteStarted = resolve; });
+    jest.spyOn(autoCoverSystem, 'setCoverBetween').mockImplementation(async (...args) => {
+      if (args[2] !== 'none') {
+        coverWriteStarted();
+        await coverWriteHeld;
+      }
+      return originalSetCoverBetween(...args);
+    });
+
+    const combatStart = combatStartCoverService.applyCombatStartAutoCover({
+      round: 1,
+      turn: 0,
+      combatants: [attacker, target].map((token) => ({ token: token.document })),
+    });
+    await coverWriteReached;
+    await new AutoCoverHooks().onUpdateToken(attacker.document, { x: 100 });
+    resumeCoverWrite();
+    await combatStart;
+
+    expect(target.actor.itemTypes.effect).toHaveLength(0);
+    expect(attacker.actor.itemTypes.effect).toHaveLength(0);
+    expect(autoCoverSystem.getCoverBetween(attacker, target)).toBe('none');
+    expect(autoCoverSystem.getCoverBetween(target, attacker)).toBe('none');
+  });
+
   test.each([{ x: 100 }, { elevation: 10 }])(
     'movement hook removes existing cover with auto-cover disabled: %j',
     async (changes) => {

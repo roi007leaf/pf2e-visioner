@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.10.3] - 2026-09-26
+
+### Fixed
+
+- GM Observer wall highlights preserve Foundry's wall-category colors instead of falling back to yellow. Door and secret-door segments are omitted.
+- First-turn movement invalidates unfinished combat-start cover writes, preventing cover from being restored after movement clears it.
+
+### Tests
+
+- Added regressions for Foundry Color objects, normal and secret doors in every state, and movement during combat-start cover application.
+
 ## [8.10.2] - 2026-09-25
 
 ### Added

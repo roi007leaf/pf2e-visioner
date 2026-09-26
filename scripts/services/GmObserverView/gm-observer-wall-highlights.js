@@ -4,6 +4,8 @@ let highlight = null;
 let highlightScene = null;
 
 function colorNumber(color) {
+  // Foundry category colors are Color objects (boxed numbers).
+  if (color && typeof color === 'object') color = color.valueOf?.();
   if (typeof color === 'number' && Number.isFinite(color)) return color;
   if (typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color)) {
     return Number.parseInt(color.slice(1), 16);
@@ -59,6 +61,8 @@ export function syncGmObserverWallHighlights({ active, enabled, redraw = false }
   highlightScene = canvas.scene;
 
   for (const wall of parent.placeables ?? []) {
+    // Core already renders door controls; omit both normal and secret doors.
+    if (wall?.document?.door > 0) continue;
     const c = wall?.document?.c;
     const color = coreWallColor(wall);
     if (!Array.isArray(c) || c.length !== 4 || !c.every(Number.isFinite) || color === null) {
