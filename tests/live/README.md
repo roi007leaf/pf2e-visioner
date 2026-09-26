@@ -1,5 +1,23 @@
 # Local automated Foundry tests
 
+## GM-only concurrent replacement regression
+
+With only the GM account connected to `visioner-qa`, set
+`VISIONER_LIVE_URL`, `VISIONER_LIVE_GM_USERNAME`, and
+`VISIONER_LIVE_GM_PASSWORD`, then run:
+
+```powershell
+node tests/live/gm-only-replacement-race.mjs
+```
+
+This dedicated test grants the example In Area effect eight times within the
+same combat turn. It delays replacement flag writes by 20 ms on disposable
+fixture tokens to expose concurrent native rule writes, then also reapplies
+both rules concurrently. Both directions must become Concealed with both sources
+retained, without movement or turn advancement. Documents, settings, pause and
+the original scene are restored; a report is written under `artifacts/live`.
+The delay exposes a timing regression; it does not certify every network timing.
+
 ## Rule and region verification
 
 Run every rule-element and region scenario, including configuration matrices,

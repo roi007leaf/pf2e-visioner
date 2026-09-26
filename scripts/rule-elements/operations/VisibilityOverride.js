@@ -3,6 +3,19 @@ import { PredicateHelper } from '../PredicateHelper.js';
 import { SourceTracker } from '../SourceTracker.js';
 
 export class VisibilityOverride {
+  static replacementWrites = new WeakMap();
+
+  static async withReplacementWrite(token, operation) {
+    const document = token.document;
+    const previous = this.replacementWrites.get(document) || Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    this.replacementWrites.set(document, next);
+    try {
+      return await next;
+    } finally {
+      if (this.replacementWrites.get(document) === next) this.replacementWrites.delete(document);
+    }
+  }
   static getReplacementSources(token) {
     const sources = token.document.getFlag('pf2e-visioner', 'visibilityReplacements');
     if (Array.isArray(sources)) return sources;
@@ -11,6 +24,12 @@ export class VisibilityOverride {
   }
 
   static async removeReplacementSources(token, operation, ruleElementId) {
+    return this.withReplacementWrite(token, () =>
+      this.removeReplacementSourcesUnlocked(token, operation, ruleElementId),
+    );
+  }
+
+  static async removeReplacementSourcesUnlocked(token, operation, ruleElementId) {
     const sources = this.getReplacementSources(token);
     const remaining = sources.filter((s) =>
       s.ownerId && ruleElementId
@@ -113,21 +132,23 @@ export class VisibilityOverride {
         source,
       };
 
-      const sources = this.getReplacementSources(subjectToken).filter(
-        (s) =>
-          !(
-            s.id === sourceData.id &&
-            s.direction === direction &&
-            s.ownerId === sourceData.ownerId
-          ),
-      );
-      await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacements', [
-        ...sources,
-        { active: true, ...sourceData },
-      ]);
-      await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
-        active: true,
-        ...sourceData,
+      await this.withReplacementWrite(subjectToken, async () => {
+        const sources = this.getReplacementSources(subjectToken).filter(
+          (s) =>
+            !(
+              s.id === sourceData.id &&
+              s.direction === direction &&
+              s.ownerId === sourceData.ownerId
+            ),
+        );
+        await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacements', [
+          ...sources,
+          { active: true, ...sourceData },
+        ]);
+        await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
+          active: true,
+          ...sourceData,
+        });
       });
 
       if (triggerRecalculation) {
@@ -625,9 +646,10 @@ export class VisibilityOverride {
 
     if (range) {
       filteredTokens = filteredTokens.filter((token) => {
-        const distance = subjectToken.distanceTo?.(token)
-          ?? canvas.grid.measurePath?.([subjectToken.center, token.center]).distance
-          ?? canvas.grid.measureDistance?.(subjectToken, token);
+        const distance =
+          subjectToken.distanceTo?.(token) ??
+          canvas.grid.measurePath?.([subjectToken.center, token.center]).distance ??
+          canvas.grid.measureDistance?.(subjectToken, token);
         return distance <= range;
       });
     }

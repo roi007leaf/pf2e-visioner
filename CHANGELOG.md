@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.10.8] - 2026-09-26
+
+### Fixed
+
+- Visibility replacement additions and removals serialize per token. Concurrent native rule callbacks no longer overwrite independent sources or discard one visibility direction during mid-turn effect application.
+
+### Tests
+
+- Added concurrent-write and concurrent-removal regressions plus a dedicated GM-only live test. With controlled 20 ms flag-write delays, 8.10.7 failed while the fix passed eight grants/removals and concurrent rule reapplications within an unchanged combat turn.
+- All four existing related live scenarios, 5,093 unit/integration tests, and 54 live-harness checks passed. The timing test does not claim every network timing combination.
+
 ## [8.10.7] - 2026-09-26
 
 ### Fixed

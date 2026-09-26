@@ -28,6 +28,31 @@ const leaves = (direction) => ({
   sourceTags: ['leaves'],
 });
 
+test('concurrent native rule writes preserve both visibility directions', async () => {
+  const subject = token('subject'),
+    other = token('other');
+  canvas.tokens.placeables = [subject, other];
+  const write = subject.document.setFlag;
+  subject.document.setFlag = async (...args) => {
+    await Promise.resolve();
+    await write(...args);
+  };
+  await Promise.all(
+    ['to', 'from'].map((direction) =>
+      VisibilityOverride.applyVisibilityOverride(leaves(direction), subject, {
+        ruleElementId: 'shared-item',
+      }),
+    ),
+  );
+  expect(subject.document.getFlag('pf2e-visioner', 'visibilityReplacements')).toHaveLength(2);
+  expect(RuleElementChecker.checkVisibilityReplacement(subject, other, 'observed')?.state).toBe(
+    'concealed',
+  );
+  expect(RuleElementChecker.checkVisibilityReplacement(other, subject, 'observed')?.state).toBe(
+    'concealed',
+  );
+});
+
 test('ranged replacements use native token distance without removed grid APIs', async () => {
   const subject = token('subject'),
     other = token('other');
@@ -91,4 +116,27 @@ test('one immune or unmatched replacement does not block another eligible source
   expect(RuleElementChecker.checkVisibilityReplacement(outside, inside, 'observed')?.source).toBe(
     'mist',
   );
+});
+
+test('queued removal preserves concurrent independent additions', async () => {
+  const subject = token('subject'),
+    other = token('other');
+  canvas.tokens.placeables = [subject, other];
+  await VisibilityOverride.applyVisibilityOverride(leaves('to'), subject, {
+    ruleElementId: 'first',
+  });
+  const write = subject.document.setFlag;
+  subject.document.setFlag = async (...args) => {
+    await Promise.resolve();
+    await write(...args);
+  };
+  await Promise.all([
+    VisibilityOverride.applyVisibilityOverride(leaves('from'), subject, {
+      ruleElementId: 'second',
+    }),
+    VisibilityOverride.removeVisibilityOverride(leaves('to'), subject, 'first'),
+  ]);
+  expect(
+    subject.document.getFlag('pf2e-visioner', 'visibilityReplacements').map((s) => s.ownerId),
+  ).toEqual(['second']);
 });
