@@ -65,6 +65,7 @@ export const autumnLeavesWorkflows = {
     );
     await pair(true, 'hidden', 'edited-outgoing-source-coexists');
     await c.mutate('effect-delete', { id: 'high' });
+    await c.mutate('target-token', { x: 900 });
     await pair(true, 'observed', 'removal-cleans-only-edited-direction');
     await c.check({ state: 'concealed' }, true, 'independent-effect-survives-other-item-removal');
     await c.mutate('effect-add', { id: 'high', operations: [{ ...high, range: 1 }] });
@@ -74,8 +75,18 @@ export const autumnLeavesWorkflows = {
     await c.check({ state: 'hidden' }, false, 'generic-concealment-preserves-invisibility');
     await c.mutate('target-condition', 'invisible');
     await c.check({ state: 'concealed' }, true, 'generic-concealment-restored');
+    await c.gm.evaluate(async f => canvas.tokens.get(f.target).document.unsetFlag('pf2e-visioner', 'visibilityReplacement'), c.fixture);
+    await c.mutate('target-token', { x: 1000 });
+    await c.check({ state: 'concealed' }, true, 'stacked-source-works-without-legacy-mirror');
     await c.mutate('effect-delete', { id: 'low' });
     await c.check({ state: 'observed' }, true, 'last-independent-effect-removal-restores-art');
+    await c.mutate('effect-add', { id: 'both-directions', operations: [low, { ...low, source: 'generic-outgoing', direction: 'to' }] });
+    const nativeCount = await c.gm.evaluate(f => canvas.tokens.get(f.target).actor.itemTypes.effect.find(i => i.rules.some(r => r.key === 'PF2eVisionerEffect')).rules.find(r => r.key === 'PF2eVisionerEffect').smartMergeOperations().length, c.fixture);
+    c.equal(nativeCount, 2, 'native-application-keeps-both-directions-in-one-rule');
+    await pair(true, 'concealed', 'single-rule-outgoing-replacement');
+    await c.check({ state: 'concealed' }, true, 'single-rule-incoming-replacement');
+    await c.mutate('effect-delete', { id: 'both-directions' });
+    await c.check({ state: 'observed' }, true, 'single-rule-cleanup');
   },
   'regression-autumn-leaves-aura': async (c) => {
     const previousScene = await c.gm.evaluate(() => game.scenes.active?.id ?? null);
@@ -145,6 +156,13 @@ export const autumnLeavesWorkflows = {
       await pair(outside, inside, 'concealed', 'outsider-sees-leaves-concealment');
       await pair(inside, outside, 'concealed', 'inside-sees-outside-concealed');
       await pair(outside, owner, 'concealed', 'outsider-sees-caster-concealed');
+      await c.gm.evaluate(async f => {
+        const token = canvas.tokens.get(f.target);
+        const effect = token.actor.itemTypes.effect.find(i => i.slug === 'autumn-leaves-within');
+        await effect.update({ name: effect.name + ' edited', 'system.rules': effect.toObject().system.rules.slice().reverse() });
+      }, c.fixture);
+      await pair(inside, outside, 'concealed', 'native-rule-reapplication-preserves-to');
+      await pair(outside, inside, 'concealed', 'native-rule-reapplication-preserves-from');
       await c.check({ state: 'observed' }, true, 'caster-sees-inside-art');
       await c.mutate('target-condition', 'invisible');
       await pair(owner, inside, 'hidden', 'caster-does-not-ignore-invisibility');

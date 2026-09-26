@@ -686,16 +686,8 @@ export function createPF2eVisionerEffectRuleElement(baseRuleElementClass, fields
         };
       }
 
-      // Merge visibility overrides with priority
-      if (op1.type === 'overrideVisibility' && op2.type === 'overrideVisibility') {
-        const priority1 = op1.priority || 100;
-        const priority2 = op2.priority || 100;
-
-        return {
-          success: true,
-          operation: priority1 >= priority2 ? op1 : op2,
-        };
-      }
+      // Visibility operations retain distinct sources and directions. Resolve
+      // priority per observer/target after predicates and ranges are evaluated.
 
       // Merge distance-based visibility with conditional state
       if (op1.type === 'distanceBasedVisibility' && op2.type === 'conditionalState') {

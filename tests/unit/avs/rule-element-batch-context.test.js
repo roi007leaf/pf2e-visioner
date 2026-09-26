@@ -12,6 +12,13 @@ function token(id, flags = {}, actor = null) {
 }
 
 describe('RuleElementBatchContext', () => {
+  test('recognizes stacked replacements without the legacy singleton flag', () => {
+    const checker = { checkVisibilityReplacement: jest.fn(() => ({ state: 'concealed' })) };
+    const observer = token('inside', { visibilityReplacements: [{ active: true, direction: 'to' }] });
+    const target = token('outside');
+    const context = new RuleElementBatchContext({ checker, tokens: [observer, target] });
+    expect(context.checkVisibilityReplacement(observer, target, 'observed')).toEqual({ state: 'concealed' });
+  });
   test('skips checker when batch has no rule-element state', () => {
     const checker = { checkRuleElements: jest.fn() };
     const observer = token('observer');

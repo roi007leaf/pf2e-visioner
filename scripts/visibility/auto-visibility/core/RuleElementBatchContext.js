@@ -35,6 +35,8 @@ export class RuleElementBatchContext {
   }
 
   #tokenHasRuleElementState(token) {
+    const replacements = readFlag(token, this.moduleId, 'visibilityReplacements');
+    if (Array.isArray(replacements) && replacements.some(source => source?.active)) return true;
     for (const key of RULE_ELEMENT_FLAG_KEYS) {
       if (readFlag(token, this.moduleId, key)?.active) return true;
     }

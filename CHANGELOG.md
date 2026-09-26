@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.10.6] - 2026-09-26
+
+### Fixed
+
+- AVS recognizes stacked visibility replacements even when the legacy singleton flag is absent. Movement after removing another effect no longer resets surviving replacements to Observed.
+- Native rule application preserves distinct visibility operations within one rule element, including both to/from directions, instead of discarding all but one during operation merging.
+
+### Tests
+
+- Expanded live Aura and generic replacement regressions cover native item edits, movement after selective removal, absent legacy flags, and both directions within one native rule. Both scenarios passed on GM and player clients with cleanup complete.
+- All 5,089 unit/integration tests and 54 live-harness checks passed.
+
 ## [8.10.5] - 2026-09-26
 
 ### Fixed
