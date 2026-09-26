@@ -367,6 +367,9 @@ export class AvsInvalidationCoordinator {
   #handleFullSceneImmediateInvalidation() {
     if (!this.#shouldProcessEvents()) return false;
 
+    // Stationary lighting samples and the short lighting-hash memo survive the
+    // directional cache reset. Discard them before the immediate scene batch.
+    LightingPrecomputer.clearLightingCaches();
     this.cacheManager?.clearAllCaches?.();
     this.visibilityState?.markAllTokensChangedImmediate?.();
     return true;

@@ -14,6 +14,7 @@ import { fpsCases } from './fps-workflows.mjs';
 import { performanceLifecycleCases } from './performance-lifecycle-workflows.mjs';
 import { scenePerformanceCases } from './scene-performance-workflows.mjs';
 import { deletionRaceCases } from './deletion-race-workflows.mjs';
+import { visibilityRegressionCases } from './visibility-regression-workflows.mjs';
 // Every case gets fresh documents. These are live contracts, not mocked calculators.
 export const smokeCases = [
   { name: 'darkvision-in-darkness', darkness: true, steps: [{ expect: { state: 'observed', visible: true, filter: null }, art: true }] },
@@ -62,6 +63,7 @@ export const smokeCases = [
 ];
 
 export const fullCases = [
+  ...visibilityRegressionCases,
   ...regionAuditCases,
   ...fpsCases,
   ...performanceLifecycleCases,
@@ -102,3 +104,7 @@ export const fullCases = [
     { operation: 'state', value: 'observed', expect: { state: 'observed', filter: null }, art: true },
   ] },
 ];
+
+export const ruleRegionCases = fullCases.filter(c =>
+  ['rule-elements', 'regions'].includes(c.area) || /^(regression-|region-|rule-)/.test(c.name) ||
+  /upper-level-suppression$/.test(c.name) || c.name === 'detection-overlapping-suppression');

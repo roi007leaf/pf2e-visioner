@@ -21,7 +21,7 @@ export const automatedCases = [
   scenario('take-cover-expiry', 'take-cover', { area: 'cover' }),
   ...['wall', 'tile'].map(type => scenario(`${type}-cover-controls`, `${type}-cover`, { area: 'cover', requireSettings: { autoCover: true } })),
   ...['hazard', 'loot'].map(targetType => scenario(`${targetType}-manager-privacy`, 'hazard-loot', { area: 'hazards-loot', targetType, observerType: 'character' })),
-  scenario('region-visibility', 'region-visibility', { area: 'regions', camera: { x: 1150, y: 550, scale: 0.6 } }),
+  scenario('region-visibility', 'region-visibility', { area: 'regions', camera: { x: 1150, y: 900, scale: 0.6 } }),
   scenario('rule-elements-lifecycle', 'rule-elements', { area: 'rule-elements' }),
   scenario('rule-strike-consumption', 'rule-strike', { area: 'rule-elements' }),
   scenario('rule-native-strike-off-guard', 'strike-off-guard', { area: 'rule-elements', requireSettings: { autoCover: true } }),

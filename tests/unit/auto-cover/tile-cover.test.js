@@ -115,6 +115,19 @@ describe('CoverDetector tile cover', () => {
     expect(coverDetector.detectBetweenTokens(attacker, target)).toBe('none');
   });
 
+  test.each([
+    [{ x: 1330, y: 4830 }, { x: 1330, y: 5215 }],
+    [{ x: 1610, y: 4830 }, { x: 1610, y: 5215 }],
+    [{ x: 1200, y: 4620 }, { x: 1700, y: 4620 }],
+    [{ x: 1200, y: 4900 }, { x: 1700, y: 4900 }],
+  ])('tile boundary contact does not grant cover: %j -> %j', (start, end) => {
+    canvas.tiles.placeables = [
+      makeTile({ id: 'barricade', x: 1330, y: 4620, width: 280, height: 280, coverOverride: 'lesser' }),
+    ];
+    expect(coverDetector._checkTileCoverOverrides(start, end)).toBeNull();
+    expect(coverDetector._checkTileCoverOverrides({ x: 1331, y: 4830 }, { x: 1331, y: 5215 })).toBe('lesser');
+  });
+
   test('uses the rendered bounds of a rotated tile', () => {
     const { attacker, target } = makePair();
     canvas.tiles.placeables = [

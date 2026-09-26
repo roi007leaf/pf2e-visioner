@@ -46,6 +46,7 @@ global.CONST = {
 // Import after setting up mocks
 const { VisibilityRegionBehavior } = require('../../../scripts/regions/VisibilityRegionBehavior.js');
 import AvsOverrideManager from '../../../scripts/chat/services/infra/AvsOverrideManager.js';
+import { getVisibility } from '../../../scripts/stores/visibility-map.js';
 jest.mock('../../../scripts/stores/visibility-map.js', () => ({
   getVisibility: jest.fn(() => 'undetected'), getVisibilityBetween: jest.fn(() => 'undetected'), setVisibilityBetween: jest.fn(),
 }));
@@ -327,6 +328,32 @@ describe('VisibilityRegionBehavior', () => {
   });
 
   describe('Error Handling', () => {
+    test('matching computed state still installs a durable region override', async () => {
+      getVisibility.mockReturnValueOnce('hidden');
+      const apply = jest.spyOn(AvsOverrideManager, 'applyOverrides').mockResolvedValue(true);
+      try {
+        await regionBehavior._applyVisibilityUpdates([{ source: 'token2', target: 'token1', state: 'hidden' }]);
+        expect(apply).toHaveBeenCalled();
+      } finally { apply.mockRestore(); }
+    });
+
+    test('native behavior snapshots coalesce movement events for the same document', async () => {
+      jest.useFakeTimers();
+      const other = new VisibilityRegionBehavior();
+      regionBehavior.parent = { uuid: 'Scene.qa.Region.qa.RegionBehavior.shared', region: mockRegion };
+      other.parent = regionBehavior.parent;
+      regionBehavior._processPendingEvents = jest.fn();
+      other._processPendingEvents = jest.fn();
+      try {
+        regionBehavior._scheduleTokenEvent(mockToken1, true, CONST.REGION_EVENTS.TOKEN_ENTER);
+        other._scheduleTokenEvent(mockToken1, false, CONST.REGION_EVENTS.TOKEN_EXIT);
+        expect(other._pendingTokenEvents.get('token1').isEntering).toBe(false);
+        expect(regionBehavior._pendingTokenEvents).toBe(other._pendingTokenEvents);
+        await jest.advanceTimersByTimeAsync(60);
+        expect(regionBehavior._processPendingEvents).not.toHaveBeenCalled();
+        expect(other._processPendingEvents).toHaveBeenCalledTimes(1);
+      } finally { jest.useRealTimers(); }
+    });
     test('should handle empty updates gracefully', async () => {
       await regionBehavior._applyVisibilityUpdates([]);
       expect(ui.notifications.error).not.toHaveBeenCalled();

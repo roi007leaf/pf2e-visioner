@@ -7,9 +7,11 @@ import { fpsCases } from './fps-workflows.mjs';
 import { performanceLifecycleCases } from './performance-lifecycle-workflows.mjs';
 import { scenePerformanceCases } from './scene-performance-workflows.mjs';
 import { deletionRaceCases } from './deletion-race-workflows.mjs';
+import { visibilityRegressionCases } from './visibility-regression-workflows.mjs';
 // Required functional contracts. Missing implementations are explicit blockers,
 // not omitted from the denominator or replaced with a passing placeholder.
 export const requirements = [
+  ['Visibility regressions and provided cover lifecycle', visibilityRegressionCases.map(c => c.name)],
   ['Region checkbox and mode matrix', regionAuditCases.map(c => c.name)],
   ['Deletion during AVS persistence waits', deletionRaceCases.map(c => c.name)],
   ['Dungeon walls, lights and lighting regions', scenePerformanceCases.map(c => c.name)],

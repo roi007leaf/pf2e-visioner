@@ -7,13 +7,14 @@ import { AutoCoverHooks } from '../../../scripts/cover/auto-cover/AutoCoverHooks
 function makeToken(id, alliance) {
   const flags = {};
   const effects = [];
+  let nextEffectId = 0;
   const actor = {
     id: `${id}-actor`,
     signature: `${id}-signature`,
     alliance,
     itemTypes: { effect: effects },
     createEmbeddedDocuments: jest.fn(async (_type, items) => {
-      effects.push(...items.map((item) => ({ ...item, id: `${id}-${effects.length}` })));
+      effects.push(...items.map((item) => ({ ...item, id: `${id}-${nextEffectId++}` })));
     }),
     deleteEmbeddedDocuments: jest.fn(async (_type, ids) => {
       for (let i = effects.length - 1; i >= 0; i--) {
@@ -69,11 +70,40 @@ describe('combat-start cover effect lifecycle', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
+  test('ending combat removes both stored directions and effects even with settings disabled', async () => {
+    await game.settings.set('pf2e-visioner', 'computeCoverAtCombatStart', false);
+    await game.settings.set('pf2e-visioner', 'autoCover', false);
+    await combatStartCoverService.cleanupCombatCover({
+      combatants: [attacker, target].map(token => ({ tokenId: token.id })),
+    });
+    expect(attacker.actor.itemTypes.effect).toHaveLength(0);
+    expect(target.actor.itemTypes.effect).toHaveLength(0);
+    expect(autoCoverSystem.getCoverBetween(attacker, target)).toBe('none');
+    expect(autoCoverSystem.getCoverBetween(target, attacker)).toBe('none');
+    expect(autoCoverSystem._activePairsByAttacker.size).toBe(0);
+  });
+
   test('first movement removes combat-start effects in both directions', async () => {
     await autoCoverSystem.onUpdateDocument(attacker.document, { x: 100 });
     expect(target.actor.itemTypes.effect).toHaveLength(0);
     expect(attacker.actor.itemTypes.effect).toHaveLength(0);
   });
+
+  test.each(['none', 'lesser'])(
+    'third creature movement revalidates lesser cover with %s remaining',
+    async (remainingCover) => {
+      await autoCoverSystem.setCoverBetween(attacker, target, 'lesser');
+      const blocker = makeToken('blocker', 'party');
+      canvas.tokens.placeables.push(blocker);
+      autoCoverSystem.detectCoverBetweenTokens.mockReturnValue(remainingCover);
+
+      await new AutoCoverHooks().onUpdateToken(blocker.document, { x: 200 });
+
+      expect(autoCoverSystem.getCoverBetween(attacker, target)).toBe(remainingCover);
+      expect(target.actor.itemTypes.effect).toHaveLength(remainingCover === 'none' ? 0 : 1);
+      expect(autoCoverSystem.getCoverBetween(target, attacker)).toBe('greater');
+    },
+  );
 
   test('first-turn movement while combat-start cover is still applying leaves no cover', async () => {
     attacker.actor.itemTypes.effect.length = 0;

@@ -79,6 +79,31 @@ describe('CoverDetector', () => {
     });
   });
 
+  test.each([false, true])('Tiny blocker respects Ignore Smaller Tokens = %s', (ignoreSmaller) => {
+    const attacker = createMockToken({ id: 'kel-varo', x: 0, y: 0, center: { x: 25, y: 25 } });
+    const target = createMockToken({ id: 'silva', x: 0, y: 200, center: { x: 25, y: 225 } });
+    const blocker = createMockToken({ id: 'flint', x: 12.5, y: 100, width: 0.5, height: 0.5, center: { x: 25, y: 112.5 } });
+    attacker.actor.system.traits.size.value = 'med';
+    target.actor.system.traits.size.value = 'sm';
+    blocker.actor.system.traits.size.value = 'tiny';
+    const originalGridSize = canvas.grid.size;
+    canvas.grid.size = 50;
+    canvas.tokens.placeables = [attacker, target, blocker];
+    canvas.tokens.controlled = [];
+    const originalGet = game.settings.get;
+    game.settings.get = jest.fn((scope, key) => {
+      if (key === 'autoCoverIgnoreSmallerTokens') return ignoreSmaller;
+      if (key === 'autoCoverTokenIntersectionMode') return 'any';
+      return originalGet(scope, key);
+    });
+    try {
+      expect(coverDetector.detectBetweenTokens(attacker, target)).toBe(ignoreSmaller ? 'none' : 'lesser');
+    } finally {
+      canvas.grid.size = originalGridSize;
+      game.settings.get = originalGet;
+    }
+  });
+
   describe('wall hot-path reuse', () => {
     test('returns shared wall array directly when Foundry exposes one array through both surfaces', () => {
       const wall = makeVerticalWall(WALL_SENSE_TYPES.NORMAL, 0);

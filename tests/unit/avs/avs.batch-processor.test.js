@@ -921,6 +921,20 @@ describe('BatchProcessor', () => {
     expect(undetected.some((u) => u.target.document.id === 'A')).toBe(true);
   });
 
+  test.each(['concealed', 'observed'])('spell override %s cannot reveal a target through walls', async (state) => {
+    processor.visionAnalyzer.hasLineOfSight.mockReturnValue(false);
+    processor.visionAnalyzer.getVisionCapabilities.mockReturnValue({ isDeafened: true, sensingSummary: { precise: [], imprecise: [], hearing: null } });
+    const tokens = global.canvas.tokens.placeables;
+    const target = tokens.find(token => token.document.id === 'B');
+    const original = target.document.getFlag;
+    target.document.getFlag = jest.fn((scope, key) => key === 'ruleElementOverride' ? { active: true, state, direction: 'from', source: 'spell' } : original?.call(target.document, scope, key));
+    try {
+      const result = await processor.process(tokens, new Set(['A']), {});
+      const pair = result.updates.find(update => update.observer.document.id === 'A' && update.target.document.id === 'B');
+      expect(pair?.visibility).toBe('undetected');
+    } finally { target.document.getFlag = original; }
+  });
+
   test('precomputes LOS directionally instead of assuming symmetry', async () => {
     processor.visionAnalyzer.hasLineOfSight.mockImplementation((observer, target) => {
       return !(observer.document.id === 'A' && target.document.id === 'B');

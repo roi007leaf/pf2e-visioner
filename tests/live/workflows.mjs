@@ -13,8 +13,10 @@ import { fpsWorkflows } from './fps-workflows.mjs';
 import { performanceLifecycleWorkflows } from './performance-lifecycle-workflows.mjs';
 import { scenePerformanceWorkflows } from './scene-performance-workflows.mjs';
 import { deletionRaceWorkflows } from './deletion-race-workflows.mjs';
+import { visibilityRegressionWorkflows } from './visibility-regression-workflows.mjs';
 
 export const workflows = {
+  ...visibilityRegressionWorkflows,
   ...regionAuditWorkflows,
   ...fpsWorkflows,
   ...performanceLifecycleWorkflows,

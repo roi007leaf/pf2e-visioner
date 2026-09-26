@@ -1,8 +1,32 @@
 # Automated live coverage inventory
 
-**283 automated scenarios; zero guided scenarios.** The former 24 manual reviews
+**301 automated scenarios; zero guided scenarios.** The former 24 manual reviews
 became 42 separate automated workflows. Counts describe executable definitions,
 not successful live verification or exhaustive line/branch coverage.
+
+## Current rule and region verification
+
+On 2026-09-26, `--rules-regions` passed **53/53 scenarios and 744 assertions**
+on Foundry 14.368 / PF2e 8.5.1, using the current 8.10.3 checkout with pending fixes.
+Run: `0fb2eada-c4a4-427a-aafd-98456dd1e4aa`; report:
+`artifacts/live/0fb2eada-c4a4-427a-aafd-98456dd1e4aa/report.json`.
+Cleanup complete; no startup errors; source unchanged during execution.
+
+Coverage includes all 14 rule operation families, native item creation/edit/removal,
+predicate/direction/source stacking, conditional visibility, roll context and native
+Strike consumption/off-guard integration. All four Visioner region types have
+configuration and native multilevel scenarios; cover grades/modes and rendered
+scent/lifesense/thoughtsense suppression above floors are included.
+
+Verification exposed and fixed region event races across Core behavior snapshots,
+missing persistent overrides when computed visibility already matched, and stale
+hearing metadata removing presence markers for Deafened observers. The visual
+harness camera also avoids an unrelated Combater toolbar obstruction.
+
+The complete unit/integration suite passed 533 suites / 5,084 tests, and the live
+harness passed 54 checks. This run does not certify every configuration combination,
+all region event masks, every third-party module, or the full 301-scenario catalog.
+Earlier runs and their boundaries below remain historical evidence.
 
 Four `region-multilevel-*` workflows passed 86 assertions on Foundry 14.367 /
 PF2e 8.5.0, cleanup complete (run `f7f35817-8d9a-433d-a1a9-84ac2b779ba9`).

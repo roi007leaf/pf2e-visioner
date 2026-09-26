@@ -5,7 +5,7 @@ import { PNG } from 'pngjs';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile, readFile, open, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { smokeCases, fullCases } from './cases.mjs';
+import { smokeCases, fullCases, ruleRegionCases } from './cases.mjs';
 import { executeWorkflow, workflows } from './workflows.mjs';
 import { assessRequirements } from './requirements.mjs';
 import { coverageFor, validateCases } from './coverage.mjs';
@@ -233,12 +233,13 @@ async function run() {
     console.table(fullCases.map(c => ({ case: c.name, mode: 'automated', area: c.area ?? 'core', smoke: smokeCases.includes(c), steps: c.steps.length })));
     return;
   }
-  if (process.argv.includes('--release') && (process.env.VISIONER_LIVE_CASE || process.argv.includes('--performance') || !process.argv.includes('--full'))) {
+  if (process.argv.includes('--release') && (process.env.VISIONER_LIVE_CASE || process.argv.includes('--performance') || process.argv.includes('--rules-regions') || !process.argv.includes('--full'))) {
     throw Error('Shipping validation requires --full, without a case filter');
   }
   if (process.argv.includes('--guided')) throw Error('Manual reviews were removed. Use --full for the automated suite.');
   for (const c of fullCases) for (const step of c.steps) if (step.workflow && !Object.hasOwn(workflows, step.workflow)) throw Error(`Missing workflow: ${step.workflow}`);
-  const allCases = process.argv.includes('--performance') ? fullCases.filter(c => c.area === 'performance' || c.name === 'movement-animation-performance')
+  const allCases = process.argv.includes('--rules-regions') ? ruleRegionCases
+    : process.argv.includes('--performance') ? fullCases.filter(c => c.area === 'performance' || c.name === 'movement-animation-performance')
     : process.argv.includes('--full') ? fullCases : smokeCases;
   const requested = process.env.VISIONER_LIVE_CASE?.split(',').map(name => name.trim()).filter(Boolean);
   const unknown = requested?.filter(name => !allCases.some(c => c.name === name)) ?? [];

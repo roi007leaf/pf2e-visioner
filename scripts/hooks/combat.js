@@ -125,6 +125,9 @@ export async function handleCombatEnd(combat = null) {
   combatEndCleanupInProgress = true;
 
   try {
+    if (game.user?.isGM) {
+      await combatStartCoverService.cleanupCombatCover(combat ?? game.combat);
+    }
     const avsOnlyInCombat = game.settings.get(MODULE_ID, 'avsOnlyInCombat');
     if (!avsOnlyInCombat) {
       combatEndCleanupInProgress = false;

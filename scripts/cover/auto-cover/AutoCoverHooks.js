@@ -273,7 +273,6 @@ export class AutoCoverHooks {
   async _cleanupCoverForMovedToken(tokenId) {
     // Get all active pairs involving this token
     const pairs = this.autoCoverSystem.getActivePairsInvolving(tokenId);
-    if (pairs.length === 0) return;
 
     const tokens = canvas?.tokens;
     if (!tokens?.get) return;
@@ -287,6 +286,7 @@ export class AutoCoverHooks {
       // Movement should clear any pre-applied cover
       await this.autoCoverSystem.cleanupCover(attacker, target);
     }
+    await this.autoCoverSystem.revalidateLesserCover();
   }
 
   /**

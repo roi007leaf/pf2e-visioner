@@ -1150,6 +1150,23 @@ describe('Event Handler Tests', () => {
       expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
     });
 
+    test.each([
+      'pf2e-visioner.Pf2eVisionerConcealment',
+      'pf2e-visioner.Pf2eVisionerVisibility',
+      'pf2e-visioner.Pf2eVisionerSenseSuppression',
+    ])('refreshes visibility when %s is edited without token movement', (type) => {
+      sceneHandler.initialize();
+      const region = { id: 'visioner-region', parent: canvas.scene, behaviors: [{ type }] };
+      const behavior = { id: 'visioner-behavior', type, parent: region };
+      const behaviorHandler = mockHooks.on.mock.calls.find(call => call[0] === 'updateRegionBehavior')[1];
+      behaviorHandler(behavior, { system: { enabled: false } });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+      mockVisibilityState.markAllTokensChangedImmediate.mockClear();
+      const regionHandler = mockHooks.on.mock.calls.find(call => call[0] === 'updateRegion')[1];
+      regionHandler(region, { shapes: [] });
+      expect(mockVisibilityState.markAllTokensChangedImmediate).toHaveBeenCalled();
+    });
+
     test('should ignore non-surface region behavior updates', () => {
       const behavior = {
         id: 'behavior-2',

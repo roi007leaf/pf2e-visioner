@@ -135,6 +135,20 @@ test('scent marker does not self-latch after detection changes to hearing', () =
   expect(decision.shouldShowIndicator).toBe(false);
 });
 
+test.each(['scent', 'lifesense', 'thoughtsense'])('%s marker is not replaced by stale hearing while deafened', sense => {
+  const observer = { distanceTo: () => 25, document: {},
+    actor: { system: { perception: { senses: [{ type: sense, range: 30 }] } },
+      hasCondition: condition => condition === 'deafened' } };
+  const target = { visible: false, renderable: false, document: {},
+    actor: { system: { traits: { value: [] } } },
+    _pvPresenceOnlyRenderSuppression: { mode: sense, observerId: 'observer' } };
+  const decision = buildSystemHiddenIndicatorDecision({ observer, token: target,
+    getVisibilityState: () => 'hidden', getDetectionBetween: () => ({ sense: 'hearing', isPrecise: false }),
+    canLifesenseDetect: () => true, canThoughtsenseDetect: () => true,
+    isSoundBlocked: () => true, isScentBlocked: () => false });
+  expect(decision).toMatchObject({ shouldShowIndicator: true, indicatorMode: sense });
+});
+
 function makePixiMock() {
   const makeDisplayObject = () => ({
     position: { set: jest.fn() },

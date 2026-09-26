@@ -174,7 +174,8 @@ export async function mutate({ fixture, operation, value, runId }) {
       await actor.deleteEmbeddedDocuments('Item', ids); break;
     }
     case 'effect-edit': {
-      const item = target.actor.items.find(item => owned(item, runId) && item.getFlag(MODULE, 'liveEffectId') === value.id);
+      const actor = value.subject === 'observer' ? observer.actor : target.actor;
+      const item = actor.items.find(item => owned(item, runId) && item.getFlag(MODULE, 'liveEffectId') === value.id);
       if (!item) throw Error('Fixture effect missing for edit');
       await item.update({ 'system.rules': [{ key: 'PF2eVisionerEffect', operations: value.operations, priority: 100 }] }); break;
     }

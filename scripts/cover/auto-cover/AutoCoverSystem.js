@@ -380,6 +380,22 @@ export class AutoCoverSystem {
     }
   }
 
+  async revalidateLesserCover() {
+    const tokens = canvas?.tokens;
+    if (!tokens?.get) return;
+    // Third-party creatures can supply cover without belonging to the stored pair.
+    for (const attacker of tokens.placeables || []) {
+      const coverMap = attacker.document?.getFlag?.(MODULE_ID, 'autoCoverMap') || {};
+      for (const [targetId, state] of Object.entries(coverMap)) {
+        if (state !== 'lesser') continue;
+        const target = tokens.get(targetId);
+        if (target && this.detectCoverBetweenTokens(attacker, target) === 'none') {
+          await this.cleanupCover(attacker, target);
+        }
+      }
+    }
+  }
+
   async onUpdateDocument(document, changes) {
     if (document?.documentName !== 'Token') return;
     // Cleanup belongs to the GM and must outlive the automatic detection setting.
@@ -402,6 +418,7 @@ export class AutoCoverSystem {
         await this.cleanupCover(attacker, target);
       }
     }
+    await this.revalidateLesserCover();
     return;
   }
 

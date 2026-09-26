@@ -1,5 +1,25 @@
 # Changelog
 
+## [8.10.4] - 2026-09-26
+
+### Added
+
+- Visibility rule elements and concealment regions support source tags. The `ignoreVisibilitySources` operation lets observers ignore matching concealed or hidden sources while preserving unrelated effects.
+
+### Fixed
+
+- Encounter-start lesser cover is revalidated when an intervening creature moves. Tile boundary contact no longer grants cover, and smaller creature blockers honor the Auto-Cover size setting.
+- Blur and Faerie Fire respect blocked sight lines. Conditional visibility and native item edits/removal refresh automatically, including Faerie Fire rendering on invisible targets.
+- Stationary region and lighting changes clear stale calculations immediately. Active visibility-region edits update existing occupants.
+- Visibility regions coalesce native behavior snapshots and serialize writes, preventing stale enter/exit events from overwriting newer movement. Matching calculated states still install persistent region overrides.
+- Deafened observers retain valid presence markers when stale Hearing metadata remains during a sense transition.
+- Tagged visibility immunity preserves independent sources and stacked immunity effects, and removes its flags after the final effect is deleted.
+
+### Tests
+
+- Verified all 14 rule-operation families and all four region types across 53 live scenarios and 744 assertions, including configuration matrices, native levels, source immunity, provided cover, and rendered suppression markers.
+- Added `--rules-regions` for repeatable live verification. All 5,084 unit/integration tests and 54 live-harness checks passed. Coverage does not claim every possible configuration combination.
+
 ## [8.10.3] - 2026-09-26
 
 ### Fixed

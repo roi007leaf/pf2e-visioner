@@ -28,6 +28,11 @@ export async function cleanupDeletedVisionerRuleElements(item, tokens, log = nul
 
         try {
           switch (operationWithSource.type) {
+            case 'ignoreVisibilitySources': {
+              const { removeIgnoredVisibilitySources } = await import('./visibility-source-tags.js');
+              await removeIgnoredVisibilitySources(token, ruleElementId);
+              break;
+            }
             case 'overrideVisibility':
             case 'conditionalState':
               if (cleanedVisibility) break;
@@ -152,5 +157,10 @@ export async function cleanupDeletedVisionerRuleElements(item, tokens, log = nul
       await token.document.update(updates);
     }
   }
+  // PF2e's onDelete recalculation can run before this async deleteItem cleanup.
+  // Reconcile after the last source/map write so cleanup cannot leave observed
+  // behind a wall or overwrite another surviving visibility source.
+  await recalculateRuntimeAvsTokenIds(tokens.map(token => token.id));
 }
 
+import { recalculateRuntimeAvsTokenIds } from '../services/avs-token-refresh.js';

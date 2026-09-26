@@ -18,6 +18,21 @@ describe('ConcealmentRegionBehavior', () => {
     });
 
     describe('_extractRegionBoundarySegments', () => {
+        it('ignores smoke while retaining another concealment source', () => {
+            const smoke = { type: 'pf2e-visioner.Pf2eVisionerConcealment', system: { sourceTags: 'smoke' } };
+            const mist = { type: smoke.type, system: { sourceTags: 'mist' } };
+            const region = { behaviors: [smoke], testPoint: () => true };
+            const regions = jest.spyOn(ConcealmentRegionBehavior, 'getAllConcealmentRegions').mockReturnValue([region]);
+            const crosses = jest.spyOn(ConcealmentRegionBehavior, 'checkRayCrossesRegionBoundary').mockReturnValue(true);
+            const observer = { document: { getFlag: () => ({ immunity: { sourceTags: ['smoke'] } }) } };
+            try {
+                expect(ConcealmentRegionBehavior.doesRayHaveConcealment({}, {}, observer)).toBe(false);
+                expect(ConcealmentRegionBehavior.doesRayHaveConcealment({}, {})).toBe(true);
+                region.behaviors.push(mist);
+                expect(ConcealmentRegionBehavior.doesRayHaveConcealment({}, {}, observer)).toBe(true);
+            } finally { regions.mockRestore(); crosses.mockRestore(); }
+        });
+
         it('should extract segments from points array', () => {
             const region = {
                 points: [

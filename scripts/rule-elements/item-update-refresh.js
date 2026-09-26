@@ -460,6 +460,11 @@ export function buildRuleElementRegistryValues(operations = []) {
 
 async function removeOperation(operation, token, ruleElementId, getOperationClass) {
   switch (operation.type) {
+    case 'ignoreVisibilitySources': {
+      const { removeIgnoredVisibilitySources } = await import('./visibility-source-tags.js');
+      await removeIgnoredVisibilitySources(token, ruleElementId);
+      break;
+    }
     case 'overrideVisibility':
     case 'conditionalState': {
       const OperationClass = await getOperationClass('VisibilityOverride');
@@ -532,6 +537,11 @@ async function applyOperation(
   ruleElementContext = null,
 ) {
   switch (operation.type) {
+    case 'ignoreVisibilitySources': {
+      const { setIgnoredVisibilitySources } = await import('./visibility-source-tags.js');
+      await setIgnoredVisibilitySources(token, ruleElementId, operation);
+      break;
+    }
     case 'distanceBasedVisibility': {
       const OperationClass = await getOperationClass('DistanceBasedVisibility');
       await OperationClass?.applyDistanceBasedVisibility?.(operation, token);

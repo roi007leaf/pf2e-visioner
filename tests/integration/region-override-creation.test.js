@@ -139,8 +139,9 @@ describe('Region Behavior Override Creation Integration', () => {
         expect(changes.length).toBe(2);
     });
 
-    test('should skip redundant updates', async () => {
+    test('should skip redundant updates with a persisted region override', async () => {
         getVisibilitySpy.mockReturnValue('hidden');
+        mockToken2.document.getFlag = () => ({ source: 'region_override', state: 'hidden' });
 
         const updates = [
             { source: mockToken1.id, target: mockToken2.id, state: 'hidden' },

@@ -1,5 +1,36 @@
 # Local automated Foundry tests
 
+## Rule and region verification
+
+Run every rule-element and region scenario, including configuration matrices,
+native levels and rendered upper-level suppression markers:
+
+```powershell
+npm run test:live:full -- --rules-regions
+```
+
+This verifies 53 defined scenarios, not every possible combination of event masks,
+mixed regions, geometries or third-party modules. This partial suite cannot pass
+the complete module release gate.
+
+## Visibility regression tests
+
+Eight `regression-*` scenarios cover wiki Blur/Faerie Fire behind walls,
+conditional-state refresh, stationary region creation/edit/disable/removal,
+tagged smoke immunity with independent Blur/mist, stacked effects and cleanup,
+and `provideCover` create/edit/delete, direction and Take Cover lifecycle.
+They use native item/region mutations and automatic AVS updates; they never move
+tokens or call recalculation to rescue stationary edits. GM and player maps must
+converge within eight seconds. Player screenshots check artwork separately;
+wall tests also sample frames during spell creation to detect transient reveals.
+Explicit GM overrides keep their stored state while Core still blocks artwork
+behind walls. Fixtures and settings use the runner's recovery journal.
+
+```powershell
+$env:VISIONER_LIVE_CASE = 'regression-wiki-blur-walls,regression-wiki-faerie-fire-walls,regression-conditional-stationary-refresh,regression-concealment-stationary-region-edits,regression-visibility-stationary-region-edits,regression-smoke-immunity-region-lifecycle,regression-smoke-immunity-rule-lifecycle'
+try { npm run test:live:full } finally { Remove-Item Env:VISIONER_LIVE_CASE }
+```
+
 Player action cases (`player-native-*` and `player-character-*`) use the supplied
 non-GM account. The runner temporarily enables that account's native manual-roll
 permission in the QA world and enters dice values automatically. No human dice
@@ -43,7 +74,7 @@ try { npm run test:live:full } finally { Remove-Item Env:VISIONER_LIVE_CASE }
 See [coverage inventory](coverage.md) for assertion scope and remaining boundaries.
 
 All scenarios are automated. No guided mode, review prompts, or human pass/fail
-verdicts. The full catalog contains **284 scenarios**, including eight region-option/multilevel audits, two deletion-race regressions, eighteen performance scenarios, eighteen detection-boundary/transition additions, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and automated workflows
+verdicts. The full catalog contains **301 scenarios**, including eight visibility regressions, eight region-option/multilevel audits, two deletion-race regressions, eighteen performance scenarios, eighteen detection-boundary/transition additions, nine player-originated action cases, four player Seek template cases, 48 audit cases, 23 gap cases, 20 action-gap cases and automated workflows
 replacing the former 24 bundled reviews. A workflow records each assertion and
 screenshots; a failed or blocked prerequisite never counts as a pass.
 

@@ -8,10 +8,13 @@ export class VisibilityOverride {
     if (override && override.coverOnly !== true && !this._matchesAnyCleanupId(override.source, cleanupIds)) {
       return;
     }
-    const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
+    const { setVisibilityBetween, getVisibilityBetween } = await import('../../stores/visibility-map.js');
     const sources = SourceTracker.getVisibilityStateSources(target, observer.id) || [];
     const remainingState = SourceTracker.getEffectiveState(sources, 'visibility');
-    await setVisibilityBetween(observer, target, remainingState || 'observed', {
+    const nextState = remainingState || 'observed';
+    const currentState = getVisibilityBetween(observer, target);
+    await setVisibilityBetween(observer, target,
+      currentState === 'undetected' && ['observed', 'concealed'].includes(nextState) ? currentState : nextState, {
       skipEphemeralUpdate: true, isAutomatic: false, direction: 'observer_to_target',
     });
   }
@@ -66,6 +69,7 @@ export class VisibilityOverride {
         predicate,
         range: operation.range,
         levelComparison: operation.levelComparison,
+        sourceTags: operation.sourceTags,
       };
 
       await subjectToken.document.setFlag('pf2e-visioner', 'visibilityReplacement', {
@@ -94,8 +98,12 @@ export class VisibilityOverride {
       priority,
       state,
       qualifications: operation.qualifications || {},
+      condition: operation.condition,
+      thenState: operation.thenState,
+      elseState: operation.elseState,
       direction,
       predicate: predicate && predicate.length > 0 ? predicate : undefined,
+      sourceTags: operation.sourceTags,
     };
 
     // Check if predicates are being used (affects whether we set global override flag)
@@ -160,6 +168,10 @@ export class VisibilityOverride {
         source: sourceData.id,
         state,
         direction,
+        sourceTags: operation.sourceTags,
+        condition: operation.condition,
+        thenState: operation.thenState,
+        elseState: operation.elseState,
       });
     }
 
@@ -203,8 +215,12 @@ export class VisibilityOverride {
 
       // Update the visibility map for this specific observer->target pair
       // This is unidirectional: only sets visibility from observer's perspective of target
-      const { setVisibilityBetween } = await import('../../stores/visibility-map.js');
-      await setVisibilityBetween(observerToken, targetToken, state, {
+      const { setVisibilityBetween, getVisibilityBetween } = await import('../../stores/visibility-map.js');
+      // Keep an unseen pair unseen until AVS evaluates the rule against LOS.
+      const currentState = getVisibilityBetween(observerToken, targetToken);
+      const initialState = currentState === 'undetected' && ['observed', 'concealed'].includes(state)
+        ? currentState : state;
+      await setVisibilityBetween(observerToken, targetToken, initialState, {
         skipEphemeralUpdate: !applyOffGuard,
         isAutomatic: false,
         direction: 'observer_to_target', // Explicitly unidirectional
@@ -598,6 +614,7 @@ export class VisibilityOverride {
     if (stateType === 'visibility') {
       await this.applyVisibilityOverride(
         {
+          ...operation,
           state: targetState,
           source,
           direction,

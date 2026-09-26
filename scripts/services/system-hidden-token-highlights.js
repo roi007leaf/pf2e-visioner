@@ -254,6 +254,9 @@ export function buildSystemHiddenIndicatorDecision({
   const activeDetectionReplacedPresenceSense =
     isPresenceOnlySuppressed &&
     !!detection?.sense &&
+    // Stored detection can precede the condition update. Deafened observers
+    // cannot hand a presence marker to that stale hearing result.
+    !(detection.sense === 'hearing' && senseContext?.observerIsDeafened) &&
     !!presenceOnlyMode &&
     detection.sense !== presenceOnlyMode;
   const isSystemHidden =

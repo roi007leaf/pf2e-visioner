@@ -63,6 +63,7 @@ export async function tokenStateToInput(
     options,
     observerPosition,
     targetPosition,
+    observer,
   );
 
   // Calculate distance for sense range filtering using PF2e's token distance rules.
@@ -227,6 +228,7 @@ function extractTargetState(
   options,
   observerPosition = null,
   targetPosition = null,
+  observer = null,
 ) {
   // Get lighting level at target position
   if (!targetPosition) {
@@ -277,7 +279,7 @@ function extractTargetState(
 
   // Check for region-based concealment (if observer position is available)
   if (!concealment && observerPosition && targetPosition) {
-    const regionConcealment = checkRegionConcealment(observerPosition, targetPosition);
+    const regionConcealment = checkRegionConcealment(observerPosition, targetPosition, observer);
     concealment = regionConcealment;
   }
 
@@ -525,11 +527,12 @@ export function extractConcealment(target, options) {
  * @param {Object} targetPosition - Target's position {x, y}
  * @returns {boolean} True if ray crosses any concealment region boundary
  */
-function checkRegionConcealment(observerPosition, targetPosition) {
+function checkRegionConcealment(observerPosition, targetPosition, observer = null) {
   try {
     const result = ConcealmentRegionBehavior.doesRayHaveConcealment(
       observerPosition,
       targetPosition,
+      observer,
     );
     return result;
   } catch (error) {

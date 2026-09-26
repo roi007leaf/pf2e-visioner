@@ -1,7 +1,7 @@
 import '../../setup.js';
 
 jest.mock('../../../scripts/services/CombatStartCoverService.js', () => ({
-  combatStartCoverService: { applyCombatStartAutoCover: jest.fn() },
+  combatStartCoverService: { applyCombatStartAutoCover: jest.fn(), cleanupCombatCover: jest.fn() },
 }));
 
 jest.mock('../../../scripts/services/EncounterStealthInitiativeService.js', () => ({
@@ -50,6 +50,15 @@ describe('combat-only AVS end cleanup', () => {
     canvas.perception = {
       update: jest.fn().mockResolvedValue(undefined),
     };
+  });
+
+  test('cleans encounter cover even when AVS is not combat-only', async () => {
+    await game.settings.set(MODULE_ID, 'avsOnlyInCombat', false);
+    const combat = { combatants: [] };
+    const { handleCombatEnd } = await import('../../../scripts/hooks/combat.js');
+    const { combatStartCoverService } = await import('../../../scripts/services/CombatStartCoverService.js');
+    await handleCombatEnd(combat);
+    expect(combatStartCoverService.cleanupCombatCover).toHaveBeenCalledWith(combat);
   });
 
   test('clears combat-only AVS state without rendering an intermediate token frame', async () => {

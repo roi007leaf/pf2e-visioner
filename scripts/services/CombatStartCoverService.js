@@ -56,6 +56,24 @@ export class CombatStartCoverService {
     for (const movedTokenIds of this._activeCoverRuns) movedTokenIds.add(tokenId);
   }
 
+  async cleanupCombatCover(combat) {
+    if (!game.user?.isGM || !combat) return;
+    const pairs = new Map();
+    for (const combatant of collectionToArray(combat.combatants ?? combat.turns)) {
+      const tokenId = getTokenIdFromCombatant(combatant);
+      if (!tokenId) continue;
+      this.invalidateTokenCover(tokenId);
+      for (const pair of autoCoverSystem.getActivePairsInvolving(tokenId)) {
+        pairs.set(`${pair.attackerId}->${pair.targetId}`, pair);
+      }
+    }
+    for (const { attackerId, targetId } of pairs.values()) {
+      const attacker = canvas?.tokens?.get?.(attackerId);
+      const target = canvas?.tokens?.get?.(targetId);
+      if (attacker && target) await autoCoverSystem.cleanupCover(attacker, target);
+    }
+  }
+
   isEnabled() {
     try {
       return !!game.settings.get(MODULE_ID, COMPUTE_COVER_SETTING);

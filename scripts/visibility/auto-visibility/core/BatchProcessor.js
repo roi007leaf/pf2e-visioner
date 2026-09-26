@@ -1,4 +1,5 @@
 import { RuleElementChecker } from '../../../rule-elements/RuleElementChecker.js';
+import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../../../stores/visibility-map.js';
 import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
@@ -649,7 +650,7 @@ export class BatchProcessor {
       checker: RuleElementChecker,
       tokens: allTokens,
     });
-    const applyVisibilityReplacement = (observerToken, targetToken, visibility) => {
+    const applyVisibilityReplacement = (observerToken, targetToken, visibility, hasLineOfSight = true) => {
       if (!visibility) return { visibility, profileMetadata: {} };
       const ruleElementResult = ruleElementContext.checkVisibilityReplacement(
         observerToken,
@@ -663,6 +664,9 @@ export class BatchProcessor {
       );
       const replacementResult = ruleElementResult || featResult;
       if (!replacementResult) return { visibility, profileMetadata: {} };
+      if (!hasLineOfSight && ['observed', 'concealed'].includes(replacementResult.state)) {
+        return { visibility, profileMetadata: {} };
+      }
       return {
         visibility: replacementResult.state,
         profileMetadata: buildVisibilityReplacementProfileMetadata(replacementResult, visibility),
@@ -959,11 +963,7 @@ export class BatchProcessor {
           );
           if (!hasNonVisualSenses1) {
             effectiveVisibility1 = 'undetected';
-            const replacement = applyVisibilityReplacement(
-              changedToken,
-              otherToken,
-              effectiveVisibility1,
-            );
+            const replacement = applyVisibilityReplacement(changedToken, otherToken, effectiveVisibility1, false);
             effectiveVisibility1 = replacement.visibility;
             profileMetadata1 = replacement.profileMetadata;
             skipVisibilityCalc1 = true;
@@ -979,11 +979,7 @@ export class BatchProcessor {
           );
           if (!hasNonVisualSenses2) {
             effectiveVisibility2 = 'undetected';
-            const replacement = applyVisibilityReplacement(
-              otherToken,
-              changedToken,
-              effectiveVisibility2,
-            );
+            const replacement = applyVisibilityReplacement(otherToken, changedToken, effectiveVisibility2, false);
             effectiveVisibility2 = replacement.visibility;
             profileMetadata2 = replacement.profileMetadata;
             skipVisibilityCalc2 = true;
@@ -1006,7 +1002,7 @@ export class BatchProcessor {
           });
           effectiveVisibility1 = visibility1;
 
-          const ruleElementResult1 = ruleElementContext.checkRuleElements(
+          const ruleElementResult1 = los1 && ruleElementContext.checkRuleElements(
             changedToken,
             otherToken,
             visibility1,
@@ -1017,6 +1013,9 @@ export class BatchProcessor {
               ruleElementResult1,
               visibility1,
             );
+            if (EXPLICIT_VISIBLE_STATES.has(effectiveVisibility1)) {
+              profileMetadata1.detectionSense = AVS_EXPLICIT_VISIBLE_DETECTION_SENSE;
+            }
           }
           const featReplacement1 = applyFeatVisibilityReplacement(
             changedToken,
@@ -1044,7 +1043,7 @@ export class BatchProcessor {
           });
           effectiveVisibility2 = visibility2;
 
-          const ruleElementResult2 = ruleElementContext.checkRuleElements(
+          const ruleElementResult2 = los2 && ruleElementContext.checkRuleElements(
             otherToken,
             changedToken,
             visibility2,
@@ -1055,6 +1054,9 @@ export class BatchProcessor {
               ruleElementResult2,
               visibility2,
             );
+            if (EXPLICIT_VISIBLE_STATES.has(effectiveVisibility2)) {
+              profileMetadata2.detectionSense = AVS_EXPLICIT_VISIBLE_DETECTION_SENSE;
+            }
           }
           const featReplacement2 = applyFeatVisibilityReplacement(
             otherToken,
@@ -1078,11 +1080,13 @@ export class BatchProcessor {
         const needsProfileMetadataSync1 = !visibilityReplacementMetadataEquals(
           originalProfileMetadata1,
           profileMetadata1,
-        );
+        ) || (profileMetadata1.detectionSense !== undefined &&
+          profileMetadata1.detectionSense !== profileCache.getMapById(aId)?.[bId]?.detectionSense);
         const needsProfileMetadataSync2 = !visibilityReplacementMetadataEquals(
           originalProfileMetadata2,
           profileMetadata2,
-        );
+        ) || (profileMetadata2.detectionSense !== undefined &&
+          profileMetadata2.detectionSense !== profileCache.getMapById(bId)?.[aId]?.detectionSense);
         const needsVisibilityUpdate1 =
           needsEphemeralUpdate1 || needsDocumentSync1 || needsProfileMetadataSync1;
         const needsVisibilityUpdate2 =

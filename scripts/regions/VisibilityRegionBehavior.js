@@ -23,6 +23,9 @@ const RegionBehaviorBase =
     : class {};
 
 const DEFAULT_DEBOUNCE_MS = 50;
+// Core supplies different behavior models for native event snapshots. Queue by
+// document identity so an older snapshot cannot outlive a newer enter/exit.
+const eventQueues = new Map();
 
 export class VisibilityRegionBehavior extends RegionBehaviorBase {
   static LOCALIZATION_PREFIXES = ['PF2E_VISIONER.REGION_BEHAVIOR'];
@@ -152,15 +155,31 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
   // Debounce/batch quick sequences of enter/exit events to reduce workload and perceived lag
   _ensurePending() {
-    if (!this._pendingTokenEvents) this._pendingTokenEvents = new Map();
+    const key = this.parent?.uuid;
+    if (key) {
+      let queue = eventQueues.get(key);
+      if (!queue) {
+        queue = { events: new Map(), timer: null, processing: Promise.resolve() };
+        eventQueues.set(key, queue);
+      }
+      this._eventQueueKey = key;
+      this._eventQueue = queue;
+      this._pendingTokenEvents = queue.events;
+    } else if (!this._pendingTokenEvents) this._pendingTokenEvents = new Map();
   }
 
   _scheduleTokenEvent(token, isEntering, eventName) {
     this._ensurePending();
     try {
       this._pendingTokenEvents.set(token.id, { id: token.id, isEntering, eventName });
+      const queue = this._eventQueue;
+      if (queue?.timer) clearTimeout(queue.timer);
       if (this._pendingTimer) clearTimeout(this._pendingTimer);
-      this._pendingTimer = setTimeout(() => this._processPendingEvents(), DEFAULT_DEBOUNCE_MS);
+      this._pendingTimer = setTimeout(() => {
+        if (queue) queue.timer = null;
+        return this._processPendingEvents();
+      }, DEFAULT_DEBOUNCE_MS);
+      if (queue) queue.timer = this._pendingTimer;
     } catch (err) {
       console.warn('PF2e Visioner | Failed to schedule token event:', err);
     }
@@ -299,6 +318,21 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
   async _processPendingEvents() {
     this._ensurePending();
+    const queue = this._eventQueue;
+    if (!queue) return this._processPendingEventsNow();
+    // Serialize writes as well as timers. Native document writes can take longer
+    // than the debounce interval and must finish before the next movement state.
+    const processing = queue.processing.then(() => this._processPendingEventsNow());
+    const tracked = processing.catch(() => {});
+    queue.processing = tracked;
+    try { await processing; }
+    finally {
+      if (!queue.timer && !queue.events.size && queue.processing === tracked &&
+          !this._pendingCanvasReadyHook) eventQueues.delete(this._eventQueueKey);
+    }
+  }
+
+  async _processPendingEventsNow() {
 
     if (!this._pendingTokenEvents.size) return;
 
@@ -351,7 +385,10 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
           CONST.REGION_EVENTS.TOKEN_ROUND_START, CONST.REGION_EVENTS.TOKEN_ROUND_END].includes(e.eventName);
         // Ending a turn does not mean the token left the region. Use the
         // event token's containment, independently of the new active combatant.
-        const isEntering = isTurnBoundary ? tokensInRegion.some(t => t.id === e.id) : e.isEntering;
+        const isMovementBoundary = [CONST.REGION_EVENTS.TOKEN_ENTER, CONST.REGION_EVENTS.TOKEN_EXIT,
+          CONST.REGION_EVENTS.BEHAVIOR_ACTIVATED].includes(e.eventName);
+        const isEntering = isTurnBoundary || isMovementBoundary
+          ? tokensInRegion.some(t => t.id === e.id) : e.isEntering;
         allUpdates = allUpdates.concat(
           this._gatherUpdatesForToken(e.id, isEntering, tokensInRegion),
         );
@@ -501,7 +538,11 @@ export class VisibilityRegionBehavior extends RegionBehaviorBase {
 
           try {
             const current = getVisibility(sourceToken, targetToken, 'observer_to_target');
-            if (current === state) {
+            const override = targetToken.document?.getFlag?.('pf2e-visioner', `avs-override-from-${sourceToken.id}`);
+            if (current === state && state !== 'observed' &&
+                override?.source === 'region_override' && override.state === state) continue;
+            if (current === state && state === 'observed' &&
+                !override) {
               continue;
             }
           } catch {}

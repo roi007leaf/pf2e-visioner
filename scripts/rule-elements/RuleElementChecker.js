@@ -2,8 +2,16 @@ import { PredicateHelper } from './PredicateHelper.js';
 import { SourceTracker } from './SourceTracker.js';
 import { getVisibilityBetween } from '../stores/visibility-map.js';
 import { getActorLevel } from '../utils/actor-features.js';
+import { ignoresVisibilitySource } from './visibility-source-tags.js';
 
 export class RuleElementChecker {
+  static resolveOverrideState(config, subjectToken) {
+    if (config?.condition) {
+      return this.evaluateCondition(subjectToken?.actor, config.condition) ? config.thenState : config.elseState;
+    }
+    return config?.state;
+  }
+
   /**
    * Check all rule element effects for a token pair
    * @param {Token} observerToken - The observing token
@@ -241,12 +249,15 @@ export class RuleElementChecker {
       );
       const targetConfig = targetToken.document?.getFlag('pf2e-visioner', 'ruleElementOverride');
 
+      const observerState = this.resolveOverrideState(observerConfig, observerToken);
+      const targetState = this.resolveOverrideState(targetConfig, targetToken);
+
       // Check global flag-based overrides first (no predicates)
-      if (observerConfig?.active) {
+      if (observerConfig?.active && !ignoresVisibilitySource(observerToken, observerConfig.sourceTags, observerState)) {
         const direction = observerConfig.direction || 'to';
         if (direction === 'to') {
           return {
-            state: observerConfig.state,
+            state: observerState,
             source: observerConfig.source,
             priority: observerConfig.priority || 100,
             type: 'ruleElementOverride',
@@ -254,11 +265,11 @@ export class RuleElementChecker {
         }
       }
 
-      if (targetConfig?.active) {
+      if (targetConfig?.active && !ignoresVisibilitySource(observerToken, targetConfig.sourceTags, targetState)) {
         const direction = targetConfig.direction || 'from';
         if (direction === 'from') {
           return {
-            state: targetConfig.state,
+            state: targetState,
             source: targetConfig.source,
             priority: targetConfig.priority || 100,
             type: 'ruleElementOverride',
@@ -291,11 +302,13 @@ export class RuleElementChecker {
 
         // For now, check all sources but log warnings for mismatched directions
         for (const source of [...targetSources].sort((a, b) => (b.priority ?? 100) - (a.priority ?? 100))) {
+          const sourceState = this.resolveOverrideState(source, source.direction === 'to' ? observerToken : targetToken);
+          if (ignoresVisibilitySource(observerToken, source.sourceTags, sourceState)) continue;
           if (!source.predicate?.length) {
             // Removing one effect clears its global flag. Other scoped rule
             // sources still apply to this pair, including unconditional ones.
-            if (source.state && ['from', 'to'].includes(source.direction)) {
-              return { state: source.state, source: source.id,
+            if (sourceState && ['from', 'to'].includes(source.direction)) {
+              return { state: sourceState, source: source.id,
                 priority: source.priority ?? 100, type: 'ruleElementOverride' };
             }
             continue;
@@ -345,9 +358,9 @@ export class RuleElementChecker {
             const storedState = getVisibilityBetween(observerToken, targetToken);
 
             // Return the source state or stored state (prefer source.state if available)
-            if (source.state || storedState !== 'observed') {
+            if (sourceState || storedState !== 'observed') {
               return {
-                state: source.state || storedState,
+                state: sourceState || storedState,
                 source: source.id,
                 priority: source.priority || 100,
                 type: 'ruleElementOverride',
@@ -367,6 +380,8 @@ export class RuleElementChecker {
       if (observerSources.length > 0) {
         // Check if any of these are 'to' direction sources that should apply to observer->target check
         for (const source of observerSources) {
+          const sourceState = this.resolveOverrideState(source, source.direction === 'to' ? observerToken : targetToken);
+          if (ignoresVisibilitySource(observerToken, source.sourceTags, sourceState)) continue;
           if (!source.predicate?.length || source.direction !== 'to') continue;
 
           // Direction 'to' stored on observerToken: means observerToken (as subject) sees targetToken differently
@@ -382,9 +397,9 @@ export class RuleElementChecker {
           if (predicatePasses) {
             const storedState = getVisibilityBetween(observerToken, targetToken);
 
-            if (source.state || storedState !== 'observed') {
+            if (sourceState || storedState !== 'observed') {
               return {
-                state: source.state || storedState,
+                state: sourceState || storedState,
                 source: source.id,
                 priority: source.priority || 100,
                 type: 'ruleElementOverride',
@@ -422,7 +437,7 @@ export class RuleElementChecker {
 
       // Check observer's visibility replacement (direction: 'to')
       // The observer with direction='to' affects how they see the target
-      if (observerConfig?.active) {
+      if (observerConfig?.active && !ignoresVisibilitySource(observerToken, observerConfig.sourceTags, observerConfig.toState)) {
         const direction = observerConfig.direction || 'from';
         if (direction === 'to' && observerConfig.fromStates?.includes(currentVisibility)) {
           // Check range if specified
@@ -485,7 +500,7 @@ export class RuleElementChecker {
 
       // Check target's visibility replacement (direction: 'from')
       // The target with direction='from' affects how others see them
-      if (targetConfig?.active) {
+      if (targetConfig?.active && !ignoresVisibilitySource(observerToken, targetConfig.sourceTags, targetConfig.toState)) {
         const direction = targetConfig.direction || 'from';
         if (direction === 'from' && targetConfig.fromStates?.includes(currentVisibility)) {
           // Check range if specified
@@ -566,7 +581,7 @@ export class RuleElementChecker {
       }
 
       // Check observer's conditional state (direction: 'to')
-      if (observerConfig?.active) {
+      if (observerConfig?.active && !ignoresVisibilitySource(observerToken, observerConfig.sourceTags, this.evaluateCondition(observerToken.actor, observerConfig.condition) ? observerConfig.thenState : observerConfig.elseState)) {
         const conditionMet = this.evaluateCondition(observerToken.actor, observerConfig.condition);
         const targetState = conditionMet ? observerConfig.thenState : observerConfig.elseState;
 
@@ -580,7 +595,7 @@ export class RuleElementChecker {
       }
 
       // Check target's conditional state (direction: 'from')
-      if (targetConfig?.active) {
+      if (targetConfig?.active && !ignoresVisibilitySource(observerToken, targetConfig.sourceTags, this.evaluateCondition(targetToken.actor, targetConfig.condition) ? targetConfig.thenState : targetConfig.elseState)) {
         const conditionMet = this.evaluateCondition(targetToken.actor, targetConfig.condition);
         const targetState = conditionMet ? targetConfig.thenState : targetConfig.elseState;
 

@@ -11,6 +11,7 @@
 import { MODULE_ID } from '../constants.js';
 import { segmentsIntersect } from '../helpers/geometry-utils.js';
 import RegionHelper from '../utils/region.js';
+import { ignoresVisibilitySource } from '../rule-elements/visibility-source-tags.js';
 
 const RegionBehaviorBase =
     typeof foundry !== 'undefined' &&
@@ -40,6 +41,10 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
                 initial: true,
                 label: 'PF2E_VISIONER.REGION_BEHAVIOR.CONCEALMENT_ENABLED.label',
                 hint: 'PF2E_VISIONER.REGION_BEHAVIOR.CONCEALMENT_ENABLED.hint',
+            }),
+            sourceTags: new fields.StringField({
+                required: false, initial: '', label: 'Source Tags',
+                hint: 'Comma-separated tags, such as smoke or mist, for source-specific visibility rules.',
             }),
         };
     }
@@ -157,8 +162,10 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
                     if (behavior.type === `${MODULE_ID}.Pf2eVisionerConcealment`) {
                         // In Foundry v13, check both 'enabled' and absence of 'disabled'
                         const isEnabled = (behavior.system?.enabled ?? behavior.enabled) !== false && behavior.disabled !== true;
-                        hasConcealmentBehavior = isEnabled;
-                        break;
+                        if (isEnabled) {
+                            hasConcealmentBehavior = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -172,10 +179,16 @@ export class ConcealmentRegionBehavior extends RegionBehaviorBase {
         return regions;
     }
 
-    static doesRayHaveConcealment(originPoint, targetPoint) {
+    static doesRayHaveConcealment(originPoint, targetPoint, observer = null) {
         const regions = ConcealmentRegionBehavior.getAllConcealmentRegions();
 
         for (const region of regions) {
+            const behaviors = region.behaviors || region.document?.behaviors || [];
+            const activeBehaviors = Array.from(behaviors).filter(b =>
+                b.type === `${MODULE_ID}.Pf2eVisionerConcealment` &&
+                (b.system?.enabled ?? b.enabled) !== false && b.disabled !== true);
+            if (activeBehaviors.length && activeBehaviors.every(b =>
+                ignoresVisibilitySource(observer, b.system?.sourceTags))) continue;
             // Check if ray crosses the region boundary
             const crosses = ConcealmentRegionBehavior.checkRayCrossesRegionBoundary(region, originPoint, targetPoint);
             if (crosses) {

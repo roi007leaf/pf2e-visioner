@@ -46,11 +46,8 @@ export class OverrideService {
      */
     getActiveOverrideForTokens(observer, target) {
         try {
-            // Check for rule element overrides first
-            const ruleElementOverride = this._checkRuleElementOverride(observer, target);
-            if (ruleElementOverride) {
-                return ruleElementOverride;
-            }
+            // Rule elements modify the calculated state after LOS. Treating them
+            // as manual overrides here skips walls and the visibility calculator.
 
             // Use dynamic require to avoid ESM async import in hot paths; tests can mock this module.
             const mod = (0, eval)('require')('../../chat/services/infra/AvsOverrideManager.js');

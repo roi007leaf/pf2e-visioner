@@ -545,11 +545,14 @@ export class CoverDetector {
         segmentEnd = unrotate(p2);
       }
 
+      // Riding a tile edge is not crossing its interior. The tiny inset also
+      // absorbs floating-point error after unrotating a boundary-aligned ray.
+      const inset = Math.min(1e-6, width / 4, height / 4);
       const intersectionLength = segmentRectIntersectionLength(segmentStart, segmentEnd, {
-        x1: x,
-        y1: y,
-        x2: x + width,
-        y2: y + height,
+        x1: x + inset,
+        y1: y + inset,
+        x2: x + width - inset,
+        y2: y + height - inset,
       });
       if (intersectionLength <= 0) continue;
       highest = highest ? this._highestCoverState(highest, coverOverride) : coverOverride;
@@ -1963,19 +1966,7 @@ export class CoverDetector {
         return false;
       }
 
-      // Rule 2: Get sizes for cover rules
-      const targetSize = this._getTokenSizeCategory(target);
-      const blockerSize = this._getTokenSizeCategory(blocker);
-
-      // Rule 3: Tiny tokens cannot provide cover to non-tiny creatures
-      if (blockerSize === 'tiny' && targetSize !== 'tiny') {
-        return false;
-      }
-
-      // Rule 4: Additional size-based rules from the PF2E cover table
-      // Tiny targets can only get cover from Small+ blockers (already covered by rule 3)
-      // Small+ targets cannot get cover from tiny blockers (already covered by rule 3)
-
+      // Size exclusions are controlled by the Ignore Smaller/Same/Larger settings.
       return true;
     } catch {
       // If we can't determine sizes/positions, allow cover to be safe

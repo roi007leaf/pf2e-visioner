@@ -161,27 +161,31 @@ export class SceneEventHandler {
         return !!activeScene && ((scene === activeScene) || (scene.id && scene.id === activeScene.id));
     }
 
-    #isDefineSurfaceBehavior(behavior) {
-        return behavior?.type === 'defineSurface';
+    #isVisibilityAffectingBehavior(behavior) {
+        return behavior?.type === 'defineSurface' || [
+            'pf2e-visioner.Pf2eVisionerConcealment',
+            'pf2e-visioner.Pf2eVisionerVisibility',
+            'pf2e-visioner.Pf2eVisionerSenseSuppression',
+        ].includes(behavior?.type);
     }
 
-    #regionHasDefineSurfaceBehavior(region) {
+    #regionHasVisibilityAffectingBehavior(region) {
         const behaviors = region?.behaviors;
         if (!behaviors) return false;
 
         if (typeof behaviors.some === 'function') {
-            return behaviors.some((behavior) => this.#isDefineSurfaceBehavior(behavior));
+            return behaviors.some((behavior) => this.#isVisibilityAffectingBehavior(behavior));
         }
 
         if (Symbol.iterator in Object(behaviors)) {
             for (const behavior of behaviors) {
-                if (this.#isDefineSurfaceBehavior(behavior)) return true;
+                if (this.#isVisibilityAffectingBehavior(behavior)) return true;
             }
         }
 
         if (typeof behaviors.values === 'function') {
             for (const behavior of behaviors.values()) {
-                if (this.#isDefineSurfaceBehavior(behavior)) return true;
+                if (this.#isVisibilityAffectingBehavior(behavior)) return true;
             }
         }
 
@@ -208,7 +212,7 @@ export class SceneEventHandler {
         if (!this.#isCurrentScene(scene)) return;
 
         const placementLevelsChanged = this.#regionPlacementLevelsChanged(changes);
-        const hasDefineSurface = this.#regionHasDefineSurfaceBehavior(region);
+        const hasDefineSurface = this.#regionHasVisibilityAffectingBehavior(region);
         if (!placementLevelsChanged && !hasDefineSurface) return;
 
         this.#triggerRegionSurfaceRecalculation(
@@ -228,11 +232,20 @@ export class SceneEventHandler {
     }
 
     #onRegionBehaviorChange(behavior, changes = {}, options = {}, userId) {
-        if (!this.#isDefineSurfaceBehavior(behavior)) return;
+        if (!this.#isVisibilityAffectingBehavior(behavior)) return;
 
         const region = behavior?.region ?? behavior?.parent ?? null;
         const scene = behavior?.scene ?? region?.parent ?? null;
         if (!this.#isCurrentScene(scene)) return;
+
+        // Editing an active event-driven region must update stationary occupants.
+        // Cache invalidation alone retains its previous manual region override.
+        const system = behavior?.system;
+        if (behavior?.type === 'pf2e-visioner.Pf2eVisionerVisibility' &&
+            behavior.disabled !== true && changes.system &&
+            system?.events?.has?.(CONST.REGION_EVENTS.BEHAVIOR_ACTIVATED)) {
+            void system._handleRegionEvent?.({ name: CONST.REGION_EVENTS.BEHAVIOR_ACTIVATED });
+        }
 
         this.#triggerRegionSurfaceRecalculation('region-behavior-update', {
             document: behavior,

@@ -348,6 +348,7 @@ describe('AvsInvalidationCoordinator scene reasons', () => {
       const result = coordinator.invalidate({ reason });
 
       expect(result).toBe(true);
+      expect(LightingPrecomputer.clearLightingCaches).toHaveBeenCalledTimes(1);
       expect(cacheManager.clearAllCaches).toHaveBeenCalledTimes(1);
       expect(visibilityState.markAllTokensChangedImmediate).toHaveBeenCalledTimes(1);
     },

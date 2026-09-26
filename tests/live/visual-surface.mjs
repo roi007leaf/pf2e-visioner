@@ -9,7 +9,9 @@ export async function prepareVisualSurface(page) {
     const apps = new Set([...Object.values(ui.windows), ...(foundry.applications.instances?.values?.() ?? [])]);
     for (const app of apps) {
       // Only this runner's browser, and only a panel spawned by combat hooks.
-      if (/pf2e-combater/i.test(app.id ?? '') || app.element?.className?.includes?.('pf2e-combater')) await app.close();
+      const element = app.element?.[0] ?? app.element;
+      if (/pf2e-combater/i.test(app.id ?? '') || element?.className?.includes?.('pf2e-combater') ||
+          element?.querySelector?.('.combater-header-loadout')) await app.close();
       // A delayed native initiative prompt may arrive on the player after a
       // fixture encounter starts. Cancel only prompts naming a tagged actor.
       const title = String(app.title ?? '');
