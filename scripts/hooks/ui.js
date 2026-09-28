@@ -6,6 +6,7 @@ import { FeatsHandler } from '../chat/services/FeatsHandler.js';
 import { COVER_STATES, MODULE_ID } from '../constants.js';
 import { scheduleCanvasPerceptionUpdate } from '../helpers/perception-refresh.js';
 import { onRenderTokenHUD } from '../services/token-hud.js';
+import { onRenderTileHUD } from '../services/tile-hud.js';
 import {
   clearSuppressLightingRefresh,
   setSuppressLightingRefresh,
@@ -22,6 +23,7 @@ import {
 
 export function registerUIHooks() {
   Hooks.on('renderTokenHUD', onRenderTokenHUD);
+  Hooks.on('renderTileHUD', onRenderTileHUD);
   Hooks.on('getTokenDirectoryEntryContext', onGetTokenDirectoryEntryContext);
   Hooks.on('renderWallConfig', onRenderWallConfig);
   Hooks.on('renderTileConfig', onRenderTileConfig);

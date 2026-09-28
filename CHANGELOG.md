@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.11.1] - 2026-09-28
+
+### Fixed
+
+- Hidden tiles now show a GM-only Search Exploration button in the tile HUD, matching the existing hidden-token workflow. The action rolls against the selected tile's Stealth DC.
+
+### Tests
+
+- Added regression coverage for tile HUD registration, Search action, duplicate prevention, and GM-only hidden-tile gating.
+
 ## [8.11.0] - 2026-09-28
 
 ### Added
