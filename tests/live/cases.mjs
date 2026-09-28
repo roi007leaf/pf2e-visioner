@@ -16,6 +16,7 @@ import { performanceLifecycleCases } from './performance-lifecycle-workflows.mjs
 import { scenePerformanceCases } from './scene-performance-workflows.mjs';
 import { deletionRaceCases } from './deletion-race-workflows.mjs';
 import { visibilityRegressionCases } from './visibility-regression-workflows.mjs';
+import { elevationCases } from './elevation-workflows.mjs';
 // Every case gets fresh documents. These are live contracts, not mocked calculators.
 export const smokeCases = [
   { name: 'darkvision-in-darkness', darkness: true, steps: [{ expect: { state: 'observed', visible: true, filter: null }, art: true }] },
@@ -64,6 +65,7 @@ export const smokeCases = [
 ];
 
 export const fullCases = [
+  ...elevationCases,
   ...autumnLeavesCases,
   ...visibilityRegressionCases,
   ...regionAuditCases,

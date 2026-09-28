@@ -3,6 +3,7 @@ import { AVS_EXPLICIT_VISIBLE_DETECTION_SENSE } from '../../../stores/visibility
 import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
+import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
 import { sceneDistanceToPixels } from '../../../helpers/geometry-utils.js';
 import { getLogger } from '../../../utils/logger.js';
 import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
@@ -260,6 +261,13 @@ function hasCoreLosFromControlledObserver(observerToken, targetToken) {
 
     const points = getVisibilityTestPoints(targetToken);
     if (points.length === 0) return false;
+
+    // A 2D source polygon cannot establish sight through a floor or another level.
+    const levels = LevelsIntegration.getInstance();
+    if (levels.isActive) {
+      const collision = levels.get3DCollisionDetails(observerToken, targetToken, 'sight');
+      if (collision.surfaceCollision || collision.levelInclusionCollision) return false;
+    }
 
     return sources.some((source) =>
       points.some(

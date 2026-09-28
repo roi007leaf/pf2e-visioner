@@ -37,7 +37,7 @@ export const requirements = [
   ['Visibility and suppression regions', ['region-concealment-remove', 'region-sense-suppression-remove', 'region-visibility']],
   ['Player privacy and GM exceptions', ['player-undetected-privacy', 'player-unnoticed-privacy', 'gm-player-undetected-tooltip-permissions', 'gm-player-unnoticed-tooltip-permissions', 'privacy-targeting-nameplates']],
   ['Movement', ['door-close-open-close', 'drag-preview', 'movement-animation-performance', 'detection-movement-soundwave-handoff']],
-  ['Levels', ['levels-pillar', 'levels-surfaces-floor-occlusion']],
+  ['Levels', ['levels-pillar', 'levels-surfaces-floor-occlusion', 'avs-v14-elevated-mutual-observed', 'avs-v14-hidden-elevation-indicator', 'avs-v14-descent-reveals-undetected', 'avs-v14-single-level-elevation-refresh', 'avs-v14-combat-single-level-elevations', 'avs-v14-combat-bounded-single-level-elevations', 'avs-v14-kingmaker-tree-elevation-rendering']],
   ['Observer and connection lifecycle', ['observer-switch', 'reload-hidden-reset', 'door-player-reload', 'socket-player-reconnect', 'socket-reconnect-gm-handover']],
   ['Hide', ['combat-hide-apply', 'hide-apply-revert-outcome', 'hide-apply-revert']],
   ['Sneak', ['combat-sneak-action', 'sneak-apply-revert']],

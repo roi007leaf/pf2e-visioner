@@ -14,7 +14,9 @@ import {
   wrapTokenControl,
   wrapTokenApplyRenderFlags,
   wrapTokenRefreshVisibility,
+  wrapPrimaryTokenMeshRender,
 } from '../../../scripts/services/Detection/detection-token-refresh.js';
+import { wrapTokenRenderDetectionFilter } from '../../../scripts/services/Detection/detection-filter-render.js';
 import { registerDetectionWrappers } from '../../../scripts/services/Detection/detection-wrapper-registration.js';
 import {
   applyCurrentViewHardHide,
@@ -185,6 +187,51 @@ describe('multi-level hover visibility refresh ordering', () => {
     const unrelatedSuppression = { mesh: { visible: true, renderable: false } };
     clearAllDetectionFilterVisuals([unrelatedSuppression]);
     expect(unrelatedSuppression.mesh.renderable).toBe(false);
+  });
+
+  it.each([20, 25])('keeps Silva Hidden detection rendering at +%s with Celdar at +20', (elevation) => {
+    observer.document.elevation = 20;
+    observer.document.level = 'main';
+    const token = foundryHiddenTarget();
+    token.document = {
+      ...token.document, documentName: 'Token', elevation, level: 'main',
+      getMovementOrigin: () => ({ x: 200, y: 100, elevation }),
+    };
+    token.mesh.object = token;
+    token.mesh.filters = null;
+    token.detectionFilterMesh = { visible: true, renderable: true, alpha: 1 };
+    globalThis.canvas.tokens.placeables = [observer, token];
+
+    // The stored Hidden state must retain its detection pass without exposing
+    // primary artwork when the elevation differs by five feet.
+    token.document.hidden = false;
+    __setStoredVisibilityForTest(new Map([['obs:t', 'hidden']]));
+    const hearingFilter = { id: 'hearing' };
+    wrapTokenRefreshVisibility.call(token, () => {
+      token.visible = true;
+      token.detectionFilter = hearingFilter;
+      token.mesh.visible = true;
+      token.mesh.renderable = true;
+    });
+
+    expect(token._pvCurrentViewHardHidden).not.toBe(true);
+    expect(token.visible).toBe(true);
+    expect(token.renderable).toBe(true);
+    expect(token.detectionFilter).toBe(hearingFilter);
+    expect(token.detectionFilterMesh).toMatchObject({ visible: true, renderable: true });
+
+    const drawMesh = jest.fn();
+    wrapPrimaryTokenMeshRender.call(token.mesh, drawMesh);
+    expect(drawMesh).not.toHaveBeenCalled();
+    // Core attaches the filter during its detection pass. Exercise both real
+    // Visioner render wrappers to ensure they allow that pass at +25 as at +20.
+    wrapTokenRenderDetectionFilter.call(token, () => {
+      token.mesh.filters = [hearingFilter];
+      wrapPrimaryTokenMeshRender.call(token.mesh, drawMesh);
+      token.mesh.filters = null;
+    });
+    expect(drawMesh).toHaveBeenCalledTimes(1);
+    expect(token.mesh.renderable).toBe(false);
   });
 });
 

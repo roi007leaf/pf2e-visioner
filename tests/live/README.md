@@ -191,6 +191,56 @@ Remove the filter before running the full suite. For release validation, use the
 actual report path, for example `npm run test:shipping -- artifacts/live/<run-UUID>/report.json`.
 This checks evidence; it does not run the live suite or publish a release.
 
+For the v14 AVS elevation regression:
+
+`VISIONER_LIVE_CASE=avs-v14-kingmaker-tree-elevation-rendering` requires the local
+Mad Wilderwoods tree texture. It reproduces the saved Kingmaker tree footprint,
+elevation +19 and occlusion settings around Celdar/Silva, on a single 0–20 level
+in QA combat. It checks Hidden soundwave pixels after native elevation edits and
+after disabling tree occlusion. Campaign documents are never edited.
+
+`avs-v14-combat-bounded-single-level-elevations` also repeats the combat test
+with Kingmaker's saved single-level bounds 0–20, without its tree tile.
+
+`VISIONER_LIVE_CASE=avs-v14-combat-single-level-elevations` runs +20/+25/+60
+elevation edits during active combat with combat-only AVS enabled. Normal walls
+remain on the default level, outside the clear sight ray. Both clients must retain
+Observed artwork or Hidden soundwaves. The original AVS setting is restored.
+
+`VISIONER_LIVE_CASE=avs-v14-single-level-elevation-refresh` tests a single native
+level without walls, regions, floors, or tiles. Native elevation edits through
++25/+20 and +25/+60 must keep both directions Observed on GM and player clients,
+including observer descent from +60 through +25 to +20. No forced AVS
+recalculation follows the edits. The Hidden indicator case also exercises +25/+60.
+
+`VISIONER_LIVE_CASE=avs-v14-descent-reveals-undetected` checks a native sight/sound
+surface between an observer at +25 and a target at +20. Changing only the observer's
+elevation to +20 must automatically reveal the target as Observed. Ascending and
+descending again verifies cached LOS in both directions, including rendered artwork.
+
+```powershell
+$env:VISIONER_LIVE_CASE = 'avs-v14-elevated-mutual-observed'
+npm run test:live:full
+Remove-Item Env:VISIONER_LIVE_CASE
+```
+
+This requires AVS enabled outside combat. Two unobstructed tokens stay Observed
+in both directions through stationary elevation changes `0 -> 20 -> 0 -> 20`,
+including the intermediate step where only one token has changed elevation.
+GM and player state maps and rendered artwork are checked before switching the
+GM's selected observer in both directions. No manual recalculation rescues the
+elevation updates. Failure reports include snapshots, visibility factors, and a
+fresh calculation to distinguish stale AVS state from collision/lighting errors.
+
+`VISIONER_LIVE_CASE=avs-v14-hidden-elevation-indicator` selects the Hidden rendering
+regression: observer at +20 ft, target at +25 ft. It checks an explicit Hidden
+override and automatic Hidden from native Invisible, rendered neutral hearing
+soundwaves, elevation changes, and observer switching. A correct Hidden map
+without visible indicator pixels fails this case.
+It also sets the target to +25 before setting the observer to +20, then changes
+both elevations repeatedly using native document updates with default animation
+options. No scene re-view or explicit perception refresh repairs those updates.
+
 ## What runs automatically
 
 The catalog exercises visibility/AVS states, senses and conditions, lighting,

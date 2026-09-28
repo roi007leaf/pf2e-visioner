@@ -1,5 +1,6 @@
 import { BatchDirectionalLosResolver } from '../../../scripts/visibility/auto-visibility/core/BatchDirectionalLosResolver.js';
 import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
+import { PositionBatchCache } from '../../../scripts/visibility/auto-visibility/core/PositionBatchCache.js';
 
 const token = (id) => ({ document: { id } });
 
@@ -15,6 +16,30 @@ function makeBreakdown() {
 }
 
 describe('BatchDirectionalLosResolver', () => {
+  test('recomputes blocked LOS when an observer descends to the target elevation without moving horizontally', () => {
+    const observer = token('observer'), target = token('target');
+    let elevation = 25;
+    const values = new Map();
+    const globalLosCache = {
+      getWithMeta: key => ({ state: values.has(key) ? 'hit' : 'miss', value: values.get(key) }),
+      set: (key, value) => values.set(key, value),
+    };
+    const visionAnalyzer = { hasLineOfSight: jest.fn(() => elevation === 20) };
+    const calculate = () => {
+      const positions = new PositionBatchCache();
+      const observerKey = positions.getCoarseKeyById('observer', { x: 400, y: 500, elevation });
+      const targetKey = positions.getCoarseKeyById('target', { x: 800, y: 500, elevation: 20 });
+      const resolver = new BatchDirectionalLosResolver({ visionAnalyzer, globalLosCache,
+        batchLosCache: new Map(), precomputedLOS: new Map(), breakdown: makeBreakdown() });
+      return resolver.get(observer, target, positions.makeLosPairKey('observer', observerKey, 'target', targetKey));
+    };
+    expect(calculate()).toBe(false);
+    elevation = 20;
+    expect(calculate()).toBe(true);
+    elevation = 25;
+    expect(calculate()).toBe(false);
+    expect(visionAnalyzer.hasLineOfSight).toHaveBeenCalledTimes(2);
+  });
   test('returns a batch cached LOS value without consulting wider caches', () => {
     const observer = token('A');
     const target = token('B');

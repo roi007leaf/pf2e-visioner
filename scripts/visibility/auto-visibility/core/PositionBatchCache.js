@@ -206,7 +206,8 @@ export class PositionBatchCache {
         const gs = Math.max(1, canvas?.grid?.size || 1);
         const cx = Math.floor((p?.x ?? 0) / gs);
         const cy = Math.floor((p?.y ?? 0) / gs);
-        // Ignore elevation for LOS coarse key to maximize reuse; LOS rarely depends on z in 2D scenes
-        return `${cx}:${cy}`;
+        // Elevation changes can cross a surface without changing the horizontal grid cell.
+        const z = Number(p?.elevation ?? 0) || 0;
+        return `${cx}:${cy}:${z}`;
     }
 }

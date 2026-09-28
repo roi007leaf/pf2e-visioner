@@ -8,6 +8,7 @@ import {
 import { GlobalLosCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalLosCache.js';
 import { GlobalVisibilityCache } from '../../../scripts/visibility/auto-visibility/utils/GlobalVisibilityCache.js';
 import { peekRegistry } from '../../../scripts/services/Peek/PeekRegistry.js';
+import { LevelsIntegration } from '../../../scripts/services/LevelsIntegration.js';
 import { HashGridIndex } from '../../../scripts/visibility/auto-visibility/core/HashGridIndex.js';
 import { DependencyInjectionContainer } from '../../../scripts/visibility/auto-visibility/core/DependencyInjectionContainer.js';
 
@@ -596,13 +597,17 @@ describe('BatchProcessor', () => {
     );
   });
 
-  test('controlled source-polygon LOS reveals target when analyzer LOS is conservative', async () => {
+  test.each([false, true])('controlled source-polygon LOS respects surface blocking (%s)', async (surfaceCollision) => {
+    const levels = jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
+      isActive: true,
+      get3DCollisionDetails: jest.fn(() => ({ surfaceCollision })),
+    });
     const previousControlled = global.canvas.tokens.controlled;
     const previousEffects = global.canvas.effects;
     const observer = makeToken('A', 0, 0);
-    const target = makeToken('B', 5000, 0);
+    const target = makeToken('B', 100, 0);
     observer.center = { x: 50, y: 50 };
-    target.center = { x: 5050, y: 50 };
+    target.center = { x: 150, y: 50 };
     target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
     global.canvas.tokens.placeables = [observer, target];
     global.canvas.tokens.controlled = [observer];
@@ -620,7 +625,7 @@ describe('BatchProcessor', () => {
       ]),
       lightSources: new Map(),
     };
-    processor.maxVisibilityDistance = 1;
+    processor.maxVisibilityDistance = 100;
     processor.visionAnalyzer = {
       hasLineOfSight: jest.fn(() => false),
       getVisionCapabilities: jest.fn(() => ({
@@ -640,6 +645,7 @@ describe('BatchProcessor', () => {
     try {
       res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
     } finally {
+      levels.mockRestore();
       global.canvas.tokens.controlled = previousControlled;
       global.canvas.effects = previousEffects;
     }
@@ -649,6 +655,12 @@ describe('BatchProcessor', () => {
       expect.objectContaining({ document: expect.objectContaining({ id: 'B' }) }),
       'sight',
     );
+    if (surfaceCollision) {
+      expect(res.updates).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ observer: observer, target: target, visibility: 'observed' }),
+      ]));
+      return;
+    }
     expect(optimizedVisibilityCalculator.calculateVisibilityBetweenTokens).toHaveBeenCalled();
     expect(res.updates).toEqual(
       expect.arrayContaining([

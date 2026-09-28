@@ -15,10 +15,12 @@ import { performanceLifecycleWorkflows } from './performance-lifecycle-workflows
 import { scenePerformanceWorkflows } from './scene-performance-workflows.mjs';
 import { deletionRaceWorkflows } from './deletion-race-workflows.mjs';
 import { visibilityRegressionWorkflows } from './visibility-regression-workflows.mjs';
+import { elevationWorkflows } from './elevation-workflows.mjs';
 
 export const workflows = {
   ...autumnLeavesWorkflows,
   ...visibilityRegressionWorkflows,
+  ...elevationWorkflows,
   ...regionAuditWorkflows,
   ...fpsWorkflows,
   ...performanceLifecycleWorkflows,

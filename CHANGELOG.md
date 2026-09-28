@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.10.10] - 2026-09-28
+
+### Fixed
+
+- Automatic visibility recomputes line of sight when a token changes elevation without moving horizontally. Cached LOS no longer reuses a result from another elevation.
+- Controlled-token vision polygons no longer override native floor or level-inclusion blockers when calculating automatic visibility.
+
+### Tests
+
+- Added unit regressions for elevation-sensitive LOS caching, controlled-token surface blocking, and Hidden rendering at elevated positions.
+- Added Foundry 14 live elevation scenarios covering Observed artwork and Hidden soundwaves across elevation changes, combat, bounded levels, and a QA copy of Kingmaker's tree tile settings. These scenarios passed; the original Kingmaker disappearance was not reproduced.
+
 ## [8.10.9] - 2026-09-26
 
 ### Added
