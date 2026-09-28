@@ -64,6 +64,57 @@ describe('Tile config cover controls', () => {
     expect(root.querySelectorAll('.pf2e-visioner-tile-cover-settings')).toHaveLength(1);
   });
 
+  test('GM can toggle a typed hidden-tile flag; players cannot edit it', () => {
+    const hook = getRenderTileConfigHook();
+    const originalUser = game.user;
+    const app = { document: { getFlag: jest.fn((_module, key) => key === 'hiddenTile') } };
+    try {
+      game.user = { ...originalUser, isGM: true };
+      const gmRoot = makeRoot();
+      hook(app, gmRoot);
+      const toggle = gmRoot.querySelector('[data-hidden-tile-toggle]');
+      const input = gmRoot.querySelector(`input[name="flags.${MODULE_ID}.hiddenTile"]`);
+      expect(toggle.checked).toBe(true);
+      expect(input.dataset.dtype).toBe('Boolean');
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      expect(input.value).toBe('false');
+
+      game.user = { ...originalUser, isGM: false };
+      const playerRoot = makeRoot();
+      hook(app, playerRoot);
+      expect(playerRoot.querySelector('[data-hidden-tile-toggle]')).toBeNull();
+      expect(playerRoot.querySelector(`input[name="flags.${MODULE_ID}.hiddenTile"]`)).toBeNull();
+    } finally {
+      game.user = originalUser;
+    }
+  });
+
+  test('GM can edit persisted tile Stealth DC; players cannot see the field', () => {
+    const hook = getRenderTileConfigHook();
+    const originalUser = game.user;
+    const app = {
+      document: {
+        getFlag: jest.fn((_module, key) => key === 'stealthDC' ? 22 : undefined),
+      },
+    };
+    try {
+      game.user = { ...originalUser, isGM: true };
+      const gmRoot = makeRoot();
+      hook(app, gmRoot);
+      const input = gmRoot.querySelector(`input[name="flags.${MODULE_ID}.stealthDC"]`);
+      expect(input?.type).toBe('number');
+      expect(input?.value).toBe('22');
+
+      game.user = { ...originalUser, isGM: false };
+      const playerRoot = makeRoot();
+      hook(app, playerRoot);
+      expect(playerRoot.querySelector(`input[name="flags.${MODULE_ID}.stealthDC"]`)).toBeNull();
+    } finally {
+      game.user = originalUser;
+    }
+  });
+
   test('ships row layout and state colors in loaded base stylesheet', () => {
     const css = fs.readFileSync(path.resolve(process.cwd(), 'styles/base.css'), 'utf8');
 

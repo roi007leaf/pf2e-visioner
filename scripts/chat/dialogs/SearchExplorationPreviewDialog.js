@@ -18,6 +18,7 @@ function getTargetId(target) {
 function getWallDisplayName(target) {
   const wall = target?._isWall ? target.wall : target;
   const doc = wall?.document;
+  if (target?._isTile) return doc?.getFlag?.(MODULE_ID, 'tileIdentifier') || 'Hidden Tile';
   const doorType = Number(doc?.door) || 0;
   return (
     doc?.getFlag?.(MODULE_ID, 'wallIdentifier') ||
@@ -31,7 +32,7 @@ function getTargetDisplay(target, resolveTokenImage) {
     const doorType = Number(wall?.document?.door) || 0;
     return {
       name: getWallDisplayName(target),
-      image: getWallImage(doorType),
+      image: target._isTile ? wall?.document?.texture?.src || 'icons/svg/mystery-man.svg' : getWallImage(doorType),
     };
   }
 

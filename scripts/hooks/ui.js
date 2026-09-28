@@ -1312,7 +1312,7 @@ export function registerUIHooks() {
               const action = await VisionerConfirmDialog.confirm({
                 title: 'Hidden Scene Visibility',
                 content:
-                  '<p>Set loot, hazards, and hidden walls to <strong>Hidden</strong> for current and future PC tokens, or clear that prep back to <strong>Observed</strong>.</p>',
+                  '<p>Set loot, hazards, hidden walls, and hidden tiles to <strong>Hidden</strong> for current and future PC tokens, or clear that prep back to <strong>Observed</strong>.</p>',
                 yes: 'Set Hidden',
                 yesValue: 'set-hidden',
                 no: 'Cancel',
@@ -1333,9 +1333,9 @@ export function registerUIHooks() {
                 );
                 const result = await initializeSceneHiddenForPCs();
 
-                if (result.tokenTargets === 0 && result.wallTargets === 0) {
+                if (result.tokenTargets === 0 && result.wallTargets === 0 && result.tileTargets === 0) {
                   ui.notifications?.warn?.(
-                    'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                    'PF2E Visioner: No loot tokens, hazards, hidden walls, or hidden tiles found.',
                   );
                 } else if (result.observers === 0) {
                   const prepParts = [];
@@ -1344,6 +1344,9 @@ export function registerUIHooks() {
                   }
                   if (result.wallDefaults > 0) {
                     prepParts.push(`${result.wallDefaults} hidden wall(s)`);
+                  }
+                  if (result.tileDefaults > 0) {
+                    prepParts.push(`${result.tileDefaults} hidden tile(s)`);
                   }
 
                   if (prepParts.length > 0) {
@@ -1355,7 +1358,7 @@ export function registerUIHooks() {
                   }
                 } else {
                   ui.notifications?.info?.(
-                    `PF2E Visioner: Set ${result.tokenPairs} token and ${result.wallEntries} wall visibility entries to Hidden for ${result.observers} PC token(s).`,
+                    `PF2E Visioner: Set ${result.tokenPairs} token, ${result.wallEntries} wall, and ${result.tileEntries} tile visibility entries to Hidden for ${result.observers} PC token(s).`,
                   );
                 }
               } else if (action === 'clear-prep') {
@@ -1367,14 +1370,15 @@ export function registerUIHooks() {
                 if (
                   result.tokenTargets === 0 &&
                   result.wallTargets === 0 &&
+                  result.tileTargets === 0 &&
                   result.actorPrepCleared === 0
                 ) {
                   ui.notifications?.warn?.(
-                    'PF2E Visioner: No loot tokens, hazards, or hidden walls found.',
+                    'PF2E Visioner: No loot tokens, hazards, hidden walls, or hidden tiles found.',
                   );
                 } else {
                   ui.notifications?.info?.(
-                    `PF2E Visioner: Cleared ${result.defaultsCleared} token prep default(s), ${result.wallDefaultsCleared} wall prep default(s), ${result.actorPrepCleared} actor prep result(s), ${result.tokenPairs} token visibility entries, and ${result.wallEntries} wall visibility entries for ${result.observers} PC token(s).`,
+                    `PF2E Visioner: Cleared ${result.defaultsCleared} token and ${result.wallDefaultsCleared} wall prep default(s); reset ${result.tileDefaultsCleared} tile prep default(s) to Observed. Cleared ${result.actorPrepCleared} actor prep result(s); set ${result.tokenPairs} token, ${result.wallEntries} wall, and ${result.tileEntries} tile visibility entries to Observed for ${result.observers} PC token(s).`,
                   );
                 }
               }

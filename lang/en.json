@@ -922,6 +922,10 @@
         "name": "Hidden Walls",
         "hint": "Allows configuring of walls conditional visibility states within the Visioner manager. Visual indicator when succeeding at Seek"
       },
+      "HIDDEN_TILES": {
+        "name": "Hidden Tiles",
+        "hint": "Hide marked tile artwork from players until an observer discovers it. GMs retain normal tile editing access."
+      },
       "EXTINGUISH_LIGHT_SWIMMING": {
         "name": "Extinguish Held Light When Swimming",
         "hint": "When a token's movement type changes to swimming, automatically turn off any lit held or worn light source (e.g. a torch)."
@@ -1322,6 +1326,7 @@
       "HAZARDS_LABEL": "Hazards",
       "LOOT_LABEL": "Loot",
       "HIDDEN_WALLS_LABEL": "Hidden Walls",
+      "HIDDEN_TILES_LABEL": "Hidden Tiles",
       "TAKING_COVER_HINT": "Taking cover against observers",
       "CEASELESS_SHADOWS_TAKE_COVER_TOOLTIP": "Ceaseless Shadows upgrades creature cover: lesser cover becomes standard cover, and standard cover becomes greater cover.",
       "SHOW_ONLY_CHANGES_LABEL": "Show only changes",

@@ -5,9 +5,19 @@ function splitSeekChanges(changes) {
   const actorPreparedTokenChanges = [];
   const actorPreparedWallChanges = [];
   const wallChangesByObserver = new Map();
+  const tileChangesByObserver = new Map();
 
   for (const change of changes) {
     if (change?.wallId) {
+      if (change.tileId) {
+        const observerId = change?.observer?.id;
+        if (!observerId) continue;
+        if (!tileChangesByObserver.has(observerId)) {
+          tileChangesByObserver.set(observerId, { observer: change.observer, tiles: new Map() });
+        }
+        tileChangesByObserver.get(observerId).tiles.set(change.tileId, change.newWallState);
+        continue;
+      }
       if (change?.observer?._isActorSearchSeeker) {
         actorPreparedWallChanges.push(change);
         continue;
@@ -35,6 +45,7 @@ function splitSeekChanges(changes) {
     actorPreparedTokenChanges,
     actorPreparedWallChanges,
     wallChangesByObserver,
+    tileChangesByObserver,
   };
 }
 
@@ -131,6 +142,21 @@ async function applyWallChanges(wallChangesByObserver, deps) {
   }
 }
 
+async function applyTileChanges(tileChangesByObserver, deps) {
+  if (!tileChangesByObserver.size) return;
+  const { refreshHiddenTileVisuals } = await import('../../../../services/Tiles/hidden-tile-visibility.js');
+  for (const { observer, tiles } of tileChangesByObserver.values()) {
+    const doc = observer?.document;
+    if (!doc) continue;
+    const next = { ...(doc.getFlag?.(MODULE_ID, 'tiles') || {}) };
+    for (const [tileId, state] of tiles) {
+      next[tileId] = normalizeWallState(state);
+    }
+    await doc.setFlag?.(MODULE_ID, 'tiles', next);
+  }
+  (deps.refreshTileVisuals || refreshHiddenTileVisuals)();
+}
+
 export async function applySeekChangesInternal(changes, deps = {}) {
   try {
     const {
@@ -138,11 +164,13 @@ export async function applySeekChangesInternal(changes, deps = {}) {
       actorPreparedTokenChanges,
       actorPreparedWallChanges,
       wallChangesByObserver,
+      tileChangesByObserver,
     } = splitSeekChanges(changes);
 
     await applyPreparedActorChanges(actorPreparedTokenChanges, actorPreparedWallChanges, deps);
     await applyTokenChanges(tokenChanges, deps);
     await applyWallChanges(wallChangesByObserver, deps);
+    await applyTileChanges(tileChangesByObserver, deps);
   } catch {
     return deps.applyBaseChanges?.(changes);
   }

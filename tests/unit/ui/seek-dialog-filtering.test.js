@@ -113,6 +113,19 @@ describe('seek dialog filtering', () => {
     expect(result).toEqual([{ _isWall: true, wallId: 'w1', overrideState: 'hidden' }]);
   });
 
+  test('Ignore Walls still shows hidden tile Seek rows', async () => {
+    const tile = { _isWall: true, _isTile: true, wallId: 'tile-1', tileId: 'tile-1' };
+    const wall = { _isWall: true, wallId: 'wall-1' };
+    const dialog = buildDialog({
+      _originalOutcomes: [tile, wall],
+      outcomes: [tile, wall],
+      ignoreWalls: true,
+      ignoreAllies: false,
+      filterByDetection: false,
+    });
+    expect(await getSeekDialogFilteredOutcomes(dialog)).toEqual([tile]);
+  });
+
   test('applies display-only visual filters', () => {
     const result = applySeekVisualFilters(
       [

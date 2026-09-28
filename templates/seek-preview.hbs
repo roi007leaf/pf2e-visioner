@@ -130,7 +130,7 @@
       </thead>
       <tbody>
         {{#each outcomes as |outcome|}}
-          <tr class="token-row" {{#unless outcome._isWall}}data-token-id="{{outcome.rowId}}" data-target-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}}>
+          <tr class="token-row {{#if outcome._isTile}}tile-row{{/if}}" {{#unless outcome._isWall}}data-token-id="{{outcome.rowId}}" data-target-id="{{outcome.target.id}}"{{/unless}} {{#if outcome._isWall}}data-wall-id="{{outcome.wallId}}"{{/if}} {{#if outcome._isTile}}data-tile-id="{{outcome.tileId}}"{{/if}}>
             <td class="token-image">
               {{#if ../searchExplorationGroup}}
                 <img src="{{outcome.searchExplorationObserverImage}}" data-tooltip="{{outcome.searchExplorationObserverName}}" width="28" height="28" />

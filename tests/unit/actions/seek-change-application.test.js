@@ -77,6 +77,23 @@ describe('seek change application', () => {
     expect(setPreparedActorWallVisibility).toHaveBeenCalledWith(seeker.actor, 'wall-a', 'observed');
   });
 
+  test('stores tile discoveries on the observer without changing wall visibility', async () => {
+    const setFlag = jest.fn().mockResolvedValue(undefined);
+    const observer = {
+      id: 'seeker',
+      document: { getFlag: jest.fn(() => ({ other: 'hidden' })), setFlag },
+    };
+    const refreshTileVisuals = jest.fn();
+    await applySeekChangesInternal(
+      [{ observer, wallId: 'tile-a', tileId: 'tile-a', newWallState: 'observed' }],
+      { refreshTileVisuals },
+    );
+    expect(setFlag).toHaveBeenCalledWith('pf2e-visioner', 'tiles', {
+      other: 'hidden', 'tile-a': 'observed',
+    });
+    expect(refreshTileVisuals).toHaveBeenCalledTimes(1);
+  });
+
   test('falls back to base change application when injected dependency throws', async () => {
     const changes = [{ target: { id: 'target' }, newVisibility: 'observed' }];
     const applyBaseChanges = jest.fn().mockResolvedValue('fallback');

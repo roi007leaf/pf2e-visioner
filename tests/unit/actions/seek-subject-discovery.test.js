@@ -66,6 +66,25 @@ describe('seek subject discovery', () => {
     expect(subjects).toEqual([hazard, loot]);
   });
 
+  test('discovers hidden tiles only while the feature is enabled', async () => {
+    const tile = {
+      id: 'tile-a',
+      center: { x: 0, y: 0 },
+      document: { getFlag: jest.fn((_module, key) => key === 'hiddenTile' ? true : undefined) },
+    };
+    const enabled = await discoverSeekSubjects(
+      { actor: makeToken('seeker') },
+      { ...baseDeps, tokens: [], walls: [], tiles: [tile], getSetting: key => key === 'hiddenTilesEnabled' ? true : 15 },
+    );
+    expect(enabled).toEqual([{ _isWall: true, _isTile: true, _isHiddenTile: true, wall: tile, dc: 15 }]);
+
+    const disabled = await discoverSeekSubjects(
+      { actor: makeToken('seeker') },
+      { ...baseDeps, tokens: [], walls: [], tiles: [tile] },
+    );
+    expect(disabled).toEqual([]);
+  });
+
   test('applies seek range limit to token subjects', async () => {
     const actor = makeToken('actor');
     const near = makeToken('near');

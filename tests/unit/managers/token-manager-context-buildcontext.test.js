@@ -363,6 +363,31 @@ describe('Token Manager Context Building - DC Display Fix', () => {
       expect(context.isObserverMode).toBe(true);
       expect(context.isTargetMode).toBe(false);
     });
+
+    test('shows hidden tiles with this observer state even without token targets', async () => {
+      require('../../../scripts/utils.js').getSceneTargets.mockReturnValue([]);
+      global.game.settings.get.mockImplementation((_moduleId, settingId) => {
+        if (settingId === 'hiddenTilesEnabled') return true;
+        if (settingId === 'wallStealthDC') return 15;
+        return false;
+      });
+      mockObserver.document.getFlag.mockImplementation((_moduleId, key) =>
+        key === 'tiles' ? { 'tile-a': 'observed' } : null);
+      global.canvas.tiles = {
+        placeables: [{ id: 'tile-a', document: {
+          id: 'tile-a', texture: { src: 'tile.webp' },
+          getFlag: jest.fn((_moduleId, key) => ({ hiddenTile: true, tileIdentifier: 'Secret floor', stealthDC: 21 })[key]),
+        } }],
+      };
+      const context = await buildContext(mockApp, {});
+      expect(context.hasTargets).toBe(true);
+      expect(context.includeTiles).toBe(true);
+      expect(context.tileTargets).toEqual([expect.objectContaining({
+        id: 'tile-a', identifier: 'Secret floor', img: 'tile.webp', dc: 21,
+        currentVisibilityState: 'observed',
+      })]);
+      expect(context.tileTargets[0].visibilityStates.find((state) => state.value === 'observed').selected).toBe(true);
+    });
   });
 
   describe('Canonical AVS Override Display', () => {

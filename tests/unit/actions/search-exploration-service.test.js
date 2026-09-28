@@ -157,6 +157,22 @@ describe('Search exploration Seek automation helpers', () => {
     expect(filtered).toEqual([hiddenWallSubject, hiddenLoot, hazard, hiddenNpc]);
   });
 
+  test('includes nearby hidden tiles as Search exploration candidates', async () => {
+    const { filterSearchExplorationSubjects } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    const seeker = createMockToken({ center: { x: 0, y: 0 } });
+    const nearby = {
+      _isWall: true, _isTile: true, _isHiddenTile: true,
+      wall: { id: 'near', center: { x: 100, y: 0 } },
+    };
+    const far = {
+      _isWall: true, _isTile: true, _isHiddenTile: true,
+      wall: { id: 'far', center: { x: 1000, y: 0 } },
+    };
+    expect(filterSearchExplorationSubjects([nearby, far], seeker, 30)).toEqual([nearby]);
+  });
+
   test('rolls Search exploration as blind GM roll', async () => {
     let rollOptions = null;
     const roll = { total: 17, dice: [{ total: 10, results: [{ result: 10 }] }] };
@@ -554,6 +570,28 @@ describe('Search exploration Seek automation helpers', () => {
     expect(
       rollOptions[0].message.flags['pf2e-visioner'].searchExploration.groupId,
     ).toEqual(expect.any(String));
+  });
+
+  test('hidden tile Search action rolls for a seeker and records the tile target', async () => {
+    const statisticRoll = jest.fn(async () => ({ total: 18, dice: [{ total: 11, results: [{ result: 11 }] }] }));
+    const tile = {
+      id: 'hidden-tile',
+      document: {
+        id: 'hidden-tile',
+        getFlag: jest.fn((_scope, key) => key === 'hiddenTile'),
+      },
+    };
+    const seeker = createMockToken({
+      id: 'searcher',
+      actor: createMockActor({ getStatistic: jest.fn(() => ({ roll: statisticRoll })) }),
+    });
+    const { runSearchExplorationForTile } = await import(
+      '../../../scripts/chat/services/search-exploration-service.js'
+    );
+    expect(await runSearchExplorationForTile(tile, { seekers: [seeker] })).toBe(1);
+    expect(statisticRoll).toHaveBeenCalledTimes(1);
+    expect(statisticRoll.mock.calls[0][0].message.flags['pf2e-visioner'].searchExploration)
+      .toMatchObject({ targetWallId: 'hidden-tile' });
   });
 
   test('wall tool action rolls for PC actors with Search active when no PC tokens are on the scene', async () => {

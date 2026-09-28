@@ -125,7 +125,7 @@ export async function getSeekDialogFilteredOutcomes(
 
   if (dialog.ignoreWalls === true) {
     filtered = Array.isArray(filtered)
-      ? filtered.filter((outcome) => !outcome?._isWall && !outcome?.wallId)
+      ? filtered.filter((outcome) => outcome?._isTile || (!outcome?._isWall && !outcome?.wallId))
       : filtered;
   }
 

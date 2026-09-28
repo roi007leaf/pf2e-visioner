@@ -75,6 +75,8 @@ export class VisionerTokenManager extends foundry.applications.api.ApplicationV2
       bulkHazardsGreaterCover: VisionerTokenManager.bulkSetCoverState,
       bulkWallsObserved: bulkSetWallState,
       bulkWallsHidden: bulkSetWallState,
+      bulkTilesObserved: bulkSetWallState,
+      bulkTilesHidden: bulkSetWallState,
       cancelTimer: VisionerTokenManager.cancelTimer,
       toggleTimersSection: VisionerTokenManager.toggleTimersSection,
       toggleRowTimer: VisionerTokenManager.toggleRowTimer,

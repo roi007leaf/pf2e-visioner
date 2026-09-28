@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.11.0] - 2026-09-28
+
+### Added
+
+- Hidden tiles support per-observer Hidden and Observed states, with player artwork hidden until discovery through Seek or Search Exploration.
+- Visioner Manager and Hidden Scene Visibility include hidden tiles. Tile configuration provides a Stealth DC and a Search Exploration action.
+- Observed hidden tiles display a translucent purple tint and an outline following the tile image's visible perimeter.
+
+### Fixed
+
+- Hidden-tile visibility refreshes after observer state changes so players and GM Observer View see the correct artwork and indicator.
+
+### Tests
+
+- Added regressions for hidden-tile visibility, lifecycle, indicators, Seek and Search discovery, manager state, tile configuration, and scene preparation.
+
 ## [8.10.10] - 2026-09-28
 
 ### Fixed

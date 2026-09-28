@@ -17,6 +17,16 @@ describe('Seek preview template wall row actions', () => {
     );
   });
 
+  test('tile Seek results retain tile identity while using working row actions', () => {
+    const template = fs.readFileSync(
+      path.resolve(process.cwd(), 'templates/seek-preview.hbs'), 'utf8',
+    );
+    expect(template).toContain('data-tile-id="{{outcome.tileId}}"');
+    expect(template).toContain('class="token-row {{#if outcome._isTile}}tile-row{{/if}}"');
+    expect(template).toContain('{{outcome.wallIdentifier}}');
+    expect(template).toContain('data-wall-id="{{outcome.wallId}}"');
+  });
+
   test('search exploration rows show only the seeker name in the Searcher column', () => {
     const template = fs.readFileSync(
       path.resolve(process.cwd(), 'templates/seek-preview.hbs'),

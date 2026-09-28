@@ -172,6 +172,7 @@ export async function buildContext(app, options) {
     integrateRollOutcome: !!game.settings.get(MODULE_ID, 'integrateRollOutcome'),
     autoVisibilityEnabled: !!game.settings.get(MODULE_ID, 'autoVisibilityEnabled'),
     hiddenWallsEnabled: !!game.settings.get(MODULE_ID, 'hiddenWallsEnabled'),
+    hiddenTilesEnabled: !!game.settings.get(MODULE_ID, 'hiddenTilesEnabled'),
     wallStealthDC: Number(game.settings.get(MODULE_ID, 'wallStealthDC')) || 15,
   };
   const coverStateBase = Object.entries(COVER_STATES).map(([key, config]) => ({
@@ -691,6 +692,34 @@ export async function buildContext(app, options) {
     }
   } catch {}
 
+  context.tileTargets = [];
+  context.includeTiles = false;
+  try {
+    if (context.isObserverMode && tokenManagerSettings.hiddenTilesEnabled) {
+      const tileMap = app.observer?.document?.getFlag?.(MODULE_ID, 'tiles') || {};
+      const defaultDC = tokenManagerSettings.wallStealthDC;
+      context.tileTargets = (canvas?.tiles?.placeables || [])
+        .filter((tile) => !!tile?.document?.getFlag?.(MODULE_ID, 'hiddenTile'))
+        .map((tile, index) => {
+          const document = tile.document;
+          const currentState = tileMap[document.id] === 'observed' ? 'observed' : 'hidden';
+          const identifier = document.getFlag?.(MODULE_ID, 'tileIdentifier');
+          const overrideDC = Number(document.getFlag?.(MODULE_ID, 'stealthDC'));
+          return {
+            id: document.id,
+            identifier: identifier && String(identifier).trim() ? String(identifier) : `Hidden Tile ${index + 1}`,
+            img: document.texture?.src || 'icons/svg/mystery-man.svg',
+            dc: Number.isFinite(overrideDC) && overrideDC > 0 ? overrideDC : defaultDC,
+            currentVisibilityState: currentState,
+            visibilityStates: ['hidden', 'observed'].map((key) =>
+              buildVisibilityStateContext(key, { selected: currentState === key }),
+            ),
+          };
+        });
+      context.includeTiles = context.tileTargets.length > 0;
+    }
+  } catch {}
+
   // Check if AVS is enabled to filter out 'avs' state from bulk actions
   const avsEnabled = tokenManagerSettings.autoVisibilityEnabled;
 
@@ -706,7 +735,7 @@ export async function buildContext(app, options) {
 
   context.coverStates = coverStateBase.map((state) => ({ key: state.value, ...state }));
 
-  context.hasTargets = allTargets.length > 0;
+  context.hasTargets = allTargets.length > 0 || context.includeWalls || context.includeTiles;
   context.hasPCs = context.pcTargets.length > 0;
   context.hasNPCs = context.npcTargets.length > 0;
   context.hasHazards = app.mode === 'observer' && context.hazardTargets.length > 0;

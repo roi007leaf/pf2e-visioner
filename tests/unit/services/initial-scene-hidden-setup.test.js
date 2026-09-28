@@ -73,6 +73,24 @@ function makeWall(id, options = {}) {
   return { id, document };
 }
 
+function makeTile(id, options = {}) {
+  const flags = { [MODULE_ID]: { hiddenTile: !!options.hiddenTile } };
+  const document = {
+    id,
+    getFlag: jest.fn((moduleId, key) => flags[moduleId]?.[key]),
+    setFlag: jest.fn(async (moduleId, key, value) => {
+      flags[moduleId] ||= {};
+      flags[moduleId][key] = value;
+      return value;
+    }),
+    unsetFlag: jest.fn(async (moduleId, key) => {
+      delete flags[moduleId]?.[key];
+      return true;
+    }),
+  };
+  return { id, document };
+}
+
 function makeActor(id, options = {}) {
   const flags = { ...(options.flags || {}) };
   return {
@@ -106,6 +124,7 @@ describe('initial scene hidden setup', () => {
     game.user.isGM = true;
     canvas.tokens.placeables = [];
     canvas.walls.placeables = [];
+    canvas.tiles = { placeables: [] };
     canvas.walls.get = jest.fn((id) => canvas.walls.placeables.find((wall) => wall.id === id));
     canvas.scene.walls = {
       get: jest.fn((id) => canvas.walls.placeables.find((wall) => wall.id === id)?.document),
@@ -128,6 +147,39 @@ describe('initial scene hidden setup', () => {
     expect(targets.observers).toEqual([pc]);
     expect(targets.tokenTargets).toEqual([loot, hazard]);
     expect(targets.wallTargets).toEqual([hiddenWall]);
+  });
+
+  test('prepares hidden tiles for current and future PC tokens and clears them to Observed', async () => {
+    const pc = makeToken('pc', 'character', { hasPlayerOwner: true });
+    const futurePc = makeToken('future-pc', 'character', { hasPlayerOwner: true });
+    futurePc.document.actor = futurePc.actor;
+    const hiddenTile = makeTile('secret', { hiddenTile: true });
+    const ordinaryTile = makeTile('ordinary');
+    const options = { tokens: [pc], walls: [], tiles: [hiddenTile, ordinaryTile] };
+
+    expect(getInitialHiddenSceneTargets(options).tileTargets).toEqual([hiddenTile]);
+    const prepared = await initializeSceneHiddenForPCs(options);
+    expect(prepared).toMatchObject({ tileTargets: 1, tileDefaults: 1, tileEntries: 1 });
+    expect(hiddenTile.document.getFlag(MODULE_ID, 'defaultPlayerTileVisibility')).toBe('hidden');
+    expect(pc.document.getFlag(MODULE_ID, 'tiles')).toEqual({ secret: 'hidden' });
+
+    const service = await import('../../../scripts/services/initial-scene-hidden-setup.js');
+    await service.applyDefaultPlayerVisibilityForToken(futurePc.document, {
+      tokens: [futurePc], walls: [], tiles: [hiddenTile, ordinaryTile],
+    });
+    expect(futurePc.document.getFlag(MODULE_ID, 'tiles')).toEqual({ secret: 'hidden' });
+
+    const cleared = await clearSceneHiddenForPCs(options);
+    expect(cleared).toMatchObject({ tileTargets: 1, tileDefaultsCleared: 1, tileEntries: 1 });
+    expect(hiddenTile.document.getFlag(MODULE_ID, 'defaultPlayerTileVisibility')).toBe('observed');
+    expect(pc.document.getFlag(MODULE_ID, 'tiles')).toEqual({ secret: 'observed' });
+
+    const laterPc = makeToken('later-pc', 'character', { hasPlayerOwner: true });
+    laterPc.document.actor = laterPc.actor;
+    await service.applyDefaultPlayerVisibilityForToken(laterPc.document, {
+      tokens: [laterPc], walls: [], tiles: [hiddenTile, ordinaryTile],
+    });
+    expect(laterPc.document.getFlag(MODULE_ID, 'tiles')).toEqual({ secret: 'observed' });
   });
 
   test('sets all loot tokens, hazards, and hidden walls hidden to all PCs', async () => {

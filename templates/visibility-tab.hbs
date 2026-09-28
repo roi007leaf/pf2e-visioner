@@ -28,6 +28,49 @@
         </div>
       {{/if}}
 
+      {{!-- Hidden Tiles Table --}}
+      {{#if includeTiles}}
+        <div class="table-section tiles-section">
+          <div class="table-section-header">
+            <div class="header-left">
+              <i class="fas fa-border-all"></i>
+              <span>{{localize "PF2E_VISIONER.UI.HIDDEN_TILES_LABEL"}}</span>
+            </div>
+            <div class="bulk-actions-header">
+              <button type="button" class="bulk-state-header visibility-observed" data-action="bulkTilesObserved" data-state="observed" data-target-type="tiles" data-tooltip="Set all tiles Observed"><i class="fas fa-eye"></i></button>
+              <button type="button" class="bulk-state-header visibility-hidden" data-action="bulkTilesHidden" data-state="hidden" data-target-type="tiles" data-tooltip="Set all tiles Hidden"><i class="fas fa-eye-slash"></i></button>
+            </div>
+          </div>
+          <div class="visibility-table-container">
+            <table class="visibility-table">
+              <thead><tr>
+                <th class="token-image">Tile</th>
+                <th class="token-name">{{localize "PF2E_VISIONER.UI.IDENTIFIER"}}</th>
+                <th class="visibility-state">{{localize "PF2E_VISIONER.TOKEN_MANAGER.VISIBILITY_STATE"}}</th>
+                <th class="dc-column">{{localize "PF2E_VISIONER.UI.DC"}}</th>
+              </tr></thead>
+              <tbody>
+                {{#each tileTargets as |tile|}}
+                  <tr class="token-row tile-row" data-tile-id="{{tile.id}}">
+                    <td class="token-image"><img src="{{tile.img}}" width="28" height="28" /></td>
+                    <td class="token-name"><strong>{{tile.identifier}}</strong></td>
+                    <td class="visibility-state">
+                      <div class="icon-selection" data-target="{{tile.id}}">
+                        {{#each tile.visibilityStates as |state|}}
+                          <button type="button" class="state-icon {{#if state.selected}}selected{{/if}} {{state.cssClass}}" data-state="{{state.value}}" data-target="{{tile.id}}" data-tooltip="{{state.label}}"><i class="{{state.icon}}"></i></button>
+                        {{/each}}
+                        <input type="hidden" name="tiles.{{tile.id}}" value="{{tile.currentVisibilityState}}" />
+                      </div>
+                    </td>
+                    <td class="dc-column"><span class="dc-value">{{tile.dc}}</span></td>
+                  </tr>
+                {{/each}}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {{/if}}
+
       {{!-- NPCs Table --}}
       {{#if hasNPCs}}
         <div class="table-section">

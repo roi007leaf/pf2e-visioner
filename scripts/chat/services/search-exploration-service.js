@@ -302,6 +302,7 @@ function getSearchTargetId(target) {
 function getSearchTargetName(target) {
   if (target?._isWall) {
     const wall = target.wall;
+    if (target._isTile) return wall?.document?.getFlag?.(MODULE_ID, 'tileIdentifier') || 'Hidden Tile';
     const doorType = Number(wall?.document?.door) || 0;
     return (
       wall?.document?.getFlag?.(MODULE_ID, 'wallIdentifier') ||
@@ -464,7 +465,7 @@ function tokenHasHiddenState(token) {
 
 export function isSearchExplorationCandidate(subject) {
   try {
-    if (subject?._isWall) return !!subject._isHiddenWall;
+    if (subject?._isWall) return !!(subject._isHiddenWall || subject._isHiddenTile);
 
     const actorType = subject?.actor?.type;
     if (actorType === 'hazard') return hasConfiguredStealthDC(subject);
@@ -497,6 +498,14 @@ export function isSearchExplorationHudTarget(token) {
 export function isSearchExplorationWallTarget(wall) {
   try {
     return !!(game?.user?.isGM && wall?.document?.getFlag?.(MODULE_ID, 'hiddenWall'));
+  } catch {
+    return false;
+  }
+}
+
+export function isSearchExplorationTileTarget(tile) {
+  try {
+    return !!(game?.user?.isGM && tile?.document?.getFlag?.(MODULE_ID, 'hiddenTile'));
   } catch {
     return false;
   }
@@ -836,6 +845,24 @@ export async function runSearchExplorationForWall(wall, options = {}) {
   }
 }
 
+export async function runSearchExplorationForTile(tile, options = {}) {
+  if (!isSearchExplorationTileTarget(tile)) {
+    ui.notifications?.warn?.('PF2E Visioner: Selected tile is not a hidden tile.');
+    return 0;
+  }
+  const seekers = options.seekers || getSearchExplorationSeekers(null);
+  if (!seekers.length) {
+    ui.notifications?.warn?.('PF2E Visioner: No player characters have Search as their active exploration activity.');
+    return 0;
+  }
+  const targetWall = { _isWall: true, _isTile: true, _isHiddenTile: true, wall: tile, dc: getWallStealthDC(tile) };
+  const groupId = options.groupId || createSearchExplorationGroupId(targetWall);
+  for (const seeker of seekers) {
+    await rollSearchPerception(seeker, { ...options, targetWall, groupId });
+  }
+  return seekers.length;
+}
+
 function getSearchExplorationFlagFromMessage(message) {
   return message?.flags?.[MODULE_ID]?.searchExploration || null;
 }
@@ -918,6 +945,13 @@ function resolveTokenById(tokenId) {
 
 function resolveWallById(wallId) {
   if (!wallId) return null;
+  const tile =
+    canvas?.tiles?.get?.(wallId) ||
+    canvas?.tiles?.placeables?.find?.((candidate) => getWallId(candidate) === wallId) ||
+    null;
+  if (tile?.document?.getFlag?.(MODULE_ID, 'hiddenTile')) {
+    return { _isWall: true, _isTile: true, _isHiddenTile: true, wall: tile, dc: getWallStealthDC(tile) };
+  }
   const wall =
     canvas?.walls?.get?.(wallId) ||
     canvas?.walls?.placeables?.find?.((candidate) => getWallId(candidate) === wallId) ||

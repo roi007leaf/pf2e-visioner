@@ -11,6 +11,7 @@ import { onCanvasReady, onReady } from './lifecycle.js';
 import { registerMovementCostHooks } from './movement-cost.js';
 import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
+import { registerHiddenTileHooks } from '../services/Tiles/hidden-tile-visibility.js';
 import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
 import { handleDefeatEffectCreated } from '../services/defeated-actor-cleanup.js';
 import {
@@ -117,6 +118,7 @@ export async function registerHooks() {
 
   // UI hues
   registerUIHooks();
+  registerHiddenTileHooks();
   registerCombatHooks();
   await initializeDeferredSeekManager();
   AutoCoverHooks.registerHooks();

@@ -389,8 +389,8 @@ export async function analyzeSeekOutcome(actionData, subject, deps = {}) {
   try {
     newVisibility =
       featsHandler?.adjustVisibility?.('seek', actionData.actor, effectiveCurrent, newVisibility, {
-        subjectType: subject?._isWall ? 'wall' : subject?.actor?.type,
-        isHiddenWall: !!subject?._isWall,
+        subjectType: subject?._isTile ? 'tile' : subject?._isWall ? 'wall' : subject?.actor?.type,
+        isHiddenWall: !!subject?._isHiddenWall,
         outcome,
       }) ?? newVisibility;
   } catch {}

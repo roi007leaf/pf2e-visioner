@@ -4,6 +4,7 @@ import { expandWallIdWithConnected } from './Walls/connected-walls.js';
 
 export const DEFAULT_PLAYER_VISIBILITY_FLAG = 'defaultPlayerVisibility';
 export const DEFAULT_PLAYER_WALL_VISIBILITY_FLAG = 'defaultPlayerWallVisibility';
+export const DEFAULT_PLAYER_TILE_VISIBILITY_FLAG = 'defaultPlayerTileVisibility';
 export const PREPARED_SCENE_VISIBILITY_FLAG = 'preparedSceneVisibility';
 
 function actorIsType(actor, type) {
@@ -26,6 +27,10 @@ function getWallId(wall) {
   return wall?.document?.id || wall?.id || null;
 }
 
+function getTileId(tile) {
+  return tile?.document?.id || tile?.id || null;
+}
+
 function getTokenDocument(tokenOrDocument) {
   if (typeof tokenOrDocument?.document?.getFlag === 'function') return tokenOrDocument.document;
   if (typeof tokenOrDocument?.getFlag === 'function') return tokenOrDocument;
@@ -40,6 +45,15 @@ function getWallDocument(wallOrDocument) {
   if (typeof wallOrDocument?.getFlag === 'function') return wallOrDocument;
   if (typeof wallOrDocument?.object?.document?.getFlag === 'function') {
     return wallOrDocument.object.document;
+  }
+  return null;
+}
+
+function getTileDocument(tileOrDocument) {
+  if (typeof tileOrDocument?.document?.getFlag === 'function') return tileOrDocument.document;
+  if (typeof tileOrDocument?.getFlag === 'function') return tileOrDocument;
+  if (typeof tileOrDocument?.object?.document?.getFlag === 'function') {
+    return tileOrDocument.object.document;
   }
   return null;
 }
@@ -259,6 +273,39 @@ export async function setDefaultPlayerWallVisibility(wallOrDocument, state) {
   return false;
 }
 
+export function getDefaultPlayerTileVisibility(tileOrDocument) {
+  const state = getTileDocument(tileOrDocument)?.getFlag?.(
+    MODULE_ID,
+    DEFAULT_PLAYER_TILE_VISIBILITY_FLAG,
+  );
+  return state === 'hidden' || state === 'observed' ? state : null;
+}
+
+export async function setDefaultPlayerTileVisibility(tileOrDocument, state) {
+  const doc = getTileDocument(tileOrDocument);
+  if (!doc) return false;
+  if (state === 'hidden' || state === 'observed') {
+    await doc.setFlag?.(MODULE_ID, DEFAULT_PLAYER_TILE_VISIBILITY_FLAG, state);
+    return true;
+  }
+  return false;
+}
+
+async function setTileVisibility(observer, tileTargets, state) {
+  const doc = observer?.document;
+  if (!doc?.setFlag) return 0;
+  const next = { ...(doc.getFlag?.(MODULE_ID, 'tiles') || {}) };
+  let changed = 0;
+  for (const tile of tileTargets) {
+    const id = getTileId(tile);
+    if (!id || next[id] === state) continue;
+    next[id] = state;
+    changed += 1;
+  }
+  if (changed) await doc.setFlag(MODULE_ID, 'tiles', next);
+  return changed;
+}
+
 export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, options = {}) {
   if (!game?.user?.isGM) {
     return {
@@ -266,6 +313,8 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
       targetDefaults: 0,
       wallDefaults: 0,
       wallEntries: 0,
+      tileDefaults: 0,
+      tileEntries: 0,
       actorTokenEntries: 0,
       actorWallEntries: 0,
     };
@@ -273,6 +322,7 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
 
   const tokens = getPlaceables({ placeables: options.tokens || getPlaceables(canvas?.tokens) });
   const walls = getPlaceables({ placeables: options.walls || getPlaceables(canvas?.walls) });
+  const tiles = getPlaceables({ placeables: options.tiles || getPlaceables(canvas?.tiles) });
   const observer = resolveToken(tokenOrDocument, tokens);
   const observerId = getTokenId(observer);
 
@@ -282,6 +332,8 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
       targetDefaults: 0,
       wallDefaults: 0,
       wallEntries: 0,
+      tileDefaults: 0,
+      tileEntries: 0,
       actorTokenEntries: 0,
       actorWallEntries: 0,
     };
@@ -316,6 +368,14 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
   }
 
   const wallEntries = await setHiddenWallVisibility(observer, defaultWallTargets, walls);
+  const defaultTileTargets = tiles.filter(tile =>
+    !!getTileId(tile) && !!getTileDocument(tile)?.getFlag?.(MODULE_ID, 'hiddenTile'));
+  const hiddenTileTargets = defaultTileTargets.filter(tile =>
+    getDefaultPlayerTileVisibility(tile) === 'hidden');
+  const observedTileTargets = defaultTileTargets.filter(tile =>
+    getDefaultPlayerTileVisibility(tile) === 'observed');
+  const tileEntries = await setTileVisibility(observer, hiddenTileTargets, 'hidden') +
+    await setTileVisibility(observer, observedTileTargets, 'observed');
   const actorPreparedVisibility = getPreparedSceneVisibilityMap(observer, options);
 
   for (const target of tokens) {
@@ -343,6 +403,8 @@ export async function applyDefaultPlayerVisibilityForToken(tokenOrDocument, opti
     targetDefaults,
     wallDefaults,
     wallEntries,
+    tileDefaults: hiddenTileTargets.length + observedTileTargets.length,
+    tileEntries,
     actorTokenEntries,
     actorWallEntries,
   };
@@ -406,6 +468,7 @@ function expandWallIdsWithExplicitWalls(wallId, walls) {
 export function getInitialHiddenSceneTargets({
   tokens = getPlaceables(canvas?.tokens),
   walls = getPlaceables(canvas?.walls),
+  tiles = getPlaceables(canvas?.tiles),
 } = {}) {
   const observers = tokens.filter((token) => {
     const actor = token?.actor;
@@ -425,7 +488,11 @@ export function getInitialHiddenSceneTargets({
     (wall) => !!getWallId(wall) && !!wall?.document?.getFlag?.(MODULE_ID, 'hiddenWall'),
   );
 
-  return { observers, tokenTargets, wallTargets };
+  const tileTargets = tiles.filter(
+    tile => !!getTileId(tile) && !!getTileDocument(tile)?.getFlag?.(MODULE_ID, 'hiddenTile'),
+  );
+
+  return { observers, tokenTargets, wallTargets, tileTargets };
 }
 
 async function setHiddenWallVisibility(observer, wallTargets, allWalls) {
@@ -546,18 +613,23 @@ export async function initializeSceneHiddenForPCs(options = {}) {
       observers: 0,
       tokenTargets: 0,
       wallTargets: 0,
+      tileTargets: 0,
       tokenPairs: 0,
       wallEntries: 0,
       wallDefaults: 0,
+      tileEntries: 0,
+      tileDefaults: 0,
       foundryUnhidden: 0,
     };
   }
 
   const allWalls = options.walls || getPlaceables(canvas?.walls);
-  const { observers, tokenTargets, wallTargets } = getInitialHiddenSceneTargets(options);
+  const { observers, tokenTargets, wallTargets, tileTargets } = getInitialHiddenSceneTargets(options);
   let tokenPairs = 0;
   let wallEntries = 0;
   let wallDefaults = 0;
+  let tileEntries = 0;
+  let tileDefaults = 0;
   let foundryUnhidden = 0;
 
   for (const target of tokenTargets) {
@@ -567,6 +639,10 @@ export async function initializeSceneHiddenForPCs(options = {}) {
 
   for (const wall of wallTargets) {
     if (await setDefaultPlayerWallVisibility(wall, 'hidden')) wallDefaults += 1;
+  }
+
+  for (const tile of tileTargets) {
+    if (await setDefaultPlayerTileVisibility(tile, 'hidden')) tileDefaults += 1;
   }
 
   for (const observer of observers) {
@@ -582,6 +658,12 @@ export async function initializeSceneHiddenForPCs(options = {}) {
     }
 
     wallEntries += await setHiddenWallVisibility(observer, wallTargets, allWalls);
+    tileEntries += await setTileVisibility(observer, tileTargets, 'hidden');
+  }
+
+  if (tileEntries) {
+    const { refreshHiddenTileVisuals } = await import('./Tiles/hidden-tile-visibility.js');
+    refreshHiddenTileVisuals();
   }
 
   try {
@@ -589,9 +671,12 @@ export async function initializeSceneHiddenForPCs(options = {}) {
       observers: observers.length,
       tokenTargets: tokenTargets.length,
       wallTargets: wallTargets.length,
+      tileTargets: tileTargets.length,
       tokenPairs,
       wallEntries,
       wallDefaults,
+      tileEntries,
+      tileDefaults,
       foundryUnhidden,
     });
   } catch {
@@ -602,9 +687,12 @@ export async function initializeSceneHiddenForPCs(options = {}) {
     observers: observers.length,
     tokenTargets: tokenTargets.length,
     wallTargets: wallTargets.length,
+    tileTargets: tileTargets.length,
     tokenPairs,
     wallEntries,
     wallDefaults,
+    tileEntries,
+    tileDefaults,
     foundryUnhidden,
   };
 }
@@ -615,20 +703,25 @@ export async function clearSceneHiddenForPCs(options = {}) {
       observers: 0,
       tokenTargets: 0,
       wallTargets: 0,
+      tileTargets: 0,
       tokenPairs: 0,
       wallEntries: 0,
       defaultsCleared: 0,
       wallDefaultsCleared: 0,
+      tileEntries: 0,
+      tileDefaultsCleared: 0,
       actorPrepCleared: 0,
     };
   }
 
   const allWalls = options.walls || getPlaceables(canvas?.walls);
-  const { observers, tokenTargets, wallTargets } = getInitialHiddenSceneTargets(options);
+  const { observers, tokenTargets, wallTargets, tileTargets } = getInitialHiddenSceneTargets(options);
   let tokenPairs = 0;
   let wallEntries = 0;
   let defaultsCleared = 0;
   let wallDefaultsCleared = 0;
+  let tileEntries = 0;
+  let tileDefaultsCleared = 0;
   const actorPrepCleared = await clearPreparedActorSceneVisibility(options);
 
   for (const target of tokenTargets) {
@@ -645,6 +738,13 @@ export async function clearSceneHiddenForPCs(options = {}) {
     }
   }
 
+  for (const tile of tileTargets) {
+    if (getDefaultPlayerTileVisibility(tile) !== 'observed') {
+      await setDefaultPlayerTileVisibility(tile, 'observed');
+      tileDefaultsCleared += 1;
+    }
+  }
+
   for (const observer of observers) {
     for (const target of tokenTargets) {
       if (!getTokenId(observer) || !getTokenId(target) || getTokenId(observer) === getTokenId(target)) {
@@ -658,6 +758,12 @@ export async function clearSceneHiddenForPCs(options = {}) {
     }
 
     wallEntries += await clearHiddenWallVisibility(observer, wallTargets, allWalls);
+    tileEntries += await setTileVisibility(observer, tileTargets, 'observed');
+  }
+
+  if (tileEntries) {
+    const { refreshHiddenTileVisuals } = await import('./Tiles/hidden-tile-visibility.js');
+    refreshHiddenTileVisuals();
   }
 
   try {
@@ -665,10 +771,13 @@ export async function clearSceneHiddenForPCs(options = {}) {
       observers: observers.length,
       tokenTargets: tokenTargets.length,
       wallTargets: wallTargets.length,
+      tileTargets: tileTargets.length,
       tokenPairs,
       wallEntries,
       defaultsCleared,
       wallDefaultsCleared,
+      tileEntries,
+      tileDefaultsCleared,
       actorPrepCleared,
     });
   } catch {
@@ -679,10 +788,13 @@ export async function clearSceneHiddenForPCs(options = {}) {
     observers: observers.length,
     tokenTargets: tokenTargets.length,
     wallTargets: wallTargets.length,
+    tileTargets: tileTargets.length,
     tokenPairs,
     wallEntries,
     defaultsCleared,
     wallDefaultsCleared,
+    tileEntries,
+    tileDefaultsCleared,
     actorPrepCleared,
   };
 }

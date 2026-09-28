@@ -58,6 +58,19 @@ function makeWall(id, options = {}) {
   return { id, document };
 }
 
+function makeTile(id, hiddenTile = true) {
+  const flags = { [MODULE_ID]: { hiddenTile } };
+  const document = {
+    id,
+    getFlag: jest.fn((moduleId, key) => flags[moduleId]?.[key]),
+    setFlag: jest.fn(async (moduleId, key, value) => {
+      flags[moduleId][key] = value;
+      return value;
+    }),
+  };
+  return { id, document };
+}
+
 describe('initial scene hidden setup token tool', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -67,6 +80,7 @@ describe('initial scene hidden setup token tool', () => {
     game.settings.set(MODULE_ID, 'playerPeekBlockMode', 'none');
     canvas.tokens.placeables = [];
     canvas.walls.placeables = [];
+    canvas.tiles = { placeables: [] };
   });
 
   test('adds a single GM token tool for hidden scene visibility actions', () => {
@@ -184,6 +198,28 @@ describe('initial scene hidden setup token tool', () => {
       'PF2E Visioner: Prepared 1 hidden wall(s) as Hidden for future PC token(s).',
     );
     expect(hiddenWall.document.getFlag(MODULE_ID, 'defaultPlayerWallVisibility')).toBe('hidden');
+  });
+
+  test('dialog prepares hidden tiles even when no PC tokens are placed', async () => {
+    const hook = getSceneControlsHook();
+    const controls = [{ name: 'tokens', tools: [] }];
+    const hiddenTile = makeTile('secret');
+    canvas.tiles.placeables = [hiddenTile, makeTile('ordinary', false)];
+    jest.spyOn(VisionerConfirmDialog, 'confirm').mockResolvedValue('set-hidden');
+
+    hook(controls);
+    const tool = controls[0].tools.find(
+      candidate => candidate.name === 'pf2e-visioner-hidden-scene-visibility',
+    );
+    await tool.onChange();
+
+    expect(VisionerConfirmDialog.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('hidden tiles'),
+    }));
+    expect(hiddenTile.document.getFlag(MODULE_ID, 'defaultPlayerTileVisibility')).toBe('hidden');
+    expect(ui.notifications.info).toHaveBeenCalledWith(
+      'PF2E Visioner: Prepared 1 hidden tile(s) as Hidden for future PC token(s).',
+    );
   });
 
   test('adds a GM wall tool for Search exploration against selected hidden walls', () => {

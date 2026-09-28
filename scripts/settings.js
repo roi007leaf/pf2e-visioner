@@ -50,6 +50,7 @@ const SETTINGS_GROUPS = {
     },
     { title: 'Hidden Loot Actors', keys: ['includeLootActors', 'lootStealthDC'] },
     { title: 'Hidden Walls', keys: ['hiddenWallsEnabled', 'wallStealthDC'] },
+    { title: 'Hidden Tiles', keys: ['hiddenTilesEnabled'] },
     {
       title: 'Advanced Seek Options',
       keys: [
@@ -677,6 +678,11 @@ export function registerSettings() {
             const { updateWallVisuals } = await import('./services/visual-effects.js');
             await updateWallVisuals();
           } catch { }
+        };
+      } else if (key === 'hiddenTilesEnabled') {
+        settingConfig.onChange = async () => {
+          const { refreshHiddenTileVisuals } = await import('./services/Tiles/hidden-tile-visibility.js');
+          refreshHiddenTileVisuals();
         };
       } else if (key === 'tooltipFontSize') {
         settingConfig.onChange = (value) => {

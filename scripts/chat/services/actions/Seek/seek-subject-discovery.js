@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../../../constants.js';
 import { buildHiddenWallSeekSubjects, calculateDistanceToWall } from './seek-wall-subjects.js';
+import { buildHiddenTileSeekSubjects } from './seek-tile-subjects.js';
 
 async function loadSharedUtils(deps) {
   if (deps.shouldFilterAlly && deps.hasActiveEncounter && deps.calculateTokenDistance) {
@@ -85,10 +86,14 @@ export async function discoverSeekSubjects(actionData, deps = {}) {
   const shared = await loadSharedUtils(deps);
   const allTokens = deps.tokens || canvas?.tokens?.placeables || [];
   const allWalls = deps.walls || canvas?.walls?.placeables || [];
+  const allTiles = deps.tiles || canvas?.tiles?.placeables || [];
   const defaultWallDC = Number(getSetting(deps, 'wallStealthDC')) || 15;
 
   let subjects = discoverTokenSubjects(actionData, allTokens, shared.shouldFilterAlly);
   subjects = appendHiddenWallSubjects(subjects, allWalls, defaultWallDC);
+  if (getSetting(deps, 'hiddenTilesEnabled') !== false) {
+    subjects = subjects.concat(buildHiddenTileSeekSubjects(allTiles, defaultWallDC));
+  }
 
   return applySeekRangeFilter(subjects, actionData, {
     ...deps,

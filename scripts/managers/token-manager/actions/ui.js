@@ -429,7 +429,7 @@ export async function bulkSetWallState(event, button) {
   try {
     const state = button.dataset.state;
     const targetType = button.dataset.targetType;
-    if (!state || targetType !== 'walls') {
+    if (!state || !['walls', 'tiles'].includes(targetType)) {
       return;
     }
 

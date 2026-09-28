@@ -15,16 +15,17 @@ export function buildHiddenWallSeekSubjects(walls, defaultWallDC) {
 export function getSeekWallCurrentVisibility(actionData, subject) {
   try {
     const observerToken = actionData.actorToken || actionData.actor;
-    let map = observerToken?.document?.getFlag?.(MODULE_ID, 'walls') || {};
+    const flagKey = subject?._isTile ? 'tiles' : 'walls';
+    let map = observerToken?.document?.getFlag?.(MODULE_ID, flagKey) || {};
 
-    if (Object.keys(map).length === 0 && observerToken?.actor?.id) {
+    if (!subject?._isTile && Object.keys(map).length === 0 && observerToken?.actor?.id) {
       const actorId = observerToken.actor.id;
       const allTokensOfSameActor = (canvas?.tokens?.placeables || []).filter(
         (token) => token.actor?.id === actorId,
       );
 
       for (const token of allTokensOfSameActor) {
-        const tokenMap = token.document?.getFlag?.(MODULE_ID, 'walls') || {};
+        const tokenMap = token.document?.getFlag?.(MODULE_ID, flagKey) || {};
         if (Object.keys(tokenMap).length > 0) {
           map = tokenMap;
           break;
@@ -44,6 +45,17 @@ export async function buildSeekWallMetadata(subject) {
   try {
     const d = subject.wall?.document;
     const doorType = Number(d?.door) || 0;
+    if (subject._isTile) {
+      return {
+        _isWall: true,
+        _isTile: true,
+        wall: subject.wall,
+        wallId: subject.wall?.id,
+        tileId: subject.wall?.id,
+        wallIdentifier: d?.getFlag?.(MODULE_ID, 'tileIdentifier') || 'Hidden Tile',
+        wallImg: d?.texture?.src || 'icons/svg/mystery-man.svg',
+      };
+    }
     const name =
       d?.getFlag?.(MODULE_ID, 'wallIdentifier') ||
       (doorType === 2 ? 'Hidden Secret Door' : doorType === 1 ? 'Hidden Door' : 'Hidden Wall');

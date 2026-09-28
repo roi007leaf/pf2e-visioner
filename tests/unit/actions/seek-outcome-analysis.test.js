@@ -1,4 +1,5 @@
 import { analyzeSeekOutcome } from '../../../scripts/chat/services/actions/Seek/seek-outcome-analysis.js';
+import { buildSeekWallMetadata, getSeekWallCurrentVisibility } from '../../../scripts/chat/services/actions/Seek/seek-wall-subjects.js';
 
 describe('seek outcome analysis', () => {
   function makeActionData() {
@@ -51,6 +52,27 @@ describe('seek outcome analysis', () => {
       usedSensePrecision: 'precise',
     });
     expect(recordSenseUsed).toHaveBeenCalledWith('vision', 'precise');
+  });
+
+  test('tile discovery uses only this observer and returns a tile change', async () => {
+    const tile = {
+      id: 'tile-a',
+      document: { texture: { src: 'tile.webp' }, getFlag: jest.fn(() => undefined) },
+    };
+    const subject = { _isWall: true, _isTile: true, _isHiddenTile: true, wall: tile, dc: 15 };
+    const actionData = {
+      ...makeActionData(),
+      actorToken: { id: 'seeker', document: { getFlag: jest.fn(() => ({})) }, actor: { id: 'actor' } },
+    };
+    expect(getSeekWallCurrentVisibility(actionData, subject)).toBe('hidden');
+    const result = await analyzeSeekOutcome(actionData, subject, baseDeps({
+      getSeekWallCurrentVisibility,
+      buildSeekWallMetadata,
+    }));
+    expect(result).toMatchObject({
+      wallId: 'tile-a', tileId: 'tile-a', currentVisibility: 'hidden',
+      newVisibility: 'observed', changed: true, wallImg: 'tile.webp',
+    });
   });
 
   test('unmet sense condition returns blocked outcome', async () => {

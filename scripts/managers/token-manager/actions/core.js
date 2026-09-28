@@ -55,6 +55,27 @@ function computeAllowedTokenIds(app) {
   }
 }
 
+export async function persistObserverTileStates(observer, changes = {}) {
+  const document = observer?.document;
+  if (!document || !Object.keys(changes).length) return false;
+  const current = document.getFlag?.(MODULE_ID, 'tiles') || {};
+  const next = { ...current };
+  let changed = false;
+  for (const [tileId, state] of Object.entries(changes)) {
+    if (state !== 'hidden' && state !== 'observed') continue;
+    const tile = canvas?.tiles?.get?.(tileId) || canvas?.tiles?.placeables?.find?.((item) => item.id === tileId);
+    if (!tile?.document?.getFlag?.(MODULE_ID, 'hiddenTile')) continue;
+    if (next[tileId] === state) continue;
+    next[tileId] = state;
+    changed = true;
+  }
+  if (!changed) return false;
+  await document.setFlag(MODULE_ID, 'tiles', next);
+  const { refreshHiddenTileVisuals } = await import('../../../services/Tiles/hidden-tile-visibility.js');
+  refreshHiddenTileVisuals();
+  return true;
+}
+
 /**
  * ApplicationV2 form handler
  * @param {*} event - Form submission event
@@ -69,6 +90,7 @@ export async function formHandler(event, form, formData, options = {}) {
   const visibilityChanges = {};
   const coverChanges = {};
   const wallVisibilityChanges = {};
+  const tileVisibilityChanges = {};
 
   // Respect all filters using scene-level computation
   const allowedTokenIds = computeAllowedTokenIds(app);
@@ -91,6 +113,9 @@ export async function formHandler(event, form, formData, options = {}) {
     } else if (key.startsWith('walls.')) {
       const wallId = key.replace('walls.', '');
       wallVisibilityChanges[wallId] = value;
+    } else if (key.startsWith('tiles.')) {
+      const tileId = key.replace('tiles.', '');
+      tileVisibilityChanges[tileId] = value;
     }
   }
 
@@ -258,6 +283,7 @@ export async function formHandler(event, form, formData, options = {}) {
         console.warn('Token Manager: failed to persist wall visibility states', error);
       }
     }
+    await persistObserverTileStates(app.observer, tileVisibilityChanges);
   } else {
     const perObserverChanges = new Map();
     const avsRemovals = new Set();
@@ -488,6 +514,7 @@ export async function applyCurrent(event, button) {
     const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
     const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
+    const tileInputs = app.element.querySelectorAll('input[name^="tiles."]');
     const isVisibilityTab = app.activeTab === 'visibility';
     const isCoverTab = app.activeTab === 'cover';
 
@@ -501,6 +528,9 @@ export async function applyCurrent(event, button) {
       });
       wallInputs.forEach((input) => {
         const wallId = input.name.replace('walls.', '');
+        formDataObj[input.name] = input.value;
+      });
+      tileInputs.forEach((input) => {
         formDataObj[input.name] = input.value;
       });
     }
@@ -522,6 +552,7 @@ export async function applyCurrent(event, button) {
     if (!app._savedModeData[app.mode].visibility) app._savedModeData[app.mode].visibility = {};
     if (!app._savedModeData[app.mode].cover) app._savedModeData[app.mode].cover = {};
     if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
+    if (!app._savedModeData[app.mode].tiles) app._savedModeData[app.mode].tiles = {};
 
     // Use the same data we created for form submission
     for (const [key, value] of Object.entries(formDataObj)) {
@@ -535,6 +566,8 @@ export async function applyCurrent(event, button) {
         const wallId = key.replace('walls.', '');
         if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
         app._savedModeData[app.mode].walls[wallId] = value;
+      } else if (key.startsWith('tiles.')) {
+        app._savedModeData[app.mode].tiles[key.slice('tiles.'.length)] = value;
       }
     }
   } catch (error) {
@@ -733,6 +766,10 @@ export async function applyCurrent(event, button) {
           }
         }
       } catch { }
+      const tileChanges = app._savedModeData.observer?.tiles || {};
+      if (Object.keys(tileChanges).length) {
+        allOperations.push(async () => persistObserverTileStates(app.observer, tileChanges));
+      }
     }
 
     if (isCover) {
@@ -856,6 +893,7 @@ export async function applyBoth(_event, _button) {
     const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
     const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
     const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
+    const tileInputs = app.element.querySelectorAll('input[name^="tiles."]');
     if (!app._savedModeData) app._savedModeData = {};
     if (!app._savedModeData[app.mode])
       app._savedModeData[app.mode] = { visibility: {}, cover: {}, walls: {} };
@@ -873,6 +911,10 @@ export async function applyBoth(_event, _button) {
       const wallId = input.name.replace('walls.', '');
       if (!app._savedModeData[app.mode].walls) app._savedModeData[app.mode].walls = {};
       app._savedModeData[app.mode].walls[wallId] = input.value;
+    });
+    tileInputs.forEach((input) => {
+      if (!app._savedModeData[app.mode].tiles) app._savedModeData[app.mode].tiles = {};
+      app._savedModeData[app.mode].tiles[input.name.slice('tiles.'.length)] = input.value;
     });
   } catch (error) {
     console.error('Token Manager: Error saving current form state:', error);
@@ -979,6 +1021,7 @@ export async function applyBoth(_event, _button) {
         console.warn('Token Manager: failed to persist wall visibility states (applyBoth):', error);
       }
     }
+    await persistObserverTileStates(app.observer, app._savedModeData.observer?.tiles || {});
 
     const targetVisUpdates = new Map();
     const targetCovUpdates = new Map();

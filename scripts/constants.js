@@ -538,6 +538,16 @@ export const DEFAULT_SETTINGS = {
     default: true,
   },
 
+  hiddenTilesEnabled: {
+    name: 'PF2E_VISIONER.SETTINGS.HIDDEN_TILES.name',
+    hint: 'PF2E_VISIONER.SETTINGS.HIDDEN_TILES.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Boolean,
+    default: true,
+  },
+
   extinguishLightWhenSwimming: {
     name: 'PF2E_VISIONER.SETTINGS.EXTINGUISH_LIGHT_SWIMMING.name',
     hint: 'PF2E_VISIONER.SETTINGS.EXTINGUISH_LIGHT_SWIMMING.hint',

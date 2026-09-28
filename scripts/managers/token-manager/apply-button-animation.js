@@ -18,6 +18,7 @@ function hasFormChanges(app) {
         const visibilityInputs = app.element.querySelectorAll('input[name^="visibility."]');
         const coverInputs = app.element.querySelectorAll('input[name^="cover."]');
         const wallInputs = app.element.querySelectorAll('input[name^="walls."]');
+        const tileInputs = app.element.querySelectorAll('input[name^="tiles."]');
 
         // Check visibility changes
         for (const input of visibilityInputs) {
@@ -85,6 +86,12 @@ function hasFormChanges(app) {
             if (currentValue !== originalValue) {
                 return true;
             }
+        }
+
+        const tileFlags = app.observer?.document?.getFlag?.('pf2e-visioner', 'tiles') || {};
+        for (const input of tileInputs) {
+            const tileId = input.name.replace('tiles.', '');
+            if (input.value !== (tileFlags[tileId] || 'hidden')) return true;
         }
 
     } catch (error) {

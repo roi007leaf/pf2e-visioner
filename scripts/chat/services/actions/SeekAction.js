@@ -61,6 +61,7 @@ export class SeekActionHandler extends ActionHandlerBase {
     if (change?.wallId) {
       return {
         wallId: change.wallId,
+        tileId: change.tileId,
         observerId: change?.observer?.id ?? null,
         oldVisibility: change.oldVisibility,
       };
@@ -82,7 +83,7 @@ export class SeekActionHandler extends ActionHandlerBase {
       if (e?.wallId) {
         // Revert wall state on the seeker back to previous visibility (default hidden)
         const prev = typeof e.oldVisibility === 'string' ? e.oldVisibility : 'hidden';
-        changes.push({ observer, wallId: e.wallId, newWallState: prev });
+        changes.push({ observer, wallId: e.wallId, tileId: e.tileId, newWallState: prev });
       } else if (e?.targetId) {
         const tgt = this.getTokenById(e.targetId);
         if (tgt)
@@ -100,6 +101,7 @@ export class SeekActionHandler extends ActionHandlerBase {
         return {
           observer: this.getOutcomeObserver(actionData, outcome),
           wallId: outcome.wallId,
+          tileId: outcome.tileId,
           newWallState: effective,
           oldVisibility: outcome?.oldVisibility || outcome?.currentVisibility || null,
         };
