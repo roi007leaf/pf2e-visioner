@@ -15,7 +15,8 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       icon: 'fas fa-grip-lines-vertical',
       resizable: true,
     },
-    position: { width: 520, height: 'auto' },
+    classes: ['pf2e-visioner-wall-quick'],
+    position: { width: 520, height: 720 },
     actions: {
       apply: VisionerWallQuickSettings._onApply,
       close: VisionerWallQuickSettings._onClose,
@@ -31,7 +32,12 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     loadSharedUICSS();
     // ApplicationV2 identifies open windows by id. Keep each wall's dialog distinct
     // so switching from a door to an ordinary wall cannot reuse the door's content.
-    super({ id: `pf2e-visioner-wall-quick-${wallDocument?.id ?? 'new'}`, ...options });
+    const height = Math.min(720, Math.max(320, (globalThis.window?.innerHeight ?? 800) - 80));
+    super({
+      id: `pf2e-visioner-wall-quick-${wallDocument?.id ?? 'new'}`,
+      ...options,
+      position: { width: 520, height, ...options.position },
+    });
     this.wall = wallDocument; // WallDocument
     this._doorType = doorType;
   }

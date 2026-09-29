@@ -4883,10 +4883,10 @@ button.row-timer-toggle.active:not(:hover) {
     line-height: 1.4;
   }
 }
-.pv-wall-quick {
-  max-height: calc(100vh - 8rem);
-  max-height: calc(100dvh - 8rem);
+.application.pf2e-visioner-wall-quick .window-content {
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 

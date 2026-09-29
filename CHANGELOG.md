@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.11.4] - 2026-09-29
+
+### Fixed
+
+- Visioner wall settings use a bounded popup height and scroll their window content vertically. This fixes the previous form-only height cap, which still let the window grow without a usable scroll area.
+
 ## [8.11.3] - 2026-09-29
 
 ### Fixed
