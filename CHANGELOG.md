@@ -1,5 +1,16 @@
 # Changelog
 
+## [8.11.2] - 2026-09-29
+
+### Changed
+
+- Door peek slit angle, sweep angle, and range are configured per door in the Visioner wall settings popup. Existing world values remain defaults for doors without saved values.
+- The wall configuration form now opens a compact Visioner popup for wall options. Peek DC and geometry fields appear only when Allow Peeking is enabled; disabling it keeps saved values for later.
+
+### Tests
+
+- Added door-specific peek geometry and popup visibility/save regressions.
+
 ## [8.11.1] - 2026-09-28
 
 ### Fixed

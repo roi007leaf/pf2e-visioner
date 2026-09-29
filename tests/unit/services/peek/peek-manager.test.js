@@ -625,6 +625,36 @@ describe('PeekManager settings-backed geometry', () => {
     mgr.startDoorPeek(token, { id: 'door1', c: [0, 0, 0, 100] });
     expect(d.registry.get('peeker').fov).toBe(30);
   });
+
+  test('door flags override legacy world geometry independently, including zero range', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const door = (id, flags) => ({
+      id, c: [0, 0, 0, 100],
+      getFlag: (_module, key) => flags[key],
+    });
+    mgr.startDoorPeek(token, door('door1', { peekSlitAngle: 15, peekSweepAngle: 0, peekRange: 0 }));
+    expect(d.registry.get('peeker')).toEqual(expect.objectContaining({ fov: 15, range: 0 }));
+    expect(mgr._maxSweep(mgr._active.get('peeker').doorDoc)).toBe(0);
+
+    mgr.startDoorPeek(token, door('door2', { peekSlitAngle: 60, peekSweepAngle: 90, peekRange: 30 }));
+    expect(d.registry.get('peeker')).toEqual(expect.objectContaining({ fov: 60, range: 600 }));
+    expect(mgr._maxSweep(mgr._active.get('peeker').doorDoc)).toBeCloseTo(Math.PI / 2);
+  });
+
+  test('reaim reads updated geometry from the active door', () => {
+    const d = deps();
+    const mgr = new PeekManager(d);
+    const token = createMockToken({ id: 'peeker', x: -50, y: 50, width: 1, height: 1 });
+    const flags = { peekSlitAngle: 15, peekSweepAngle: 30, peekRange: 10 };
+    const door = { id: 'door1', c: [0, 0, 0, 100], getFlag: (_module, key) => flags[key] };
+    mgr.startDoorPeek(token, door);
+    flags.peekSlitAngle = 25;
+    flags.peekRange = 40;
+    mgr.updatePeek('peeker', { x: 100, y: 50 });
+    expect(d.registry.get('peeker')).toEqual(expect.objectContaining({ fov: 25, range: 800 }));
+  });
 });
 
 describe('PeekManager reaimFromPointer', () => {

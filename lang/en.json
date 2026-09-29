@@ -1590,6 +1590,7 @@
       "BLOCKED_BY_GM": "Peeking is temporarily blocked by the GM.",
       "CHECK_LABEL": "Peek Through Door",
       "DC_FIELD_LABEL": "Peek DC",
+      "DOOR_SETTINGS_TITLE": "Door Peeking",
       "ALLOW_FIELD_LABEL": "Allow Peeking",
       "NOT_ALLOWED": "Peeking is not allowed through this door.",
       "TOO_FAR": "You are too far from the door to peek through it.",

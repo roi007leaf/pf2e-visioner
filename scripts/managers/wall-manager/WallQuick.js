@@ -4,6 +4,7 @@
 
 import { MODULE_ID } from '../../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
+import { readDoorPeekGeometry } from '../../services/Peek/peek-door-dc.js';
 
 export class VisionerWallQuickSettings extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -45,6 +46,12 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       hiddenWallsEnabled,
       hiddenWall: !!hiddenWall,
       blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
+      isDoor: Number(d?.door) > 0,
+      peekAllowed: d?.getFlag?.(MODULE_ID, 'peekAllowed') === true,
+      peekDC: d?.getFlag?.(MODULE_ID, 'peekDC') ?? '',
+      peekSlitAngle: readDoorPeekGeometry(d, 'peekSlitAngle', 10),
+      peekSweepAngle: readDoorPeekGeometry(d, 'peekSweepAngle', 20),
+      peekRange: readDoorPeekGeometry(d, 'peekRange', 0),
       identifier: identifier || '',
       dc: Number(dc) || '',
       connectedCsv: Array.isArray(connected) ? connected.join(', ') : '',
@@ -63,6 +70,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     content.innerHTML = result;
 
     this._bindHiddenWallSectionToggle(content);
+    this._bindPeekOptionsToggle(content);
 
     // Add event listeners for cover override functionality
     this._bindCoverOverrideListeners(content);
@@ -77,6 +85,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     try {
       const root = this.element;
       this._bindHiddenWallSectionToggle(root);
+      this._bindPeekOptionsToggle(root);
 
       // Bind cover override listeners
       this._bindCoverOverrideListeners(root);
@@ -107,6 +116,22 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     } catch (_) {
       /* ignore */
     }
+  }
+
+  _bindPeekOptionsToggle(root) {
+    const checkbox = root?.querySelector?.('input[name="peekAllowed"]');
+    const options = root?.querySelector?.('.pv-peek-options');
+    if (!checkbox || !options) return;
+    const sync = () => {
+      options.hidden = !checkbox.checked;
+      options.querySelectorAll('input').forEach((input) => {
+        input.disabled = !checkbox.checked;
+      });
+    };
+    sync();
+    if (checkbox.dataset.pf2eVisionerPeekToggleBound === 'true') return;
+    checkbox.dataset.pf2eVisionerPeekToggleBound = 'true';
+    checkbox.addEventListener('change', sync);
   }
 
   _bindCoverOverrideListeners(root) {
@@ -144,10 +169,22 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     const app = this;
     const form = app.element?.querySelector?.('form.pv-wall-quick');
     if (!form) return app.close();
+    if (!form.reportValidity()) return;
     const fd = new FormData(form);
     const entries = Object.fromEntries(fd.entries());
     const patch = { _id: app.wall.id };
     patch[`flags.${MODULE_ID}.blocksScent`] = fd.has('blocksScent');
+    if (Number(app.wall?.door) > 0) {
+      const peekAllowed = fd.has('peekAllowed');
+      patch[`flags.${MODULE_ID}.peekAllowed`] = peekAllowed;
+      if (peekAllowed) {
+        const peekDC = String(entries.peekDC ?? '').trim();
+        patch[`flags.${MODULE_ID}.peekDC`] = peekDC === '' ? null : Number(peekDC);
+        for (const key of ['peekSlitAngle', 'peekSweepAngle', 'peekRange']) {
+          patch[`flags.${MODULE_ID}.${key}`] = Number(entries[key]);
+        }
+      }
+    }
 
     // Handle cover override - this now determines if wall provides cover
     const coverOverride = entries['coverOverride'];

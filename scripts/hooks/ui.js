@@ -2357,45 +2357,15 @@ function onRenderWallConfig(app, html) {
     // Avoid duplicate injection
     if (form.querySelector('.pf2e-visioner-wall-settings')) return;
 
-    // Build a simple fieldset with just the advanced settings button
+    // Keep the native wall form compact; Visioner fields live in its wall popup.
     const fs = document.createElement('fieldset');
     fs.className = 'pf2e-visioner-wall-settings';
     fs.innerHTML = `
       <legend>PF2E Visioner</legend>
       <div class="form-group">
-        <button type="button" class="visioner-btn" data-action="open-visioner-wall-quick" style="border:1px solid var(--pf2e-visioner-primary)">Open Advanced Wall Settings</button>
-        <p class="notes">Configure cover settings, hidden walls, and other advanced options.</p>
+        <button type="button" class="visioner-btn" data-action="open-visioner-wall-quick" style="border:1px solid var(--pf2e-visioner-primary)">Open Visioner Wall Settings</button>
       </div>
     `;
-
-    const scentRow = document.createElement('div');
-    scentRow.className = 'form-group';
-    scentRow.innerHTML = `
-      <label>${game.i18n.localize('PF2E_VISIONER.UI.WALL_BLOCKS_SCENT')}</label>
-      <input type="checkbox" name="flags.${MODULE_ID}.blocksScent" ${app.document?.getFlag?.(MODULE_ID, 'blocksScent') === true ? 'checked' : ''} data-dtype="Boolean" />
-      <p class="notes">${game.i18n.localize('PF2E_VISIONER.UI.WALL_BLOCKS_SCENT_HINT')}</p>
-    `;
-    fs.appendChild(scentRow);
-
-    const isDoor = Number(app.document?.door) > 0;
-    if (isDoor) {
-      const allowed = app.document?.getFlag?.(MODULE_ID, 'peekAllowed') === true;
-      const allowRow = document.createElement('div');
-      allowRow.className = 'form-group';
-      allowRow.innerHTML = `
-        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.ALLOW_FIELD_LABEL')}</label>
-        <input type="checkbox" name="flags.${MODULE_ID}.peekAllowed" ${allowed ? 'checked' : ''} data-dtype="Boolean" />
-      `;
-      fs.appendChild(allowRow);
-      const current = app.document?.getFlag?.(MODULE_ID, 'peekDC');
-      const row = document.createElement('div');
-      row.className = 'form-group';
-      row.innerHTML = `
-        <label>${game.i18n.localize('PF2E_VISIONER.PEEK.DC_FIELD_LABEL')}</label>
-        <input type="number" name="flags.${MODULE_ID}.peekDC" value="${current ?? ''}" step="1" min="0" data-dtype="Number" />
-      `;
-      fs.appendChild(row);
-    }
 
     // Append near Door Configuration or at form end
     const doorHeader = Array.from(form.querySelectorAll('label, h3, header, legend')).find((el) =>

@@ -4883,3 +4883,40 @@ button.row-timer-toggle.active:not(:hover) {
     line-height: 1.4;
   }
 }
+.pv-wall-quick .pv-peek-settings {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border-light-primary, #685a51);
+  border-radius: 6px;
+}
+
+.pv-wall-quick .pv-peek-settings h3 {
+  margin: 0 0 0.75rem;
+}
+
+.pv-wall-quick .pv-peek-field {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) minmax(7rem, 11rem);
+  gap: 0.25rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.7rem;
+}
+
+.pv-wall-quick .pv-peek-field:last-child {
+  margin-bottom: 0;
+}
+
+.pv-wall-quick .pv-peek-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.pv-wall-quick .pv-peek-toggle input {
+  width: auto;
+  justify-self: start;
+}
+
+.pv-wall-quick .pv-peek-field .notes {
+  grid-column: 1 / -1;
+  margin: 0;
+}

@@ -1,6 +1,6 @@
 import { MODULE_ID } from '../../constants.js';
 import { clampCornerPeek, clampDoorPeek, mergeSweptCone, pullBackOrigin } from './peek-geometry.js';
-import { readPeekDC } from './peek-door-dc.js';
+import { readDoorPeekGeometry, readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 import { inferPeekKind, isPeekKindBlocked } from './peek-block-mode.js';
 
@@ -134,22 +134,20 @@ export class PeekManager {
     });
   }
 
-  _slitAngle() {
-    try { const v = Number(globalThis.game?.settings?.get?.(MODULE_ID, 'peekSlitAngle')); return Number.isFinite(v) && v > 0 ? v : 10; } catch (_) { return 10; }
+  _slitAngle(doorDoc) {
+    return readDoorPeekGeometry(doorDoc, 'peekSlitAngle', 10);
   }
 
-  _maxSweep() {
-    try { const v = Number(globalThis.game?.settings?.get?.(MODULE_ID, 'peekSweepAngle')); const deg = Number.isFinite(v) && v >= 0 ? v : 20; return (deg * Math.PI) / 180; } catch (_) { return (20 * Math.PI) / 180; }
+  _maxSweep(doorDoc) {
+    return (readDoorPeekGeometry(doorDoc, 'peekSweepAngle', 20) * Math.PI) / 180;
   }
 
-  _rangePx() {
-    try {
-      const feet = Number(globalThis.game?.settings?.get?.(MODULE_ID, 'peekRange'));
-      if (!Number.isFinite(feet) || feet <= 0) return 0;
-      const size = globalThis.canvas?.dimensions?.size ?? globalThis.canvas?.grid?.size ?? 100;
-      const dist = globalThis.canvas?.dimensions?.distance ?? 5;
-      return (feet / dist) * size;
-    } catch (_) { return 0; }
+  _rangePx(doorDoc) {
+    const feet = readDoorPeekGeometry(doorDoc, 'peekRange', 0);
+    if (feet <= 0) return 0;
+    const size = globalThis.canvas?.dimensions?.size ?? globalThis.canvas?.grid?.size ?? 100;
+    const dist = globalThis.canvas?.dimensions?.distance ?? 5;
+    return (feet / dist) * size;
   }
 
   startCornerPeek(token, mouse) {
@@ -200,14 +198,14 @@ export class PeekManager {
   }
 
   startDoorPeek(token, doorDoc, mouse) {
-    const geo = clampDoorPeek({ door: doorDoc, tokenCenter: token.center, nudge: DOOR_NUDGE, fov: this._slitAngle(), aim: mouse, maxSweep: this._maxSweep() });
-    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id], range: this._rangePx() }, { kind: 'door', doorDoc });
+    const geo = clampDoorPeek({ door: doorDoc, tokenCenter: token.center, nudge: DOOR_NUDGE, fov: this._slitAngle(doorDoc), aim: mouse, maxSweep: this._maxSweep(doorDoc) });
+    this._begin(token, { ...geo, ignoredWallIds: [doorDoc.id], range: this._rangePx(doorDoc) }, { kind: 'door', doorDoc });
   }
 
   _computeNextGeo(entry, mouse) {
     let geo;
     if (entry.kind === 'door') {
-      geo = clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: this._slitAngle(), aim: mouse, maxSweep: this._maxSweep() });
+      geo = clampDoorPeek({ door: entry.doorDoc, tokenCenter: entry.token.center, nudge: DOOR_NUDGE, fov: this._slitAngle(entry.doorDoc), aim: mouse, maxSweep: this._maxSweep(entry.doorDoc) });
     } else {
       geo = clampCornerPeek({ footprint: this._footprint(entry.token), mouse, band: PEEK_BAND, fov: null });
       geo.origin = this._clampOriginToWalls(entry.token.center, geo.origin);
@@ -215,7 +213,7 @@ export class PeekManager {
     return {
       ...geo,
       ignoredWallIds: entry.kind === 'door' ? [entry.doorDoc.id] : [],
-      range: entry.kind === 'door' ? this._rangePx() : 0,
+      range: entry.kind === 'door' ? this._rangePx(entry.doorDoc) : 0,
     };
   }
 

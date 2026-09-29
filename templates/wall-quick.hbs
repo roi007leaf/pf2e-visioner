@@ -6,6 +6,36 @@
       <input type="checkbox" name="blocksScent" {{checked blocksScent}} />
       <p class="notes">{{localize "PF2E_VISIONER.UI.WALL_BLOCKS_SCENT_HINT"}}</p>
     </div>
+    {{#if isDoor}}
+    <section class="pv-peek-settings">
+      <h3>{{localize "PF2E_VISIONER.PEEK.DOOR_SETTINGS_TITLE"}}</h3>
+      <div class="pv-peek-field pv-peek-toggle">
+        <label for="pv-peek-allowed">{{localize "PF2E_VISIONER.PEEK.ALLOW_FIELD_LABEL"}}</label>
+        <input id="pv-peek-allowed" type="checkbox" name="peekAllowed" {{checked peekAllowed}} />
+      </div>
+      <div class="pv-peek-options" {{#unless peekAllowed}}hidden{{/unless}}>
+      <div class="pv-peek-field">
+        <label for="pv-peek-dc">{{localize "PF2E_VISIONER.PEEK.DC_FIELD_LABEL"}}</label>
+        <input id="pv-peek-dc" type="number" name="peekDC" value="{{peekDC}}" min="0" step="1" />
+      </div>
+      <div class="pv-peek-field">
+        <label for="pv-peek-slit">{{localize "PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.name"}}</label>
+        <input id="pv-peek-slit" type="number" name="peekSlitAngle" value="{{peekSlitAngle}}" min="0.01" step="any" required />
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.hint"}}</p>
+      </div>
+      <div class="pv-peek-field">
+        <label for="pv-peek-sweep">{{localize "PF2E_VISIONER.SETTINGS.PEEK_SWEEP_ANGLE.name"}}</label>
+        <input id="pv-peek-sweep" type="number" name="peekSweepAngle" value="{{peekSweepAngle}}" min="0" step="any" required />
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.PEEK_SWEEP_ANGLE.hint"}}</p>
+      </div>
+      <div class="pv-peek-field">
+        <label for="pv-peek-range">{{localize "PF2E_VISIONER.SETTINGS.PEEK_RANGE.name"}}</label>
+        <input id="pv-peek-range" type="number" name="peekRange" value="{{peekRange}}" min="0" step="any" required />
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.PEEK_RANGE.hint"}}</p>
+      </div>
+      </div>
+    </section>
+    {{/if}}
     <div class="form-group">
       <label>{{localize "PF2E_VISIONER.UI.COVER_LABEL"}}</label>
   <div class="cover-override-buttons pv-u-flex pv-u-gap-4" style="margin-top:4px;">

@@ -5,6 +5,20 @@ export function readPeekDC(doorDoc) {
   return typeof v === 'number' && !Number.isNaN(v) ? v : null;
 }
 
+// Old world values remain defaults for doors that have not saved their own geometry yet.
+export function readDoorPeekGeometry(doorDoc, key, fallback) {
+  const valid = (value) =>
+    typeof value === 'number' && Number.isFinite(value) &&
+    (key === 'peekSlitAngle' ? value > 0 : value >= 0);
+  const doorValue = doorDoc?.getFlag?.(MODULE_ID, key);
+  if (valid(doorValue)) return doorValue;
+  try {
+    const worldValue = globalThis.game?.settings?.get?.(MODULE_ID, key);
+    if (valid(worldValue)) return worldValue;
+  } catch (_) {}
+  return fallback;
+}
+
 export function isDoorPeekAllowed(doorDoc) {
   return doorDoc?.getFlag?.(MODULE_ID, 'peekAllowed') === true;
 }
