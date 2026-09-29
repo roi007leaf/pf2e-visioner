@@ -18,7 +18,10 @@ test('popup context shows door peek values only for doors', async () => {
     isDoor: true, peekAllowed: true, peekDC: 15,
     peekSlitAngle: 12, peekSweepAngle: 0, peekRange: 30,
   }));
-  expect((await new VisionerWallQuickSettings(wall(0))._prepareContext()).isDoor).toBe(false);
+  const ordinaryWallApp = new VisionerWallQuickSettings({ ...wall(0), id: 'wall-2' });
+  expect((await ordinaryWallApp._prepareContext()).isDoor).toBe(false);
+  expect(doorApp.options.id).not.toBe(ordinaryWallApp.options.id);
+  expect((await new VisionerWallQuickSettings(wall(1), { doorType: '0' })._prepareContext()).isDoor).toBe(false);
 });
 
 test('popup apply saves door peek values as wall flags', async () => {

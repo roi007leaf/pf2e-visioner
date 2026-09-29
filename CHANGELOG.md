@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.11.3] - 2026-09-29
+
+### Fixed
+
+- Door Peeking settings appear only when the current wall configuration is a door, including when the door type has changed in an unsaved Wall Configuration form.
+- Visioner wall settings windows use a distinct ID per wall so a previously opened door popup cannot be reused for another wall.
+- Visioner wall settings now scroll within the viewport when their content is taller than the screen.
+
+### Tests
+
+- Added regression coverage for switching a door to a regular wall before opening Visioner wall settings.
+
 ## [8.11.2] - 2026-09-29
 
 ### Changed

@@ -26,11 +26,18 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     content: { template: 'modules/pf2e-visioner/templates/wall-quick.hbs' },
   };
 
-  constructor(wallDocument, options = {}) {
+  constructor(wallDocument, { doorType, ...options } = {}) {
     loadDialogCSS();
     loadSharedUICSS();
-    super(options);
+    // ApplicationV2 identifies open windows by id. Keep each wall's dialog distinct
+    // so switching from a door to an ordinary wall cannot reuse the door's content.
+    super({ id: `pf2e-visioner-wall-quick-${wallDocument?.id ?? 'new'}`, ...options });
     this.wall = wallDocument; // WallDocument
+    this._doorType = doorType;
+  }
+
+  _isDoor() {
+    return Number(this._doorType ?? this.wall?.document?.door ?? this.wall?.door) > 0;
   }
 
   async _prepareContext() {
@@ -46,7 +53,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       hiddenWallsEnabled,
       hiddenWall: !!hiddenWall,
       blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
-      isDoor: Number(d?.door) > 0,
+      isDoor: this._isDoor(),
       peekAllowed: d?.getFlag?.(MODULE_ID, 'peekAllowed') === true,
       peekDC: d?.getFlag?.(MODULE_ID, 'peekDC') ?? '',
       peekSlitAngle: readDoorPeekGeometry(d, 'peekSlitAngle', 10),
@@ -174,7 +181,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     const entries = Object.fromEntries(fd.entries());
     const patch = { _id: app.wall.id };
     patch[`flags.${MODULE_ID}.blocksScent`] = fd.has('blocksScent');
-    if (Number(app.wall?.door) > 0) {
+    if (app._isDoor()) {
       const peekAllowed = fd.has('peekAllowed');
       patch[`flags.${MODULE_ID}.peekAllowed`] = peekAllowed;
       if (peekAllowed) {

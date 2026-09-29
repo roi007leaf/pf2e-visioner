@@ -2385,7 +2385,8 @@ function onRenderWallConfig(app, html) {
           ev.stopPropagation();
           const { VisionerWallQuickSettings } =
             await import('../managers/wall-manager/WallQuick.js');
-          new VisionerWallQuickSettings(app.document).render(true);
+          const doorInput = form.querySelector('[name="door"]');
+          new VisionerWallQuickSettings(app.document, { doorType: doorInput?.value }).render(true);
         });
       }
     } catch {}

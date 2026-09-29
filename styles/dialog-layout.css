@@ -4883,6 +4883,13 @@ button.row-timer-toggle.active:not(:hover) {
     line-height: 1.4;
   }
 }
+.pv-wall-quick {
+  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .pv-wall-quick .pv-peek-settings {
   margin: 1rem 0;
   padding: 0.75rem 1rem;
