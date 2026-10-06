@@ -790,6 +790,15 @@
         "name": "Set Default \"Hide Foundry Hidden\" State",
         "hint": "Determines whether the Hide Foundry Hidden checkbox in Visioner Manager/Action dialogs starts enabled or disabled but can still be toggled manually"
       },
+      "HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES": {
+        "name": "Hide Health Estimates on Hidden Tokens",
+        "hint": "Choose who has PF2e HUD health estimates hidden for Hidden silhouettes, Undetected, and Unnoticed tokens. Distance displays remain visible. Changes apply immediately.",
+        "CHOICES": {
+          "off": "Off",
+          "players": "Players only",
+          "all": "GM & players"
+        }
+      },
       "SNEAK_ALLOW_HIDDEN_UNDETECTED_END_POSITION": {
         "name": "Allow Hidden/Undetected for Sneak End Position",
         "hint": "When enabled, Sneak end positions will also qualify if the target is Hidden or Undetected (in addition to the default Concealed). A plus icon will appear in the dialog to indicate this extended qualification."

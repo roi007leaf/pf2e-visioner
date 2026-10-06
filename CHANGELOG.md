@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.11.5] - 2026-10-06
+
+### Added
+
+- Added Hide Health Estimates on Hidden Tokens under General UI settings, with Off, Players only, and GM & players modes. Defaults to Off and applies immediately.
+
+### Fixed
+
+- PF2e HUD health estimates now respect Hidden silhouettes, Undetected, and Unnoticed token presentations for the configured audience. Distance displays remain available, and health estimates return when tokens become visible or suppression is disabled.
+
+### Tests
+
+- Added health-estimate regressions for all audience modes, GM/player transitions, silhouette rendering without a selected observer, and live setting and visibility changes.
+
 ## [8.11.4] - 2026-09-29
 
 ### Fixed

@@ -798,6 +798,20 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  hideHiddenTokenHealthEstimates: {
+    name: 'PF2E_VISIONER.SETTINGS.HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES.name',
+    hint: 'PF2E_VISIONER.SETTINGS.HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: String,
+    choices: {
+      off: 'PF2E_VISIONER.SETTINGS.HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES.CHOICES.off',
+      players: 'PF2E_VISIONER.SETTINGS.HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES.CHOICES.players',
+      all: 'PF2E_VISIONER.SETTINGS.HIDE_HIDDEN_TOKEN_HEALTH_ESTIMATES.CHOICES.all',
+    },
+    default: 'off',
+  },
   // Visual filter: hide Foundry-hidden tokens in UIs
   hideFoundryHiddenTokens: {
     name: 'PF2E_VISIONER.SETTINGS.HIDE_FOUNDRY_HIDDEN_TOKENS.name',

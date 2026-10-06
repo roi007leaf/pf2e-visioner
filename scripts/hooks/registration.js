@@ -13,6 +13,7 @@ import { registerTokenHooks } from './token-events.js';
 import { registerUIHooks } from './ui.js';
 import { registerHiddenTileHooks } from '../services/Tiles/hidden-tile-visibility.js';
 import { registerPf2eHudTakeCoverIntegration } from '../integrations/pf2e-hud-take-cover.js';
+import { registerPf2eHudHealthStatusIntegration } from '../integrations/pf2e-hud-health-status.js';
 import { handleDefeatEffectCreated } from '../services/defeated-actor-cleanup.js';
 import {
   captureActorPreparedSenseSnapshot,
@@ -67,6 +68,7 @@ export async function registerHooks() {
   gmObserverView.registerHooks();
   registerPersistentSequencerEffectLayeringHooks();
   registerPf2eHudTakeCoverIntegration();
+  registerPf2eHudHealthStatusIntegration();
 
   Hooks.on('ready', onReady);
   Hooks.on('canvasReady', onCanvasReady);

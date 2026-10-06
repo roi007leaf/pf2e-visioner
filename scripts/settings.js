@@ -19,6 +19,7 @@ const SETTINGS_GROUPS = {
         'useHudButton',
         'showVisionerSceneTools',
         'showQuickEditTool',
+        'hideHiddenTokenHealthEstimates',
         'hiddenWallIndicatorWidth',
         'dimLightingThreshold',
         'extinguishLightWhenSwimming',
