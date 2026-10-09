@@ -70,8 +70,21 @@ function stopTracking(effect, { restore = true, restoreSortLayer = restore } = {
   else if (restore) restoreVoidProxy(state);
 }
 
+// An effect attached to a token (a condition marker, an aura) is part of that token's look:
+// lowering it would hide it behind the token's own art. Only scene effects (Darkness and other
+// areas) go below tokens.
+function isTokenAttached(effect) {
+  if (effect?.sourceDocument?.documentName === 'Token') return true;
+  return /(?:^|\.)Token\.[^.]+$/.test(String(effect?.data?.source ?? ''));
+}
+
 function isPrimaryPersistentEffect(effect, primaryGroup) {
-  return !!effect?.data?.persist && !!primaryGroup && effect.parent === primaryGroup;
+  return (
+    !!effect?.data?.persist &&
+    !!primaryGroup &&
+    effect.parent === primaryGroup &&
+    !isTokenAttached(effect)
+  );
 }
 
 function tokenElevation(token) {

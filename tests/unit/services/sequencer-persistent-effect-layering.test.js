@@ -95,6 +95,30 @@ describe('persistent Sequencer effect layering', () => {
     expect(darkness.sortLayer).toBe(850);
   });
 
+  test('leaves effects attached to a token (condition markers) above that token', () => {
+    const marker = effect({ parent: primary });
+    marker.data.source = 'Scene.abc.Token.owlbear';
+    const attached = effect({ parent: primary });
+    attached.sourceDocument = { documentName: 'Token' };
+    const darkness = effect({ parent: primary });
+    darkness.data.source = 'Scene.abc.Region.darkness';
+
+    const result = refreshPersistentSequencerEffectLayering({
+      effects: [marker, attached, darkness],
+      controlledTokens: [{ id: 'silva' }],
+      primaryGroup: primary,
+      tokenSortLayer: 700,
+      avsEnabled: true,
+      tokenVisionEnabled: true,
+      bypassAvs: false,
+    });
+
+    expect(result).toEqual({ active: true, adjusted: 1 });
+    expect(marker.sortLayer).toBe(800);
+    expect(attached.sortLayer).toBe(800);
+    expect(darkness.sortLayer).toBe(699);
+  });
+
   test('leaves persistent effects already below tokens unchanged', () => {
     const floorEffect = effect({ parent: primary, sortLayer: 600 });
 
