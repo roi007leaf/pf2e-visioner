@@ -9,6 +9,7 @@
 PF2E Visioner is a comprehensive visibility and cover toolkit for Foundry VTT's Pathfinder 2nd Edition system. It provides granular control over what each creature can see, automates PF2E perception mechanics, and offers an intuitive user experience for both GMs and players.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/roileaf)
+[![Patreon](https://c5.patreon.com/external/logo/become_a_patron_button.png)](https://www.patreon.com/roileaf)
 
 ---
 
