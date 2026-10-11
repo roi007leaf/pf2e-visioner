@@ -4,6 +4,7 @@
 
 import { AutoCoverHooks } from '../cover/auto-cover/AutoCoverHooks.js';
 import { registerSnipingDuoDamageBonusHooks } from '../feats/sniping-duo-damage-bonus.js';
+import { registerStealthPrerequisiteItemHooks } from '../items/stealth-prerequisite-chat.js';
 import { onHighlightObjects } from '../services/HoverTooltips.js';
 import { registerChatHooks } from './chat.js';
 import { registerCombatHooks } from './combat.js';
@@ -127,6 +128,7 @@ export async function registerHooks() {
   await initializeDeferredSeekManager();
   AutoCoverHooks.registerHooks();
   registerSnipingDuoDamageBonusHooks();
+  registerStealthPrerequisiteItemHooks();
 
   await registerTimedOverrideHooks();
 

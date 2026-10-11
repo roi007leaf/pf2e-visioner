@@ -653,6 +653,16 @@
         "DISTRACTING_SHADOWS_TOOLTIP": "You may use larger creatures as cover for Hide/Sneak prerequisites"
       }
     },
+    "STEALTH_PREREQ_ITEMS": {
+      "EFFECT_NAME": "Effect: {item}",
+      "DESCRIPTION_HIDE": "You can Hide without cover or concealment.",
+      "DESCRIPTION_HIDE_SNEAK": "You can Hide and Sneak without cover or concealment.",
+      "BUTTON": "Apply Visioner Effect",
+      "BUTTON_TOOLTIP": "Apply an effect that lets the target (or the speaker if none targeted) pass Hide/Sneak cover/concealment prerequisites",
+      "APPLIED": "{item} effect applied to {actor}",
+      "NO_PERMISSION": "You don't own the creature to apply this effect to",
+      "BADGE_TOOLTIP": "Cover/concealment requirement is bypassed by this item effect"
+    },
     "SNEAK_AUTOMATION": {
       "BUTTON_APPLY": "Apply Sneak Results",
       "BUTTON_PREVIEW": "Preview Results",

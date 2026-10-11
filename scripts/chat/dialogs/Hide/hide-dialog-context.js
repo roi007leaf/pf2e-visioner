@@ -1,4 +1,5 @@
 import { MODULE_TITLE } from '../../../constants.js';
+import { getStealthBypassEffects } from '../../../items/stealth-prerequisite-items.js';
 import { ActionQualifier } from '../../../rule-elements/operations/ActionQualifier.js';
 import {
   canAttemptHideOrRemainHidden,
@@ -119,8 +120,8 @@ async function applyHidePositionQualification(app, filteredOutcomes) {
           { forceFresh: true, useCurrentPositionForCover: true },
         );
         let qualifies = app._endPositionQualifiesForHide(endPos);
-        qualifies = await applyHideFeatQualification(hider, outcome, endPos, qualifies);
         qualifies = await applyHideRuleQualification(hider, qualifies, endPos);
+        qualifies = await applyHideFeatQualification(hider, outcome, endPos, qualifies);
 
         const baseOldState = outcome.oldVisibility || outcome.currentVisibility;
         const baseCalculated =
@@ -173,6 +174,7 @@ async function applyHideFeatQualification(hider, outcome, endPos, qualifies) {
     base.bothQualify = base.startQualifies && base.endQualifies;
 
     const overridden = FeatsHandler.overridePrerequisites(hider, base, {
+      action: 'hide',
       startVisibility,
       endVisibility,
       endCoverState,
@@ -342,6 +344,7 @@ async function buildHidePrereqBadges(app) {
     const badges = [];
 
     addStaticFeatBadges(badges, has);
+    addStealthItemBadges(app, badges);
     await addCamouflageBadge(app, badges, has);
     await addTerrainStalkerBadge(app, badges, has, FeatsHandler);
     await addVanishIntoTheLandBadge(app, badges, has, FeatsHandler);
@@ -385,6 +388,17 @@ function addStaticFeatBadges(badges, has) {
       tooltip: game.i18n.localize(
         'PF2E_VISIONER.HIDE_AUTOMATION.BADGES.VERY_VERY_SNEAKY_TOOLTIP',
       ),
+    });
+  }
+}
+
+function addStealthItemBadges(app, badges) {
+  for (const effect of getStealthBypassEffects(app.actorToken, 'hide')) {
+    badges.push({
+      key: `stealth-item-${effect.id}`,
+      icon: 'fas fa-user-secret',
+      label: effect.name,
+      tooltip: game.i18n.localize('PF2E_VISIONER.STEALTH_PREREQ_ITEMS.BADGE_TOOLTIP'),
     });
   }
 }

@@ -34,6 +34,7 @@ function applyFeatPrerequisiteOverrides(
     const startPosition = positionTransition.startPosition || {};
     const endPosition = positionTransition.endPosition || {};
     effective = FeatsHandler.overridePrerequisites(dialog.sneakingToken, effective, {
+      action: 'sneak',
       startVisibility: startPosition.effectiveVisibility,
       endVisibility: endPosition.effectiveVisibility,
       endCoverState: endPosition.coverState,

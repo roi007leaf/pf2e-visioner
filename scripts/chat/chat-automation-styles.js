@@ -205,6 +205,11 @@ function getChatAutomationCSS() {
             color: white;
         }
 
+        .visioner-btn-stealth-item {
+            background: linear-gradient(135deg, var(--pf2e-visioner-purple), var(--pf2e-visioner-gray));
+            color: white;
+        }
+
         .visioner-btn-take-cover {
             background: linear-gradient(135deg, var(--pf2e-visioner-brown), var(--pf2e-visioner-brown));
             color: white;

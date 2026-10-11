@@ -1,5 +1,6 @@
 import { MODULE_ID } from '../../../constants.js';
 import { ActionQualifier } from '../../../rule-elements/operations/ActionQualifier.js';
+import { getStealthBypassEffects } from '../../../items/stealth-prerequisite-items.js';
 import { FeatsHandler } from '../../services/FeatsHandler.js';
 import turnSneakTracker from '../../services/TurnSneakTracker.js';
 import {
@@ -255,6 +256,7 @@ async function buildSneakPrereqBadges(app, movementType, processedOutcomes) {
     addCeaselessShadowsBadge(badges, has);
     await addCamouflageBadge(badges, actorOrToken, has);
     addLegendarySneakBadge(badges, has);
+    addStealthItemBadges(badges, actorOrToken);
     addVeryVerySneakyBadge(badges, has);
     await addTerrainStalkerBadge(badges, actorOrToken, has, movementType);
     await addVanishIntoTheLandBadge(badges, actorOrToken, has, movementType);
@@ -339,6 +341,17 @@ async function addCamouflageBadge(badges, actorOrToken, has) {
     });
   } catch {
     /* Optional environment badge */
+  }
+}
+
+function addStealthItemBadges(badges, actorOrToken) {
+  for (const effect of getStealthBypassEffects(actorOrToken, 'sneak')) {
+    badges.push({
+      key: `stealth-item-${effect.id}`,
+      icon: 'fas fa-user-secret',
+      label: effect.name,
+      tooltip: game.i18n.localize('PF2E_VISIONER.STEALTH_PREREQ_ITEMS.BADGE_TOOLTIP'),
+    });
   }
 }
 

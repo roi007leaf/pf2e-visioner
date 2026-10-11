@@ -22,6 +22,7 @@ import {
   recalculateHideOutcomeVisibility,
   toggleHidePositionPrerequisite,
 } from './Hide/hide-position-qualification.js';
+import { hidePrerequisiteFailed } from '../services/actions/Hide/hide-position-qualification.js';
 import { BaseActionDialog } from './base-action-dialog.js';
 
 // Store reference to current hide dialog
@@ -217,7 +218,12 @@ export class HidePreviewDialog extends BaseActionDialog {
       let effectiveState = outcome.overrideState ?? outcome.newVisibility;
 
       const isOldStateAvsControlled = this.isOldStateAvsControlled(outcome);
-      if (effectiveState === 'avs' && isOldStateAvsControlled && outcome._calculatedNewVisibility) {
+      if (
+        effectiveState === 'avs' &&
+        isOldStateAvsControlled &&
+        outcome._calculatedNewVisibility &&
+        !hidePrerequisiteFailed(outcome)
+      ) {
         effectiveState = outcome._calculatedNewVisibility;
       }
 

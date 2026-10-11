@@ -3,6 +3,7 @@
  * Stateless event binding for automation panel.
  */
 
+import { hidePrerequisiteFailed } from '../services/actions/Hide/hide-position-qualification.js';
 import { notify } from '../services/infra/notifications.js';
 import {
   findSeekTemplateDocument,
@@ -68,7 +69,8 @@ export function getDirectHideChangedOutcomes(handler, outcomes = [], actionData 
       effectiveNewState === 'avs' &&
       oldStateAvsControlled &&
       outcome._calculatedNewVisibility &&
-      outcome._calculatedNewVisibility !== 'avs'
+      outcome._calculatedNewVisibility !== 'avs' &&
+      !hidePrerequisiteFailed(outcome)
     ) {
       outcome.overrideState = outcome._calculatedNewVisibility;
       return true;

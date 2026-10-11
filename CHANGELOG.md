@@ -1,5 +1,22 @@
 # Changelog
 
+## [8.11.6] - 2026-10-11
+
+### Added
+
+- Items that let you Hide or Sneak without cover or concealment are now supported. Using Camouflage Dye (Lesser/Greater) or a Chameleon Suit (base/Greater/Major) automatically applies a timed Visioner effect to the user, or to the single targeted creature. Camouflaging Chromatophores (Lesser/Greater) item cards get an **Apply Visioner Effect** button.
+- While the effect is active, Hide (and Sneak for Camouflage Dye) passes its end-position cover/concealment prerequisite, and the Hide/Sneak results dialogs show a badge for the effect. Chameleon Suit and Chromatophores only affect Hide, per their rules.
+
+### Fixed
+
+- Hide results no longer preselect Hidden when the end-position prerequisite fails for an AVS-controlled observer; AVS is selected instead. Apply Changes from chat no longer applies Hidden in that case.
+- Hide prerequisite bypasses from feats (e.g. Legendary Sneak, Ceaseless Shadows) and item effects are no longer overridden by the rule-element cover/concealment check.
+- Token-attached Sequencer effects stay above their token and are hidden while Visioner hides the token's art.
+
+### Tests
+
+- Added regressions for stealth prerequisite items, Hide failed-prerequisite selection, and Hide bypass ordering.
+
 ## [8.11.5] - 2026-10-06
 
 ### Added

@@ -13,6 +13,7 @@
  */
 
 import coverDetector from '../../cover/auto-cover/CoverDetector.js';
+import { hasStealthPrerequisiteBypass } from '../../items/stealth-prerequisite-items.js';
 import {
   actorHasFeature,
   getActorFeatureSlugs,
@@ -209,7 +210,8 @@ export class FeatsHandler {
     try {
       if (
         (action === 'sneak' || action === 'hide') &&
-        FeatsHandler.hasCeaselessShadows(tokenOrActor)
+        (FeatsHandler.hasCeaselessShadows(tokenOrActor) ||
+          hasStealthPrerequisiteBypass(tokenOrActor, action))
       )
         return true;
     } catch {}
@@ -380,6 +382,11 @@ export class FeatsHandler {
     if (feats.has('legendary-sneak')) {
       endQualifies = true;
       if (!reason) reason = 'Legendary Sneak removes cover/concealment requirement';
+    }
+
+    if (!endQualifies && hasStealthPrerequisiteBypass(actor, extra?.action)) {
+      endQualifies = true;
+      if (!reason) reason = 'Item effect removes cover/concealment requirement';
     }
 
     // Very, Very Sneaky: End position does not require cover or concealment either

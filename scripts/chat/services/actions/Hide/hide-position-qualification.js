@@ -23,6 +23,12 @@ export function applyHidePrerequisiteFallback(newVisibility, qualification) {
   return qualification?.endQualifies ? newVisibility : 'avs';
 }
 
+export function hidePrerequisiteFailed(outcome) {
+  const displayed = outcome?.positionDisplay?.endPosition?.qualifies;
+  if (typeof displayed === 'boolean') return !displayed;
+  return outcome?.positionQualification?.endQualifies === false;
+}
+
 function resolveHidingToken(actionData) {
   let hidingToken = actionData.actorToken || actionData.actor;
   if (hidingToken?.actor) return hidingToken;
@@ -94,13 +100,8 @@ export async function resolveHidePositionQualification({ actionData, subject, cu
     );
     qualification.endVisibility = position.endVisibility;
     qualification.endCoverState = position.endCoverState;
-    qualification = await applyFeatPrerequisiteOverrides(
-      actionData,
-      subject,
-      qualification,
-      position,
-    );
-    return applyRuleElementQualification(actionData, qualification);
+    qualification = await applyRuleElementQualification(actionData, qualification);
+    return applyFeatPrerequisiteOverrides(actionData, subject, qualification, position);
   } catch {
     return null;
   }
