@@ -28,6 +28,7 @@ export function withDetectionFilterPrimaryMesh(token, render) {
   const renderable = mesh.renderable;
   mesh.visible = true;
   mesh.renderable = true;
+  if (mesh.parent) mesh.updateTransform?.();
   try {
     return render();
   } finally {

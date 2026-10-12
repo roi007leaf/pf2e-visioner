@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.11.8] - 2026-10-12
+
+### Fixed
+
+- Hidden creature silhouettes (soundwave outlines) no longer get stuck at a fixed screen position, such as the top-left corner, or stay behind when panning or zooming the canvas. They now render on their token.
+
 ## [8.11.7] - 2026-10-12
 
 ### Fixed

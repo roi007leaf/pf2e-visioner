@@ -29,3 +29,18 @@ test('movement-cleared filter surface returns when Core resumes Hidden detection
   releaseDetectionFilterMesh(token);
   expect(token.detectionFilterMesh).toEqual({ visible: true, renderable: true, alpha: 1 });
 });
+
+test('Hidden filter draw refreshes the suppressed primary mesh transform so it follows the canvas', () => {
+  const calls = [];
+  const mesh = {
+    visible: true,
+    renderable: true,
+    parent: {},
+    updateTransform: jest.fn(() => calls.push(`update:${mesh.visible}`)),
+  };
+  const token = { mesh, detectionFilter: {} };
+  suppressDetectionFilterPrimaryMesh(token);
+  const draw = jest.fn(() => calls.push('draw'));
+  wrapTokenRenderDetectionFilter.call(token, draw);
+  expect(calls).toEqual(['update:true', 'draw']);
+});
