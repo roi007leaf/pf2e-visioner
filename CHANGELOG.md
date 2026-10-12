@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.11.7] - 2026-10-12
+
+### Fixed
+
+- On V14 multi-level scenes, creatures standing at the top elevation of a lower level's darkness region (e.g. elevation 0 above an Underground level) are no longer treated as being in darkness. AVS now respects the region's exclusive top, so these creatures are no longer wrongly set to Hidden and no longer pop to full visibility during movement.
+
 ## [8.11.6] - 2026-10-11
 
 ### Added

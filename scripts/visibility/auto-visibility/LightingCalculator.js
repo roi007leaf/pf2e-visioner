@@ -206,7 +206,9 @@ export class LightingCalculator {
     const adlRegions = sceneRegions.filter(
       (r) =>
         elevation >= r.elevation.bottom &&
-        elevation <= r.elevation.top &&
+        (r.elevation.topInclusive === false
+          ? elevation < r.elevation.top
+          : elevation <= r.elevation.top) &&
         r.polygonTree &&
         r.behaviors.some((b) => b.active && b.type === 'adjustDarknessLevel'),
     );
