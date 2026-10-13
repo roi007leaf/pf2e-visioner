@@ -189,7 +189,7 @@ describe('slow opening doors', () => {
     } finally { game.user = previousUser; }
   });
 
-  test('capture listener keeps door targeted during swing, releases on movement, restores normal clicks', async () => {
+  test('capture listener keeps original door targeted until Shift release, restores normal clicks', async () => {
     const previousCanvas = global.canvas;
     const previousUser = game.user;
     const previousUsers = game.users;
@@ -218,6 +218,13 @@ describe('slow opening doors', () => {
       expect(request).toHaveBeenCalledTimes(2);
       expect(rotateTokens).not.toHaveBeenCalled();
       document.dispatchEvent(new MouseEvent('pointermove', { clientX: 100, clientY: 100 }));
+      hovered = { wall: { document: makeDoor({ id: 'other-door' }) } };
+      expect(wheel()).toBe(false);
+      expect(request).toHaveBeenCalledTimes(3);
+      expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ wallId: 'door' }));
+      expect(rotateTokens).not.toHaveBeenCalled();
+      hovered = null;
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
       expect(wheel()).toBe(true);
       expect(rotateTokens).toHaveBeenCalledTimes(1);
       window.removeEventListener('wheel', rotateTokens);
@@ -228,15 +235,15 @@ describe('slow opening doors', () => {
       document.elementFromPoint = () => view;
       const boardHovered = new WheelEvent('wheel', { bubbles: true, cancelable: true, shiftKey: true, deltaY: -100, clientX: 10, clientY: 10 });
       expect(document.body.dispatchEvent(boardHovered)).toBe(false);
-      expect(request).toHaveBeenCalledTimes(3);
+      expect(request).toHaveBeenCalledTimes(4);
       // Also exercise the exact native rotation dispatch entry point.
       const wrapper = wrappers.get('foundry.canvas.layers.TokenLayer.prototype._onMouseWheel');
       const normalized = { shiftKey: true, delta: -100, clientX: 10, clientY: 10, preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
       wrapper.call({}, rotateTokens, normalized);
       expect(rotateTokens).toHaveBeenCalledTimes(1);
-      expect(request).toHaveBeenCalledTimes(4);
+      expect(request).toHaveBeenCalledTimes(5);
       await adjustSlowDoor(doc, 1, gm); // Wait for queued requests; each moves wall.
-      expect(doc.getFlag().angle).toBe(5);
+      expect(doc.getFlag().angle).toBe(6);
       expect(doc.c).not.toEqual([0, 0, 100, 0]);
       document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
       wrapper.call({}, rotateTokens, { ...normalized, shiftKey: false });

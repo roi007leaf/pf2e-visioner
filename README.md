@@ -20,7 +20,9 @@ Documentation: https://github.com/roi007leaf/pf2e-visioner/wiki
 Hover over a door control, hold **Shift**, and scroll **up to open** or **down to
 close** in 1-degree steps by default. Change **Slow Door Opening Step (Degrees)**
 under **PF2E Visioner Settings → Vision → Doors** to adjust the step from 1 to 45
-degrees for all users. Partially open doors retain their wall restrictions;
+degrees for all users. Once scrolling starts, the same door stays selected even
+when the cursor moves. Release **Shift** to end the interaction.
+Partially open doors retain their wall restrictions;
 fully open doors use Foundry's normal open state. The hinge and swing direction
 follow the door's animation settings. Regular clicking still opens or closes
 the whole door.

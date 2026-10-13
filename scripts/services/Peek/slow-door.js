@@ -111,9 +111,15 @@ export function registerSlowDoorInteraction({ getControl, requestStep, libWrappe
   registered = true;
   let gesture = null;
   const consume = (event) => {
-    const control = findSlowDoorControl(event) ?? getControl() ?? gesture?.control;
+    if (!event.shiftKey) {
+      gesture = null;
+      return false;
+    }
+    // Keep the original door selected until Shift is released, even when its
+    // icon moves or the cursor passes over another door.
+    const control = gesture?.control ?? findSlowDoorControl(event) ?? getControl();
     if (!handleSlowDoorWheel(event, control, requestStep)) return false;
-    gesture = { control, x: event.clientX, y: event.clientY };
+    gesture = { control };
     return true;
   };
   // Intercept the actual rotation entry point as well as DOM events. Foundry's
@@ -131,16 +137,15 @@ export function registerSlowDoorInteraction({ getControl, requestStep, libWrappe
   document.addEventListener('wheel', (event) => {
     const view = globalThis.canvas?.app?.view ?? globalThis.canvas?.app?.canvas;
     const hover = document.elementFromPoint?.(event.clientX, event.clientY);
-    if (!event.shiftKey || (event.target !== view && hover !== view && !view?.contains?.(event.target))) {
+    if (!event.shiftKey) {
       gesture = null;
       return;
     }
+    if (event.target !== view && hover !== view && !view?.contains?.(event.target)) return;
     consume(event);
   }, { capture: true, passive: false });
-  document.addEventListener('pointermove', (event) => {
-    if (gesture && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) gesture = null;
-  }, true);
   document.addEventListener('keyup', (event) => { if (event.key === 'Shift') gesture = null; });
+  globalThis.window?.addEventListener('blur', () => { gesture = null; });
   globalThis.Hooks?.on?.('canvasTearDown', () => { gesture = null; });
   globalThis.Hooks?.on?.('updateWall', (doc, changes, options = {}) => {
     if (!game.user?.isGM || options.visionerSlowDoor || !doc.getFlag(MODULE_ID, FLAG)) return;

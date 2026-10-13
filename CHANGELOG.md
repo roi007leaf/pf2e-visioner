@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.12.3] - 2026-10-13
+
+### Fixed
+
+- Slow door opening keeps the original door selected while Shift is held, even when the cursor moves away or passes over another door. Release Shift to end the interaction; leaving the window or changing scenes also clears the selection.
+
 ## [8.12.2] - 2026-10-13
 
 ### Added
