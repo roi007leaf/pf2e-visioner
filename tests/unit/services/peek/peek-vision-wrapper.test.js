@@ -3,6 +3,7 @@ import {
   applyPeekOverrideToData,
   createPeekLightSourceDataWrapper,
   createPeekSourceInitializeWrapper,
+  createPeekVisionPolygonConfigurationWrapper,
   radiansToFoundryRotation,
 } from '../../../../scripts/services/Peek/peek-vision-wrapper.js';
 
@@ -44,12 +45,12 @@ describe('applyPeekOverrideToData', () => {
     expect(data.angle).toBe(360);
   });
 
-  test('positive range also expands external radius for darkness fallback geometry', () => {
+  test('door range preserves core external radius for proximity and distance wall thresholds', () => {
     const data = applyPeekOverrideToData(
       { externalRadius: 50 },
       { origin: { x: 1, y: 2 }, direction: 0, fov: 10, range: 400 },
     );
-    expect(data.externalRadius).toBe(400);
+    expect(data.externalRadius).toBe(50);
   });
 
   test('range 0 leaves data.radius undefined', () => {
@@ -57,13 +58,13 @@ describe('applyPeekOverrideToData', () => {
     expect(data.radius).toBeUndefined();
   });
 
-  test('range 0 mirrors existing sight radius into external radius for corner peeks', () => {
+  test('corner peek preserves core external radius independently of sight range', () => {
     const data = applyPeekOverrideToData(
       { radius: 1200, externalRadius: 50 },
       { origin: { x: 1, y: 2 }, direction: 0, fov: null, range: 0 },
     );
     expect(data.radius).toBe(1200);
-    expect(data.externalRadius).toBe(1200);
+    expect(data.externalRadius).toBe(50);
   });
 
   test('range 0 does not shrink an external radius that is already larger than the sight radius (non-darkvision token in darkness)', () => {
@@ -75,7 +76,7 @@ describe('applyPeekOverrideToData', () => {
     expect(data.externalRadius).toBe(400);
   });
 
-  test('range 0 falls back to the scene max radius when the token has no usable sight radius at all (non-darkvision token blinded by darkness)', () => {
+  test('darkness fallback must not enlarge external radius used by wall thresholds', () => {
     const originalCanvas = globalThis.canvas;
     globalThis.canvas = { ...originalCanvas, dimensions: { ...originalCanvas.dimensions, maxR: 6490 } };
     try {
@@ -84,7 +85,7 @@ describe('applyPeekOverrideToData', () => {
         { origin: { x: 1, y: 2 }, direction: 0, fov: null, range: 0 },
       );
       expect(data.radius).toBe(0);
-      expect(data.externalRadius).toBe(6490);
+      expect(data.externalRadius).toBe(25);
     } finally {
       globalThis.canvas = originalCanvas;
     }
@@ -101,13 +102,13 @@ describe('createPeekLightSourceDataWrapper', () => {
     const override = { origin: { x: 10, y: 20 }, direction: 0, fov: 1, range: 400 };
     const controller = { getOverride: jest.fn(() => override) };
     const wrapper = createPeekLightSourceDataWrapper(controller);
-    const data = wrapper.call({ document: { id: 't' } }, () => ({ x: 1, y: 2, angle: 90 }));
+    const data = wrapper.call({ document: { id: 't' } }, () => ({ x: 1, y: 2, angle: 90, externalRadius: 25 }));
 
     expect(data.x).toBe(10);
     expect(data.y).toBe(20);
     expect(data.angle).toBe(360);
     expect(data.radius).toBe(400);
-    expect(data.externalRadius).toBe(400);
+    expect(data.externalRadius).toBe(25);
     expect(coneCenterRadians(data.rotation)).toBeCloseTo(0, 5);
   });
 });
@@ -144,5 +145,40 @@ describe('createPeekSourceInitializeWrapper', () => {
     wrapper.call({ object: token }, jest.fn());
 
     expect(controller.constrainToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('peek darkness polygon configuration', () => {
+  test.each([0, 400])('darkness fallback expands LOS radius only (peek range %s)', (range) => {
+    const previousCanvas = global.canvas;
+    global.canvas = { dimensions: { maxR: 6490 } };
+    try {
+      const wrapper = createPeekVisionPolygonConfigurationWrapper({ getOverride: () => ({ range }) });
+      const config = { radius: 25, externalRadius: 25, useThreshold: true, level: { id: 'level' } };
+      const source = { object: { document: { id: 't' } }, blinded: { darkness: true }, data: {} };
+      const result = wrapper.call(source, () => config);
+      expect(result.radius).toBe(range || 6490);
+      expect(result.externalRadius).toBe(25);
+      expect(result.useThreshold).toBe(true);
+      expect(result.level).toBe(config.level);
+    } finally { global.canvas = previousCanvas; }
+  });
+
+  test.each([
+    { blinded: { darkness: false }, data: {} },
+    { blinded: { darkness: true }, data: { disabled: true } },
+    { blinded: { darkness: true }, data: {}, suppressed: true },
+  ])('preserves ordinary, disabled and suppressed vision configuration (%j)', (source) => {
+    const wrapper = createPeekVisionPolygonConfigurationWrapper({ getOverride: () => ({ range: 400 }) });
+    const config = { radius: 0, externalRadius: 25, useThreshold: true };
+    expect(wrapper.call({ ...source, object: { document: { id: 't' } } }, () => config)).toEqual({ radius: 0, externalRadius: 25, useThreshold: true });
+  });
+
+  test('leaves non-peeking darkness fallback untouched', () => {
+    const wrapper = createPeekVisionPolygonConfigurationWrapper({ getOverride: () => null });
+    const config = { radius: 25, externalRadius: 25 };
+    const source = { object: { document: { id: 't' } }, blinded: { darkness: true }, data: {} };
+    expect(wrapper.call(source, () => config)).toBe(config);
+    expect(config.radius).toBe(25);
   });
 });

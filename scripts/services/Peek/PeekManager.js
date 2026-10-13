@@ -3,6 +3,7 @@ import { clampCornerPeek, clampDoorPeek, mergeSweptCone, pullBackOrigin } from '
 import { readDoorPeekGeometry, readPeekDC } from './peek-door-dc.js';
 import { registerDoorPeekInteraction } from './peek-door-control.js';
 import { inferPeekKind, isPeekKindBlocked } from './peek-block-mode.js';
+import { collectSeenPeekTokenIds } from './peek-socket.js';
 
 const PEEK_BAND = 25;
 const DOOR_NUDGE = 5;
@@ -46,6 +47,8 @@ export class PeekManager {
     this._pendingReaimTimer = null;
     this._pendingSweptGeo = new Map();
     this._lastRenderAt = new Map();
+    this._lastSeenTokenIds = new Map();
+    this._seenRefreshTimer = null;
   }
 
   async tryStartDoorPeek(token, doorDoc, mouse, { skipApproval = false } = {}) {
@@ -256,6 +259,7 @@ export class PeekManager {
     this._active.delete(tokenId);
     this._pendingSweptGeo.delete(tokenId);
     this._lastRenderAt.delete(tokenId);
+    this._lastSeenTokenIds.delete(tokenId);
     if (token) this._renderer.clear(token);
     this._socket.sendEnd(tokenId);
     this._recompute(tokenId);
@@ -265,10 +269,14 @@ export class PeekManager {
     return this._registry.get(tokenId);
   }
 
-  heartbeat() {
+  heartbeat({ onlyIfSightChanged = false } = {}) {
     for (const [id, entry] of this._active) {
       const peek = this._registry.get(id);
-      if (peek) this._socket.sendUpdate(id, { ...peek, points: this._polygonPoints(entry.token) });
+      if (!peek) continue;
+      const seen = JSON.stringify(collectSeenPeekTokenIds(id).sort());
+      if (onlyIfSightChanged && this._lastSeenTokenIds.get(id) === seen) continue;
+      this._lastSeenTokenIds.set(id, seen);
+      this._socket.sendUpdate(id, { ...peek, points: this._polygonPoints(entry.token) });
     }
   }
 
@@ -315,6 +323,8 @@ export class PeekManager {
   }
 
   endAll(reason) {
+    if (this._seenRefreshTimer) clearTimeout(this._seenRefreshTimer);
+    this._seenRefreshTimer = null;
     this._pendingDoorApprovals.clear();
     this._clearPendingReaim();
     for (const id of this._registry.ids()) this.endPeek(id, reason);
@@ -341,12 +351,23 @@ export class PeekManager {
     Hooks.on('updateToken', (doc, change) => this.onTokenUpdate(doc, change));
     Hooks.on('updateWall', (doc, change) => this.onWallUpdate(doc, change));
     Hooks.on('controlToken', () => this.onControlToken());
+    Hooks.on('refreshToken', () => this.scheduleSeenTokenRefresh());
     Hooks.on('canvasTearDown', () => this.endAll('teardown'));
     registerDoorPeekInteraction(this);
     if (typeof setInterval !== 'undefined') {
       this._heartbeatTimer = setInterval(() => this.heartbeat(), 2000);
     }
     this._attachPointerMove();
+  }
+
+  scheduleSeenTokenRefresh() {
+    if (globalThis.game?.user?.isGM || !this._active.size || this._seenRefreshTimer) return;
+    // Sample after Foundry finishes refreshing all token meshes. Coalesce a
+    // perception refresh into one report, without rebuilding vision sources.
+    this._seenRefreshTimer = setTimeout(() => {
+      this._seenRefreshTimer = null;
+      this.heartbeat({ onlyIfSightChanged: true });
+    }, 50);
   }
 
   _attachPointerMove() {

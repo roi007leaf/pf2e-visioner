@@ -6,6 +6,7 @@ import { isPointInCone } from './Peek/peek-geometry.js';
 import { peekRegistry } from './Peek/PeekRegistry.js';
 import { peekGmOverlay } from './Peek/peek-gm-overlay.js';
 import { inferPeekKind, isPeekKindBlocked } from './Peek/peek-block-mode.js';
+import { slowDoorStepHandler } from './Peek/slow-door.js';
 
 // Avoid name collision with Foundry/socket.io global `socket`
 // No module-scoped socket reference required; use the service wrapper
@@ -31,6 +32,7 @@ class SocketService {
     this._socket.register(PEEK_APPROVAL_REQUEST_CHANNEL, doorPeekApprovalRequestHandler);
     this._socket.register(PEEK_APPROVAL_RESPONSE_CHANNEL, doorPeekApprovalResponseHandler);
     this._socket.register(PEEK_REVEAL_REFRESH_CHANNEL, peekRevealRefreshHandler);
+    this._socket.register('SlowDoorStep', slowDoorStepHandler);
     this._socket.register(
       STEALTH_INITIATIVE_COVER_REQUEST_CHANNEL,
       stealthInitiativeCoverRequestHandler,
@@ -75,6 +77,11 @@ const STEALTH_INITIATIVE_COVER_RESPONSE_CHANNEL = 'StealthInitiativeCoverRespons
 
 export function registerSocket() {
   _socketService.register();
+}
+
+export function requestSlowDoorStep(payload) {
+  if (game.user?.isGM) return slowDoorStepHandler(payload);
+  return _socketService.socket?.executeAsGM?.('SlowDoorStep', payload);
 }
 
 /*
@@ -515,6 +522,7 @@ export function peekUpdateHandler(payload) {
       range: payload.range ?? 0,
       ignoredWallIds: payload.ignoredWallIds ?? [],
       points: payload.points ?? null,
+      seenTokenIds: payload.seenTokenIds ?? [],
       userColor: payload.userColor ?? null,
       userName: payload.userName ?? payload.tokenId,
       userId: payload.userId ?? null,

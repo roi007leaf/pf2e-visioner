@@ -1,6 +1,8 @@
 import { MODULE_ID } from '../../constants.js';
 import { isDoorPeekAllowed } from './peek-door-dc.js';
 import { isWithinDoorPeekRange } from './peek-geometry.js';
+import { registerSlowDoorInteraction } from './slow-door.js';
+import { requestSlowDoorStep } from '../socket.js';
 
 let _registered = false;
 let _hoveredDoorControl = null;
@@ -54,6 +56,7 @@ export async function handleDoorRightDown(manager, control) {
 }
 
 export function registerDoorPeekInteraction(_manager, { libWrapperAdapter } = {}) {
+  registerSlowDoorInteraction({ getControl: () => _hoveredDoorControl, requestStep: requestSlowDoorStep, libWrapperAdapter });
   if (_registered) return;
   const adapter = libWrapperAdapter || (typeof libWrapper !== 'undefined' ? libWrapper : null);
   if (!adapter) return;

@@ -1,5 +1,20 @@
 # Changelog
 
+## [8.12.0] - 2026-10-13
+
+### Added
+
+- GM previews for corner and door peeking mark enemies and neutral NPCs that the peeking player currently sees, with player-colored rings and eye badges above their tokens. Allies and soundwave-only detections are excluded; markers update automatically and disappear when the peek ends.
+- Hold Shift while scrolling over a door control to gradually open or close it in 1-degree steps. Partially open doors retain their wall restrictions, locked doors remain locked, and normal door clicks continue to work. Player use requires door-control permission, socketlib, and a connected GM.
+
+### Fixed
+
+- Peeking preserves Foundry's proximity and distance wall thresholds and attenuation instead of expanding the source footprint to its sight range. Darkness fallback remains available without overriding wall threshold calculations.
+
+### Tests
+
+- Added coverage for GM peek markers, ally filtering, sight updates, slow door gestures, permissions, and doors without animation settings. Verified gradual opening and closing live in Foundry with selected token rotation unchanged.
+
 ## [8.11.8] - 2026-10-12
 
 ### Fixed

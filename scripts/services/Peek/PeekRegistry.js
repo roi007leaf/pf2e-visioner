@@ -11,6 +11,9 @@ export class PeekRegistry {
       range: typeof data.range === 'number' ? data.range : 0,
       ignoredWallIds: Array.isArray(data.ignoredWallIds) ? data.ignoredWallIds : [],
       points: Array.isArray(data.points) ? data.points : null,
+      seenTokenIds: Array.isArray(data.seenTokenIds)
+        ? [...new Set(data.seenTokenIds.filter((id) => typeof id === 'string'))]
+        : [],
       userColor: data.userColor ?? null,
       userName: data.userName ?? null,
       userId: data.userId ?? null,

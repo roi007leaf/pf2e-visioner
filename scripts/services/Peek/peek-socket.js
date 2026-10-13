@@ -9,6 +9,21 @@ function roundPoints(points) {
   return out;
 }
 
+// Read the player's final render state, rather than the GM's omniscient view or
+// the swept reveal cone. A detection-filter silhouette is not a seen token.
+export function collectSeenPeekTokenIds(observerId) {
+  if (globalThis.game?.user?.isGM) return [];
+  return (globalThis.canvas?.tokens?.placeables ?? [])
+    .filter((token) => {
+      const id = token.document?.id ?? token.id;
+      return id && id !== observerId && token.visible === true &&
+        token.mesh?.visible === true && token.mesh.renderable !== false &&
+        token.mesh.worldAlpha !== 0 && !token.detectionFilter &&
+        token._pvCurrentViewHardHidden !== true;
+    })
+    .map((token) => token.document?.id ?? token.id);
+}
+
 export class PeekSocketSender {
   constructor({ emit, now, minIntervalMs = 100 }) {
     this._emit = emit;
@@ -42,6 +57,7 @@ export class PeekSocketSender {
       ignoredWallIds: peek.ignoredWallIds ?? [],
       range: typeof peek.range === 'number' ? peek.range : 0,
       points: roundPoints(peek.points),
+      seenTokenIds: collectSeenPeekTokenIds(tokenId),
       userColor: globalThis.game?.user?.color?.toString?.() ?? globalThis.game?.user?.color ?? null,
       userName: globalThis.game?.user?.name ?? null,
       userId: globalThis.game?.user?.id ?? null,

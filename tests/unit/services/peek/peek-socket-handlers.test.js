@@ -49,6 +49,18 @@ describe('GM peek socket handlers', () => {
     expect(peekRegistry.get('t').ignoredWallIds).toEqual(['w']);
   });
 
+  test.each([[[]], [['door1']]])('seen-token reports survive GM socket updates and clear on end (%j)', (ignoredWallIds) => {
+    const payload = { tokenId: 't', sceneId, userId: 'player1', origin: { x: 1, y: 2 }, direction: 0, fov: 10, ignoredWallIds };
+    peekUpdateHandler({ ...payload, seenTokenIds: ['seen', 'seen', null, 12] });
+    expect(peekRegistry.get('t').seenTokenIds).toEqual(['seen']);
+    peekUpdateHandler({ ...payload, seenTokenIds: [] });
+    expect(peekRegistry.get('t').seenTokenIds).toEqual([]);
+    peekUpdateHandler(payload);
+    expect(peekRegistry.get('t').seenTokenIds).toEqual([]);
+    peekEndHandler({ tokenId: 't', sceneId });
+    expect(peekRegistry.has('t')).toBe(false);
+  });
+
   test('peekUpdateHandler rejects player updates while GM block is active', () => {
     global.game.settings.get = jest.fn((moduleId, key) =>
       moduleId === 'pf2e-visioner' && key === 'playerPeekBlockMode'

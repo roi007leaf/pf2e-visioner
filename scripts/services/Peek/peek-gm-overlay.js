@@ -46,6 +46,29 @@ export class PeekGmOverlay {
       g.endFill();
     }
     this._drawEye(g, peek.origin.x, peek.origin.y, color);
+    if (drawPolygon && globalThis.game?.user?.isGM) {
+      const observer = globalThis.canvas?.tokens?.get?.(id);
+      for (const targetId of peek.seenTokenIds ?? []) {
+        if (targetId === id) continue;
+        const token = globalThis.canvas?.tokens?.get?.(targetId);
+        if (!token?.center || !this._isTargetEligible(observer, token)) continue;
+        const radius = Math.max(token.w ?? 0, token.h ?? 0) / 2 + 6;
+        g.lineStyle(5, 0x000000, 0.8);
+        g.drawCircle(token.center.x, token.center.y, radius);
+        g.lineStyle(3, color, 1);
+        g.drawCircle(token.center.x, token.center.y, radius);
+        this._drawEye(g, token.center.x, token.center.y - (token.h ?? 0) / 2 - 20, color);
+      }
+    }
+  }
+
+  _isTargetEligible(observer, token) {
+    if (token.actor?.type !== 'npc') return false;
+    if (token.actor.alliance === 'party' || observer?.actor?.isAllyOf?.(token.actor)) return false;
+    const dispositions = globalThis.CONST?.TOKEN_DISPOSITIONS;
+    const disposition = token.document?.disposition;
+    return disposition === (dispositions?.HOSTILE ?? -1) ||
+      disposition === (dispositions?.NEUTRAL ?? 0);
   }
 
   _drawEye(g, x, y, color) {

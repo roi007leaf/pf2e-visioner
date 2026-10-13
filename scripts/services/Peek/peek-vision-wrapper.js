@@ -24,20 +24,23 @@ export function applyPeekOverrideToData(data, override) {
   }
   if (typeof override.range === 'number' && override.range > 0) {
     data.radius = override.range;
-    data.externalRadius = override.range;
-  } else {
-    // Foundry uses externalRadius when darkness-blinding a non-darkvision source.
-    // Keep peek geometry from collapsing to the token footprint during that path.
-    const maxR = globalThis.canvas?.dimensions?.maxR;
-    const floor = Math.max(
-      typeof data.radius === 'number' ? data.radius : 0,
-      typeof maxR === 'number' ? maxR : 0,
-    );
-    if (floor > 0) {
-      data.externalRadius = Math.max(data.externalRadius ?? 0, floor);
-    }
   }
+  // externalRadius is the source footprint, not its sight range. Foundry uses
+  // it for proximity/distance thresholds and attenuation as well as angles.
   return data;
+}
+
+export function createPeekVisionPolygonConfigurationWrapper(controller) {
+  return function peekVisionPolygonConfigurationWrapper(wrapped, ...args) {
+    const config = wrapped.call(this, ...args);
+    const override = controller?.getOverride?.(this?.object?.document?.id);
+    if (!override || !this.blinded?.darkness || this.data?.disabled || this.suppressed) return config;
+    // Retain the darkness fallback LOS used by peek's post-init cone without
+    // changing the footprint supplied to Foundry's wall threshold calculations.
+    const radius = override.range > 0 ? override.range : globalThis.canvas?.dimensions?.maxR;
+    if (Number.isFinite(radius) && radius > 0) config.radius = radius;
+    return config;
+  };
 }
 
 export function createPeekVisionSourceDataWrapper(controller) {
@@ -77,6 +80,17 @@ export function registerPeekVisionWrapper(controller) {
   if (_registered) return;
   if (typeof libWrapper === 'undefined' || typeof libWrapper.register !== 'function') return;
   let registered = false;
+  try {
+    libWrapper.register(
+      MODULE_ID,
+      'foundry.canvas.sources.PointVisionSource.prototype._getPolygonConfiguration',
+      createPeekVisionPolygonConfigurationWrapper(controller),
+      'WRAPPER',
+    );
+    registered = true;
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to register peek vision polygon wrapper:', error);
+  }
   try {
     libWrapper.register(
       MODULE_ID,

@@ -13,6 +13,48 @@ function deps() {
   };
 }
 
+describe('PeekManager seen-token refresh', () => {
+  test('coalesces mesh refreshes, reports stationary sight changes without feedback, cancels on teardown', () => {
+    jest.useFakeTimers();
+    const previousCanvas = global.canvas;
+    const previousGM = game.user.isGM;
+    try {
+      game.user.isGM = false;
+      const target = { id: 'target', visible: true, mesh: { visible: true } };
+      global.canvas = { tokens: { placeables: [target] } };
+      const d = deps();
+      const manager = new PeekManager(d);
+      d.registry.set('observer', { origin: { x: 0, y: 0 } }, 0);
+      manager._active.set('observer', { token: {} });
+      manager.scheduleSeenTokenRefresh();
+      manager.scheduleSeenTokenRefresh();
+      jest.advanceTimersByTime(50);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+      manager.scheduleSeenTokenRefresh();
+      jest.advanceTimersByTime(50);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(1);
+      target.visible = false;
+      manager.scheduleSeenTokenRefresh();
+      jest.advanceTimersByTime(50);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(2);
+      expect(d.renderer.apply).not.toHaveBeenCalled();
+      expect(d.recompute).not.toHaveBeenCalled();
+      manager.scheduleSeenTokenRefresh();
+      manager.endAll('teardown');
+      jest.advanceTimersByTime(50);
+      expect(d.socket.sendUpdate).toHaveBeenCalledTimes(2);
+      game.user.isGM = true;
+      manager._active.set('observer', { token: {} });
+      manager.scheduleSeenTokenRefresh();
+      expect(manager._seenRefreshTimer).toBeNull();
+    } finally {
+      global.canvas = previousCanvas;
+      game.user.isGM = previousGM;
+      jest.useRealTimers();
+    }
+  });
+});
+
 function overridePeekSettings(values) {
   const previousGet = global.game.settings.get;
   global.game.settings.get = jest.fn((moduleId, key) => {

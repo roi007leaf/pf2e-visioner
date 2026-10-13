@@ -15,6 +15,17 @@ PF2E Visioner is a comprehensive visibility and cover toolkit for Foundry VTT's 
 
 Documentation: https://github.com/roi007leaf/pf2e-visioner/wiki
 
+## Slow opening doors
+
+Hover over a door control, hold **Shift**, and scroll **up to open** or **down to
+close** in 1-degree steps. Partially open doors retain their wall restrictions;
+fully open doors use Foundry's normal open state. The hinge and swing direction
+follow the door's animation settings. Regular clicking still opens or closes
+the whole door.
+
+Locked doors remain locked. Players need door-control permission, socketlib,
+and a connected GM; player interaction is disabled while the game is paused.
+
 ## Local automated tests
 
 From a source checkout, run `npm ci` and `npx playwright install chromium`, then

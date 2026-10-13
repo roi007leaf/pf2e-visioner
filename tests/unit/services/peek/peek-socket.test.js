@@ -1,8 +1,57 @@
 import '../../../setup.js';
-import { mergeSweptCone, PeekSocketSender } from '../../../../scripts/services/Peek/peek-socket.js';
+import { collectSeenPeekTokenIds, mergeSweptCone, PeekSocketSender } from '../../../../scripts/services/Peek/peek-socket.js';
 import { isPointInCone } from '../../../../scripts/services/Peek/peek-geometry.js';
 
 describe('PeekSocketSender', () => {
+  test.each([undefined, 10])('reports rendered sight for corner/door peeks (fov %s)', (fov) => {
+    const previousCanvas = global.canvas;
+    const previousGM = game.user.isGM;
+    try {
+      game.user.isGM = false;
+      const token = (id, props = {}) => ({ document: { id }, visible: true, mesh: { visible: true, renderable: true, worldAlpha: 1 }, ...props });
+      global.canvas = { tokens: { placeables: [
+        token('observer'), token('seen'), token('concealed'),
+        token('wall', { visible: false }),
+        token('dark', { mesh: { visible: false } }),
+        token('heard', { detectionFilter: {} }),
+        token('undetected', { _pvCurrentViewHardHidden: true }),
+        token('transparent', { mesh: { visible: true, worldAlpha: 0 } }),
+      ] } };
+      const emit = jest.fn();
+      const sender = new PeekSocketSender({ emit, now: () => 0 });
+      sender.sendUpdate('observer', { origin: { x: 0, y: 0 }, fov });
+      expect(emit).toHaveBeenLastCalledWith('PeekUpdate', expect.objectContaining({ seenTokenIds: ['seen', 'concealed'] }));
+      game.user.isGM = true;
+      expect(collectSeenPeekTokenIds('observer')).toEqual([]);
+    } finally {
+      global.canvas = previousCanvas;
+      game.user.isGM = previousGM;
+    }
+  });
+
+  test('trailing update samples latest rendered view, not earlier sweep visibility', () => {
+    jest.useFakeTimers();
+    const previousCanvas = global.canvas;
+    const previousGM = game.user.isGM;
+    try {
+      game.user.isGM = false;
+      const target = { id: 'target', visible: true, mesh: { visible: true } };
+      global.canvas = { tokens: { placeables: [target] } };
+      const emit = jest.fn();
+      const sender = new PeekSocketSender({ emit });
+      const peek = { origin: { x: 0, y: 0 }, direction: 0, fov: 10 };
+      sender.sendUpdate('observer', peek);
+      sender.sendUpdate('observer', peek);
+      target.visible = false;
+      jest.advanceTimersByTime(100);
+      expect(emit.mock.calls[0][1].seenTokenIds).toEqual(['target']);
+      expect(emit.mock.calls[1][1].seenTokenIds).toEqual([]);
+    } finally {
+      global.canvas = previousCanvas;
+      game.user.isGM = previousGM;
+      jest.useRealTimers();
+    }
+  });
   function make(times) {
     let i = 0;
     const emit = jest.fn();
