@@ -79,9 +79,10 @@ describe('slow opening doors', () => {
     expect(doc.c).toEqual([0, 0, 100, 0]);
   });
 
-  test('hinge flip and swing direction follow door animation settings', () => {
-    expect(slowDoorCoordinates([0, 0, 100, 0], 45, { flip: true, direction: -1 })).toEqual([29, 71, 100, 0]);
+  test('texture flip preserves native first-endpoint hinge and swing direction', () => {
+    expect(slowDoorCoordinates([0, 0, 100, 0], 45, { flip: true, direction: -1 })).toEqual([0, 0, 71, -71]);
     expect(slowDoorCoordinates([0, 0, 100, 0], 45, { direction: -1 })).toEqual([0, 0, 71, -71]);
+    expect(slowDoorCoordinates([0, 0, 100, 0], 45, { flip: true, direction: 1 })).toEqual([0, 0, 71, 71]);
   });
 
   test.each([

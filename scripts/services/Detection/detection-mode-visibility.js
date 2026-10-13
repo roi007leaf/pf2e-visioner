@@ -7,6 +7,7 @@ import {
 import { shouldBypassAvsForGmVision } from '../gm-vision-bypass.js';
 import { cachedHearingPointTestDuringMove } from './during-move-hearing-cache.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
+import { isNativeVisibilityProbe } from './native-visibility-probe.js';
 
 function testDetectionPoints(detectionMode, visionSource, mode, config) {
   return (config.tests || []).some((test) =>
@@ -16,6 +17,11 @@ function testDetectionPoints(detectionMode, visionSource, mode, config) {
 
 export function testDetectionModeVisibility(visionSource, mode, config = {}) {
   if (!mode.enabled) return false;
+  if (isNativeVisibilityProbe(visionSource?.object, config.object)) {
+    const level = config.level ?? config.object?.document?.level ?? config.object?.document?._source?.level;
+    return this._canDetect(visionSource, config.object, level) &&
+      testDetectionPoints(this, visionSource, mode, config);
+  }
   if (!isAvsActiveGivenCombatGate()) {
     return testDetectionPoints(this, visionSource, mode, config);
   }

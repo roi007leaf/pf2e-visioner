@@ -33,6 +33,7 @@ import { getActiveSceneHearingRange } from '../../services/scene-hearing-range.j
 import { getLogger } from '../../utils/logger.js';
 import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
+import { withNativeVisibilityProbe } from '../../services/Detection/native-visibility-probe.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -419,12 +420,17 @@ export class VisionAnalyzer {
       // HOWEVER: During token movement, the vision polygon may be stale (based on old position)
       // So we check if the observer position has changed significantly
       const stalePositionTolerance = observerPeek?.origin ? 0.5 : 5;
+      // An offset eye is expected while peeking. Compare against the polygon's
+      // actual origin, not the token center, before discarding Core attenuation.
+      const polygonOrigin = observerPeek?.origin
+        ? (los?.origin ?? observer.vision?.origin ?? observer.center)
+        : observer.center;
       const visionPolygonStale =
         !usingOnDemandLos &&
         usingPositionManager &&
         los?.points &&
-        (Math.abs(observerPos.x - observer.center.x) > stalePositionTolerance ||
-          Math.abs(observerPos.y - observer.center.y) > stalePositionTolerance);
+        (Math.abs(observerPos.x - polygonOrigin.x) > stalePositionTolerance ||
+          Math.abs(observerPos.y - polygonOrigin.y) > stalePositionTolerance);
 
       if (los?.points && !visionPolygonStale) {
         const radius = target.externalRadius;
@@ -436,7 +442,8 @@ export class VisionAnalyzer {
         // Native points require wall-constrained geometry. Reuse them for the
         // two synchronous checks, but never retain them across movement calls.
         const nativeTargetPoints = target?.document?.getVisibilityTestPoints?.();
-        const foundryPointVisible = this.#testFoundryVisibility(observer, target, targetPos, nativeTargetPoints);
+        const foundryPointVisible = usingOnDemandLos ? null :
+          this.#testFoundryVisibility(observer, target, targetPos, nativeTargetPoints);
 
         // HYBRID VALIDATION: Compare vision polygon with full geometric LOS
         // When they agree, trust the result. When they disagree, use geometric as tiebreaker.
@@ -721,13 +728,20 @@ export class VisionAnalyzer {
       const backend = globalThis.CONFIG?.Canvas?.polygonBackends?.sight;
       if (typeof backend?.create !== 'function') return null;
       const id = observer?.document?.id ?? observer?.id ?? 'na';
+      const peek = peekRegistry.get(id);
+      const config = peek?.origin ? {
+        ...observer.vision?._getPolygonConfiguration?.(),
+        type: 'sight',
+        useThreshold: true,
+        externalRadius: observer.vision?.data?.externalRadius ?? observer.externalRadius ?? 0,
+      } : { type: 'sight' };
       const key = `${id}:${Math.round(observerPos.x)}:${Math.round(observerPos.y)}`;
       if (this.#onDemandSightPolygonCache.has(key)) {
         return this.#onDemandSightPolygonCache.get(key);
       }
       const polygon = backend.create(
         { x: observerPos.x, y: observerPos.y },
-        { type: 'sight' },
+        config,
       );
       const result = polygon?.points?.length ? polygon : null;
       if (this.#onDemandSightPolygonCache.size > 512) {
@@ -1343,12 +1357,9 @@ export class VisionAnalyzer {
         target?.document?._source?.level ??
         observer?.document?.level ??
         observer?.document?._source?.level;
-      const foundryVisibility = this.#callFoundryVisibilityTest({
-        observer,
-        target,
-        testPoints,
-        level,
-      });
+      const foundryVisibility = withNativeVisibilityProbe(observer, target, () =>
+        this.#callFoundryVisibilityTest({ observer, target, testPoints, level }),
+      );
 
       if (!foundryVisibility.available) {
         return null;

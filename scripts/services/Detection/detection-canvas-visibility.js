@@ -7,6 +7,7 @@ import {
   isAvsActiveGivenCombatGate,
 } from './detection-visibility-context.js';
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
+import { isNativeVisibilityProbe } from './native-visibility-probe.js';
 import { peekRegistry } from '../Peek/PeekRegistry.js';
 import { isPointInCone } from '../Peek/peek-geometry.js';
 import { isVisualSenseType } from '../../visibility/StatelessVisibilityCalculator.js';
@@ -183,6 +184,7 @@ function preserveDeafenedHiddenMarker(target, options) {
 }
 
 export function wrapCanvasVisibilityTest(wrapped, points, options = {}) {
+  if (isNativeVisibilityProbe(options.source?.object, options.object)) return wrapped(points, options);
   if (isSelectAllTokenVisibilityBypassActive()) {
     return wrapped(points, options);
   }

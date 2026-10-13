@@ -21,9 +21,10 @@ function enqueue(doc, work) {
 export function slowDoorCoordinates(closed, angle, animation = {}) {
   if (angle === 0 || angle === 90) return [...closed];
   const [x1, y1, x2, y2] = closed;
-  const flip = animation?.flip === true;
-  const hinge = flip ? [x2, y2] : [x1, y1];
-  const tip = flip ? [x1, y1] : [x2, y2];
+  // Foundry's single-door swing always pivots at ray.A. Flip mirrors the
+  // texture vertically; only Open Direction controls the swing side.
+  const hinge = [x1, y1];
+  const tip = [x2, y2];
   const radians = angle * Math.PI / 180 * (animation?.direction === -1 ? -1 : 1);
   const dx = tip[0] - hinge[0];
   const dy = tip[1] - hinge[1];
@@ -31,7 +32,7 @@ export function slowDoorCoordinates(closed, angle, animation = {}) {
     Math.round(hinge[0] + dx * Math.cos(radians) - dy * Math.sin(radians)),
     Math.round(hinge[1] + dx * Math.sin(radians) + dy * Math.cos(radians)),
   ];
-  return flip ? [...moved, ...hinge] : [...hinge, ...moved];
+  return [...hinge, ...moved];
 }
 
 export function adjustSlowDoor(doc, direction, user) {

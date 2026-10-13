@@ -1,5 +1,17 @@
 # Changelog
 
+## [8.12.1] - 2026-10-13
+
+### Fixed
+
+- Players can detect creatures visible through proximity windows while peeking. AVS now checks the actual peek polygon origin instead of treating its offset from the token as stale, and native sight probes no longer inherit the previous Hidden or Undetected state.
+- GM calculations for uncontrolled peeking observers retain native wall thresholds and attenuation instead of checking an inactive vision source.
+- Slow door opening follows Foundry's Open Direction and first-endpoint hinge. Flipping the door texture no longer switches the hinge or makes the door swing to the wrong side.
+
+### Tests
+
+- Added regressions for peek attenuation, GM sight calculations, native detection probe isolation, and flipped door swing direction. Checked the corrected LOS resolver against the reported player scene and both door directions live.
+
 ## [8.12.0] - 2026-10-13
 
 ### Added

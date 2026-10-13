@@ -317,6 +317,44 @@ describe('VisionAnalyzer peek constraints', () => {
     );
   });
 
+  test('current offset peek polygon remains authoritative for proximity attenuation', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair({ observerX: 195, targetX: 212 });
+    const origin = { x: 190, y: 0 };
+    observer.vision = {
+      active: true,
+      origin,
+      los: {
+        origin,
+        points: [0, 0, 1, 1],
+        intersectCircle: () => ({ points: [190, 0, 212, 0, 212, 1] }),
+        contains: () => true,
+      },
+    };
+    canvas.visibility = { testVisibility: jest.fn(() => true) };
+    canvas.walls.placeables = [proximityWall({ attenuation: true })];
+    va.clearCache();
+    peekRegistry.set(observer.document.id, { origin, fov: null, range: 0, ignoredWallIds: [] }, Date.now());
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+  });
+
+  test('GM on-demand peek sight uses native thresholds without consulting inactive token source', () => {
+    const va = new VisionAnalyzer();
+    const { observer, target } = makeProximityPeekPair({ observerX: 195, targetX: 212 });
+    const origin = { x: 190, y: 0 };
+    const polygon = { points: [190, 0, 212, 0, 212, 1], intersectCircle: () => ({ points: [190, 0, 212, 0, 212, 1] }), contains: () => true };
+    const create = jest.fn(() => polygon);
+    CONFIG.Canvas.polygonBackends.sight.create = create;
+    observer.vision = { active: false, data: { externalRadius: 5 }, _getPolygonConfiguration: () => ({ radius: 1000, externalRadius: 5 }) };
+    canvas.visibility = { testVisibility: jest.fn(() => false) };
+    canvas.walls.placeables = [proximityWall({ attenuation: true })];
+    va.clearCache();
+    peekRegistry.set(observer.document.id, { origin, fov: null, range: 0, ignoredWallIds: [] }, Date.now());
+    expect(va.hasLineOfSight(observer, target)).toBe(true);
+    expect(create).toHaveBeenCalledWith(origin, expect.objectContaining({ type: 'sight', useThreshold: true, externalRadius: 5, radius: 1000 }));
+    expect(canvas.visibility.testVisibility).not.toHaveBeenCalled();
+  });
+
   test('returns false when target is outside the peek cone', () => {
     const va = new VisionAnalyzer();
     const { observer, target } = makePair();
