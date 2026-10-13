@@ -13,7 +13,8 @@ import {
 function makeDoor(overrides = {}) {
   let saved;
   const doc = {
-    id: 'door', uuid: 'Scene.scene.Wall.door', door: 1, ds: 0,
+    id: 'door', uuid: 'Scene.scene.Wall.door',
+    parent: { id: 'scene', tokens: { get: (id) => id === 'selected' ? { object: reachToken } : null } }, door: 1, ds: 0,
     c: [0, 0, 100, 0], animation: { direction: 1, flip: false },
     getFlag: () => saved,
     update: jest.fn(async (changes) => {
@@ -29,8 +30,95 @@ function makeDoor(overrides = {}) {
 
 const gm = { id: 'gm', isGM: true, can: () => true };
 const player = { id: 'player', isGM: false, can: () => true, hasRole: () => true };
+const reachToken = {
+  document: { parent: { id: 'scene' } },
+  actor: { testUserPermission: () => true, isOfType: () => true, system: { attributes: { reach: { manipulate: 5 } } } },
+  distanceTo: () => 5,
+};
+player.character = { getActiveTokens: () => [reachToken] };
 
 describe('slow opening doors', () => {
+  test('assigned character cannot replace token selection in player or GM paths', async () => {
+    const previousUser = game.user;
+    try {
+      const doc = makeDoor();
+      expect(await adjustSlowDoor(doc, 1, player, [])).toBe(false);
+      expect(doc.update).not.toHaveBeenCalled();
+      game.user = player;
+      const request = jest.fn();
+      const event = { shiftKey: true, deltaY: -100, preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
+      expect(handleSlowDoorWheel(event, { wall: { document: doc } }, request)).toBe(true);
+      expect(request).not.toHaveBeenCalled();
+    } finally { game.user = previousUser; }
+  });
+  test('player wheel sends selected token and stops after deselection', () => {
+    const previousUser = game.user;
+    const previousTokens = canvas.tokens;
+    try {
+      game.user = player;
+      canvas.tokens = { controlled: [{ document: { id: 'selected' } }] };
+      const doc = makeDoor();
+      const request = jest.fn();
+      const event = { shiftKey: true, deltaY: -100, preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
+      expect(handleSlowDoorWheel(event, { wall: { document: doc } }, request)).toBe(true);
+      expect(request).toHaveBeenCalledWith(expect.objectContaining({ tokenIds: ['selected'] }));
+      canvas.tokens.controlled = [];
+      expect(handleSlowDoorWheel(event, { wall: { document: doc } }, request)).toBe(true);
+      expect(request).toHaveBeenCalledTimes(1);
+    } finally { game.user = previousUser; canvas.tokens = previousTokens; }
+  });
+  test('selected token reach validates ownership, scene, and native manipulate reach', async () => {
+    const token = { ...reachToken, distanceTo: () => 10 };
+    const owner = { ...player, character: null };
+    const doc = makeDoor({ parent: { id: 'scene', tokens: { get: (id) => id === 'selected' ? { object: token } : null } } });
+    expect(await adjustSlowDoor(doc, 1, owner, ['selected'])).toBe(false);
+    token.actor = { ...reachToken.actor, system: { attributes: { reach: { manipulate: 10 } } } };
+    expect(await adjustSlowDoor(doc, 1, owner, ['selected'])).toBe(true);
+    token.actor.testUserPermission = () => false;
+    expect(await adjustSlowDoor(doc, 1, owner, ['selected'])).toBe(false);
+    token.actor.testUserPermission = () => true;
+    token.document = { parent: { id: 'other-scene' } };
+    expect(await adjustSlowDoor(doc, 1, owner, ['selected'])).toBe(false);
+    expect(await adjustSlowDoor(doc, 1, owner, ['forged-token'])).toBe(false);
+    expect(doc.update).toHaveBeenCalledTimes(1);
+  });
+
+  test('out-of-reach player wheel is consumed without sending a GM request', () => {
+    const previousUser = game.user;
+    try {
+      game.user = { ...player, character: null };
+      const request = jest.fn();
+      const event = { shiftKey: true, deltaY: -100, preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
+      expect(handleSlowDoorWheel(event, { wall: { document: makeDoor() } }, request)).toBe(true);
+      expect(event.stopImmediatePropagation).toHaveBeenCalled();
+      expect(request).not.toHaveBeenCalled();
+    } finally { game.user = previousUser; }
+  });
+
+  test('GM handler rejects distant players and rechecks reach on every step', async () => {
+    const previousScenes = game.scenes;
+    const previousUsers = game.users;
+    const originalDistance = reachToken.distanceTo;
+    try {
+      const doc = makeDoor();
+      game.scenes = { get: () => ({ walls: { get: () => doc } }) };
+      game.users = { get: () => player };
+      const payload = { sceneId: 'scene', wallId: 'door', direction: 1, tokenIds: ['selected'] };
+      reachToken.distanceTo = () => 100;
+      expect(await slowDoorStepHandler.call({ socketdata: { userId: 'player' } }, payload)).toBe(false);
+      expect(doc.update).not.toHaveBeenCalled();
+      reachToken.distanceTo = () => 5;
+      expect(await slowDoorStepHandler.call({ socketdata: { userId: 'player' } }, payload)).toBe(true);
+      reachToken.distanceTo = () => 100;
+      expect(await slowDoorStepHandler.call({ socketdata: { userId: 'player' } }, payload)).toBe(false);
+      expect(doc.getFlag().angle).toBe(1);
+      expect(await adjustSlowDoor(doc, 1, gm)).toBe(true);
+    } finally {
+      game.scenes = previousScenes;
+      game.users = previousUsers;
+      reachToken.distanceTo = originalDistance;
+    }
+  });
   test('GM world setting changes subsequent wheel steps without reload', async () => {
     expect(DEFAULT_SETTINGS.slowDoorStepDegrees).toMatchObject({ scope: 'world', restricted: true, type: Number, default: 1, range: { min: 1, max: 45, step: 1 } });
     const originalGet = game.settings.get;
@@ -41,10 +129,10 @@ describe('slow opening doors', () => {
       await adjustSlowDoor(doc, 1, gm);
       expect(doc.getFlag().angle).toBe(5);
       step = 10;
-      await adjustSlowDoor(doc, 1, player);
+      await adjustSlowDoor(doc, 1, player, ['selected']);
       expect(doc.getFlag().angle).toBe(15);
       step = NaN;
-      await adjustSlowDoor(doc, -1, player);
+      await adjustSlowDoor(doc, -1, player, ['selected']);
       expect(doc.getFlag().angle).toBe(14);
       step = 1000;
       await adjustSlowDoor(doc, -1, gm);
@@ -85,7 +173,7 @@ describe('slow opening doors', () => {
 
   test('can begin by slowly closing an already-open door', async () => {
     const doc = makeDoor({ ds: 1 });
-    await adjustSlowDoor(doc, -1, player);
+    await adjustSlowDoor(doc, -1, player, ['selected']);
     expect(doc.getFlag().angle).toBe(89);
     expect(doc.ds).toBe(0);
     expect(doc.c).toEqual([0, 0, 2, 100]);

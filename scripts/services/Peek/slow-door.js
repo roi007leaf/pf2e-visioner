@@ -42,10 +42,33 @@ export function slowDoorCoordinates(closed, angle, animation = {}) {
   return [...hinge, ...moved];
 }
 
-export function adjustSlowDoor(doc, direction, user) {
+function playerCanReachDoor(doc, user, tokenIds = []) {
+  if (user?.isGM) return true;
+  const scene = doc.parent;
+  if (!scene?.id) return false;
+  const selected = Array.isArray(tokenIds)
+    ? tokenIds.map((id) => scene.tokens?.get?.(id)?.object).filter(Boolean) : [];
+  const coordinates = doc.getFlag(MODULE_ID, FLAG)?.closed ?? doc.c;
+  if (!Array.isArray(coordinates) || coordinates.length !== 4) return false;
+  const [x1, y1, x2, y2] = coordinates;
+  const points = [{ x: x1, y: y1 }, { x: x2, y: y2 }, { x: (x1 + x2) / 2, y: (y1 + y2) / 2 }];
+  // Match PF2e door reach: owned creature/party, manipulate reach (minimum
+  // five feet), measured by TokenPF2e.distanceTo. Check the requesting player,
+  // never the GM executing their socket request, and keep the original doorway.
+  return selected.some((token) => {
+    const actor = token.actor;
+    if (token.document?.parent?.id !== scene.id || !actor?.testUserPermission?.(user, 'OWNER') ||
+      !actor.isOfType?.('creature', 'party') || typeof token.distanceTo !== 'function') return false;
+    const reach = Math.max(actor.system?.attributes?.reach?.manipulate ?? 0, 5);
+    return points.some((point) => token.distanceTo(point) <= reach);
+  });
+}
+
+export function adjustSlowDoor(doc, direction, user, tokenIds = []) {
   return enqueue(doc, async () => {
     if (!doc.door || doc.ds === states().LOCKED || !user?.can?.('WALL_DOORS')) return false;
     if (!user.isGM && (game.paused || !user.hasRole?.('PLAYER') || doc.door === (globalThis.CONST?.WALL_DOOR_TYPES?.SECRET ?? 2))) return false;
+    if (!playerCanReachDoor(doc, user, tokenIds)) return false;
     if (direction !== 1 && direction !== -1) return false;
     const saved = doc.getFlag(MODULE_ID, FLAG);
     const closed = saved?.closed ?? [...doc.c];
@@ -70,7 +93,7 @@ export function slowDoorStepHandler(payload) {
   const scene = game.scenes?.get?.(payload?.sceneId);
   const doc = scene?.walls?.get?.(payload?.wallId);
   if (!doc || !user) return false;
-  return adjustSlowDoor(doc, payload.direction, user);
+  return adjustSlowDoor(doc, payload.direction, user, payload.tokenIds);
 }
 
 export function handleSlowDoorWheel(event, control, requestStep) {
@@ -83,7 +106,14 @@ export function handleSlowDoorWheel(event, control, requestStep) {
   event.preventDefault();
   event.stopImmediatePropagation();
   if (doc.ds === states().LOCKED) return true;
-  Promise.resolve(requestStep({ sceneId: canvas.scene.id, wallId: doc.id, direction: delta < 0 ? 1 : -1 }))
+  const tokenIds = (canvas.tokens?.controlled ?? []).map((token) => token.document.id);
+  if (!playerCanReachDoor(doc, game.user, tokenIds)) {
+    globalThis.ui?.notifications?.warn?.('PF2E.Wall.Door.OutOfReach', { localize: true });
+    return true;
+  }
+  const payload = { sceneId: canvas.scene.id, wallId: doc.id, direction: delta < 0 ? 1 : -1 };
+  if (!game.user.isGM) payload.tokenIds = tokenIds;
+  Promise.resolve(requestStep(payload))
     .catch((error) => { console.warn('[PF2E-Visioner] Slow door update failed:', error); });
   return true;
 }

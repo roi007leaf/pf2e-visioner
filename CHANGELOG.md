@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.12.4] - 2026-10-13
+
+### Fixed
+
+- Players must select an owned creature or party token within manipulate reach of the doorway to slowly open or close doors (minimum 5 feet). Selection and reach are checked on each scroll step, and the GM validates the requesting player's token ownership and distance before updating the door. Deselecting or moving out of reach stops further changes; GMs remain unrestricted by distance.
+
 ## [8.12.3] - 2026-10-13
 
 ### Fixed

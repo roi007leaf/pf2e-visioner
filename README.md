@@ -29,6 +29,9 @@ the whole door.
 
 Locked doors remain locked. Players need door-control permission, socketlib,
 and a connected GM; player interaction is disabled while the game is paused.
+Players must select an owned creature or party token within manipulate reach of
+the doorway (minimum 5 feet). Reach is checked on every scroll step; GMs can
+operate doors from any distance.
 
 ## Local automated tests
 
