@@ -1,5 +1,6 @@
 import '../../../setup.js';
 import { MODULE_ID } from '../../../../scripts/constants.js';
+import { DEFAULT_SETTINGS } from '../../../../scripts/constants.js';
 import {
   adjustSlowDoor,
   findSlowDoorControl,
@@ -30,6 +31,26 @@ const gm = { id: 'gm', isGM: true, can: () => true };
 const player = { id: 'player', isGM: false, can: () => true, hasRole: () => true };
 
 describe('slow opening doors', () => {
+  test('GM world setting changes subsequent wheel steps without reload', async () => {
+    expect(DEFAULT_SETTINGS.slowDoorStepDegrees).toMatchObject({ scope: 'world', restricted: true, type: Number, default: 1, range: { min: 1, max: 45, step: 1 } });
+    const originalGet = game.settings.get;
+    let step = 5;
+    game.settings.get = jest.fn((moduleId, key) => key === 'slowDoorStepDegrees' ? step : originalGet(moduleId, key));
+    try {
+      const doc = makeDoor();
+      await adjustSlowDoor(doc, 1, gm);
+      expect(doc.getFlag().angle).toBe(5);
+      step = 10;
+      await adjustSlowDoor(doc, 1, player);
+      expect(doc.getFlag().angle).toBe(15);
+      step = NaN;
+      await adjustSlowDoor(doc, -1, player);
+      expect(doc.getFlag().angle).toBe(14);
+      step = 1000;
+      await adjustSlowDoor(doc, -1, gm);
+      expect(doc.getFlag().angle).toBe(0);
+    } finally { game.settings.get = originalGet; }
+  });
   test('finds visible door icon directly with canvas offset and scaling, without hover callbacks', () => {
     const previousCanvas = global.canvas;
     const hidden = { visible: false, wall: { document: { door: 1 } }, getBounds: () => ({ x: 40, y: 40, width: 40, height: 40 }) };

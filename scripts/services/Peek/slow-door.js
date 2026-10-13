@@ -1,9 +1,16 @@
 import { MODULE_ID } from '../../constants.js';
 
 const FLAG = 'slowDoor';
-const STEP = 1;
 const queues = new Map();
 let registered = false;
+
+function slowDoorStepDegrees() {
+  try {
+    const value = Number(globalThis.game?.settings?.get?.(MODULE_ID, 'slowDoorStepDegrees'));
+    if (Number.isFinite(value) && value > 0) return Math.max(1, Math.min(45, Math.round(value)));
+  } catch (_) {}
+  return 1;
+}
 
 function states() {
   return globalThis.CONST?.WALL_DOOR_STATES ?? { CLOSED: 0, OPEN: 1, LOCKED: 2 };
@@ -44,7 +51,7 @@ export function adjustSlowDoor(doc, direction, user) {
     const closed = saved?.closed ?? [...doc.c];
     if (!Array.isArray(closed) || closed.length !== 4 || !closed.every(Number.isFinite)) return false;
     const current = saved?.angle ?? (doc.ds === states().OPEN ? 90 : 0);
-    const angle = Math.max(0, Math.min(90, current + direction * STEP));
+    const angle = Math.max(0, Math.min(90, current + direction * slowDoorStepDegrees()));
     if (angle === current) return false;
     await doc.update({
       c: slowDoorCoordinates(closed, angle, doc.animation),

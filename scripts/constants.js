@@ -1163,6 +1163,16 @@ export const DEFAULT_SETTINGS = {
     type: Boolean,
     default: true,
   },
+  slowDoorStepDegrees: {
+    name: 'PF2E_VISIONER.SETTINGS.SLOW_DOOR_STEP_DEGREES.name',
+    hint: 'PF2E_VISIONER.SETTINGS.SLOW_DOOR_STEP_DEGREES.hint',
+    scope: 'world',
+    config: true,
+    restricted: true,
+    type: Number,
+    default: 1,
+    range: { min: 1, max: 45, step: 1 },
+  },
   peekSlitAngle: {
     name: 'PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.name',
     hint: 'PF2E_VISIONER.SETTINGS.PEEK_SLIT_ANGLE.hint',

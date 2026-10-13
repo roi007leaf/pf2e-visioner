@@ -1058,6 +1058,10 @@
         "name": "Ignore Dead Tokens",
         "hint": "Dead tokens will not provide Auto-Cover"
       },
+      "SLOW_DOOR_STEP_DEGREES": {
+        "name": "Slow Door Opening Step (Degrees)",
+        "hint": "Degrees to open or close a door per Shift + mouse wheel step. Smaller values give finer control. Applies to all users immediately; default 1 degree."
+      },
       "PEEK_SLIT_ANGLE": {
         "name": "Peek Slit Angle (°)",
         "hint": "Width of the peek vision cone in degrees."

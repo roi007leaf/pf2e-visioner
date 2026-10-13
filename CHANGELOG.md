@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.12.2] - 2026-10-13
+
+### Added
+
+- Added Slow Door Opening Step (Degrees) under PF2E Visioner Settings → Vision → Doors. GMs can choose a step from 1 to 45 degrees, with a default of 1 degree. Changes apply immediately to GM and player Shift + mouse wheel door interactions.
+
 ## [8.12.1] - 2026-10-13
 
 ### Fixed

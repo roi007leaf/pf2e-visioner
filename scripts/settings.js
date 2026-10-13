@@ -49,6 +49,7 @@ const SETTINGS_GROUPS = {
         'enableCameraVisionAggregation',
       ],
     },
+    { title: 'Doors', keys: ['slowDoorStepDegrees'] },
     { title: 'Hidden Loot Actors', keys: ['includeLootActors', 'lootStealthDC'] },
     { title: 'Hidden Walls', keys: ['hiddenWallsEnabled', 'wallStealthDC'] },
     { title: 'Hidden Tiles', keys: ['hiddenTilesEnabled'] },
