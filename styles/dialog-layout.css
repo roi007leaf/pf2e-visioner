@@ -4890,23 +4890,180 @@ button.row-timer-toggle.active:not(:hover) {
   overscroll-behavior: contain;
 }
 
-.pv-wall-quick .pv-peek-settings {
-  margin: 1rem 0;
-  padding: 0.75rem 1rem;
+.application.pv-door-sound-editor .window-content {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  container-type: inline-size;
+}
+.pv-sound-editor-form {
+  --sound-border: #35313e;
+  --sound-muted: #a29daa;
+  --sound-accent: #dba45b;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  color: #e7e3eb;
+  background: #121118;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pv-sound-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px 12px; }
+.pv-sound-eyebrow { display: block; color: var(--sound-accent); font-size: 10px; letter-spacing: 0.12em; font-weight: 700; }
+.pv-sound-editor-form .pv-sound-editor-header h2 { margin: 4px 0; border: 0; color: #eeeaf2; font: 600 19px/1.2 var(--font-body); }
+.pv-sound-editor-header p { margin: 0; color: var(--sound-muted); font-size: 11px; }
+.pv-sound-enabled { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border: 1px solid var(--sound-border); border-radius: 20px; background: #201d28; }
+.pv-sound-editor-form label { font-size: 11px; font-weight: 500; }
+.pv-sound-editor-form input:not([type="checkbox"]),
+.pv-sound-editor-form file-picker { min-width: 0; width: 100%; height: 28px; font-size: 12px; border-color: #403b49; }
+.pv-sound-editor-form button { min-height: 28px; font-size: 11px; border-radius: 5px; }
+.pv-sound-editor-form input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+.pv-sound-preview { margin: 0 20px 14px; padding: 12px 14px 10px; border: 1px solid #423828; border-radius: 8px; background: linear-gradient(120deg, #262018, #1c1923 65%); }
+.pv-sound-preview-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pv-sound-preview-heading > div { flex: 1; }
+.pv-sound-preview-heading [data-preview-status] { color: var(--sound-muted); font-size: 11px; }
+.pv-sound-preview-heading output { font: 500 28px/1 var(--font-body); font-variant-numeric: tabular-nums; }
+.pv-sound-preview-heading button { width: 28px; padding: 0; color: #c4bdca; background: #24212b; }
+.pv-sound-angle-track { position: relative; height: 26px; background: #100f16; border-radius: 4px; overflow: hidden; }
+.pv-sound-angle-track button { position: absolute; top: 0; bottom: 0; left: var(--segment-left); width: var(--segment-width); min-height: 0; margin: 0; padding: 0; border: 0; border-right: 2px solid #17141c; border-radius: 0; background: color-mix(in srgb, var(--clip-color) 32%, #1b1820); color: var(--clip-color); font: 700 10px/1 var(--font-body); }
+.pv-sound-angle-track button:hover { background: color-mix(in srgb, var(--clip-color) 48%, #1b1820); }
+.pv-sound-playhead { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #fff5e6; pointer-events: none; }
+.pv-sound-editor-form .pv-sound-preview input[type="range"] { height: 18px; margin: 4px 0 0; }
+.pv-sound-ruler { display: flex; justify-content: space-between; color: #cbc3cd; font-size: 10px; font-variant-numeric: tabular-nums; }
+.pv-sound-ruler small { color: var(--sound-muted); font-size: 10px; }
+.pv-sound-editor-body { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 20px 12px; scrollbar-gutter: stable; }
+.pv-sound-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; }
+.pv-sound-editor-form .pv-sound-section-heading h3 { display: flex; align-items: center; gap: 7px; margin: 0; border: 0; font: 600 13px/1.3 var(--font-body); }
+.pv-sound-section-heading h3 span { color: var(--sound-muted); font-size: 10px; font-weight: 400; margin-left: 4px; }
+.pv-sound-section-heading button { color: #c9c2d1; border: 1px solid var(--sound-border); background: #1c1923; padding: 3px 8px; }
+.pv-sound-clip-list { display: grid; gap: 8px; }
+.pv-sound-range { padding: 10px; border: 1px solid var(--sound-border); border-left: 3px solid var(--clip-color, #dba45b); border-radius: 6px; background: #1b1822; }
+.pv-sound-clip-main { display: grid; grid-template-columns: 22px 132px minmax(0, 1fr) 26px; gap: 8px; align-items: center; }
+.pv-sound-clip-number { font-size: 10px; font-weight: 700; color: var(--clip-color); }
+.pv-sound-range-bounds { display: flex; align-items: center; gap: 4px; color: var(--sound-muted); }
+.pv-sound-editor-form .pv-sound-range-bounds input { width: 48px; padding: 0 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.pv-sound-editor-form .pv-sound-remove { min-height: 26px; padding: 0; border: 0; background: transparent; color: #99919f; }
+.pv-sound-editor-form .pv-sound-remove:hover { color: #f0a7ac; background: #3a242d; }
+.pv-sound-clip-options { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px 18px; padding-left: 30px; margin-top: 8px; color: var(--sound-muted); }
+.pv-sound-clip-options > label { display: flex; align-items: center; gap: 6px; min-height: 26px; }
+.pv-sound-clip-options summary { cursor: pointer; padding: 5px 0; font-size: 11px; }
+.pv-sound-clip-options details { min-width: 55px; }
+.pv-sound-trim { display: flex; gap: 8px; margin-top: 4px; }
+.pv-sound-trim label { display: grid; gap: 3px; }
+.pv-sound-editor-form .pv-sound-trim input { width: 80px; }
+.pv-sound-editor-form .pv-sound-volume input { width: 52px; height: 24px; padding: 0 4px; }
+.pv-sound-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 12px; padding-top: 12px; border-top: 1px solid var(--sound-border); }
+.pv-sound-toggle small { display: block; margin-top: 3px; color: var(--sound-muted); font-size: 10px; }
+.pv-sound-help { margin: 12px 0 0; color: var(--sound-muted); font-size: 10px; line-height: 1.5; }
+.pv-sound-editor-form footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--sound-border); background: #19161f; }
+.pv-sound-editor-form footer > span { color: var(--sound-muted); font-size: 10px; }
+.pv-sound-editor-form footer button { color: #20170d; background: #dba45b; border: 1px solid #e6b879; font-weight: 700; padding: 6px 12px; }
+@container (max-width: 510px) {
+  .pv-sound-editor-header { padding: 12px; }
+  .pv-sound-editor-form .pv-sound-editor-header h2 { font-size: 16px; }
+  .pv-sound-editor-header p { display: none; }
+  .pv-sound-preview { margin: 0 12px 12px; }
+  .pv-sound-editor-body { padding: 0 12px 12px; }
+  .pv-sound-clip-main { grid-template-columns: 22px minmax(0, 1fr) 26px; }
+  .pv-sound-clip-main file-picker { grid-column: 1 / -1; grid-row: 2; }
+  .pv-sound-clip-options { padding-left: 0; gap: 8px 12px; }
+  .pv-sound-editor-form footer { padding: 10px 12px; }
+  .pv-sound-editor-form footer > span { max-width: 120px; }
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick > fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick .notes {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick .form-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick input:not([type="checkbox"]),
+.application.pf2e-visioner-wall-quick .pv-wall-quick file-picker {
+  min-width: 0;
+  height: 28px;
+  font-size: 13px;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick input[type="number"] {
+  width: 80px;
+  justify-self: end;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  justify-self: end;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick file-picker,
+.application.pf2e-visioner-wall-quick .pv-wall-quick .cover-override-buttons {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.pv-wall-quick .pv-peek-settings,
+.pv-wall-quick .pv-slow-door-sound-settings {
+  margin: 10px 0;
+  padding: 10px 12px;
   border: 1px solid var(--color-border-light-primary, #685a51);
   border-radius: 6px;
 }
 
-.pv-wall-quick .pv-peek-settings h3 {
-  margin: 0 0 0.75rem;
+.application.pf2e-visioner-wall-quick .pv-wall-quick h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 600;
+  border: 0;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick .sheet-footer {
+  padding-top: 8px;
+  margin: 0;
+}
+
+.application.pf2e-visioner-wall-quick .pv-wall-quick .sheet-footer button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 13px;
 }
 
 .pv-wall-quick .pv-peek-field {
   display: grid;
-  grid-template-columns: minmax(9rem, 1fr) minmax(7rem, 11rem);
+  grid-template-columns: minmax(0, 1fr) 80px;
   gap: 0.25rem 0.75rem;
   align-items: center;
-  margin-bottom: 0.7rem;
+  margin-bottom: 8px;
 }
 
 .pv-wall-quick .pv-peek-field:last-child {

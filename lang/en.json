@@ -1062,6 +1062,18 @@
         "name": "Slow Door Opening Step (Degrees)",
         "hint": "Degrees to open or close a door per Shift + mouse wheel step. Smaller values give finer control. Applies to all users immediately; default 1 degree."
       },
+      "SLOW_DOOR_SOUNDS": {
+        "name": "Slow Door Sounds",
+        "hint": "Play a creak once per Shift-held interaction. Release Shift to allow a new sound. Nearby listeners hear it; overlapping playback is blocked."
+      },
+      "SLOW_DOOR_SOUND_PATH": {
+        "name": "Slow Door Sound File",
+        "hint": "Browse or upload a short creak, scrape, or grinding clip. Blank stays silent; normal door sounds are separate."
+      },
+      "SLOW_DOOR_SOUND_VOLUME": {
+        "name": "Slow Door Sound Volume",
+        "hint": "0 = silent, 1 = full volume. Default 0.5."
+      },
       "PEEK_SLIT_ANGLE": {
         "name": "Peek Slit Angle (°)",
         "hint": "Width of the peek vision cone in degrees."

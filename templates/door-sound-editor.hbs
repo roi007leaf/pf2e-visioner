@@ -1,0 +1,30 @@
+<form class="pv-sound-editor-form" onsubmit="return false;">
+  <header class="pv-sound-editor-header">
+    <div><span class="pv-sound-eyebrow">DOOR AUDIO</span><h2>Sound follows movement</h2><p>Place clips along the swing. Preview without moving the door.</p></div>
+    <label class="pv-sound-enabled"><span>Timeline</span><input type="checkbox" name="enabled" {{checked enabled}}></label>
+  </header>
+  <section class="pv-sound-preview">
+    <div class="pv-sound-preview-heading"><div><span class="pv-sound-eyebrow">LOCAL PREVIEW</span><span data-preview-status>Opening</span></div><output data-preview-angle>0°</output><button type="button" data-action="stopPreview" title="Stop preview" aria-label="Stop preview"><i class="fas fa-stop"></i></button></div>
+    <div class="pv-sound-angle-track" data-angle-track aria-label="Opening audio ranges">
+      {{#each opening}}<button type="button" data-action="seekAngle" data-angle-value="{{from}}" style="--segment-left:{{left}}%;--segment-width:{{width}}%;--clip-color:{{color}}" title="{{from}}–{{to}}° · {{clipLabel}}">{{number}}</button>{{/each}}
+      <span class="pv-sound-playhead" data-playhead></span>
+    </div>
+    <input type="range" data-angle min="0" max="90" step="1" value="0" aria-label="Preview door angle">
+    <div class="pv-sound-ruler"><span>0° <small>Closed</small></span><span>45°</span><span><small>Open</small> 90°</span></div>
+  </section>
+  <main class="pv-sound-editor-body">
+    <div class="pv-sound-section-heading"><h3><i class="fas fa-arrow-right"></i> Opening <span>0 → 90°</span></h3><button type="button" data-action="addOpening"><i class="fas fa-plus"></i> Range</button></div>
+    <div class="pv-sound-clip-list">
+    {{#each opening}}{{> "modules/pf2e-visioner/templates/door-sound-range.hbs" direction="opening" index=@index}}{{/each}}
+    </div>
+    <label class="pv-sound-toggle"><span><i class="fas fa-arrow-left"></i> Separate closing audio <small>Otherwise reuse opening clips</small></span><input type="checkbox" name="separateClosing" {{checked separateClosing}}></label>
+    <section data-closing>
+      <div class="pv-sound-section-heading"><h3>Closing <span>90 → 0°</span></h3><button type="button" data-action="addClosing"><i class="fas fa-plus"></i> Range</button></div>
+      <div class="pv-sound-clip-list">
+      {{#each closing}}{{> "modules/pf2e-visioner/templates/door-sound-range.hbs" direction="closing" index=@index}}{{/each}}
+      </div>
+    </section>
+    <p class="pv-sound-help"><i class="fas fa-circle-info"></i> Gaps stay silent. Loops sustain while scrolling; stopping fades out. Enable Slow Door Sounds on this door for live playback.</p>
+  </main>
+  <footer><span><i class="fas fa-headphones"></i> Preview is heard only by you</span><button type="button" data-action="save"><i class="fas fa-check"></i> Save timeline</button></footer>
+</form>

@@ -27,11 +27,39 @@ fully open doors use Foundry's normal open state. The hinge and swing direction
 follow the door's animation settings. Regular clicking still opens or closes
 the whole door.
 
+Partially open doors show an amber outline and angle badge on the door control
+(for example **35°**). The badge clears when fully closed or fully open and
+follows Foundry's normal door control visibility, including secret doors.
+
 Locked doors remain locked. Players need door-control permission, socketlib,
 and a connected GM; player interaction is disabled while the game is paused.
 Players must select an owned creature or party token within manipulate reach of
 the doorway (minimum 5 feet). Reach is checked on every scroll step; GMs can
 operate doors from any distance.
+
+Enable **Slow Door Sounds** in the door's **Open Visioner Wall Settings** dialog
+to play a dedicated movement sound. Upload a short creak, scrape, or grinding
+clip using the browser beside **Slow Door Sound File**. This is separate
+from regular door opening/closing sounds; leaving the file blank stays silent.
+**Slow Door Sound Volume** defaults to 50%. Audio uses Foundry's native
+door sound range. Audio plays once per Shift-held interaction; further scrolling
+or reversing direction does not restart it. Release Shift to begin a new
+interaction. Overlapping clips are blocked. Sound toggle, file, and volume are configured per
+door. Sounds default off and apply to all users viewing that scene.
+
+For movement-based audio, choose **Edit angle sound timeline** in the door's
+Visioner settings. Enable the timeline and assign clips to ranges from 0°
+(closed) to 90° (open). Each range has an audio browser, trim start/end in
+seconds, a volume multiplier, and a loop toggle. Ranges cannot overlap; gaps
+and empty clips are silent. Separate closing ranges are optional; otherwise
+closing reuses the opening ranges.
+
+Drag the preview angle slider to audition opening and closing locally without
+moving the door or broadcasting audio. Save the timeline, and enable **Slow
+Door Sounds** in the door's wall settings for live use. During movement, loops
+sustain within their range, transitions crossfade, and audio fades out after
+400 ms without a scroll step. Sustaining uses loops rather than time stretching.
+Disabling the timeline restores the single clip per Shift-held interaction.
 
 ## Local automated tests
 

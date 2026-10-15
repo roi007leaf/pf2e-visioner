@@ -158,7 +158,7 @@ describe('slow opening doors', () => {
     expect(doc.c).toEqual([0, 0, 100, 2]);
     expect(doc.ds).toBe(0);
     expect(doc.getFlag().angle).toBe(1);
-    expect(doc.update).toHaveBeenLastCalledWith(expect.any(Object), { visionerSlowDoor: true, sound: false, animate: false });
+    expect(doc.update).toHaveBeenLastCalledWith(expect.any(Object), { visionerSlowDoor: true, visionerSlowDoorDirection: 1, sound: false, animate: false });
     await Promise.all(Array.from({ length: 100 }, () => adjustSlowDoor(doc, 1, gm)));
     expect(doc.getFlag().angle).toBe(90);
     expect(doc.ds).toBe(1);
@@ -293,7 +293,7 @@ describe('slow opening doors', () => {
       global.canvas = { ...previousCanvas, app: { view } };
       const doc = makeDoor();
       let hovered = { wall: { document: doc } };
-      const request = jest.fn((payload) => adjustSlowDoor(doc, payload.direction, gm));
+      const request = jest.fn((payload) => adjustSlowDoor(doc, payload.direction, gm, [], payload.gestureId));
       const wrappers = new Map();
       global.foundry = { canvas: { layers: { TokenLayer: function TokenLayer() {} } } };
       const rotateTokens = jest.fn();
@@ -309,6 +309,9 @@ describe('slow opening doors', () => {
       hovered = { wall: { document: makeDoor({ id: 'other-door' }) } };
       expect(wheel()).toBe(false);
       expect(request).toHaveBeenCalledTimes(3);
+      const firstGesture = request.mock.calls[0][0].gestureId;
+      expect(typeof firstGesture).toBe('string');
+      expect(request.mock.calls.slice(0, 3).every(([payload]) => payload.gestureId === firstGesture)).toBe(true);
       expect(request).toHaveBeenLastCalledWith(expect.objectContaining({ wallId: 'door' }));
       expect(rotateTokens).not.toHaveBeenCalled();
       hovered = null;
@@ -324,14 +327,17 @@ describe('slow opening doors', () => {
       const boardHovered = new WheelEvent('wheel', { bubbles: true, cancelable: true, shiftKey: true, deltaY: -100, clientX: 10, clientY: 10 });
       expect(document.body.dispatchEvent(boardHovered)).toBe(false);
       expect(request).toHaveBeenCalledTimes(4);
+      expect(request.mock.calls[3][0].gestureId).not.toBe(firstGesture);
       // Also exercise the exact native rotation dispatch entry point.
       const wrapper = wrappers.get('foundry.canvas.layers.TokenLayer.prototype._onMouseWheel');
       const normalized = { shiftKey: true, delta: -100, clientX: 10, clientY: 10, preventDefault: jest.fn(), stopImmediatePropagation: jest.fn() };
       wrapper.call({}, rotateTokens, normalized);
       expect(rotateTokens).toHaveBeenCalledTimes(1);
       expect(request).toHaveBeenCalledTimes(5);
+      expect(request.mock.calls[4][0].gestureId).toBe(request.mock.calls[3][0].gestureId);
       await adjustSlowDoor(doc, 1, gm); // Wait for queued requests; each moves wall.
       expect(doc.getFlag().angle).toBe(6);
+      expect(doc.update.mock.calls[0][1].visionerSlowDoorGesture).toBe(`gm:${firstGesture}`);
       expect(doc.c).not.toEqual([0, 0, 100, 0]);
       document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
       wrapper.call({}, rotateTokens, { ...normalized, shiftKey: false });

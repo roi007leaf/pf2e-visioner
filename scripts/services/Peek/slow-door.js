@@ -1,8 +1,11 @@
 import { MODULE_ID } from '../../constants.js';
+import { playSlowDoorSound, stopDoorSoundTimelines } from './slow-door-sound.js';
+import { refreshPartialDoorIndicator, registerPartialDoorIndicator } from './partial-door-indicator.js';
 
 const FLAG = 'slowDoor';
 const queues = new Map();
 let registered = false;
+let gestureSequence = 0;
 
 function slowDoorStepDegrees() {
   try {
@@ -64,7 +67,7 @@ function playerCanReachDoor(doc, user, tokenIds = []) {
   });
 }
 
-export function adjustSlowDoor(doc, direction, user, tokenIds = []) {
+export function adjustSlowDoor(doc, direction, user, tokenIds = [], gestureId) {
   return enqueue(doc, async () => {
     if (!doc.door || doc.ds === states().LOCKED || !user?.can?.('WALL_DOORS')) return false;
     if (!user.isGM && (game.paused || !user.hasRole?.('PLAYER') || doc.door === (globalThis.CONST?.WALL_DOOR_TYPES?.SECRET ?? 2))) return false;
@@ -76,11 +79,15 @@ export function adjustSlowDoor(doc, direction, user, tokenIds = []) {
     const current = saved?.angle ?? (doc.ds === states().OPEN ? 90 : 0);
     const angle = Math.max(0, Math.min(90, current + direction * slowDoorStepDegrees()));
     if (angle === current) return false;
+    const options = { visionerSlowDoor: true, visionerSlowDoorDirection: direction, sound: false, animate: false };
+    if (typeof gestureId === 'string' && gestureId.length > 0 && gestureId.length <= 128) {
+      options.visionerSlowDoorGesture = `${user.id}:${gestureId}`;
+    }
     await doc.update({
       c: slowDoorCoordinates(closed, angle, doc.animation),
       ds: angle === 90 ? states().OPEN : states().CLOSED,
       [`flags.${MODULE_ID}.${FLAG}`]: { closed, angle },
-    }, { visionerSlowDoor: true, sound: false, animate: false });
+    }, options);
     return true;
   });
 }
@@ -93,7 +100,7 @@ export function slowDoorStepHandler(payload) {
   const scene = game.scenes?.get?.(payload?.sceneId);
   const doc = scene?.walls?.get?.(payload?.wallId);
   if (!doc || !user) return false;
-  return adjustSlowDoor(doc, payload.direction, user, payload.tokenIds);
+  return adjustSlowDoor(doc, payload.direction, user, payload.tokenIds, payload.gestureId);
 }
 
 export function handleSlowDoorWheel(event, control, requestStep) {
@@ -148,13 +155,15 @@ export function registerSlowDoorInteraction({ getControl, requestStep, libWrappe
     // Keep the original door selected until Shift is released, even when its
     // icon moves or the cursor passes over another door.
     const control = gesture?.control ?? findSlowDoorControl(event) ?? getControl();
-    if (!handleSlowDoorWheel(event, control, requestStep)) return false;
-    gesture = { control };
+    const next = gesture ?? { control, id: `${Date.now()}-${++gestureSequence}` };
+    if (!handleSlowDoorWheel(event, control, (payload) => requestStep({ ...payload, gestureId: next.id }))) return false;
+    gesture = next;
     return true;
   };
   // Intercept the actual rotation entry point as well as DOM events. Foundry's
   // MouseManager can dispatch wheel events whose DOM target isn't the board.
   const adapter = libWrapperAdapter ?? globalThis.libWrapper;
+  registerPartialDoorIndicator(adapter);
   const target = globalThis.foundry?.canvas?.layers?.TokenLayer?.prototype
     ? 'foundry.canvas.layers.TokenLayer.prototype._onMouseWheel'
     : typeof globalThis.TokenLayer === 'function' ? 'TokenLayer.prototype._onMouseWheel' : null;
@@ -176,8 +185,10 @@ export function registerSlowDoorInteraction({ getControl, requestStep, libWrappe
   }, { capture: true, passive: false });
   document.addEventListener('keyup', (event) => { if (event.key === 'Shift') gesture = null; });
   globalThis.window?.addEventListener('blur', () => { gesture = null; });
-  globalThis.Hooks?.on?.('canvasTearDown', () => { gesture = null; });
+  globalThis.Hooks?.on?.('canvasTearDown', () => { gesture = null; stopDoorSoundTimelines(); });
   globalThis.Hooks?.on?.('updateWall', (doc, changes, options = {}) => {
+    refreshPartialDoorIndicator(doc.object?.doorControl);
+    playSlowDoorSound(doc, changes, options);
     if (!game.user?.isGM || options.visionerSlowDoor || !doc.getFlag(MODULE_ID, FLAG)) return;
     const activeGM = game.users?.activeGM;
     if (activeGM && activeGM.id !== game.user.id) return;

@@ -1,5 +1,21 @@
 # Changelog
 
+## [8.13.0] - 2026-10-15
+
+### Added
+
+- Per-door slow movement sounds in Visioner Wall Settings, with an audio file browser, enable toggle, and volume. Dedicated creak or scrape clips remain separate from normal Foundry opening/closing sounds. Single-clip mode plays once per Shift-held interaction and prevents overlapping playback.
+- Door Sound Timeline editor with angle ranges, per-range audio files, trim start/end, volume multipliers, looping, and optional separate closing clips. Local preview includes a clickable angle track and playhead; playback crossfades between ranges and fades out when scrolling stops. Timeline playback uses loops rather than time stretching.
+- Partially open doors display an amber outline and angle badge on their door control. Indicators clear at fully closed/open states and respect native control visibility, including secret doors.
+
+### Changed
+
+- Compact wall settings and timeline editor styling, with numbered color-coded clip rows, expandable trim controls, fixed preview/save areas, and responsive layouts.
+
+### Validation
+
+- Regression coverage for sound gesture lifetime, per-door configuration, native file picker saving, angle boundaries, trim/loop validation, audio cleanup, and GM/player indicator visibility. Checked editor preview audio, save/reopen, responsive layout, and partial-door rendering live in Foundry.
+
 ## [8.12.4] - 2026-10-13
 
 ### Fixed

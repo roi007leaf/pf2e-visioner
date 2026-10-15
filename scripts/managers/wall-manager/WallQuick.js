@@ -5,6 +5,7 @@
 import { MODULE_ID } from '../../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { readDoorPeekGeometry } from '../../services/Peek/peek-door-dc.js';
+import { DoorSoundEditor } from './DoorSoundEditor.js';
 
 export class VisionerWallQuickSettings extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -18,6 +19,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     classes: ['pf2e-visioner-wall-quick'],
     position: { width: 520, height: 720 },
     actions: {
+      editDoorSound() { if (this._isDoor() && game.user.isGM) new DoorSoundEditor(this.wall).render(true); },
       apply: VisionerWallQuickSettings._onApply,
       close: VisionerWallQuickSettings._onClose,
     },
@@ -60,6 +62,9 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       hiddenWall: !!hiddenWall,
       blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
       isDoor: this._isDoor(),
+      slowDoorSounds: d?.getFlag?.(MODULE_ID, 'slowDoorSounds') === true,
+      slowDoorSoundPath: d?.getFlag?.(MODULE_ID, 'slowDoorSoundPath') ?? '',
+      slowDoorSoundVolume: d?.getFlag?.(MODULE_ID, 'slowDoorSoundVolume') ?? 0.5,
       peekAllowed: d?.getFlag?.(MODULE_ID, 'peekAllowed') === true,
       peekDC: d?.getFlag?.(MODULE_ID, 'peekDC') ?? '',
       peekSlitAngle: readDoorPeekGeometry(d, 'peekSlitAngle', 10),
@@ -188,6 +193,14 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     const patch = { _id: app.wall.id };
     patch[`flags.${MODULE_ID}.blocksScent`] = fd.has('blocksScent');
     if (app._isDoor()) {
+      patch[`flags.${MODULE_ID}.slowDoorSounds`] = fd.has('slowDoorSounds');
+      // Native file-picker is a custom form control; plain FormData does not
+      // include its value on every supported Foundry/browser combination.
+      const soundPath = form.querySelector('file-picker[name="slowDoorSoundPath"]')?.value ?? entries.slowDoorSoundPath;
+      patch[`flags.${MODULE_ID}.slowDoorSoundPath`] = String(soundPath ?? '').trim();
+      const soundVolume = entries.slowDoorSoundVolume === undefined ? 0.5 : Number(entries.slowDoorSoundVolume);
+      patch[`flags.${MODULE_ID}.slowDoorSoundVolume`] = Number.isFinite(soundVolume)
+        ? Math.max(0, Math.min(1, soundVolume)) : 0.5;
       const peekAllowed = fd.has('peekAllowed');
       patch[`flags.${MODULE_ID}.peekAllowed`] = peekAllowed;
       if (peekAllowed) {

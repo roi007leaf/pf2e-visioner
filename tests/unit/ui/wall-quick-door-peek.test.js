@@ -54,6 +54,27 @@ test('popup apply leaves peek flags alone on an ordinary wall', async () => {
   await VisionerWallQuickSettings._onApply.call(app);
   const patch = doc.parent.updateEmbeddedDocuments.mock.calls[0][1][0];
   expect(Object.keys(patch).some((key) => key.includes('peek'))).toBe(false);
+  expect(Object.keys(patch).some((key) => key.includes('slowDoor'))).toBe(false);
+});
+
+test('door sound context and save use individual wall flags, including silent volume', async () => {
+  const doc = wall(1, { slowDoorSounds: true, slowDoorSoundPath: 'wood.ogg', slowDoorSoundVolume: 0.2 });
+  const app = new VisionerWallQuickSettings(doc);
+  expect(await app._prepareContext()).toMatchObject({ slowDoorSounds: true, slowDoorSoundPath: 'wood.ogg', slowDoorSoundVolume: 0.2 });
+  expect(await new VisionerWallQuickSettings(wall(1))._prepareContext()).toMatchObject({ slowDoorSounds: false, slowDoorSoundPath: '', slowDoorSoundVolume: 0.5 });
+  app.element = document.createElement('div');
+  app.element.innerHTML = `<form class="pv-wall-quick">
+    <input type="checkbox" name="slowDoorSounds" checked />
+    <file-picker type="audio" name="slowDoorSoundPath"></file-picker>
+    <input type="number" name="slowDoorSoundVolume" value="0" min="0" max="1" />
+  </form>`;
+  app.element.querySelector('file-picker').value = ' stone.ogg ';
+  await VisionerWallQuickSettings._onApply.call(app);
+  expect(doc.parent.updateEmbeddedDocuments).toHaveBeenCalledWith('Wall', [expect.objectContaining({
+    [`flags.${MODULE_ID}.slowDoorSounds`]: true,
+    [`flags.${MODULE_ID}.slowDoorSoundPath`]: 'stone.ogg',
+    [`flags.${MODULE_ID}.slowDoorSoundVolume`]: 0,
+  })], { diff: false });
 });
 
 test('unchecked Allow Peeking hides and disables options, then restores them when checked', () => {

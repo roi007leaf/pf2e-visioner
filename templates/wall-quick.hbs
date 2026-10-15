@@ -35,6 +35,25 @@
       </div>
       </div>
     </section>
+    <section class="pv-slow-door-sound-settings">
+      <h3>{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUNDS.name"}}</h3>
+      <button type="button" data-action="editDoorSound" class="visioner-btn"><i class="fas fa-wave-square"></i> Edit angle sound timeline</button>
+      <div class="form-group">
+        <label>{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUNDS.name"}}</label>
+        <input type="checkbox" name="slowDoorSounds" {{checked slowDoorSounds}} />
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUNDS.hint"}}</p>
+      </div>
+      <div class="form-group">
+        <label>{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUND_PATH.name"}}</label>
+        <file-picker type="audio" name="slowDoorSoundPath" value="{{slowDoorSoundPath}}"></file-picker>
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUND_PATH.hint"}}</p>
+      </div>
+      <div class="form-group">
+        <label>{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUND_VOLUME.name"}}</label>
+        <input type="number" name="slowDoorSoundVolume" value="{{slowDoorSoundVolume}}" min="0" max="1" step="0.05" />
+        <p class="notes">{{localize "PF2E_VISIONER.SETTINGS.SLOW_DOOR_SOUND_VOLUME.hint"}}</p>
+      </div>
+    </section>
     {{/if}}
     <div class="form-group">
       <label>{{localize "PF2E_VISIONER.UI.COVER_LABEL"}}</label>
