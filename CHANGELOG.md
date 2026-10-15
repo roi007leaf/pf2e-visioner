@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.13.1] - 2026-10-15
+
+### Fixed
+
+- Sequencer effects played at a hidden creature's location (`.atLocation(token)`), such as impacts and splashes, are no longer hidden with it. Only effects attached to the token (`.attachTo(token)`), such as auras and lasting markers, hide while Visioner hides the creature.
+- A token whose art another module fades to alpha 0 for an animation is no longer treated as hidden. Visioner only treats a token as hidden when it or its mesh is switched off.
+
 ## [8.13.0] - 2026-10-15
 
 ### Added

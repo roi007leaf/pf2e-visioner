@@ -3,26 +3,33 @@
 // while its token is visible, so lasting effects on that creature (condition markers, auras,
 // other modules' persistent animations) stayed on screen and gave its position away. Each
 // frame, before drawing, an effect attached to a token is hidden while that token's art is.
+//
+// Only effects that follow the token (`.attachTo(token)`) count. An effect merely played at a
+// token's position (`.atLocation(token)`) also records the token as its source, but it stays
+// where it was played and says nothing about the creature, so it is left to Sequencer.
 
 const hiddenByUs = new Set();
 let registered = false;
 
-function attachedToken(effect, tokens) {
+function isAttached(effect) {
+  return effect?.data?.attachTo?.active === true;
+}
+
+export function attachedToken(effect, tokens) {
+  if (!isAttached(effect)) return null;
   const doc = effect?.sourceDocument;
   if (doc?.documentName === 'Token') return doc.object ?? null;
   const id = /(?:^|\.)Token\.([^.]+)$/.exec(String(effect?.data?.source ?? ''))?.[1];
   return id ? (tokens?.get?.(id) ?? null) : null;
 }
 
+// Visioner (and Foundry) hide a token by switching its mesh off, never by alpha alone. A mesh
+// at alpha 0 that is still visible and renderable is another module's cosmetic choice (an
+// animation hiding the art for a moment), not a hidden creature.
 export function tokenArtHidden(token) {
   if (!token) return false;
   const mesh = token.mesh;
-  return (
-    token.visible === false ||
-    mesh?.visible === false ||
-    mesh?.renderable === false ||
-    (Number.isFinite(mesh?.alpha) && mesh.alpha <= 0)
-  );
+  return token.visible === false || mesh?.visible === false || mesh?.renderable === false;
 }
 
 export function syncAttachedEffectVisibility({ effects, tokens } = {}) {
