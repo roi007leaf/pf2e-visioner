@@ -8,11 +8,19 @@ import {
 } from '../../../scripts/cover/ledge/ledge-walls.js';
 
 describe('ledge walls', () => {
-  test('patch stores ledge flag and elevation', () => {
+  test('patch stores ledge flag and elevation and clears sight, light and sound blocking', () => {
     expect(buildLedgeFlagPatch(true, '15')).toEqual({
       'flags.pf2e-visioner.ledge': true,
       'flags.pf2e-visioner.ledgeElevation': 15,
+      sight: 0,
+      light: 0,
+      sound: 0,
     });
+  });
+
+  test('patch never touches movement blocking', () => {
+    expect(buildLedgeFlagPatch(true, '15')).not.toHaveProperty('move');
+    expect(buildLedgeFlagPatch(false, '15')).not.toHaveProperty('move');
   });
 
   test('patch clears elevation when blank or ledge unchecked', () => {

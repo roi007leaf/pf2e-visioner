@@ -34,6 +34,9 @@ export function registerLedgeWallCacheHooks() {
   }
 }
 
+const SENSE_NONE = 0;
+const LEDGE_SENSE_PATCH = { sight: SENSE_NONE, light: SENSE_NONE, sound: SENSE_NONE };
+
 export function buildLedgeFlagPatch(ledgeChecked, rawElevation) {
   const text = String(rawElevation ?? '').trim();
   const elevation = text === '' ? null : Number(text);
@@ -41,6 +44,7 @@ export function buildLedgeFlagPatch(ledgeChecked, rawElevation) {
     [`flags.${MODULE_ID}.${LEDGE_FLAG}`]: !!ledgeChecked,
     [`flags.${MODULE_ID}.${LEDGE_ELEVATION_FLAG}`]:
       ledgeChecked && Number.isFinite(elevation) ? elevation : null,
+    ...(ledgeChecked ? LEDGE_SENSE_PATCH : {}),
   };
 }
 

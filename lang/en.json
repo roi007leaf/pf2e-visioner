@@ -1148,7 +1148,7 @@
       "WALL_BLOCKS_SCENT_HINT": "Stop scent through this wall, independently of sight and sound. Open doors allow scent through.",
       "WALL_QUICK_NO_WALLS_SELECTED": "Select one or more walls to apply Visioner wall settings.",
       "WALL_LEDGE": "Ledge",
-      "WALL_LEDGE_HINT": "Treat this wall as the edge of a ledge. Creatures on either side get terrain cover based on how much of them the edge hides, using the wall cover thresholds.",
+      "WALL_LEDGE_HINT": "Treat this wall as the edge of a ledge. Creatures on either side get terrain cover based on how much of them the edge hides, using the wall cover thresholds. Applying sets the wall's sight, light and sound to None; movement is left as is.",
       "WALL_LEDGE_ELEVATION": "Ledge elevation (ft)",
       "WALL_LEDGE_BADGE": "LEDGE {elevation} ft",
       "WALL_LEDGE_BADGE_AUTO": "LEDGE (auto)",
