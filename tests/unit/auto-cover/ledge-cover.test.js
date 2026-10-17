@@ -38,11 +38,11 @@ describe('CoverDetector ledge cover', () => {
     });
   }
 
-  function setup({ lowX = 0, highX = 300, highElevation = 10, edgeX = 275 } = {}) {
+  function setup({ lowX = 0, highX = 300, highElevation = 10, edgeX = 275, ledgeElevation = highElevation } = {}) {
     const low = makeToken('low', lowX, 0);
     const high = makeToken('high', highX, highElevation);
     canvas.tokens.placeables = [low, high];
-    canvas.walls.placeables = [makeLedgeWall({ c: [edgeX, -100, edgeX, 150] })];
+    canvas.walls.placeables = [makeLedgeWall({ c: [edgeX, -100, edgeX, 150], ledgeElevation })];
     return { low, high };
   }
 
@@ -89,6 +89,11 @@ describe('CoverDetector ledge cover', () => {
     allowGreater = false;
     const { low, high } = setup({ lowX: 0, highX: 300, highElevation: 20, edgeX: 50 });
     expect(coverDetector.detectBetweenTokens(high, low)).toBe('standard');
+  });
+
+  test('ledge with no elevation has no effect', () => {
+    const { low, high } = setup({ highElevation: 20, edgeX: 50, ledgeElevation: null });
+    expect(coverDetector.detectBetweenTokens(high, low)).toBe('none');
   });
 
   test('ledge between creatures at the same elevation grants no cover', () => {

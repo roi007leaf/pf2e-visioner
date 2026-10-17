@@ -26,13 +26,30 @@ function wallLevelIds(wallDoc) {
   return Array.isArray(ids) ? ids : [];
 }
 
+function levelFloor(level) {
+  const floor = level?.elevation?.bottom;
+  if (floor === null || floor === undefined) return -Infinity;
+  const value = Number(floor);
+  return Number.isFinite(value) ? value : -Infinity;
+}
+
+function lowestSceneFloor(sceneLevels) {
+  let lowest = Infinity;
+  for (const level of sceneLevels?.values?.() ?? []) {
+    const floor = levelFloor(level);
+    if (Number.isFinite(floor)) lowest = Math.min(lowest, floor);
+  }
+  return lowest;
+}
+
 function highestLevelFloor(wallDoc) {
   const sceneLevels = wallDoc?.parent?.levels;
+  const baseFloor = lowestSceneFloor(sceneLevels);
   let highest = null;
   for (const id of wallLevelIds(wallDoc)) {
-    const floor = sceneLevels?.get?.(id)?.elevation?.bottom;
-    if (floor === null || floor === undefined || !Number.isFinite(Number(floor))) continue;
-    if (highest === null || Number(floor) > highest) highest = Number(floor);
+    const floor = levelFloor(sceneLevels?.get?.(id));
+    if (!Number.isFinite(floor) || floor <= baseFloor) continue;
+    if (highest === null || floor > highest) highest = floor;
   }
   return highest;
 }

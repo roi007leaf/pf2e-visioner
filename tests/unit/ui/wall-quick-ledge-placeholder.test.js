@@ -11,7 +11,12 @@ function wall({ wallHeightTop, levelIds = [] } = {}) {
     door: 0,
     flags,
     levels: new Set(levelIds),
-    parent: { levels: new Map([['up', { elevation: { bottom: 10, top: 20 } }]]) },
+    parent: {
+      levels: new Map([
+        ['base', { elevation: { bottom: 0, top: 10 } }],
+        ['up', { elevation: { bottom: 10, top: 20 } }],
+      ]),
+    },
     getFlag: (_module, key) => flags['pf2e-visioner'][key],
   };
 }

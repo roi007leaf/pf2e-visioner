@@ -81,7 +81,20 @@ describe('ledge walls', () => {
     });
 
     test('levels with an unbounded floor are skipped', () => {
-      expect(resolveLedgeElevation(wallDoc({ levelIds: ['roof', 'down'] }))).toBe(0);
+      expect(resolveLedgeElevation(wallDoc({ levelIds: ['roof', 'up'] }))).toBe(10);
+    });
+
+    test('the base level floor is not a ledge height', () => {
+      expect(resolveLedgeElevation(wallDoc({ levelIds: ['down'] }))).toBeNull();
+    });
+
+    test('a single default scene level is ignored', () => {
+      const doc = {
+        flags: { 'pf2e-visioner': { ledge: true } },
+        levels: new Set(['only']),
+        parent: { levels: new Map([['only', { elevation: { bottom: 0, top: 20 } }]]) },
+      };
+      expect(resolveLedgeElevation(doc)).toBeNull();
     });
 
     test('nothing to inherit leaves elevation unresolved', () => {
