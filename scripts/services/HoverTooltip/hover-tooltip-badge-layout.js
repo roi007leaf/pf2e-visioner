@@ -96,3 +96,49 @@ export function computeVisibilityFactorTooltipPosition({
     top: screenY - badgeSize / 2,
   };
 }
+
+export const TOOLTIP_BADGE_TOKEN_GAP = 4;
+export const TOOLTIP_BADGE_MIN_ZOOM_SCALE = 0.6;
+
+export function computeTooltipBadgeZoomScale(zoom, minScale = TOOLTIP_BADGE_MIN_ZOOM_SCALE) {
+  const value = Number(zoom);
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  return Math.min(1, Math.max(minScale, value));
+}
+
+export function scaleTooltipBadgeMetrics(metrics, scale) {
+  return {
+    ...metrics,
+    badgeWidth: metrics.badgeWidth * scale,
+    badgeHeight: metrics.badgeHeight * scale,
+    spacing: metrics.spacing * scale,
+  };
+}
+
+export function computeTooltipBadgeWorldAnchor({
+  tokenX,
+  tokenY,
+  tokenWidth,
+  tokenHeight,
+  below = false,
+}) {
+  return {
+    x: tokenX + tokenWidth / 2,
+    y: below ? tokenY + tokenHeight : tokenY,
+    placement: below ? 'below' : 'above',
+  };
+}
+
+export function computeTooltipBadgeRowOrigin({
+  canvasRect,
+  globalPoint,
+  badgeHeight,
+  placement = 'above',
+  gap = TOOLTIP_BADGE_TOKEN_GAP,
+}) {
+  const anchorY = canvasRect.top + globalPoint.y;
+  return {
+    centerX: canvasRect.left + globalPoint.x,
+    centerY: placement === 'below' ? anchorY + gap : anchorY - badgeHeight - gap,
+  };
+}

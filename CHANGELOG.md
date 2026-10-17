@@ -6,6 +6,8 @@
 
 - Sequencer effects played at a hidden creature's location (`.atLocation(token)`), such as impacts and splashes, are no longer hidden with it. Only effects attached to the token (`.attachTo(token)`), such as auras and lasting markers, hide while Visioner hides the creature.
 - A token whose art another module fades to alpha 0 for an animation is no longer treated as hidden. Visioner only treats a token as hidden when it or its mesh is switched off.
+- Hovering a Visioner hover badge (sense, visibility or cover) that overlaps the hovered token no longer makes the badges flash on and off. They stay until the pointer leaves both the badges and the token.
+- Hover badges now sit just above the token instead of over its art, and shrink when zoomed out (down to 60%) so they no longer swallow small tokens. With PF2e HUD active, the hovered token's badges sit below it, clear of the HUD bubble.
 
 ## [8.13.0] - 2026-10-15
 

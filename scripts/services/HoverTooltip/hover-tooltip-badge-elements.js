@@ -1,3 +1,5 @@
+import { markTooltipBadgeElement } from './hover-tooltip-badge-hover.js';
+
 export const TOOLTIP_SENSE_ICONS = {
   tremorsense: 'fa-solid fa-tower-broadcast',
   lifesense: 'fa-solid fa-heartbeat',
@@ -34,6 +36,7 @@ function createPositionedTooltipBadgeContainer({ left, top, tooltipLabel = '' })
   el.style.top = '0';
   el.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
   el.style.willChange = 'transform';
+  markTooltipBadgeElement(el);
   if (tooltipLabel) {
     el.dataset.tooltip = tooltipLabel;
     el.setAttribute('aria-label', tooltipLabel);
@@ -218,6 +221,7 @@ export function createVisibilityFactorBadge({
   badgeEl.style.left = '0';
   badgeEl.style.top = '0';
   badgeEl.style.willChange = 'transform';
+  markTooltipBadgeElement(badgeEl);
   if (Number.isFinite(left) && Number.isFinite(top)) {
     badgeEl.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
   }

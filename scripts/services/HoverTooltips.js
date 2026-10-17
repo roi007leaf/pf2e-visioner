@@ -26,8 +26,11 @@ import {
 import {
   VISIBILITY_FACTOR_BADGE_SIZE,
   computeSingleTooltipBadgePosition,
-  computeTooltipBadgeCenter,
   computeTooltipBadgeMetrics,
+  computeTooltipBadgeRowOrigin,
+  computeTooltipBadgeWorldAnchor,
+  computeTooltipBadgeZoomScale,
+  scaleTooltipBadgeMetrics,
   computeTooltipBadgeStackPositions,
   computeVisibilityFactorBadgePlacement,
   computeVisibilityFactorBadgeWorldPoint,
@@ -73,6 +76,10 @@ import {
   getCoverOverlayTargets,
   canObserverRenderTooltipToken,
 } from './HoverTooltip/hover-tooltip-visibility-requests.js';
+import {
+  findHoveredTooltipBadge,
+  watchTooltipBadgeHoverExit,
+} from './HoverTooltip/hover-tooltip-badge-hover.js';
 
 function getExplicitVisibilityStateLabel(state) {
   const labelKey = getVisibilityStateLabelKey(state, { manual: true });
@@ -756,6 +763,7 @@ function onTokenHover(hoveredToken) {
   }
 
   if (HoverTooltips.currentHoveredToken === hoveredToken) {
+    cancelBadgeHoverExitWatch();
     return;
   }
 
@@ -786,16 +794,40 @@ function onTokenHover(hoveredToken) {
 function onTokenHoverEnd(token) {
   // Clear any pending hover debounce
   clearPendingHoverDebounce();
+  cancelBadgeHoverExitWatch();
 
   if (HoverTooltips._savedHoveredToken === token) {
     delete HoverTooltips._savedHoveredToken;
   }
 
-  if (HoverTooltips.currentHoveredToken === token) {
-    HoverTooltips.currentHoveredToken = null;
-    hideAllVisibilityIndicators();
-    hideAllCoverIndicators();
+  if (HoverTooltips.currentHoveredToken !== token) return;
+  if (findHoveredTooltipBadge()) {
+    deferHoverEndUntilBadgeExit(token);
+    return;
   }
+  clearHoveredTokenIndicators(token);
+}
+
+function clearHoveredTokenIndicators(token) {
+  if (HoverTooltips.currentHoveredToken !== token) return;
+  HoverTooltips.currentHoveredToken = null;
+  hideAllVisibilityIndicators();
+  hideAllCoverIndicators();
+}
+
+function cancelBadgeHoverExitWatch() {
+  HoverTooltips._badgeHoverExitCancel?.();
+  delete HoverTooltips._badgeHoverExitCancel;
+}
+
+function deferHoverEndUntilBadgeExit(token) {
+  HoverTooltips._badgeHoverExitCancel = watchTooltipBadgeHoverExit({
+    token,
+    onExit: () => {
+      delete HoverTooltips._badgeHoverExitCancel;
+      clearHoveredTokenIndicators(token);
+    },
+  });
 }
 
 /**
@@ -1147,12 +1179,7 @@ function addVisibilityIndicator(
     blockedVisibilityStates: SENSE_BADGE_BLOCKED_VISIBILITY_STATES,
   });
 
-  // Create an anchor container at the token center-top to compute transformed bounds
-  const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
-  indicator.x = targetToken.x + tokenWidth / 2;
-  indicator.y = targetToken.y - 8; // slight padding above the token
-  canvas.tokens.addChild(indicator);
+  const indicator = createTooltipBadgeAnchor(targetToken);
 
   const canvasRect = getCachedCanvasRect();
   const sizeConfig = readTooltipSizeConfig({
@@ -1164,18 +1191,15 @@ function addVisibilityIndicator(
       borderPx: 3,
     },
   });
-  const { badgeWidth, badgeHeight, spacing, borderRadius } = computeTooltipBadgeMetrics(sizeConfig);
-
-  // Compute aligned positions using world->screen transform
-  const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
-  // If pf2e-hud is active, nudge badges downward to sit beneath its tooltip bubble
-  const hudActive = !!game.modules?.get?.('pf2e-hud')?.active;
-  const { centerX, centerY } = computeTooltipBadgeCenter({
-    canvasRect,
-    globalPoint,
-    badgeHeight,
-    hudActive,
-  });
+  const baseMetrics = computeTooltipBadgeMetrics(sizeConfig);
+  const { badgeHeight, borderRadius } = baseMetrics;
+  const {
+    scale,
+    badgeWidth: scaledBadgeWidth,
+    spacing,
+    centerX,
+    centerY,
+  } = computeIndicatorBadgeFrame(indicator, baseMetrics, canvasRect);
 
   const placeBadge = (leftPx, topPx, stateClass, iconClass, kind, tooltipLabel = '') => {
     const el = createVisibilityTooltipBadge({
@@ -1185,10 +1209,11 @@ function addVisibilityIndicator(
       iconClass,
       kind,
       tooltipLabel,
-      badgeWidth,
+      badgeWidth: baseMetrics.badgeWidth,
       badgeHeight,
       borderRadius,
     });
+    setTooltipBadgeTransform(el, leftPx, topPx, scale);
     document.body.appendChild(el);
     return el;
   };
@@ -1198,11 +1223,12 @@ function addVisibilityIndicator(
       left: leftPx,
       top: topPx,
       sense,
-      badgeWidth,
+      badgeWidth: baseMetrics.badgeWidth,
       badgeHeight,
       borderRadius,
       iconPx: sizeConfig.iconPx,
     });
+    setTooltipBadgeTransform(el, leftPx, topPx, scale);
     document.body.appendChild(el);
     return el;
   };
@@ -1229,7 +1255,7 @@ function addVisibilityIndicator(
       const sensePosition = computeSingleTooltipBadgePosition({
         centerX,
         centerY,
-        badgeWidth,
+        badgeWidth: scaledBadgeWidth,
       });
       indicator._senseBadgeEl = placeSenseBadge(sensePosition.left, sensePosition.top, senseUsed);
       addBadgeClickHandler(
@@ -1250,7 +1276,7 @@ function addVisibilityIndicator(
     const badgePositions = computeTooltipBadgeStackPositions({
       centerX,
       centerY,
-      badgeWidth,
+      badgeWidth: scaledBadgeWidth,
       spacing,
       slots: senseUsed ? ['sense', 'visibility'] : ['visibility'],
     });
@@ -1349,6 +1375,47 @@ function ensureBadgeTicker() {
   } catch (_) { }
 }
 
+function isHudBubbleToken(token) {
+  if (HoverTooltips._hudActiveCache === undefined) {
+    HoverTooltips._hudActiveCache = !!game.modules?.get?.('pf2e-hud')?.active;
+  }
+  return HoverTooltips._hudActiveCache && token === HoverTooltips.currentHoveredToken;
+}
+
+function createTooltipBadgeAnchor(targetToken) {
+  const anchor = computeTooltipBadgeWorldAnchor({
+    tokenX: targetToken.x,
+    tokenY: targetToken.y,
+    tokenWidth: targetToken.document.width * canvas.grid.size,
+    tokenHeight: targetToken.document.height * canvas.grid.size,
+    below: isHudBubbleToken(targetToken),
+  });
+  const indicator = new PIXI.Container();
+  indicator.x = anchor.x;
+  indicator.y = anchor.y;
+  indicator._badgePlacement = anchor.placement;
+  canvas.tokens.addChild(indicator);
+  return indicator;
+}
+
+function computeIndicatorBadgeFrame(
+  indicator,
+  baseMetrics,
+  canvasRect,
+  positionPoint = createTooltipPositionPoint(PIXI),
+) {
+  const scale = computeTooltipBadgeZoomScale(canvas.stage?.scale?.x);
+  const metrics = scaleTooltipBadgeMetrics(baseMetrics, scale);
+  const globalPoint = toGlobalTooltipPoint(canvas.tokens, positionPoint, indicator.x, indicator.y);
+  const origin = computeTooltipBadgeRowOrigin({
+    canvasRect,
+    globalPoint,
+    badgeHeight: metrics.badgeHeight,
+    placement: indicator._badgePlacement,
+  });
+  return { scale, ...metrics, ...origin };
+}
+
 function getCachedCanvasRect() {
   // Cache getBoundingClientRect to avoid layout thrashing (expensive DOM query)
   if (!HoverTooltips._canvasRectCache || HoverTooltips._canvasRectInvalidated) {
@@ -1366,15 +1433,10 @@ function updateBadgePositions() {
   const canvasRect = getCachedCanvasRect();
 
   // Use cached sizes instead of reading from settings every frame
-  const { badgeWidth, badgeHeight, spacing } = computeTooltipBadgeMetrics({
+  const baseMetrics = computeTooltipBadgeMetrics({
     iconPx: HoverTooltips.tooltipIconSize,
     borderPx: 3,
   });
-
-  // Cache HUD active check (checking modules is expensive)
-  if (HoverTooltips._hudActiveCache === undefined) {
-    HoverTooltips._hudActiveCache = !!game.modules?.get?.('pf2e-hud')?.active;
-  }
 
   const positionPoint = createTooltipPositionPoint(PIXI);
 
@@ -1384,13 +1446,12 @@ function updateBadgePositions() {
       (!indicator._visBadgeEl && !indicator._coverBadgeEl && !indicator._senseBadgeEl)
     )
       return;
-    const globalPoint = toGlobalTooltipPoint(canvas.tokens, positionPoint, indicator.x, indicator.y);
-    const { centerX, centerY } = computeTooltipBadgeCenter({
+    const { scale, badgeWidth, spacing, centerX, centerY } = computeIndicatorBadgeFrame(
+      indicator,
+      baseMetrics,
       canvasRect,
-      globalPoint,
-      badgeHeight,
-      hudActive: HoverTooltips._hudActiveCache,
-    });
+      positionPoint,
+    );
 
     const slots = [];
     if (indicator._senseBadgeEl) slots.push('sense');
@@ -1407,34 +1468,33 @@ function updateBadgePositions() {
 
     if (indicator._senseBadgeEl) {
       const { left, top } = badgePositions.sense;
-      setTooltipBadgeTransform(indicator._senseBadgeEl, left, top);
+      setTooltipBadgeTransform(indicator._senseBadgeEl, left, top, scale);
     }
     if (indicator._visBadgeEl) {
       const { left, top } = badgePositions.visibility;
-      setTooltipBadgeTransform(indicator._visBadgeEl, left, top);
+      setTooltipBadgeTransform(indicator._visBadgeEl, left, top, scale);
     }
     if (indicator._coverBadgeEl) {
       const { left, top } = badgePositions.cover;
-      setTooltipBadgeTransform(indicator._coverBadgeEl, left, top);
+      setTooltipBadgeTransform(indicator._coverBadgeEl, left, top, scale);
     }
   });
 
   // Also update standalone cover badges
   HoverTooltips.coverIndicators.forEach((indicator) => {
     if (!indicator || !indicator._coverBadgeEl) return;
-    const globalPoint = toGlobalTooltipPoint(canvas.tokens, positionPoint, indicator.x, indicator.y);
-    const { centerX, centerY } = computeTooltipBadgeCenter({
+    const { scale, badgeWidth, centerX, centerY } = computeIndicatorBadgeFrame(
+      indicator,
+      baseMetrics,
       canvasRect,
-      globalPoint,
-      badgeHeight,
-      hudActive: HoverTooltips._hudActiveCache,
-    });
+      positionPoint,
+    );
     const { left, top } = computeSingleTooltipBadgePosition({
       centerX,
       centerY,
       badgeWidth,
     });
-    setTooltipBadgeTransform(indicator._coverBadgeEl, left, top);
+    setTooltipBadgeTransform(indicator._coverBadgeEl, left, top, scale);
   });
 
   // Update factor badge positions (DOM-based)
@@ -1484,11 +1544,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
   }
 
   // Use DOM badge with icon only (no large text), consistent with visibility badges
-  const indicator = new PIXI.Container();
-  const tokenWidth = targetToken.document.width * canvas.grid.size;
-  indicator.x = targetToken.x + tokenWidth / 2;
-  indicator.y = targetToken.y - 8; // align above token
-  canvas.tokens.addChild(indicator);
+  const indicator = createTooltipBadgeAnchor(targetToken);
 
   const canvasRect = getCachedCanvasRect();
   const sizeConfig = readTooltipSizeConfig({
@@ -1500,19 +1556,13 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
       borderPx: 3,
     },
   });
-  const { badgeWidth, badgeHeight, borderRadius } = computeTooltipBadgeMetrics(sizeConfig);
-  const globalPoint = canvas.tokens.toGlobal(new PIXI.Point(indicator.x, indicator.y));
-  const hudActive = !!game.modules?.get?.('pf2e-hud')?.active;
-  const { centerX, centerY } = computeTooltipBadgeCenter({
-    canvasRect,
-    globalPoint,
-    badgeHeight,
-    hudActive,
-  });
+  const baseMetrics = computeTooltipBadgeMetrics(sizeConfig);
+  const { badgeWidth, badgeHeight, borderRadius } = baseMetrics;
+  const frame = computeIndicatorBadgeFrame(indicator, baseMetrics, canvasRect);
   const { left, top } = computeSingleTooltipBadgePosition({
-    centerX,
-    centerY,
-    badgeWidth,
+    centerX: frame.centerX,
+    centerY: frame.centerY,
+    badgeWidth: frame.badgeWidth,
   });
 
   const color = getTooltipCoverBadgeColor({
@@ -1531,6 +1581,7 @@ function addCoverIndicator(targetToken, observerToken, coverState, isManualCover
     borderRadius,
     isManualCover,
   });
+  setTooltipBadgeTransform(el, left, top, frame.scale);
   document.body.appendChild(el);
   indicator._coverBadgeEl = el;
 
