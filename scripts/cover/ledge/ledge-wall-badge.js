@@ -1,10 +1,10 @@
 import { MODULE_ID } from '../../constants.js';
 import { LEDGE_WALL_COLOR } from './ledge-wall-color.js';
-import { getLedgeElevation, isLedgeWall, LEDGE_ELEVATION_FLAG, LEDGE_FLAG } from './ledge-walls.js';
+import { resolveLedgeElevation, isLedgeWall, LEDGE_ELEVATION_FLAG, LEDGE_FLAG } from './ledge-walls.js';
 
 export function ledgeBadgeText(wallDoc) {
   if (!isLedgeWall(wallDoc)) return null;
-  const elevation = getLedgeElevation(wallDoc);
+  const elevation = resolveLedgeElevation(wallDoc);
   if (elevation === null) return game.i18n.localize('PF2E_VISIONER.UI.WALL_LEDGE_BADGE_AUTO');
   return game.i18n.format('PF2E_VISIONER.UI.WALL_LEDGE_BADGE', { elevation });
 }
@@ -64,7 +64,7 @@ function wallLength(c) {
 
 function ledgeChainKey(doc, c, endpoint) {
   const point = endpoint === 0 ? pointKey(c[0], c[1]) : pointKey(c[2], c[3]);
-  return `${getLedgeElevation(doc) ?? 'auto'}|${point}`;
+  return `${resolveLedgeElevation(doc) ?? 'auto'}|${point}`;
 }
 
 function createUnionFind() {
@@ -154,7 +154,9 @@ export function registerLedgeWallBadgeHooks() {
   });
   Hooks.on('updateWall', (wallDoc, changes) => {
     refreshLedgeWallOnFlagChange(wallDoc, changes);
-    if (changes?.c || changes?.flags?.[MODULE_ID]) safeRefreshAllLedgeBadges();
+    if (changes?.c || changes?.levels || changes?.flags?.[MODULE_ID] || changes?.flags?.['wall-height']) {
+      safeRefreshAllLedgeBadges();
+    }
   });
   Hooks.on('canvasReady', safeRefreshAllLedgeBadges);
   Hooks.on('createWall', safeRefreshAllLedgeBadges);

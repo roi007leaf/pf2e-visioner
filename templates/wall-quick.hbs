@@ -13,7 +13,7 @@
     </div>
     <div class="form-group pv-ledge-options" {{#unless ledge}}hidden{{/unless}}>
       <label>{{localize "PF2E_VISIONER.UI.WALL_LEDGE_ELEVATION"}}</label>
-      <input type="number" name="ledgeElevation" value="{{ledgeElevation}}" step="any" />
+      <input type="number" name="ledgeElevation" value="{{ledgeElevation}}" placeholder="{{ledgeElevationPlaceholder}}" step="any" />
       <p class="notes">{{localize "PF2E_VISIONER.UI.WALL_LEDGE_ELEVATION_HINT"}}</p>
     </div>
     {{#if isDoor}}

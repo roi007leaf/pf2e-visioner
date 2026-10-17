@@ -62,6 +62,11 @@ describe('AvsInvalidationReasonRouter', () => {
     expect(changeAffectsLineOfSight({ move: 1 }, hasProperty)).toBe(false);
   });
 
+  test('wall height top and scene level changes affect line of sight', () => {
+    expect(changeAffectsLineOfSight({ flags: { 'wall-height': { top: 20 } } }, hasProperty)).toBe(true);
+    expect(changeAffectsLineOfSight({ levels: ['up'] }, hasProperty)).toBe(true);
+  });
+
   test('ledge flag changes affect line of sight', () => {
     expect(changeAffectsLineOfSight({ flags: { 'pf2e-visioner': { ledge: true } } }, hasProperty)).toBe(true);
     expect(

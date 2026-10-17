@@ -6,7 +6,18 @@ import { MODULE_ID } from '../../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { readDoorPeekGeometry } from '../../services/Peek/peek-door-dc.js';
 import { DoorSoundEditor } from './DoorSoundEditor.js';
-import { buildLedgeFlagPatch, getLedgeElevation, isLedgeWall } from '../../cover/ledge/ledge-walls.js';
+import {
+  buildLedgeFlagPatch,
+  getInheritedLedgeElevation,
+  getLedgeElevation,
+  isLedgeWall,
+} from '../../cover/ledge/ledge-walls.js';
+
+function ledgeElevationPlaceholder(wallDocument) {
+  const inherited = getInheritedLedgeElevation(wallDocument);
+  if (inherited === null) return game.i18n.localize('PF2E_VISIONER.UI.WALL_LEDGE_ELEVATION_AUTO');
+  return game.i18n.format('PF2E_VISIONER.UI.WALL_LEDGE_ELEVATION_INHERITED', { elevation: inherited });
+}
 
 export class VisionerWallQuickSettings extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -64,6 +75,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
       ledge: isLedgeWall(d),
       ledgeElevation: getLedgeElevation(d) ?? '',
+      ledgeElevationPlaceholder: ledgeElevationPlaceholder(d),
       isDoor: this._isDoor(),
       slowDoorSounds: d?.getFlag?.(MODULE_ID, 'slowDoorSounds') === true,
       slowDoorSoundPath: d?.getFlag?.(MODULE_ID, 'slowDoorSoundPath') ?? '',

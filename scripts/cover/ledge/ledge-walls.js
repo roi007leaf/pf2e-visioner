@@ -1,4 +1,5 @@
 import { MODULE_ID } from '../../constants.js';
+import { getWallElevationBounds } from '../../helpers/wall-height-utils.js';
 
 export const LEDGE_FLAG = 'ledge';
 export const LEDGE_ELEVATION_FLAG = 'ledgeElevation';
@@ -12,6 +13,36 @@ export function getLedgeElevation(wallDoc) {
   if (raw === null || raw === undefined || raw === '') return null;
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
+}
+
+function wallHeightTop(wallDoc) {
+  const top = getWallElevationBounds(wallDoc)?.top;
+  return Number.isFinite(top) ? top : null;
+}
+
+function wallLevelIds(wallDoc) {
+  const ids = wallDoc?.levels;
+  if (ids instanceof Set) return [...ids];
+  return Array.isArray(ids) ? ids : [];
+}
+
+function highestLevelFloor(wallDoc) {
+  const sceneLevels = wallDoc?.parent?.levels;
+  let highest = null;
+  for (const id of wallLevelIds(wallDoc)) {
+    const floor = sceneLevels?.get?.(id)?.elevation?.bottom;
+    if (floor === null || floor === undefined || !Number.isFinite(Number(floor))) continue;
+    if (highest === null || Number(floor) > highest) highest = Number(floor);
+  }
+  return highest;
+}
+
+export function getInheritedLedgeElevation(wallDoc) {
+  return wallHeightTop(wallDoc) ?? highestLevelFloor(wallDoc);
+}
+
+export function resolveLedgeElevation(wallDoc) {
+  return getLedgeElevation(wallDoc) ?? getInheritedLedgeElevation(wallDoc);
 }
 
 let ledgeWallCache = null;
@@ -78,7 +109,7 @@ export function findLedgeCrossings(p1, p2, walls) {
     const coords = wallCoords(wall);
     if (!coords) continue;
     const edgeT = segmentCrossingT(p1, p2, coords);
-    if (edgeT !== null) crossings.push({ edgeT, elevation: getLedgeElevation(doc) });
+    if (edgeT !== null) crossings.push({ edgeT, elevation: resolveLedgeElevation(doc) });
   }
   return crossings;
 }

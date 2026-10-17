@@ -25,6 +25,8 @@ export const WALL_LOS_FIELDS = Object.freeze([
   'threshold.sight',
   'threshold.sound',
   'threshold.attenuation',
+  'levels',
+  'flags.wall-height.top',
 ]);
 
 export const AVS_INVALIDATION_REASON_HANDLERS = Object.freeze({
