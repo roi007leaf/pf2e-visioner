@@ -54,9 +54,70 @@ function removeBadge(wall) {
   delete wall._pvLedgeBadge;
 }
 
-export function syncLedgeWallBadge(wall, { createBadge = createLedgeBadge } = {}) {
+function pointKey(x, y) {
+  return `${Math.round(x)},${Math.round(y)}`;
+}
+
+function wallLength(c) {
+  return Math.hypot(c[2] - c[0], c[3] - c[1]);
+}
+
+function ledgeChainKey(doc, c, endpoint) {
+  const point = endpoint === 0 ? pointKey(c[0], c[1]) : pointKey(c[2], c[3]);
+  return `${getLedgeElevation(doc) ?? 'auto'}|${point}`;
+}
+
+function createUnionFind() {
+  const parent = new Map();
+  const find = (key) => {
+    if (!parent.has(key)) parent.set(key, key);
+    let root = key;
+    while (parent.get(root) !== root) root = parent.get(root);
+    parent.set(key, root);
+    return root;
+  };
+  const union = (a, b) => parent.set(find(a), find(b));
+  return { find, union };
+}
+
+export function selectBadgeWallIds(walls) {
+  const sets = createUnionFind();
+  const ledges = [];
+  for (const wall of walls ?? []) {
+    const doc = wall?.document;
+    const c = doc?.c;
+    if (!isLedgeWall(doc) || !Array.isArray(c) || c.length < 4) continue;
+    const start = ledgeChainKey(doc, c, 0);
+    sets.union(start, ledgeChainKey(doc, c, 1));
+    ledges.push({ id: wall.id ?? doc.id, start, length: wallLength(c) });
+  }
+  const longestByChain = new Map();
+  for (const ledge of ledges) {
+    const chain = sets.find(ledge.start);
+    const current = longestByChain.get(chain);
+    if (!current || ledge.length > current.length) longestByChain.set(chain, ledge);
+  }
+  return new Set([...longestByChain.values()].map((ledge) => ledge.id));
+}
+
+let badgeWallIds = null;
+
+function currentBadgeWallIds() {
+  if (!badgeWallIds) badgeWallIds = selectBadgeWallIds(canvas?.walls?.placeables ?? []);
+  return badgeWallIds;
+}
+
+export function refreshAllLedgeBadges() {
+  badgeWallIds = null;
+  const ids = currentBadgeWallIds();
+  for (const wall of canvas?.walls?.placeables ?? []) {
+    syncLedgeWallBadge(wall, { show: ids.has(wall.id) });
+  }
+}
+
+export function syncLedgeWallBadge(wall, { show = true, createBadge = createLedgeBadge } = {}) {
   const doc = wall?.document;
-  const text = ledgeBadgeText(doc);
+  const text = show ? ledgeBadgeText(doc) : null;
   if (!text) return removeBadge(wall);
   const c = doc?.c;
   if (!Array.isArray(c) || c.length < 4) return removeBadge(wall);
@@ -75,13 +136,27 @@ export function refreshLedgeWallOnFlagChange(wallDoc, changes) {
   wallDoc?.object?.renderFlags?.set?.({ refreshLine: true });
 }
 
+function safeRefreshAllLedgeBadges() {
+  try {
+    refreshAllLedgeBadges();
+  } catch (error) {
+    console.warn('[PF2E-Visioner] Failed to refresh ledge wall badges:', error);
+  }
+}
+
 export function registerLedgeWallBadgeHooks() {
   Hooks.on('refreshWall', (wall) => {
     try {
-      syncLedgeWallBadge(wall);
+      syncLedgeWallBadge(wall, { show: currentBadgeWallIds().has(wall.id) });
     } catch (error) {
       console.warn('[PF2E-Visioner] Failed to sync ledge wall badge:', error);
     }
   });
-  Hooks.on('updateWall', refreshLedgeWallOnFlagChange);
+  Hooks.on('updateWall', (wallDoc, changes) => {
+    refreshLedgeWallOnFlagChange(wallDoc, changes);
+    if (changes?.c || changes?.flags?.[MODULE_ID]) safeRefreshAllLedgeBadges();
+  });
+  Hooks.on('canvasReady', safeRefreshAllLedgeBadges);
+  Hooks.on('createWall', safeRefreshAllLedgeBadges);
+  Hooks.on('deleteWall', safeRefreshAllLedgeBadges);
 }

@@ -2,6 +2,7 @@ import '../../setup.js';
 import {
   ledgeBadgeText,
   refreshLedgeWallOnFlagChange,
+  selectBadgeWallIds,
   syncLedgeWallBadge,
 } from '../../../scripts/cover/ledge/ledge-wall-badge.js';
 
@@ -56,6 +57,36 @@ describe('ledge wall badge', () => {
     expect(wall.removeChild).toHaveBeenCalledWith(badge);
     expect(badge.destroy).toHaveBeenCalled();
     expect(wall._pvLedgeBadge).toBeUndefined();
+  });
+
+  test('connected ledge walls with the same elevation share one badge on the longest segment', () => {
+    const walls = [
+      { id: 'a', document: ledgeDoc({ ledge: true, ledgeElevation: 10 }, [0, 0, 100, 0]) },
+      { id: 'b', document: ledgeDoc({ ledge: true, ledgeElevation: 10 }, [100, 0, 400, 0]) },
+      { id: 'c', document: ledgeDoc({ ledge: true, ledgeElevation: 10 }, [400, 0, 450, 50]) },
+    ];
+    expect([...selectBadgeWallIds(walls)]).toEqual(['b']);
+  });
+
+  test('separate chains and different elevations get their own badge', () => {
+    const walls = [
+      { id: 'a', document: ledgeDoc({ ledge: true, ledgeElevation: 10 }, [0, 0, 100, 0]) },
+      { id: 'b', document: ledgeDoc({ ledge: true, ledgeElevation: 20 }, [100, 0, 200, 0]) },
+      { id: 'c', document: ledgeDoc({ ledge: true, ledgeElevation: 10 }, [500, 500, 600, 500]) },
+      { id: 'd', document: ledgeDoc({}, [600, 500, 700, 500]) },
+    ];
+    expect(new Set(selectBadgeWallIds(walls))).toEqual(new Set(['a', 'b', 'c']));
+  });
+
+  test('sync removes the badge from walls that are not their chain badge holder', () => {
+    const badge = fakeBadge();
+    const wall = {
+      document: ledgeDoc({ ledge: true, ledgeElevation: 10 }),
+      _pvLedgeBadge: badge,
+      removeChild: jest.fn(),
+    };
+    syncLedgeWallBadge(wall, { show: false, createBadge: () => fakeBadge() });
+    expect(wall.removeChild).toHaveBeenCalledWith(badge);
   });
 
   test('ledge flag changes redraw the wall line', () => {
