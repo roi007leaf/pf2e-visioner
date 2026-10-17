@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.14.1] - 2026-10-17
+
+### Added
+
+- Ledge walls without a **Ledge elevation** now inherit one: first the wall's **Wall Height** top (when that module is active), then the highest floor among the Foundry v14 scene levels the wall belongs to, then the higher creature's elevation as before. The Ledge elevation field shows the inherited value as its placeholder, and the ledge badge shows the height in use.
+
+### Fixed
+
+- Changing a wall's Wall Height top or its scene levels now recalculates auto-visibility.
+
 ## [8.14.0] - 2026-10-17
 
 ### Added
