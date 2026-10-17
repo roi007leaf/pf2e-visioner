@@ -1,5 +1,15 @@
 # Changelog
 
+## [8.14.2] - 2026-10-17
+
+### Changed
+
+- A ledge's height now comes only from its **Ledge elevation**, its **Wall Height** top, or a raised Foundry v14 scene level it belongs to. The fallback to the higher creature's elevation is removed: a ledge with none of these has no effect, its elevation field reads "Not set: ledge inactive", and its badge reads "LEDGE (no height)".
+
+### Fixed
+
+- Ledges with a blank elevation no longer inherit 0 from the scene's base level (every v14 scene has one and every wall is on it), which made them do nothing in 8.14.1. Only levels above the scene's lowest floor count.
+
 ## [8.14.1] - 2026-10-17
 
 ### Added
