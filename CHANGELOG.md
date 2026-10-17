@@ -1,5 +1,19 @@
 # Changelog
 
+## [8.14.0] - 2026-10-17
+
+### Added
+
+- **Ledge walls.** Tick **Ledge** in Visioner Wall Settings to mark a wall as the edge of a cliff or raised floor, with an optional **Ledge elevation** (blank uses the higher creature's elevation). Ticking it sets the wall's sight, light and sound to None and leaves movement as you set it.
+- Ledge cover: creatures on either side of a ledge get terrain cover based on how much of them the edge hides from the attacker, using the existing wall cover thresholds. Following PF2e rules, a ledge never grants lesser cover and does not stack with creature cover; the higher of the two applies. Terraced cliffs with several ledge walls use the most restrictive edge.
+- Ledge vision: a creature the ledge hides completely from every stance is out of line of sight for auto-visibility, so it becomes hidden if heard and undetected otherwise. This also holds while tokens move.
+- Ledge walls are drawn in their own color on the walls layer, with one "LEDGE 10 ft" badge per connected chain of ledge walls.
+- Ledge math is based on **0utrider**'s [Ledge Line of Sight calculator](https://0utrider.github.io/pathfinder/ledgecover/). Thanks to 0utrider for the sightline model; find more of their tools in [0utrider's Discord channel](https://discord.com/channels/1546892063948415058/1560559780626694195).
+
+### Fixed
+
+- Visioner Wall Settings opened from the wall palette now applies to every selected wall instead of failing with "You must provide an _id for every object in the update data Array".
+
 ## [8.13.2] - 2026-10-17
 
 ### Added

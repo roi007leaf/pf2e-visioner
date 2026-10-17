@@ -599,6 +599,13 @@
       }
     },
     "UI": {
+      "WALL_QUICK_NO_WALLS_SELECTED": "Sélectionnez un ou plusieurs murs pour appliquer les paramètres de mur Visioner.",
+      "WALL_LEDGE": "Corniche",
+      "WALL_LEDGE_HINT": "Traite ce mur comme le bord d'une corniche. Les créatures de chaque côté obtiennent un abri de terrain selon la part d'elles que le bord masque, avec les seuils d'abri des murs. L'application règle la vue, la lumière et le son du mur sur Aucun ; le mouvement reste inchangé.",
+      "WALL_LEDGE_ELEVATION": "Altitude de la corniche (ft)",
+      "WALL_LEDGE_ELEVATION_HINT": "Altitude du sommet de la corniche. Laissez vide pour utiliser l'altitude de la créature la plus haute.",
+      "WALL_LEDGE_BADGE": "CORNICHE {elevation} ft",
+      "WALL_LEDGE_BADGE_AUTO": "CORNICHE (auto)",
       "ENCOUNTER_FILTER_TEXT": "Montrer seulement les jetons de la rencontre",
       "COVER_OVERRIDE": "Outrepasser l'abri",
       "ROLL": "Lancer",

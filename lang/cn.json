@@ -622,6 +622,13 @@
             }
         },
         "UI": {
+            "WALL_QUICK_NO_WALLS_SELECTED": "请选择一面或多面墙以应用 Visioner 墙体设置。",
+            "WALL_LEDGE": "崖边",
+            "WALL_LEDGE_HINT": "将此墙视为崖边。两侧的生物会根据被边缘遮挡的比例获得地形掩护，使用墙体掩护阈值。应用后会将此墙的视线、光线和声音设为无；移动保持不变。",
+            "WALL_LEDGE_ELEVATION": "崖边高度（尺）",
+            "WALL_LEDGE_ELEVATION_HINT": "崖边顶部的高度。留空则使用较高生物的高度。",
+            "WALL_LEDGE_BADGE": "崖边 {elevation} 尺",
+            "WALL_LEDGE_BADGE_AUTO": "崖边（自动）",
             "ENCOUNTER_FILTER_TEXT": "仅显示遭遇中指示物",
             "COVER_OVERRIDE": "掩蔽状态覆写",
             "ROLL": "掷骰",

@@ -1018,6 +1018,13 @@
       }
     },
     "UI": {
+      "WALL_QUICK_NO_WALLS_SELECTED": "Zaznacz jedną lub więcej ścian, aby zastosować ustawienia ścian Visioner.",
+      "WALL_LEDGE": "Krawędź urwiska",
+      "WALL_LEDGE_HINT": "Traktuj tę ścianę jako krawędź urwiska. Stworzenia po obu stronach otrzymują osłonę terenu zależnie od tego, jaką ich część zasłania krawędź, według progów osłony ścian. Zastosowanie ustawia wzrok, światło i dźwięk ściany na Brak; ruch pozostaje bez zmian.",
+      "WALL_LEDGE_ELEVATION": "Wysokość krawędzi (ft)",
+      "WALL_LEDGE_ELEVATION_HINT": "Wysokość szczytu krawędzi. Pozostaw puste, aby użyć wysokości wyżej stojącego stworzenia.",
+      "WALL_LEDGE_BADGE": "KRAWĘDŹ {elevation} ft",
+      "WALL_LEDGE_BADGE_AUTO": "KRAWĘDŹ (auto)",
       "ENCOUNTER_FILTER_TEXT": "Pokaż tylko tokeny spotkań",
       "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (ulepszenie atutu)",
       "COVER_OVERRIDE": "Pomijanie osłony",
