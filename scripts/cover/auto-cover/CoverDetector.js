@@ -11,6 +11,7 @@ import {
   segmentRectIntersectionLength,
 } from '../../helpers/line-intersection.js';
 import { CoverRegionBehavior } from '../../regions/CoverRegionBehavior.js';
+import { detectLedgeCover } from '../ledge/ledge-cover.js';
 import {
   getSizeRank,
   getTokenCorners,
@@ -290,6 +291,10 @@ export class CoverDetector {
       }
 
       calculatedCover = this._highestCoverState(calculatedCover, tileCover);
+      calculatedCover = this._highestCoverState(
+        calculatedCover,
+        this._detectLedgeCover(p1, p2, attackerSpan, targetSpan),
+      );
       const finalCover = this._applyRegionCover(regionOrigin, regionTarget, calculatedCover);
       return finalCover;
     } catch (error) {
@@ -473,6 +478,30 @@ export class CoverDetector {
       console.warn('PF2E Visioner | Error checking region cover:', error);
       return calculatedCover;
     }
+  }
+
+  _detectLedgeCover(p1, p2, attackerSpan, targetSpan) {
+    try {
+      return detectLedgeCover({
+        p1,
+        p2,
+        attackerSpan,
+        targetSpan,
+        walls: this._getSceneWalls(),
+        thresholds: this._getWallCoverThresholds(),
+      });
+    } catch (error) {
+      console.warn('PF2E Visioner | Error checking ledge cover:', error);
+      return 'none';
+    }
+  }
+
+  _getWallCoverThresholds() {
+    return {
+      standardThreshold: Math.max(0, Number(game.settings.get(MODULE_ID, 'wallCoverStandardThreshold') ?? 50)),
+      greaterThreshold: Math.max(0, Number(game.settings.get(MODULE_ID, 'wallCoverGreaterThreshold') ?? 70)),
+      allowGreater: !!game.settings.get(MODULE_ID, 'wallCoverAllowGreater'),
+    };
   }
 
   _highestCoverState(first, second) {

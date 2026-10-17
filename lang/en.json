@@ -1146,6 +1146,13 @@
     "UI": {
       "WALL_BLOCKS_SCENT": "Blocks scent",
       "WALL_BLOCKS_SCENT_HINT": "Stop scent through this wall, independently of sight and sound. Open doors allow scent through.",
+      "WALL_QUICK_NO_WALLS_SELECTED": "Select one or more walls to apply Visioner wall settings.",
+      "WALL_LEDGE": "Ledge",
+      "WALL_LEDGE_HINT": "Treat this wall as the edge of a ledge. Creatures on either side get terrain cover based on how much of them the edge hides, using the wall cover thresholds.",
+      "WALL_LEDGE_ELEVATION": "Ledge elevation (ft)",
+      "WALL_LEDGE_BADGE": "LEDGE {elevation} ft",
+      "WALL_LEDGE_BADGE_AUTO": "LEDGE (auto)",
+      "WALL_LEDGE_ELEVATION_HINT": "Elevation of the top of the ledge. Leave blank to use the higher creature's elevation.",
       "ENCOUNTER_FILTER_TEXT": "Show only encounter tokens",
       "CEASELESS_SHADOWS_UPGRADE_TOOLTIP": "{FEAT}: {FROM} → {TO} (feat upgrade)",
       "COVER_OVERRIDE": "Cover Override",

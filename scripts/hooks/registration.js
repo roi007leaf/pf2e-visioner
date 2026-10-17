@@ -39,6 +39,8 @@ import {
   registerTimedOverrideHooks,
 } from './startup-managers.js';
 import { handleWallCreated, handleWallDeleted, handleWallUpdated } from '../services/Walls/wall-lifecycle.js';
+import { registerLedgeWallColor } from '../cover/ledge/ledge-wall-color.js';
+import { registerLedgeWallBadgeHooks } from '../cover/ledge/ledge-wall-badge.js';
 import { prepareDoorScentRenderTransition } from '../services/door-state-visibility-refresh.js';
 import {
   handleAvsBatchCompleteRefresh,
@@ -124,6 +126,8 @@ export async function registerHooks() {
   // UI hues
   registerUIHooks();
   registerHiddenTileHooks();
+  registerLedgeWallColor();
+  registerLedgeWallBadgeHooks();
   registerCombatHooks();
   await initializeDeferredSeekManager();
   AutoCoverHooks.registerHooks();

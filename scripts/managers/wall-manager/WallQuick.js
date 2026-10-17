@@ -6,6 +6,7 @@ import { MODULE_ID } from '../../constants.js';
 import { loadDialogCSS, loadSharedUICSS } from '../../css-loader.js';
 import { readDoorPeekGeometry } from '../../services/Peek/peek-door-dc.js';
 import { DoorSoundEditor } from './DoorSoundEditor.js';
+import { buildLedgeFlagPatch, getLedgeElevation, isLedgeWall } from '../../cover/ledge/ledge-walls.js';
 
 export class VisionerWallQuickSettings extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -61,6 +62,8 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       hiddenWallsEnabled,
       hiddenWall: !!hiddenWall,
       blocksScent: d?.getFlag?.(MODULE_ID, 'blocksScent') === true,
+      ledge: isLedgeWall(d),
+      ledgeElevation: getLedgeElevation(d) ?? '',
       isDoor: this._isDoor(),
       slowDoorSounds: d?.getFlag?.(MODULE_ID, 'slowDoorSounds') === true,
       slowDoorSoundPath: d?.getFlag?.(MODULE_ID, 'slowDoorSoundPath') ?? '',
@@ -89,6 +92,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
 
     this._bindHiddenWallSectionToggle(content);
     this._bindPeekOptionsToggle(content);
+    this._bindLedgeOptionsToggle(content);
 
     // Add event listeners for cover override functionality
     this._bindCoverOverrideListeners(content);
@@ -104,6 +108,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
       const root = this.element;
       this._bindHiddenWallSectionToggle(root);
       this._bindPeekOptionsToggle(root);
+      this._bindLedgeOptionsToggle(root);
 
       // Bind cover override listeners
       this._bindCoverOverrideListeners(root);
@@ -152,6 +157,19 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     checkbox.addEventListener('change', sync);
   }
 
+  _bindLedgeOptionsToggle(root) {
+    const checkbox = root?.querySelector?.('input[name="ledge"]');
+    const options = root?.querySelector?.('.pv-ledge-options');
+    if (!checkbox || !options) return;
+    const sync = () => {
+      options.hidden = !checkbox.checked;
+    };
+    sync();
+    if (checkbox.dataset.pf2eVisionerLedgeToggleBound === 'true') return;
+    checkbox.dataset.pf2eVisionerLedgeToggleBound = 'true';
+    checkbox.addEventListener('change', sync);
+  }
+
   _bindCoverOverrideListeners(root) {
     try {
       // Bind cover override buttons
@@ -192,6 +210,7 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
     const entries = Object.fromEntries(fd.entries());
     const patch = { _id: app.wall.id };
     patch[`flags.${MODULE_ID}.blocksScent`] = fd.has('blocksScent');
+    Object.assign(patch, buildLedgeFlagPatch(fd.has('ledge'), entries.ledgeElevation));
     if (app._isDoor()) {
       patch[`flags.${MODULE_ID}.slowDoorSounds`] = fd.has('slowDoorSounds');
       // Native file-picker is a custom form control; plain FormData does not
@@ -233,10 +252,28 @@ export class VisionerWallQuickSettings extends foundry.applications.api.Applicat
         .filter((s) => !!s);
       patch[`flags.${MODULE_ID}.connectedWalls`] = arr;
     }
-    await app.wall.parent?.updateEmbeddedDocuments?.('Wall', [patch], { diff: false });
+    const applied = await app._applyPatchToTargetWalls(patch);
+    if (!applied) return;
     try {
       await app.close();
     } catch (_) {}
+  }
+
+  _targetWallIds() {
+    if (this.wall?.id) return [this.wall.id];
+    return (canvas?.walls?.controlled ?? []).map((w) => w?.document?.id).filter(Boolean);
+  }
+
+  async _applyPatchToTargetWalls(patch) {
+    const ids = this._targetWallIds();
+    if (!ids.length) {
+      ui.notifications?.warn?.(game.i18n.localize('PF2E_VISIONER.UI.WALL_QUICK_NO_WALLS_SELECTED'));
+      return false;
+    }
+    const scene = this.wall?.id ? this.wall.parent : canvas?.scene;
+    const updates = ids.map((id) => ({ ...patch, _id: id }));
+    await scene?.updateEmbeddedDocuments?.('Wall', updates, { diff: false });
+    return true;
   }
 
   static async _onClose(_event, _button) {
