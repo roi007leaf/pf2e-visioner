@@ -4,6 +4,7 @@ import { FeatsHandler } from '../../../chat/services/FeatsHandler.js';
 import { applyActiveSceneHearingRangeLimit } from '../../../services/scene-hearing-range.js';
 import { SensePrecomputer } from '../../../services/SensePrecomputer.js';
 import { LevelsIntegration } from '../../../services/LevelsIntegration.js';
+import { isTokenSightBlockedByLedge } from '../../../cover/ledge/ledge-vision.js';
 import { sceneDistanceToPixels } from '../../../helpers/geometry-utils.js';
 import { getLogger } from '../../../utils/logger.js';
 import { getCacheInvalidationRevision } from '../../../utils/cache-invalidation.js';
@@ -268,6 +269,7 @@ function hasCoreLosFromControlledObserver(observerToken, targetToken) {
       const collision = levels.get3DCollisionDetails(observerToken, targetToken, 'sight');
       if (collision.surfaceCollision || collision.levelInclusionCollision) return false;
     }
+    if (isTokenSightBlockedByLedge(observerToken, targetToken)) return false;
 
     return sources.some((source) =>
       points.some(

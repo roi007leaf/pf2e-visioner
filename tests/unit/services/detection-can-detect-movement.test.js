@@ -9,9 +9,13 @@ async function loadWrapper({
   threshold = 'hidden',
   reachesThreshold = false,
   avsActiveGivenCombatGate = true,
+  ledgeBlocks = false,
 }) {
   let wrapper;
   await jest.isolateModulesAsync(async () => {
+    jest.doMock('../../../scripts/cover/ledge/ledge-vision.js', () => ({
+      isTokenSightBlockedByLedge: jest.fn(() => ledgeBlocks),
+    }));
     jest.doMock('../../../scripts/services/gm-vision-bypass.js', () => ({
       shouldBypassAvsForGmVision: jest.fn(() => false),
     }));
@@ -312,6 +316,31 @@ describe('move-aware _canDetect (createCanDetectVisibilityWrapper)', () => {
       });
       const { result } = callWrapper(wrapper, 'basicSight', false, npcTarget());
       expect(result).toBe(true);
+    });
+  });
+
+  describe('during movement with a ledge hiding the target', () => {
+    test.each(['undetected', 'hidden', 'observed'])(
+      '%s + basicSight + core true -> false (core sight sees through ledge walls)',
+      async (visibility) => {
+        const wrapper = await loadWrapper({
+          hasActivePendingTokenMovement: true,
+          visibility,
+          threshold: 'hidden',
+          ledgeBlocks: true,
+        });
+        expect(callWrapper(wrapper, 'basicSight', true, npcTarget()).result).toBe(false);
+      },
+    );
+
+    test('hidden + hearing -> true (ledges do not block sound)', async () => {
+      const wrapper = await loadWrapper({
+        hasActivePendingTokenMovement: true,
+        visibility: 'hidden',
+        threshold: 'undetected',
+        ledgeBlocks: true,
+      });
+      expect(callWrapper(wrapper, 'hearing', true, npcTarget()).result).toBe(true);
     });
   });
 

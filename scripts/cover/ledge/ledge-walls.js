@@ -14,6 +14,26 @@ export function getLedgeElevation(wallDoc) {
   return Number.isFinite(value) ? value : null;
 }
 
+let ledgeWallCache = null;
+
+export function getSceneLedgeWalls() {
+  const sceneId = canvas?.scene?.id ?? null;
+  if (ledgeWallCache?.sceneId === sceneId) return ledgeWallCache.walls;
+  const walls = (canvas?.walls?.placeables ?? []).filter((wall) => isLedgeWall(wall?.document));
+  ledgeWallCache = { sceneId, walls };
+  return walls;
+}
+
+export function invalidateLedgeWallCache() {
+  ledgeWallCache = null;
+}
+
+export function registerLedgeWallCacheHooks() {
+  for (const hook of ['canvasReady', 'createWall', 'updateWall', 'deleteWall']) {
+    Hooks.on(hook, invalidateLedgeWallCache);
+  }
+}
+
 export function buildLedgeFlagPatch(ledgeChecked, rawElevation) {
   const text = String(rawElevation ?? '').trim();
   const elevation = text === '' ? null : Number(text);

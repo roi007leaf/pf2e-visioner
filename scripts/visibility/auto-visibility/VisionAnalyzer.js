@@ -34,6 +34,7 @@ import { getLogger } from '../../utils/logger.js';
 import { getCachedSettingValue } from '../../utils/setting-value-cache.js';
 import { SensingCapabilitiesBuilder } from './SensingCapabilitiesBuilder.js';
 import { withNativeVisibilityProbe } from '../../services/Detection/native-visibility-probe.js';
+import { isTokenSightBlockedByLedge } from '../../cover/ledge/ledge-vision.js';
 
 const log = getLogger('VisionAnalyzer');
 
@@ -252,6 +253,10 @@ export class VisionAnalyzer {
           return false;
         }
       }
+    }
+
+    if (isTokenSightBlockedByLedge(observer, target, { origin: observerPeek?.origin })) {
+      return false;
     }
 
     let stage = 'init';

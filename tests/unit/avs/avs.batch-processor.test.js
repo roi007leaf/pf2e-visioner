@@ -597,6 +597,64 @@ describe('BatchProcessor', () => {
     );
   });
 
+  test('controlled source-polygon LOS respects ledge blocking', async () => {
+    const { invalidateLedgeWallCache } = await import('../../../scripts/cover/ledge/ledge-walls.js');
+    const previousControlled = global.canvas.tokens.controlled;
+    const previousEffects = global.canvas.effects;
+    const previousWalls = global.canvas.walls;
+    const previousScene = global.canvas.scene;
+    const observer = makeToken('A', 0, 0);
+    const target = makeToken('B', 100, 0);
+    observer.center = { x: 50, y: 50 };
+    target.center = { x: 150, y: 50 };
+    observer.document.elevation = 20;
+    target.document.elevation = 0;
+    target.document.getVisibilityTestPoints = jest.fn(() => [target.center]);
+    const c = [140, -100, 140, 200];
+    global.canvas.scene = { ...(previousScene || {}), id: 'ledge-batch-scene' };
+    global.canvas.walls = {
+      placeables: [{ id: 'ledge', coords: c, document: { c, flags: { 'pf2e-visioner': { ledge: true, ledgeElevation: 20 } } } }],
+    };
+    invalidateLedgeWallCache();
+    global.canvas.tokens.placeables = [observer, target];
+    global.canvas.tokens.controlled = [observer];
+    global.canvas.effects = {
+      ...(global.canvas.effects || {}),
+      visionSources: new Map([
+        ['A', { active: true, object: observer, los: { contains: jest.fn(() => true) } }],
+      ]),
+      lightSources: new Map(),
+    };
+    processor.maxVisibilityDistance = 100;
+    processor.visionAnalyzer = {
+      hasLineOfSight: jest.fn(() => false),
+      getVisionCapabilities: jest.fn(() => ({
+        sensingSummary: { precise: [], imprecise: [], hearing: null },
+        isDeafened: true,
+      })),
+    };
+    optimizedVisibilityCalculator.calculateVisibilityBetweenTokens.mockResolvedValue('observed');
+    processor.visibilityMapService = {
+      getVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'hidden' } : {})),
+      getDocumentVisibilityMap: jest.fn((token) => (token.document.id === 'A' ? { B: 'hidden' } : {})),
+    };
+
+    let res;
+    try {
+      res = await processor.process(global.canvas.tokens.placeables, new Set(['A']), {});
+    } finally {
+      global.canvas.tokens.controlled = previousControlled;
+      global.canvas.effects = previousEffects;
+      global.canvas.walls = previousWalls;
+      global.canvas.scene = previousScene;
+      invalidateLedgeWallCache();
+    }
+
+    expect(res.updates).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ observer, target, visibility: 'observed' })]),
+    );
+  });
+
   test.each([false, true])('controlled source-polygon LOS respects surface blocking (%s)', async (surfaceCollision) => {
     const levels = jest.spyOn(LevelsIntegration, 'getInstance').mockReturnValue({
       isActive: true,

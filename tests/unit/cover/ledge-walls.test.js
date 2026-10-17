@@ -3,6 +3,8 @@ import {
   buildLedgeFlagPatch,
   findLedgeCrossings,
   getLedgeElevation,
+  getSceneLedgeWalls,
+  invalidateLedgeWallCache,
 } from '../../../scripts/cover/ledge/ledge-walls.js';
 
 describe('ledge walls', () => {
@@ -25,6 +27,19 @@ describe('ledge walls', () => {
     expect(getLedgeElevation({ flags: { 'pf2e-visioner': { ledgeElevation: 10 } } })).toBe(10);
     expect(getLedgeElevation({ flags: { 'pf2e-visioner': { ledgeElevation: null } } })).toBeNull();
     expect(getLedgeElevation({ flags: {} })).toBeNull();
+  });
+
+  test('scene ledge walls are cached until invalidated', () => {
+    const ledge = { document: { flags: { 'pf2e-visioner': { ledge: true } } } };
+    const plain = { document: { flags: {} } };
+    canvas.scene = { id: 'scene-1' };
+    canvas.walls.placeables = [ledge, plain];
+    invalidateLedgeWallCache();
+    expect(getSceneLedgeWalls()).toEqual([ledge]);
+    canvas.walls.placeables = [plain];
+    expect(getSceneLedgeWalls()).toEqual([ledge]);
+    invalidateLedgeWallCache();
+    expect(getSceneLedgeWalls()).toEqual([]);
   });
 
   test('findLedgeCrossings returns edge position and elevation of crossed ledges only', () => {

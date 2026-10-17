@@ -72,13 +72,22 @@ export function changeAffectsVisibility(changeData, hasProperty) {
   return changeAffectsAnyField(changeData, LIGHT_VISIBILITY_FIELDS, hasProperty);
 }
 
+const VISIONER_LOS_WALL_FLAGS = ['blocksScent', 'ledge', 'ledgeElevation'];
+
+function changeAffectsVisionerWallFlag(changeData, flag) {
+  const visionerFlags = changeData.flags?.['pf2e-visioner'] ?? {};
+  return (
+    Object.hasOwn(changeData, `flags.pf2e-visioner.${flag}`) ||
+    Object.hasOwn(changeData, `flags.pf2e-visioner.-=${flag}`) ||
+    Object.hasOwn(visionerFlags, flag) ||
+    Object.hasOwn(visionerFlags, `-=${flag}`)
+  );
+}
+
 export function changeAffectsLineOfSight(changeData, hasProperty) {
-  if (changeData && (
-    Object.hasOwn(changeData, 'flags.pf2e-visioner.blocksScent') ||
-    Object.hasOwn(changeData, 'flags.pf2e-visioner.-=blocksScent') ||
-    Object.hasOwn(changeData.flags?.['pf2e-visioner'] ?? {}, 'blocksScent') ||
-    Object.hasOwn(changeData.flags?.['pf2e-visioner'] ?? {}, '-=blocksScent')
-  )) return true;
+  if (changeData && VISIONER_LOS_WALL_FLAGS.some((flag) => changeAffectsVisionerWallFlag(changeData, flag))) {
+    return true;
+  }
   return changeAffectsAnyField(changeData, WALL_LOS_FIELDS, hasProperty);
 }
 

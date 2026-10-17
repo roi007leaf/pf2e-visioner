@@ -14,6 +14,7 @@ import {
 import { isSelectAllTokenVisibilityBypassActive } from './select-all-token-visibility-bypass.js';
 import { isPartyActorToken } from '../../utils/token-actor.js';
 import { isNativeVisibilityProbe } from './native-visibility-probe.js';
+import { isTokenSightBlockedByLedge } from '../../cover/ledge/ledge-vision.js';
 
 export function createCanDetectVisibilityWrapper(threshold) {
   return function wrapCanDetectVisibility(wrapped, visionSource, target, ...args) {
@@ -82,6 +83,8 @@ function hasUndetectedAvsOverride(observer, target) {
 
 function resolveDetectionDuringMovement(observer, target, visibility, modeId, canDetect) {
   if (isPartyActorToken(observer) || isPartyActorToken(target)) return false;
+  const visualMode = !!modeId && !NON_VISUAL_DETECTION_MODE_IDS.has(modeId);
+  if (visualMode && isTokenSightBlockedByLedge(observer, target)) return false;
   if (visibility === 'undetected' || visibility === 'unnoticed') {
     if (targetIsLootOrHazard(target)) return false;
     if (hasUndetectedAvsOverride(observer, target)) return false;
