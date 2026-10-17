@@ -689,6 +689,10 @@
         "name": "Zezwól na podpowiedzi dla gracza",
         "hint": "Po włączeniu tej opcji gracze mogą zobaczyć podpowiedzi dotyczące widoczności z własnej perspektywy po najechaniu kursorem na tokeny."
       },
+      "TOOLTIP_BADGE_OPENS_MANAGER": {
+        "name": "Odznaki podpowiedzi otwierają menedżer żetonów",
+        "hint": "Kliknięcie odznaki podpowiedzi otwiera Menedżer żetonów Visioner. Po wyłączeniu odznaki ignorują kursor, a kliknięcia trafiają do żetonu pod spodem (etykiety odznak nie są wyświetlane)."
+      },
       "TOOLTIP_FONT_SIZE": {
         "name": "Rozmiar podpowiedzi",
         "hint": "Wybierz rozmiar podpowiedzi (wpływa na rozmiar ikony i obramowania; tekst dostosowuje się odpowiednio)",

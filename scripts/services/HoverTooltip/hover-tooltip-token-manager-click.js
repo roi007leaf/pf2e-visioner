@@ -1,3 +1,5 @@
+import { MODULE_ID } from '../../constants.js';
+
 const DEFAULT_MAX_HIGHLIGHT_RETRIES = 30;
 const DEFAULT_HIGHLIGHT_RETRY_DELAY_MS = 50;
 
@@ -111,4 +113,17 @@ export function scheduleTokenManagerRowHighlight({
   };
 
   highlightRow();
+}
+
+export function tooltipBadgeOpensManager(settings = globalThis.game?.settings) {
+  try {
+    return settings?.get?.(MODULE_ID, 'tooltipBadgeOpensManager') !== false;
+  } catch (_) {
+    return true;
+  }
+}
+
+export function makeTooltipBadgeClickThrough(badgeElement) {
+  badgeElement.style.pointerEvents = 'none';
+  badgeElement.style.cursor = '';
 }

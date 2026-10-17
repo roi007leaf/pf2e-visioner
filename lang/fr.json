@@ -416,6 +416,10 @@
         "name": "Permet les infobulles pour les joueurs",
         "hint": "Lorsque c'est activé, les joueurs euvent vois les indications de visibilité de leur perspective au survol des jetons (nécessite un redémarrage)"
       },
+      "TOOLTIP_BADGE_OPENS_MANAGER": {
+        "name": "Les badges d'infobulle ouvrent le gestionnaire de jetons",
+        "hint": "Cliquer sur un badge d'infobulle de survol ouvre le gestionnaire de jetons Visioner. Désactivé, les badges ignorent le pointeur et les clics atteignent le jeton en dessous (les libellés de survol des badges ne s'affichent pas)."
+      },
       "TOOLTIP_FONT_SIZE": {
         "name": "Taille de l'infobulle",
         "hint": "Choisissez la taille de l'infobulle (affecte la taille de l'icône et de la bordure. Le texte s'ajuste en conséquence)",

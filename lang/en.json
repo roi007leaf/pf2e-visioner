@@ -730,6 +730,10 @@
         "name": "Allow Player Tooltips",
         "hint": "When enabled, players can see visibility indication tooltips from their perspective when hovering over tokens"
       },
+      "TOOLTIP_BADGE_OPENS_MANAGER": {
+        "name": "Tooltip Badges Open Token Manager",
+        "hint": "Clicking a hover tooltip badge opens the Visioner Token Manager. When off, badges ignore the pointer so clicks reach the token underneath (badge hover labels are not shown)."
+      },
       "TOOLTIP_FONT_SIZE": {
         "name": "Tooltip Size",
         "hint": "Choose tooltip size (affects icon and border size; text adjusts accordingly)",

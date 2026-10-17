@@ -615,6 +615,16 @@ export const DEFAULT_SETTINGS = {
     default: 'medium',
   },
 
+  tooltipBadgeOpensManager: {
+    name: 'PF2E_VISIONER.SETTINGS.TOOLTIP_BADGE_OPENS_MANAGER.name',
+    hint: 'PF2E_VISIONER.SETTINGS.TOOLTIP_BADGE_OPENS_MANAGER.hint',
+    scope: 'client',
+    config: true,
+    restricted: false,
+    type: Boolean,
+    default: true,
+  },
+
   // AVS changes indicator floating button size
   avsChangesIndicatorSize: {
     name: 'PF2E_VISIONER.SETTINGS.AVS_CHANGES_INDICATOR_SIZE.name',

@@ -52,7 +52,9 @@ import {
 } from './HoverTooltip/hover-tooltip-size-settings.js';
 import {
   buildTooltipTokenManagerRequest,
+  makeTooltipBadgeClickThrough,
   scheduleTokenManagerRowHighlight,
+  tooltipBadgeOpensManager,
 } from './HoverTooltip/hover-tooltip-token-manager-click.js';
 import {
   getTooltipSuppressedSenses,
@@ -1103,6 +1105,10 @@ function showKeyboardVisibilityOverlay({ mode, tokens, markInitialized = false }
  */
 function addBadgeClickHandler(badgeElement, observerToken, targetToken, mode, actualTarget = null) {
   if (!badgeElement) return;
+  if (!tooltipBadgeOpensManager()) {
+    makeTooltipBadgeClickThrough(badgeElement);
+    return;
+  }
 
   badgeElement.addEventListener('click', async (event) => {
     event.preventDefault();

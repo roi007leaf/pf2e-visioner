@@ -1,5 +1,11 @@
 # Changelog
 
+## [8.13.2] - 2026-10-17
+
+### Added
+
+- New client setting **Tooltip Badges Open Token Manager** (on by default). Turn it off to make hover tooltip badges click-through, so clicking a badge selects the token underneath instead of opening the Token Manager. Badge hover labels are not shown while it is off.
+
 ## [8.13.1] - 2026-10-15
 
 ### Fixed
